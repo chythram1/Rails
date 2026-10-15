@@ -1,0 +1,93 @@
+import { useState } from "react";
+import { Boxes, CircleGauge, FolderOpen, FolderPlus, Plus } from "lucide-react";
+import type { SessionSummary } from "@rails/shared";
+import { href, type Route } from "../router.ts";
+import { useStore } from "../store.tsx";
+import { timeAgo } from "../util.ts";
+import { AddProjectDialog } from "./AddProjectDialog.tsx";
+import { ProviderIcon } from "./ProviderIcon.tsx";
+
+const PAGE = 5;
+
+export function Sidebar({ route }: { route: Route }) {
+  const { projects, sessions, connected, live } = useStore();
+  const [adding, setAdding] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const activeKey = route.name === "session" ? route.key : undefined;
+
+  return (
+    <aside className="sidebar">
+      <div className="brand">rails</div>
+      <nav className="nav">
+        <a className={"nav-item" + (route.name === "home" && !route.projectId ? " primary" : "")} href={href.home()}>
+          <Plus size={18} /> New chat
+        </a>
+        <a className={"nav-item" + (route.name === "customize" ? " active" : "")} href="#/customize">
+          <Boxes size={18} /> Customize
+        </a>
+        <a className={"nav-item" + (route.name === "automate" ? " active" : "")} href="#/automate">
+          <CircleGauge size={18} /> Automate
+        </a>
+      </nav>
+
+      <div className="section-head">
+        <span>Projects</span>
+        <button className="icon-btn" aria-label="Add project" title="Add project" onClick={() => setAdding(true)}>
+          <FolderPlus size={16} />
+        </button>
+      </div>
+
+      <div className="tree">
+        {projects.length === 0 && (
+          <button className="empty-hint" onClick={() => setAdding(true)}>
+            Add a project folder to see its agent sessions.
+          </button>
+        )}
+        {projects.map((p) => {
+          const list = sessions[p.id] ?? [];
+          const shown = expanded[p.id] ? list : list.slice(0, PAGE);
+          return (
+            <div key={p.id} className="project">
+              <div className="project-row">
+                <a className="project-name" href={href.home(p.id)} title={p.path}>
+                  <FolderOpen size={16} /> <span className="truncate">{p.name}</span>
+                </a>
+                <a className="icon-btn" aria-label={`New chat in ${p.name}`} title="New chat" href={href.home(p.id)}>
+                  <Plus size={16} />
+                </a>
+              </div>
+              {shown.map((s) => (
+                <SessionRow key={s.key} s={s} projectId={p.id} active={s.key === activeKey} pending={live.get(s.key)?.pending ?? 0} />
+              ))}
+              {list.length > PAGE && (
+                <button className="more" onClick={() => setExpanded((e) => ({ ...e, [p.id]: !e[p.id] }))}>
+                  {expanded[p.id] ? "Show less" : `Show ${list.length - PAGE} more`}
+                </button>
+              )}
+              {list.length === 0 && <div className="muted small indent">No sessions yet</div>}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="sidebar-foot">
+        <span className={"dot " + (connected ? "on" : "off")} aria-hidden />
+        {connected ? "Connected" : "Reconnecting…"}
+        <span className="muted"> · {location.hostname}</span>
+      </div>
+      {adding && <AddProjectDialog onClose={() => setAdding(false)} />}
+    </aside>
+  );
+}
+
+function SessionRow({ s, projectId, active, pending }: { s: SessionSummary; projectId: string; active: boolean; pending: number }) {
+  const state = pending > 0 ? "attention" : s.liveStatus === "running" || s.liveStatus === "starting" ? "running" : s.liveStatus ? "live" : "idle";
+  return (
+    <a className={"session-row" + (active ? " active" : "")} href={href.session(projectId, s.key)} title={s.title}>
+      <span className={"dot " + state} aria-label={state === "idle" ? undefined : state} />
+      <span className="truncate grow">{s.title}</span>
+      <ProviderIcon provider={s.provider} />
+      <span className="muted small nowrap">{timeAgo(s.updatedAt)}</span>
+    </a>
+  );
+}
