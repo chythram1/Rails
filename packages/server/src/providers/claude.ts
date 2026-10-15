@@ -3,10 +3,9 @@ import { basename, join } from "node:path";
 import type { Message } from "@rails/shared";
 import { CLAUDE_HOME } from "../config.ts";
 import type { DiscoveredSession, DiscoveryAdapter } from "./types.ts";
-import { fileCache, firstLine, headTail, readJsonl, stringifyOutput, walk } from "./util.ts";
+import { cachedScanner, firstLine, headTail, readJsonl, stringifyOutput, walk } from "./util.ts";
 
 const root = join(CLAUDE_HOME, "projects");
-const cache = fileCache<DiscoveredSession | null>();
 
 /** Text of a user entry, or null if it's a tool_result / meta entry. */
 function userText(content: unknown): string | null {
@@ -77,15 +76,15 @@ async function scanFile(file: string): Promise<DiscoveredSession | null> {
   };
 }
 
+const scanFiles = cachedScanner(scanFile);
+
 export const claudeDiscovery: DiscoveryAdapter = {
   id: "claude",
   name: "Claude Code",
   available: () => existsSync(root),
   async scan() {
     // Top-level *.jsonl only; subdirectories hold subagent transcripts.
-    const files = await walk(root, (n) => n.endsWith(".jsonl"), 1);
-    const out = await Promise.all(files.map((f) => cache(f, () => scanFile(f)).catch(() => null)));
-    return out.filter((s): s is DiscoveredSession => !!s);
+    return scanFiles(await walk(root, (n) => n.endsWith(".jsonl"), 1));
   },
   async readTranscript(file) {
     return (await readJsonl(file)).flatMap(normalizeClaude);

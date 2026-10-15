@@ -1,22 +1,30 @@
 import { timingSafeEqual } from "node:crypto";
-import { existsSync, realpathSync, statSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { WebSocketServer } from "ws";
-import { sessionKey, type ProviderId, type SessionSummary } from "@rails/shared";
+import type { ProviderId } from "@rails/shared";
 import { HOST, PORT, TOKEN } from "./config.ts";
 import { projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
 import { LiveHub } from "./live/hub.ts";
-import { discovery, findSession, providerInfo, sessionsFor, suggestions } from "./providers/index.ts";
+import { attachProject, getProject, listProjectSessions, ServiceError } from "./projects.ts";
+import { discovery, findSession, providerInfo, suggestions } from "./providers/index.ts";
 
 const COOKIE = "rails_token";
 const hub = new LiveHub();
 const app = new Hono();
+
+// Services throw ServiceError for expected failures; anything else is a 500 (Hono's default behavior).
+app.onError((err, c) => {
+  if (err instanceof ServiceError) return c.json({ error: err.message }, err.status);
+  console.error(err);
+  return c.text("Internal Server Error", 500);
+});
 
 const tokenOk = (t: string | undefined) => {
   if (!t) return false;
@@ -47,12 +55,7 @@ app.get("/api/projects", (c) => c.json(projects.list()));
 
 app.post("/api/projects", async (c) => {
   const body = await c.req.json<{ path?: string; name?: string }>();
-  if (!body.path) return c.json({ error: "path is required" }, 400);
-  let path = resolve(body.path.replace(/^~(?=\/|$)/, process.env.HOME ?? "~")).replace(/\/+$/, "") || "/";
-  if (!existsSync(path) || !statSync(path).isDirectory()) return c.json({ error: "Not a directory" }, 400);
-  path = realpathSync(path); // agents record the real cwd (e.g. /tmp -> /private/tmp)
-  if (projects.list().some((p) => p.path === path)) return c.json({ error: "Project already attached" }, 409);
-  return c.json(projects.create(body.name?.trim() || basename(path), path), 201);
+  return c.json(attachProject(body.path, body.name), 201);
 });
 
 app.delete("/api/projects/:id", (c) => {
@@ -64,16 +67,9 @@ app.get("/api/project-suggestions", async (c) =>
   c.json(await suggestions(projects.list().map((p) => p.path))),
 );
 
-app.get("/api/projects/:id/sessions", async (c) => {
-  const project = projects.get(c.req.param("id"));
-  if (!project) return c.json({ error: "Not found" }, 404);
-  const found = await sessionsFor(project.path);
-  const out: SessionSummary[] = found.map((s) => {
-    const key = sessionKey(s.provider, s.id);
-    return { key, provider: s.provider, id: s.id, cwd: s.cwd, title: s.title, createdAt: s.createdAt, updatedAt: s.updatedAt, liveStatus: hub.statusOf(key) };
-  });
-  return c.json(out);
-});
+app.get("/api/projects/:id/sessions", async (c) =>
+  c.json(await listProjectSessions(c.req.param("id"), (key) => hub.statusOf(key))),
+);
 
 app.get("/api/sessions/:provider/:id/messages", async (c) => {
   const provider = c.req.param("provider") as ProviderId;
@@ -84,17 +80,11 @@ app.get("/api/sessions/:provider/:id/messages", async (c) => {
 });
 
 // ---- git (read-only) ----
-app.get("/api/projects/:id/git", async (c) => {
-  const project = projects.get(c.req.param("id"));
-  if (!project) return c.json({ error: "Not found" }, 404);
-  return c.json(await gitStatus(project.path));
-});
+app.get("/api/projects/:id/git", async (c) => c.json(await gitStatus(getProject(c.req.param("id")).path)));
 
-app.get("/api/projects/:id/git/diff", async (c) => {
-  const project = projects.get(c.req.param("id"));
-  if (!project) return c.json({ error: "Not found" }, 404);
-  return c.text(await gitDiff(project.path, c.req.query("path") ?? ""));
-});
+app.get("/api/projects/:id/git/diff", async (c) =>
+  c.text(await gitDiff(getProject(c.req.param("id")).path, c.req.query("path") ?? "")),
+);
 
 // ---- static web build (production) ----
 const webDist = join(dirname(fileURLToPath(import.meta.url)), "../../web/dist");

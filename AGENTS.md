@@ -90,6 +90,7 @@ for future ideas, which aren't commitments. `ref/style.png` is the visual refere
 | `packages/shared/src/index.ts` | All domain and wire types, including the WebSocket protocol (`ClientMsg` / `ServerMsg`). No runtime deps. |
 | `packages/server/src/index.ts` | Hono routes, token auth, WebSocket upgrade, static serving in prod. |
 | `packages/server/src/config.ts` | Env vars and paths, plus the token in `~/.rails/config.json`. |
+| `packages/server/src/projects.ts` | Project services (`attachProject`, `getProject`, `listProjectSessions`). `ServiceError` carries an HTTP status, and `app.onError` turns it into a JSON error. |
 | `packages/server/src/db.ts` | SQLite via `node:sqlite`. Only stores projects. |
 | `packages/server/src/git.ts` | Read-only git status and diff through the git CLI. |
 | `packages/server/src/providers/` | One discovery adapter per provider (`scan`, `readTranscript`) that maps native JSONL to `Message`. `index.ts` holds the registry, `LIVE_PROVIDERS` and the project-suggestion logic. |

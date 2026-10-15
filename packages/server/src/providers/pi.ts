@@ -3,10 +3,9 @@ import { join } from "node:path";
 import type { Message } from "@rails/shared";
 import { PI_HOME } from "../config.ts";
 import type { DiscoveredSession, DiscoveryAdapter } from "./types.ts";
-import { fileCache, firstLine, headTail, readJsonl, stringifyOutput, walk } from "./util.ts";
+import { cachedScanner, firstLine, headTail, readJsonl, stringifyOutput, walk } from "./util.ts";
 
 const root = join(PI_HOME, "sessions");
-const cache = fileCache<DiscoveredSession | null>();
 
 const textOf = (content: unknown) =>
   typeof content === "string"
@@ -56,14 +55,14 @@ async function scanFile(file: string): Promise<DiscoveredSession | null> {
   return { provider: "pi", id: s.id, cwd: s.cwd, file, title, createdAt: s.timestamp, updatedAt: mtime.toISOString() };
 }
 
+const scanFiles = cachedScanner(scanFile);
+
 export const piDiscovery: DiscoveryAdapter = {
   id: "pi",
   name: "pi",
   available: () => existsSync(root),
   async scan() {
-    const files = await walk(root, (n) => n.endsWith(".jsonl"), 1);
-    const out = await Promise.all(files.map((f) => cache(f, () => scanFile(f)).catch(() => null)));
-    return out.filter((s): s is DiscoveredSession => !!s);
+    return scanFiles(await walk(root, (n) => n.endsWith(".jsonl"), 1));
   },
   async readTranscript(file) {
     return (await readJsonl(file)).flatMap(normalize);

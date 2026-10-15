@@ -4,10 +4,9 @@ import { join } from "node:path";
 import type { Message } from "@rails/shared";
 import { CODEX_HOME } from "../config.ts";
 import type { DiscoveredSession, DiscoveryAdapter } from "./types.ts";
-import { fileCache, firstLine, headTail, readJsonl, stringifyOutput, walk } from "./util.ts";
+import { cachedScanner, firstLine, headTail, readJsonl, stringifyOutput, walk } from "./util.ts";
 
 const root = join(CODEX_HOME, "sessions");
-const cache = fileCache<DiscoveredSession | null>();
 
 const textOf = (content: unknown) =>
   Array.isArray(content) ? content.map((b: any) => b?.text ?? "").join("\n") : typeof content === "string" ? content : "";
@@ -60,14 +59,14 @@ async function scanFile(file: string): Promise<DiscoveredSession | null> {
   };
 }
 
+const scanFiles = cachedScanner(scanFile);
+
 export const codexDiscovery: DiscoveryAdapter = {
   id: "codex",
   name: "Codex",
   available: () => existsSync(root),
   async scan() {
-    const files = await walk(root, (n) => n.startsWith("rollout-") && n.endsWith(".jsonl"), 4);
-    const out = await Promise.all(files.map((f) => cache(f, () => scanFile(f)).catch(() => null)));
-    return out.filter((s): s is DiscoveredSession => !!s);
+    return scanFiles(await walk(root, (n) => n.startsWith("rollout-") && n.endsWith(".jsonl"), 4));
   },
   async readTranscript(file) {
     return (await readJsonl(file)).flatMap(normalize);

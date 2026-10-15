@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Boxes, CircleGauge, FolderOpen, FolderPlus, Plus } from "lucide-react";
-import type { SessionSummary } from "@rails/shared";
+import type { LiveStatus, SessionSummary } from "@rails/shared";
 import { href, type Route } from "../router.ts";
 import { useStore } from "../store.tsx";
 import { timeAgo } from "../util.ts";
@@ -81,7 +81,7 @@ export function Sidebar({ route }: { route: Route }) {
 }
 
 function SessionRow({ s, projectId, active, pending }: { s: SessionSummary; projectId: string; active: boolean; pending: number }) {
-  const state = pending > 0 ? "attention" : s.liveStatus === "running" || s.liveStatus === "starting" ? "running" : s.liveStatus ? "live" : "idle";
+  const state = rowState(s.liveStatus, pending);
   return (
     <a className={"session-row" + (active ? " active" : "")} href={href.session(projectId, s.key)} title={s.title}>
       <span className={"dot " + state} aria-label={state === "idle" ? undefined : state} />
@@ -90,4 +90,12 @@ function SessionRow({ s, projectId, active, pending }: { s: SessionSummary; proj
       <span className="muted small nowrap">{timeAgo(s.updatedAt)}</span>
     </a>
   );
+}
+
+/** Dot state for a session row: a pending permission request outranks everything else. */
+function rowState(liveStatus: LiveStatus | undefined, pending: number) {
+  if (pending > 0) return "attention";
+  if (liveStatus === "running" || liveStatus === "starting") return "running";
+  if (liveStatus) return "live";
+  return "idle";
 }

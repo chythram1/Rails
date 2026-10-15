@@ -6,6 +6,8 @@ import {
   type ClientMsg,
   type LiveSessionInfo,
   type PermissionMode,
+  type Project,
+  type ProviderId,
   type ServerMsg,
   type SessionKey,
 } from "@rails/shared";
@@ -81,9 +83,7 @@ export class LiveHub {
         this.subs.get(msg.key)?.delete(ws);
         return;
       case "start": {
-        const project = projects.get(msg.projectId);
-        if (!project) throw new Error("Unknown project");
-        if (!LIVE_PROVIDERS.includes(msg.provider)) throw new Error(`${msg.provider} can't run live yet`);
+        const project = liveProject(msg.projectId, msg.provider);
         const id = randomUUID();
         const key = sessionKey(msg.provider, id);
         this.subs.set(key, new Set([ws]));
@@ -96,9 +96,7 @@ export class LiveHub {
         let e = this.sessions.get(msg.key);
         if (!e) {
           const { provider, id } = parseSessionKey(msg.key);
-          if (!LIVE_PROVIDERS.includes(provider)) throw new Error(`${provider} can't run live yet`);
-          const project = projects.get(msg.projectId);
-          if (!project) throw new Error("Unknown project");
+          const project = liveProject(msg.projectId, provider);
           const found = await findSession(provider, id);
           if (!found) throw new Error("Session transcript not found");
           e = this.spawn(msg.key, project.id, found.cwd, msg.mode ?? "default", true);
@@ -162,6 +160,14 @@ export class LiveHub {
   stopAll() {
     for (const e of this.sessions.values()) e.live.stop();
   }
+}
+
+/** The project a live session runs in, after checking that the provider can run live. */
+function liveProject(projectId: string, provider: ProviderId): Project {
+  if (!LIVE_PROVIDERS.includes(provider)) throw new Error(`${provider} can't run live yet`);
+  const project = projects.get(projectId);
+  if (!project) throw new Error("Unknown project");
+  return project;
 }
 
 function send(ws: WebSocket, m: ServerMsg) {

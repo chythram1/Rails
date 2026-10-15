@@ -58,7 +58,7 @@ export function GitPanel({ projectId, refreshKey, onClose }: { projectId: string
         <pre className="diff" aria-label={`Diff of ${file}`}>
           {diff
             ? diff.split("\n").map((l, i) => (
-                <div key={i} className={l.startsWith("+") && !l.startsWith("+++") ? "add" : l.startsWith("-") && !l.startsWith("---") ? "del" : l.startsWith("@@") ? "hunk" : ""}>
+                <div key={i} className={diffLineClass(l)}>
                   {l || " "}
                 </div>
               ))
@@ -69,4 +69,19 @@ export function GitPanel({ projectId, refreshKey, onClose }: { projectId: string
   );
 }
 
-const codeClass = (s: string) => (s === "??" ? "new" : s.includes("D") ? "del" : s.includes("A") ? "new" : "mod");
+/** Colour class for a porcelain XY status code. */
+function codeClass(status: string) {
+  if (status === "??") return "new";
+  if (status.includes("D")) return "del";
+  if (status.includes("A")) return "new";
+  return "mod";
+}
+
+/** Colour class for one line of unified diff output. File headers (+++ / ---) stay uncoloured. */
+function diffLineClass(line: string) {
+  if (line.startsWith("+++") || line.startsWith("---")) return "";
+  if (line.startsWith("+")) return "add";
+  if (line.startsWith("-")) return "del";
+  if (line.startsWith("@@")) return "hunk";
+  return "";
+}

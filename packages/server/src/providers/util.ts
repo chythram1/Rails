@@ -1,5 +1,6 @@
 import { open, readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
+import type { DiscoveredSession } from "./types.ts";
 
 const CHUNK = 64 * 1024;
 
@@ -71,6 +72,15 @@ export function fileCache<T>() {
     const value = await compute();
     cache.set(file, { key, value });
     return value;
+  };
+}
+
+/** Scan files with `scanFile`, caching each result by (mtime, size). Unreadable or unrecognized files are skipped. */
+export function cachedScanner(scanFile: (file: string) => Promise<DiscoveredSession | null>) {
+  const cache = fileCache<DiscoveredSession | null>();
+  return async (files: string[]): Promise<DiscoveredSession[]> => {
+    const out = await Promise.all(files.map((f) => cache(f, () => scanFile(f)).catch(() => null)));
+    return out.filter((s): s is DiscoveredSession => !!s);
   };
 }
 
