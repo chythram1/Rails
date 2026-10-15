@@ -106,11 +106,11 @@ for future ideas, which aren't commitments. `ref/style.png` is the visual refere
 - **UI:** reuse the tokens in `styles.css`, use `lucide-react` for icons and `ProviderIcon` for agent logos. The `better-*` skills in `.agents/skills/` cover UI review work.
 
 ## Commands and verification
-- `npm install`, then `npm run dev`: server on :4317, Vite on :5173. Open the printed `?token=` URL.
-- `npm run typecheck` must pass. `npm run build && npm start` runs prod, where the server serves `web/dist`.
+- `make` lists the targets, which wrap the npm scripts. `make dev` runs the server on :4317 and Vite on :5173. Open the printed `?token=` URL.
+- `make typecheck` must pass. `make start` builds and runs prod, where the server serves `web/dist`. `make token` prints the access token.
 - There's no automated test suite yet. Verify with typecheck, `curl` against the API and a browser check. Don't add a test framework without asking.
-- Use throwaway state with `RAILS_HOME=/tmp/x RAILS_TOKEN=t`. For `curl`, log in first with `POST /api/auth/login {"token":…}` and keep the cookie.
-- Browser testing on this machine: use `agent-browser-remote` (see the global AGENTS.md). Start dev with `RAILS_HOST=0.0.0.0` and open `http://100.101.76.38:5173/?token=…`. The mac-mini reaches it over Tailscale.
+- Use throwaway state with `make dev-tmp` (LAN-reachable, `/tmp/rails-dev`, token `t`) or `RAILS_HOME=/tmp/x RAILS_TOKEN=t`. For `curl`, log in first with `POST /api/auth/login {"token":…}` and keep the cookie.
+- Browser testing on this machine: use `agent-browser-remote` (see the global AGENTS.md). Start dev with `make dev-tmp` (or `make dev-lan`) and open `http://100.101.76.38:5173/?token=…`. The mac-mini reaches it over Tailscale.
 - Live Claude tests run real agents with your Claude login. Use a scratch directory and delete the transcripts they leave in `~/.claude/projects/` afterwards.
 
 ## Invariants
