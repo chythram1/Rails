@@ -2,13 +2,11 @@
 
 None of this is fixed. Move items here as they firm up, and record real decisions as ADRs.
 
-Scope: rails supports exactly three coding agents, Claude Code, Codex and pi. The goal is the best
-possible chat support for these three, not adding more providers.
+Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
 
 ## Next
-- Provider icons: the sidebar session rows now show the official logos (`ProviderIcon`, with sources in
-  `packages/web/src/assets/providers/README.md`). Possible next step: use them in the home cards, the
-  session header and the agent picker too. The picker would need a custom dropdown.
+- Provider logos in the home cards, session header and agent picker (the sidebar already has them; the
+  picker needs a custom dropdown)
 - Live adapters for pi (`--mode rpc`) and codex (`app-server`)
 - Live-tail transcripts of sessions running outside rails (read-only mirror)
 - Git actions: stage/commit, branch, and a worktree per session
@@ -18,7 +16,7 @@ possible chat support for these three, not adding more providers.
 ## Later
 - **Customize:** agent profiles (model, system prompt, tools, permission mode)
 - **Automate:** saved prompts on a schedule or trigger (PR opened, Slack mention), with run history
-  (see the "Pinned automations" cards in `style.png`)
+  (see the "Pinned automations" cards in `ref/style.png`)
 - **Custom harness:** rails' own agent loop as an additional provider
 - **Home agent:** a lean, always-on agent native to rails (likely the harness's first user, possibly as a
   `rails` provider). It manages things across all projects and can work from `~`.
@@ -28,6 +26,6 @@ possible chat support for these three, not adding more providers.
   - Every message it sends is labeled in the UI as coming from the home agent.
   - Open question: messaging a non-live (discovered) session would resume it, which starts a process.
     The suggested default is live sessions only; the alternative is "resume if needed". Not decided yet.
-  - Prep: keep server logic in plain service functions so it can be exposed as agent tools later.
+  - Prep: server logic stays in plain service functions (an AGENTS.md invariant) so it can become agent tools.
 - Plugins and MCP server management
 - Multi-user accounts, remote runners

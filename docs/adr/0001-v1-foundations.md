@@ -12,7 +12,7 @@ These were decided in the initial design interview. Each one can be revisited in
 3. **Discovery is read-only, and resume happens in the app.** rails scans provider transcript stores, shows
    their history, and resumes a session by starting the provider with its resume id. It does not live-mirror
    sessions running in someone else's terminal in v1.
-4. **First milestone:** UI shell modeled on `style.png`, projects attached by directory, discovery for
+4. **First milestone:** UI shell modeled on `ref/style.png`, projects attached by directory, discovery for
    claude, pi, and codex, transcript viewing, and live chat and resume for **Claude only**.
 5. **Single user with access-token auth.** Binds localhost by default. LAN or Tailscale is opt-in.
 6. **Shared live view.** The server owns agent processes. Every connected client sees and can drive the

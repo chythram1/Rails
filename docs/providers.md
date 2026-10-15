@@ -13,7 +13,9 @@ Formats change between provider versions, so parsers should skip unknown lines.
   - `custom-title {customTitle}` and `summary {summary}` hold the session title.
   - Also seen (ignored): `attachment`, `queue-operation`, `file-history-snapshot`, `system`, `last-prompt`, `agent-name`, `cost-state`, `mode`, `permission-mode`.
 - Common fields: `uuid`, `parentUuid`, `timestamp`, `cwd`, `sessionId`, `gitBranch`, `isSidechain`. Skip lines with `isSidechain: true`, which are subagent traffic.
-- Resume live with the Agent SDK: `query({ prompt, options: { resume: sessionId, cwd } })`.
+- Lines with `isMeta: true` and user text starting with `<command-`, `<local-command` or `<system-reminder` are harness noise and get skipped.
+- Live: the Agent SDK streams the same `user` / `assistant` shapes, and their `uuid` matches the transcript entry (verified), so one normalizer (`normalizeClaude`) handles both.
+- Resume: `query({ prompt, options: { resume: sessionId, cwd } })`. New: `options.sessionId = <uuid>` so rails knows the id up front.
 
 ## pi — `~/.pi/agent/sessions/--<cwd with / → ->--/<iso>_<sessionId>.jsonl`
 
@@ -24,6 +26,9 @@ Formats change between provider versions, so parsers should skip unknown lines.
   - `toolResult`: `{toolCallId, toolName, content:[{type:'text',text}], isError}`
   - `system`: ignored
 - Other lines (ignored for now): `model_change`, `thinking_level_change`, `usage`, `custom`, `custom_message`.
+- Title: the scanner reads `session_info.name` if it exists, otherwise the first user message. **Unverified**:
+  no local transcript contains a `session_info` line yet, so check pi's source before relying on it.
+- User text can begin with a `<skill name="…">…</skill>` wrapper. Titles render it as `/<skill> rest`.
 - Entries form a tree through `id` / `parentId`. v1 renders them in file order.
 - Live (planned): `pi --mode rpc --session <id>`.
 

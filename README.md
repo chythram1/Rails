@@ -17,5 +17,8 @@ Status (v1 scaffold):
 - Discovery and transcript viewing for Claude Code, pi, and Codex (Codex is untested)
 - Live chat, resume, tool approvals, and permission modes for Claude Code
 - Read-only git status and diffs
+- Official agent logos in the sidebar
 
-Docs: [architecture](docs/architecture.md) · [glossary](docs/CONTEXT.md) · [decisions](docs/adr) · [roadmap](docs/roadmap.md)
+Docs: [architecture](docs/architecture.md) · [glossary](docs/CONTEXT.md) · [decisions](docs/adr) · [provider formats](docs/providers.md) · [roadmap](docs/roadmap.md)
+
+Working on rails with a coding agent? Start with [AGENTS.md](AGENTS.md).

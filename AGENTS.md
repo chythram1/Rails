@@ -63,39 +63,75 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
 ---
 
 # Project: rails
 
-rails is a self-hosted web app for agentic software development. It works as an agent multiplexer:
-you attach project directories, it discovers existing Claude Code / Codex / pi sessions, and you can
-chat with those agents live from any device. "rails" is just the name. This is **not** Ruby on Rails.
+rails is a self-hosted web app that acts as a multiplexer for coding agents. You attach project
+directories, it finds the Claude Code, Codex and pi sessions that already exist for them, and you can
+read those sessions or chat with the agents live from any device. "rails" is only a name. This is
+**not** Ruby on Rails.
+
+Scope is exactly three agents: Claude Code, Codex and pi (ADR 0002). Put effort into deeper chat
+support for these three, not into adding providers.
 
 ## Read first
-- `docs/CONTEXT.md` is the domain glossary (Project, Provider, Session, Transcript, Adapter, Live session…). Use these terms. Add a new concept there before using it.
-- `docs/architecture.md` covers the layout, runtime picture, provider support matrix, and env vars.
-- `docs/adr/` records decisions. Add a new numbered ADR when you change a foundation instead of silently diverging.
-- `docs/providers.md` has transcript format notes. Update it when you learn something new about a provider format.
-- `docs/roadmap.md` lists non-binding ideas (Customize, Automate, custom harness…).
-- `docs/` is the general store for project knowledge. Put notes there, not in code comments or chat.
+1. `docs/CONTEXT.md` is the glossary. Use its terms (Project, Provider, Session, Transcript, Live session…) in code and UI. Add a new concept there before using it.
+2. `docs/architecture.md` covers the runtime picture, live-session lifecycle, provider support matrix and env vars.
+3. `docs/adr/` holds the decisions. Read the ADRs before changing anything foundational.
 
-## Layout
-- `packages/shared`: wire and domain types only (no runtime deps). Change the protocol here first.
-- `packages/server`: Node + Hono + `ws`, `node:sqlite`, and provider adapters (`src/providers/*`). Live agents are in `src/live/*`.
-- `packages/web`: React + Vite SPA. Plain CSS with tokens in `src/styles.css`, icons from `lucide-react`, hash routing.
+Read these when relevant: `docs/providers.md` before touching a parser or adapter, and `docs/roadmap.md`
+for future ideas, which aren't commitments. `ref/style.png` is the visual reference for the UI (`ref/` is gitignored, so it may be missing in a fresh clone).
 
-## Commands
-- `npm install`, then `npm run dev` (server :4317 + Vite :5173, open the printed `?token=` URL)
-- `npm run typecheck` (must pass), `npm run build && npm start` (prod: server serves `web/dist`)
-- Use `RAILS_HOME=/tmp/x` for throwaway state when testing. `RAILS_HOST=0.0.0.0` exposes it on the LAN or Tailscale.
+## Code map
+| Path | What lives there |
+| --- | --- |
+| `packages/shared/src/index.ts` | All domain and wire types, including the WebSocket protocol (`ClientMsg` / `ServerMsg`). No runtime deps. |
+| `packages/server/src/index.ts` | Hono routes, token auth, WebSocket upgrade, static serving in prod. |
+| `packages/server/src/config.ts` | Env vars and paths, plus the token in `~/.rails/config.json`. |
+| `packages/server/src/db.ts` | SQLite via `node:sqlite`. Only stores projects. |
+| `packages/server/src/git.ts` | Read-only git status and diff through the git CLI. |
+| `packages/server/src/providers/` | One discovery adapter per provider (`scan`, `readTranscript`) that maps native JSONL to `Message`. `index.ts` holds the registry, `LIVE_PROVIDERS` and the project-suggestion logic. |
+| `packages/server/src/live/claude.ts` | `ClaudeLive`: one Claude Agent SDK `query()` per live session, with permission handling. |
+| `packages/server/src/live/hub.ts` | `LiveHub`: owns live sessions and sends their events to every subscribed WebSocket client. |
+| `packages/web/src/` | React SPA. `store.tsx` holds global state, `ws.ts` the shared socket with reconnect, `router.ts` hash routing, `api.ts` the REST client, `styles.css` all CSS (tokens at the top), `components/` the UI. |
+
+## Where to change what
+- **New WebSocket message:** add the type in `shared`, handle it in `LiveHub.handle`, then handle it in the web listener (usually `SessionView.tsx` or `store.tsx`).
+- **New REST endpoint:** put the logic in a service module, add a thin route in `server/src/index.ts`, then add the client method in `web/src/api.ts`.
+- **Make pi or Codex live:** add a class with the same shape as `ClaudeLive` under `live/`, branch on provider in `LiveHub.spawn`, then add the provider to `LIVE_PROVIDERS`. Message ids must match the ones `readTranscript` produces (see Invariants).
+- **Transcript parsing:** edit `providers/<id>.ts`, and update `docs/providers.md` with anything you learn about the format.
+- **UI:** reuse the tokens in `styles.css`, use `lucide-react` for icons and `ProviderIcon` for agent logos. The `better-*` skills in `.agents/skills/` cover UI review work.
+
+## Commands and verification
+- `npm install`, then `npm run dev`: server on :4317, Vite on :5173. Open the printed `?token=` URL.
+- `npm run typecheck` must pass. `npm run build && npm start` runs prod, where the server serves `web/dist`.
+- There's no automated test suite yet. Verify with typecheck, `curl` against the API and a browser check. Don't add a test framework without asking.
+- Use throwaway state with `RAILS_HOME=/tmp/x RAILS_TOKEN=t`. For `curl`, log in first with `POST /api/auth/login {"token":…}` and keep the cookie.
+- Browser testing on this machine: use `agent-browser-remote` (see the global AGENTS.md). Start dev with `RAILS_HOST=0.0.0.0` and open `http://100.101.76.38:5173/?token=…`. The mac-mini reaches it over Tailscale.
+- Live Claude tests run real agents with your Claude login. Use a scratch directory and delete the transcripts they leave in `~/.claude/projects/` afterwards.
 
 ## Invariants
 - Provider transcripts are the source of truth. rails reads them and **never writes** them. The DB only stores projects and settings.
-- The server owns live agent processes. Every WS client subscribed to a session sees the same events. Disconnecting must never kill an agent.
-- Message ids must be stable across the transcript and the live stream. The client dedupes history and live messages by id (Claude: `uuid:blockIndex`).
-- Provider stores can be huge (pi is about 600MB here). Discovery reads only the head and tail of each file, cached by mtime and size. Never read whole files during a scan.
-- The web client must work over plain HTTP on the LAN, so no secure-context-only APIs (for example `crypto.randomUUID`). Use `randomId()` from `src/util.ts`.
-- Keep server logic in plain service functions (`db.ts`, `git.ts`, `providers/*`, `LiveHub`), not inline in Hono route handlers. Routes should only parse input and call services, so the future home agent can reuse those services as tools (see `docs/roadmap.md`).
-- Scope is exactly three coding agents: Claude Code, Codex and pi. Spend effort on deeper chat support for these three, not on adding providers.
-- Only `claude` is live-capable today (`LIVE_PROVIDERS`). pi and codex are discovery and read-only.
-- Test UI with `agent-browser-remote` (see the global AGENTS.md). Run dev with `RAILS_HOST=0.0.0.0` so the mac-mini can reach it over Tailscale.
+- The server owns live agent processes. Every WS client subscribed to a session sees the same events. A client disconnecting must never kill an agent.
+- Message ids must be the same in the transcript and the live stream, because the client dedupes history against live messages by id. Claude uses `<entry uuid>:<blockIndex>`, and the SDK's `uuid` matches the transcript's (verified).
+- Discovery must stay cheap. Provider stores can be huge (pi is about 600MB here), so scans read only the head and tail of each file and cache by mtime and size. Never read whole files during a scan.
+- The web client must work over plain HTTP on the LAN or Tailscale, so don't use secure-context-only browser APIs (for example `crypto.randomUUID`). Use `randomId()` from `web/src/util.ts`.
+- Keep server logic in plain service functions, not inside Hono route handlers. Routes should only parse input and call services, so the future home agent can reuse those services as tools.
+- Project paths are stored as realpaths, because agents record the real cwd (on macOS, `/tmp` is really `/private/tmp`).
+
+## Gotchas
+- Live sessions exist only in server memory. Restarting the server stops them all, and `tsx watch` restarts it on every server file save. The transcripts survive, so the user can resume.
+- Imports use explicit `.ts` / `.tsx` extensions (`allowImportingTsExtensions`). The server runs TypeScript directly through `tsx` and has no build step.
+- Native `<select>` can't show images, so the agent picker shows text.
+- Only `claude` can run live today. pi and Codex are discovery plus read-only transcripts. Codex parsing is written from public docs and hasn't been tested on this machine.
+
+## Keeping docs current
+Update the docs in the same change as the code:
+- Provider capability changes go in the matrix in `architecture.md` and the status list in `README.md`.
+- Format discoveries go in `providers.md`.
+- New terms go in `CONTEXT.md`.
+- New or changed foundations get a new numbered ADR. Never quietly break an existing one.
+- Remove finished items from `roadmap.md`.
+- Keep this file short: a map and rules. Detail belongs in `docs/`.
