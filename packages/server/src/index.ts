@@ -35,6 +35,28 @@ const tokenOk = (t: string | undefined) => {
   return a.length === b.length && timingSafeEqual(a, b);
 };
 
+/**
+ * Whether a browser request comes from the rails page itself. Cookies are shared by every port of a
+ * host (SameSite ignores ports), so without this a page served from any other port, such as another dev
+ * server, could use the login cookie to drive panels. Requests without an Origin (curl) aren't
+ * cross-site browser requests and still need the token.
+ */
+const sameOrigin = (origin: string | undefined, host: string | undefined) => {
+  if (!origin) return true;
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+};
+
+app.use("/api/*", async (c, next) => {
+  if (c.req.method !== "GET" && !sameOrigin(c.req.header("origin"), c.req.header("host"))) {
+    return c.json({ error: "Cross-origin request refused" }, 403);
+  }
+  await next();
+});
+
 // ---- auth ----
 app.post("/api/auth/login", async (c) => {
   const { token } = await c.req.json<{ token?: string }>();
@@ -116,7 +138,8 @@ const wss = new WebSocketServer({ noServer: true });
 server.on("upgrade", (req, socket, head) => {
   const url = new URL(req.url ?? "/", "http://x");
   const cookie = /(?:^|;\s*)rails_token=([^;]+)/.exec(req.headers.cookie ?? "")?.[1];
-  if (url.pathname !== "/ws" || !tokenOk(cookie && decodeURIComponent(cookie))) {
+  const authorized = tokenOk(cookie && decodeURIComponent(cookie)) && sameOrigin(req.headers.origin, req.headers.host);
+  if (url.pathname !== "/ws" || !authorized) {
     socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
     socket.destroy();
     return;
