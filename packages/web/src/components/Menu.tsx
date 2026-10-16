@@ -58,13 +58,23 @@ export function usePopover(align: "left" | "right") {
     return () => document.removeEventListener("pointerdown", onPointer);
   }, [at, close]);
 
-  // Keep the popover on screen (e.g. right-aligned under a trigger in a narrow sidebar), before it's painted.
+  // Keep the popover on screen before it's painted: shift it in from the left/right edge (e.g. a
+  // right-aligned menu in a narrow sidebar), and open it above the trigger if it would run off the
+  // bottom (or pin it to the bottom edge if it fits neither way). Runs after every render, not only on
+  // open, because the content can grow after opening (e.g. the folder list arriving).
   useLayoutEffect(() => {
     const r = panel.current?.getBoundingClientRect();
     if (!at || !r) return;
-    if (r.left < 8) setAt({ top: at.top, left: 8 });
-    else if (r.right > innerWidth - 8) setAt({ top: at.top, left: Math.max(8, innerWidth - 8 - r.width) });
-  }, [at]);
+    let { top } = at;
+    let left = r.left;
+    if (r.left < 8) left = 8;
+    else if (r.right > innerWidth - 8) left = Math.max(8, innerWidth - 8 - r.width);
+    if (r.bottom > innerHeight - 8) {
+      const above = trigger.current!.getBoundingClientRect().top - 6 - r.height;
+      top = above >= 8 ? above : Math.max(8, innerHeight - 8 - r.height);
+    }
+    if (left !== r.left || top !== at.top) setAt({ top, left });
+  });
 
   return { at, trigger, panel, close, toggle };
 }

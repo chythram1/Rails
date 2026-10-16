@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import type { RecentFolder } from "@rails/shared";
 import { api } from "../api.ts";
 import { useStore } from "../store.tsx";
@@ -7,9 +7,15 @@ import { usePopover } from "./Menu.tsx";
 // Last list from the server, so the menu shows folders instantly while it refreshes. Prefetched when the
 // pointer reaches the trigger, so even the first open isn't empty.
 let cache: RecentFolder[] = [];
+let inflight: Promise<void> | null = null;
+/** Refresh the cache; concurrent calls share one request. */
+const refresh = () =>
+  (inflight ??= api
+    .recentFolders()
+    .then((f) => void (cache = f), () => {})
+    .finally(() => (inflight = null)));
 /** Rows shown at once (recent or search matches), so the menu never needs a scrollbar. */
 const MAX_ROWS = 8;
-const prefetch = () => void api.recentFolders().then((f) => (cache = f), () => {});
 
 interface Props {
   /** Accessible name of the trigger button. */
@@ -30,13 +36,15 @@ export function FolderMenu({ label, className, align = "left", children }: Props
   const [folders, setFolders] = useState(cache);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const id = useId();
+  const rowId = (i: number) => `${id}-row-${i}`;
 
   useEffect(() => {
     if (!at) return;
     setQuery("");
     setActive(0);
     setFolders(cache);
-    void api.recentFolders().then((f) => setFolders((cache = f)), () => {});
+    void refresh().then(() => setFolders(cache));
   }, [at]);
 
   const shown = useMemo(() => {
@@ -80,16 +88,22 @@ export function FolderMenu({ label, className, align = "left", children }: Props
         aria-haspopup="dialog"
         aria-expanded={!!at}
         disabled={picking}
-        onPointerEnter={prefetch}
+        onPointerEnter={() => void refresh()}
         onClick={toggle}
       >
         {children}
       </button>
       {at && (
         <div className="menu folder-menu" role="dialog" aria-label={label} ref={panel} style={at}>
+          {/* Focus stays in the search field; arrow keys move the highlight, announced via aria-activedescendant. */}
           <input
             className="folder-search"
             autoFocus
+            role="combobox"
+            aria-expanded
+            aria-controls={`${id}-list`}
+            aria-activedescendant={rowId(Math.min(active, rows - 1))}
+            aria-autocomplete="list"
             placeholder="Search folders…"
             aria-label="Search folders"
             value={query}
@@ -100,11 +114,16 @@ export function FolderMenu({ label, className, align = "left", children }: Props
             onKeyDown={onKey}
           />
           <div className="menu-sep" />
-          <div className="folder-list" role="listbox" aria-label="Recent folders">
-            {!query && shown.length > 0 && <div className="menu-heading">Recent</div>}
+          <div className="folder-list" id={`${id}-list`} role="listbox" aria-label="Folders">
+            {!query && shown.length > 0 && (
+              <div className="menu-heading" role="presentation">
+                Recent
+              </div>
+            )}
             {shown.map((f, i) => (
               <button
                 key={f.path}
+                id={rowId(i)}
                 role="option"
                 aria-selected={i === active}
                 className={i === active ? "active" : undefined}
@@ -116,12 +135,24 @@ export function FolderMenu({ label, className, align = "left", children }: Props
                 {hint(f) && <span className="muted small truncate">{hint(f)}</span>}
               </button>
             ))}
-            {query && shown.length === 0 && <div className="menu-empty">No matching folders</div>}
+            {query && shown.length === 0 && (
+              <div className="menu-empty" role="presentation">
+                No matching folders
+              </div>
+            )}
+            <div className="menu-sep" role="presentation" />
+            <button
+              id={rowId(shown.length)}
+              role="option"
+              aria-selected={active === shown.length}
+              className={active === shown.length ? "active" : undefined}
+              tabIndex={-1}
+              onMouseMove={() => setActive(shown.length)}
+              onClick={() => pick(shown.length)}
+            >
+              Open folder…
+            </button>
           </div>
-          <div className="menu-sep" />
-          <button className={active === shown.length ? "active" : undefined} tabIndex={-1} onMouseMove={() => setActive(shown.length)} onClick={() => pick(shown.length)}>
-            Open folder…
-          </button>
         </div>
       )}
     </>
