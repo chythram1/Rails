@@ -9,7 +9,8 @@
     "dev": "concurrently -k -n server,web -c blue,magenta \"npm:dev -w @rails/server\" \"npm:dev -w @rails/web\"",
     "build": "npm run build -w @rails/web",
     "start": "NODE_ENV=production npm run start -w @rails/server",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "postinstall": "chmod +x node_modules/node-pty/prebuilds/*/spawn-helper 2>/dev/null || true"
   },
   "devDependencies": {
     "concurrently": "^9.2.0",

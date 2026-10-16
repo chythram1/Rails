@@ -1,14 +1,14 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { basename, resolve } from "node:path";
-import { sessionKey, type LiveStatus, type Project, type SessionKey, type SessionSummary } from "@rails/shared";
-import { projects } from "./db.ts";
+import { sessionKey, type Project, type SessionSummary } from "@rails/shared";
+import { layouts, panels, projects } from "./db.ts";
 import { sessionsFor } from "./providers/index.ts";
 
 /** An expected failure with the HTTP status the route should answer with. */
 export class ServiceError extends Error {
   constructor(
     message: string,
-    readonly status: 400 | 404 | 409,
+    readonly status: 400 | 404 | 409 | 503,
   ) {
     super(message);
   }
@@ -32,24 +32,29 @@ export function attachProject(rawPath: string | undefined, name?: string): Proje
 
 /**
  * Remove a project from rails. Transcripts are untouched, so attaching the same path later brings
- * every session back. Refused while the project has live agents, so nothing is stopped by surprise.
+ * every session back. Refused while the project has open panels, so nothing is stopped by surprise.
  */
-export function detachProject(id: string, liveAgents: (projectId: string) => number): void {
+export function detachProject(id: string): void {
   getProject(id);
-  const n = liveAgents(id);
-  if (n > 0) throw new ServiceError(`Stop the ${n} live agent${n === 1 ? "" : "s"} in this project first.`, 409);
+  const n = panels.list(id).length;
+  if (n > 0) throw new ServiceError(`Close the ${n} open panel${n === 1 ? "" : "s"} in this project first.`, 409);
+  layouts.remove(id);
   projects.remove(id);
 }
 
-/** Sessions discovered inside a project's directory, newest first, with live status attached. */
-export async function listProjectSessions(
-  projectId: string,
-  liveStatus: (key: SessionKey) => LiveStatus | undefined,
-): Promise<SessionSummary[]> {
+/** Sessions discovered inside a project's directory, newest first, with their open panel (if any). */
+export async function listProjectSessions(projectId: string): Promise<SessionSummary[]> {
   const project = getProject(projectId);
+  const panelBySession = new Map(panels.list(projectId).map((p) => [p.sessionId, p.id]));
   const found = await sessionsFor(project.path);
-  return found.map((s) => {
-    const key = sessionKey(s.provider, s.id);
-    return { key, provider: s.provider, id: s.id, cwd: s.cwd, title: s.title, createdAt: s.createdAt, updatedAt: s.updatedAt, liveStatus: liveStatus(key) };
-  });
+  return found.map((s) => ({
+    key: sessionKey(s.provider, s.id),
+    provider: s.provider,
+    id: s.id,
+    cwd: s.cwd,
+    title: s.title,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+    panelId: panelBySession.get(s.id),
+  }));
 }

@@ -2,8 +2,8 @@
 
 rails is a self-hosted web app that works as an **agent multiplexer**. You attach local project
 directories, and rails discovers the sessions that existing coding agents (Claude Code, Codex, pi)
-already have on disk for them. You can then read those sessions or resume and chat with them live
-from any device.
+already have on disk for them. Each project has a workspace of terminal panels running the agents'
+own TUIs, which you can split, resize and rearrange, and use from any device (ADR 0003).
 
 Terms are defined in [CONTEXT.md](./CONTEXT.md). Decisions and their reasons are in [adr/](./adr).
 
@@ -12,64 +12,87 @@ Terms are defined in [CONTEXT.md](./CONTEXT.md). Decisions and their reasons are
 ```
 packages/
   shared/   @rails/shared  TypeScript types for the wire protocol + domain (no runtime deps)
-  server/   @rails/server  Node + Hono HTTP API, WebSocket hub, SQLite, provider adapters
-  web/      @rails/web     React + Vite SPA (the UI). Served by Vite in dev, by the server in prod.
+  server/   @rails/server  Node + Hono HTTP API, terminal WebSocket hub, SQLite, tmux, discovery
+  web/      @rails/web     React + Vite SPA: dockview layout + xterm.js terminals. Vite in dev, the server in prod.
 ```
 
 ## Runtime picture
 
 ```
- browser(s) ──HTTP /api/*──▶ Hono (index.ts) ──▶ db.ts `projects` (SQLite ~/.rails/rails.db)
-     ▲                         │
-     │                         ├──▶ providers/{claude,pi,codex}.scan() / readTranscript()
-     │                         │        (reads provider transcript files, read-only)
-     │                         └──▶ git.ts gitStatus() / gitDiff()  (git CLI, read-only)
+ browser(s) ──HTTP /api/*──▶ Hono (index.ts) ──▶ services: projects.ts, panels.ts, git.ts
+     ▲                                             │          │
+     │                                             │          ├─▶ db.ts: projects, panels, layouts (SQLite)
+     │                                             │          └─▶ tmux.ts: new-session / kill / respawn
+     │                                             └─▶ providers/*: scan transcripts (read-only)
      │
-     └────── WS /ws ◀──────── LiveHub (live/hub.ts) ──▶ ClaudeLive (live/claude.ts)
-            subscribe / send / permission              one Claude Agent SDK `query()` per live session,
-            interrupt / stop / setMode                 emits normalized Message + permission events
+     └──── WS /ws ◀── TerminalHub (terminals.ts) ──▶ node-pty: `tmux attach -t p-<panelId>`
+           term.attach / input / resize / detach      one tmux client per (browser, panel)
+
+ tmux server on $RAILS_HOME/tmux.sock
+   session p-<panelId> ──▶ `claude --resume <id>` | `pi --session <id>` | `codex resume <id>` | $SHELL -l
 ```
 
-- **History** comes from the provider transcript, which is the source of truth. The DB stores only
-  projects. A live session's transcript is written by the provider itself, so rails never copies messages.
-- **Live session lifecycle:**
-  - *New chat* (`start`): the server picks the session UUID, starts the SDK with `sessionId: <uuid>`, and
-    immediately replies `session.started` with the final key `claude:<uuid>`. There is no temporary key.
-  - *Resume* (`send` to a key that isn't live): the server finds the transcript, then starts the SDK with
-    `resume: <id>` in the transcript's recorded cwd.
-  - Status moves `starting → running → idle` per turn. `interrupt` cancels the current turn but keeps
-    the process. `stop` ends the process, after which the session drops out of the live list.
-  - Live state, the replay buffer and pending permission requests live only in memory. A server restart
-    stops every live session, but the transcripts stay on disk and can be resumed.
-- **Multi-device:** every WS client subscribed to a session gets the same events. A client that subscribes
-  late gets a `snapshot` with the live buffer and pending permission requests. The client merges
-  transcript history with live messages by id. Closing a browser never stops an agent.
-- **Permissions:** `canUseTool` turns each tool request into a `permission.request` event. The first
-  client to answer wins, and every client gets `permission.resolved`.
+- **History** lives in provider transcripts. rails reads them only for discovery (titles, dates, the
+  sidebar). The agents write their own transcripts while they run in panels.
+- **Panels:** `POST /api/projects/:id/panels` creates a DB row and a detached tmux session running the
+  agent's CLI in the project (or the session's recorded cwd). Claude and pi get their session id up
+  front (`--session-id`), so the panel knows its session immediately. New Codex panels don't know their
+  session id. Opening a session that already has a panel returns that panel and restarts its process
+  if it exited (`tmux respawn-pane`). `DELETE /api/panels/:id` kills the tmux session.
+- **Terminals:** each browser terminal sends `term.attach` with its size; the server spawns
+  `tmux attach` in a PTY for it and streams bytes both ways. Killing that PTY only detaches. tmux
+  `window-size latest` sizes a shared window to the device that typed last.
+- **Exits:** tmux keeps exited panes visible (`remain-on-exit`). While any terminal is attached, the
+  hub polls tmux every 2s and sends `term.exited` for newly dead panes.
+- **Persistence:** panels survive browser disconnects and server restarts (`tsx watch` included).
+  On a reboot the tmux server is gone; the next workspace read drops panels whose tmux session no
+  longer exists. Their transcripts remain, so sessions can be resumed from the sidebar.
+- **Layout:** the web app saves dockview's `toJSON()` per project (`PUT /api/projects/:id/layout`). The
+  server stores it opaquely. The server's panel list is the source of truth: on load the client
+  restores the layout, then adds panels missing from it and removes ones that were closed.
+  `panels.changed` broadcasts keep other devices' panel lists current.
 - **Auth:** one access token, generated on first run into `~/.rails/config.json` or set with `RAILS_TOKEN`.
   `POST /api/auth/login` exchanges it for an httpOnly cookie, and both `/api/*` and the WebSocket
   upgrade check that cookie. The web app also accepts `?token=` once, then removes it from the URL.
-  The server binds `127.0.0.1` by default. Set `RAILS_HOST=0.0.0.0` for LAN or Tailscale access.
-- **Discovery** runs on request (sidebar refresh, about every 20s while the app is open). It scans every
-  provider store and keeps sessions whose cwd is the project directory or inside it. Per-file results
-  are cached by mtime and size.
+  The server binds `127.0.0.1` by default. Panels are full shell access, so set `RAILS_HOST=0.0.0.0`
+  only on networks you trust (LAN, Tailscale).
+- **Environment:** tmux and everything in it get the server's environment minus `RAILS_*` (the token),
+  `npm_*`, `PI_*`, `CLAUDE_CODE_*`, `CLAUDECODE`, `NODE_ENV` and `INIT_CWD`.
+- **Discovery** runs on request (sidebar refresh, about every 20s while the app is open, and after
+  panel changes). It scans every provider store and keeps sessions whose cwd is the project directory
+  or inside it. Per-file results are cached by mtime and size.
 
-## Provider support matrix (v1)
+## Provider support matrix
 
-| Provider | Discovery | Transcript view | Live / resume |
-| --- | --- | --- | --- |
-| claude | ✅ `~/.claude/projects/*/*.jsonl` | ✅ | ✅ via `@anthropic-ai/claude-agent-sdk` |
-| pi | ✅ `~/.pi/agent/sessions/*/*.jsonl` | ✅ | ⏳ planned (`pi --mode rpc`, with `--session <id>` to resume) |
-| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl` (format from docs; untested locally) | ✅ | ⏳ planned (`codex app-server`) |
+| Provider | Discovery | Panels (new / resume) |
+| --- | --- | --- |
+| claude | ✅ `~/.claude/projects/*/*.jsonl` | ✅ `claude --session-id <uuid> [-- prompt]` / `claude --resume <id>` |
+| pi | ✅ `~/.pi/agent/sessions/*/*.jsonl` | ✅ `pi --session-id <uuid> [-- prompt]` / `pi --session <id>` |
+| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl` (format from docs; untested locally) | ⚠️ `codex [-- prompt]` / `codex resume <id>` (untested: Codex isn't installed here) |
 
+A provider is only offered when its CLI is on the server's `PATH` (`ProviderInfo.installed`).
 Transcript format notes are in [providers.md](./providers.md).
+
+## Requirements
+
+- Node 24+ (uses `node:sqlite`), tmux 3.2+ on the server host, and the agents' CLIs on `PATH`.
+  `make system-deps` checks the tmux version and installs tmux with Homebrew, apt or dnf when it's missing;
+  `make dev` / `start` / `install` run it first. Without tmux the server logs a warning at startup and the
+  panel endpoints answer 503 with that hint. It never treats a missing tmux as "no panels".
+- node-pty ships prebuilt binaries only for macOS and Windows. On Linux it compiles during `npm install`
+  (python3, make, a C++ compiler).
+- `npm install` runs a root `postinstall` that marks node-pty's `spawn-helper` executable
+  (without it, spawning fails with `posix_spawnp failed`).
 
 ## Config / env
 
 | Var | Default | Meaning |
 | --- | --- | --- |
-| `RAILS_HOME` | `~/.rails` | DB + config dir |
+| `RAILS_HOME` | `~/.rails` | DB, config, `tmux.sock` and `tmux.conf` |
 | `RAILS_HOST` | `127.0.0.1` | bind address |
 | `RAILS_PORT` | `4317` | server port (Vite dev runs on 5173 and proxies to it) |
 | `RAILS_TOKEN` | generated | access token override |
 | `CLAUDE_HOME` / `PI_HOME` / `CODEX_HOME` | `~/.claude`, `~/.pi/agent`, `~/.codex` | provider store roots |
+
+Attach to a panel from a normal terminal: `tmux -S ~/.rails/tmux.sock ls`, then
+`tmux -S ~/.rails/tmux.sock attach -t p-<panelId>`.

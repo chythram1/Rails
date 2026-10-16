@@ -5,10 +5,11 @@ None of this is fixed. Move items here as they firm up, and record real decision
 Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
 
 ## Next
-- Provider logos in the home cards, session header and agent picker (the sidebar already has them; the
-  picker needs a custom dropdown)
-- Live adapters for pi (`--mode rpc`) and codex (`app-server`)
-- Live-tail transcripts of sessions running outside rails (read-only mirror)
+- Verify Codex panels on a machine with Codex installed; map new Codex panels to their session id
+- "Needs attention" signal for panels (e.g. Claude Code hooks or terminal bell), lost with the chat UI
+- Restart for exited shell panels (agents already resume)
+- Provider logos in the home cards and agent picker (the picker needs a custom dropdown)
+- Adopt sessions running in the user's own terminal (today only panels started by rails are shared)
 - Git actions: stage/commit, branch, and a worktree per session
 - Session search across projects
 - Show the session's model in the composer and let the user pick it
@@ -20,7 +21,8 @@ Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
 - **Custom harness:** rails' own agent loop as an additional provider
 - **Home agent:** a lean, always-on agent native to rails (likely the harness's first user, possibly as a
   `rails` provider). It manages things across all projects and can work from `~`.
-  - Can: read across projects (sessions, transcripts, git status) and message sessions.
+  - Can: read across projects (sessions, transcripts, git status) and message sessions (with panels,
+    that likely means typing into a panel's terminal).
   - Cannot: start sessions. Approving other agents' permission requests may come later, not in v1.
   - Always on means it persists and wakes on messages or events. It doesn't poll.
   - Every message it sends is labeled in the UI as coming from the home agent.

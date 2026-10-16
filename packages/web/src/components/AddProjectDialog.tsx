@@ -28,7 +28,7 @@ export function AddProjectDialog({ onClose }: { onClose: () => void }) {
       const project = await api.addProject(p);
       await refreshProjects();
       onClose();
-      navigate(href.home(project.id));
+      navigate(href.project(project.id));
     } catch (e: any) {
       setError(e.message);
     }

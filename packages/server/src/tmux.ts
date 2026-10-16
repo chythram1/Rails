@@ -1,0 +1,109 @@
+// Every panel's process runs in its own tmux session on a socket private to RAILS_HOME (ADR 0003).
+// Processes therefore outlive the rails server, and each browser attaches as its own tmux client.
+import { execFile } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { promisify } from "node:util";
+import { spawn, type IPty } from "node-pty";
+import { RAILS_HOME } from "./config.ts";
+import { ServiceError } from "./projects.ts";
+
+const run = promisify(execFile);
+
+export const SOCKET = join(RAILS_HOME, "tmux.sock");
+const CONF = join(RAILS_HOME, "tmux.conf");
+
+writeFileSync(
+  CONF,
+  [
+    "set -g status off", // the web UI shows tabs; no tmux status bar
+    "set -g mouse on", // wheel scrolls tmux history (the browser terminal only sees the screen)
+    "set -g history-limit 50000",
+    "set -s escape-time 0", // TUIs need Esc without delay
+    "set -g remain-on-exit on", // keep the last output visible after the process exits
+    "set -g window-size latest", // several devices: the one typing last sets the size
+    'set -g default-terminal "tmux-256color"',
+    'set -as terminal-features ",xterm-256color:RGB"',
+    "set -g focus-events on",
+    "set -s extended-keys on", // pass modified keys (e.g. Shift+Enter) through to the TUIs
+  ].join("\n") + "\n",
+);
+
+/**
+ * Environment for tmux and everything it starts. Drops rails' own and npm's variables (the access
+ * token must not leak into agents) plus markers of a parent agent session.
+ */
+function cleanEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (v === undefined || /^(npm_|RAILS_|PI_|CLAUDE_CODE_)|^(CLAUDECODE|NODE_ENV|INIT_CWD)$/.test(k)) continue;
+    env[k] = v;
+  }
+  env.LANG ??= "en_US.UTF-8"; // tmux only draws UTF-8 when the locale says so
+  return env;
+}
+
+const MISSING = "tmux isn't installed on the server. Run `make system-deps` (or install tmux >= 3.2), then restart rails.";
+
+async function tmux(...args: string[]) {
+  try {
+    return await run("tmux", ["-S", SOCKET, "-f", CONF, ...args], { env: cleanEnv() });
+  } catch (e: any) {
+    if (e?.code === "ENOENT") throw new ServiceError(MISSING, 503);
+    throw e;
+  }
+}
+
+/** tmux's version string, or null when tmux isn't installed. */
+export async function version(): Promise<string | null> {
+  try {
+    return (await run("tmux", ["-V"])).stdout.trim();
+  } catch {
+    return null;
+  }
+}
+
+const sessionName = (panelId: string) => `p-${panelId}`;
+
+/** Start `argv` detached in a new tmux session for the panel. */
+export async function startSession(panelId: string, cwd: string, argv: string[]): Promise<void> {
+  // A single argv entry would go through `sh -c`; several are exec'd as-is (no shell quoting issues).
+  await tmux("new-session", "-d", "-s", sessionName(panelId), "-x", "160", "-y", "48", "-c", cwd, "--", ...argv);
+  await tmux("source-file", CONF); // apply config changes to an already-running tmux server
+}
+
+/** Re-run a panel's (exited) process with a new command, keeping the session and its scrollback. */
+export async function respawn(panelId: string, cwd: string, argv: string[]): Promise<void> {
+  await tmux("respawn-pane", "-k", "-t", sessionName(panelId), "-c", cwd, "--", ...argv);
+}
+
+export async function killSession(panelId: string): Promise<void> {
+  await tmux("kill-session", "-t", sessionName(panelId)).catch(() => {}); // already gone is fine
+}
+
+/** State of every rails tmux session: panel id -> whether its process has exited. */
+export async function sessionStates(): Promise<Map<string, { dead: boolean }>> {
+  const out = new Map<string, { dead: boolean }>();
+  let stdout = "";
+  try {
+    ({ stdout } = await tmux("list-panes", "-a", "-F", "#{session_name} #{pane_dead}"));
+  } catch (e) {
+    if (e instanceof ServiceError) throw e; // tmux missing: don't mistake that for "no panels"
+    return out; // no tmux server running yet
+  }
+  for (const line of stdout.split("\n")) {
+    const [name, dead] = line.split(" ");
+    if (name?.startsWith("p-")) out.set(name.slice(2), { dead: dead === "1" });
+  }
+  return out;
+}
+
+/** Attach a new tmux client in a PTY. Killing the PTY only detaches; the process keeps running. */
+export function attach(panelId: string, cols: number, rows: number): IPty {
+  return spawn("tmux", ["-u", "-S", SOCKET, "attach-session", "-t", sessionName(panelId)], {
+    name: "xterm-256color",
+    cols,
+    rows,
+    env: { ...cleanEnv(), TERM: "xterm-256color" },
+  });
+}

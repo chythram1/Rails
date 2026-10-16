@@ -1,4 +1,4 @@
-import type { GitStatus, Message, Project, ProjectSuggestion, ProviderInfo, SessionSummary } from "@rails/shared";
+import type { GitStatus, Panel, PanelKind, Project, ProjectSuggestion, ProviderInfo, SessionSummary, Workspace } from "@rails/shared";
 
 export class Unauthorized extends Error {}
 
@@ -33,7 +33,12 @@ export const api = {
   removeProject: (id: string) => req("/api/projects/" + enc(id), { method: "DELETE" }),
   suggestions: () => req<ProjectSuggestion[]>("/api/project-suggestions"),
   sessions: (projectId: string) => req<SessionSummary[]>(`/api/projects/${enc(projectId)}/sessions`),
-  messages: (provider: string, id: string) => req<Message[]>(`/api/sessions/${enc(provider)}/${enc(id)}/messages`),
+  workspace: (projectId: string) => req<Workspace>(`/api/projects/${enc(projectId)}/workspace`),
+  openPanel: (projectId: string, body: { kind: PanelKind; sessionId?: string; prompt?: string }) =>
+    req<Panel>(`/api/projects/${enc(projectId)}/panels`, { method: "POST", body: JSON.stringify(body) }),
+  closePanel: (id: string) => req("/api/panels/" + enc(id), { method: "DELETE" }),
+  saveLayout: (projectId: string, layout: unknown) =>
+    req(`/api/projects/${enc(projectId)}/layout`, { method: "PUT", body: JSON.stringify({ layout }) }),
   git: (projectId: string) => req<GitStatus>(`/api/projects/${enc(projectId)}/git`),
   diff: (projectId: string, path: string) => req<string>(`/api/projects/${enc(projectId)}/git/diff?path=${enc(path)}`),
 };

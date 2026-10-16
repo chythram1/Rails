@@ -7,16 +7,17 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { WebSocketServer } from "ws";
-import type { ProviderId } from "@rails/shared";
 import { HOST, PORT, TOKEN } from "./config.ts";
 import { projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
-import { LiveHub } from "./live/hub.ts";
+import { closePanel, getWorkspace, openPanel, saveLayout, type OpenPanel } from "./panels.ts";
 import { attachProject, detachProject, getProject, listProjectSessions, ServiceError } from "./projects.ts";
-import { discovery, findSession, providerInfo, suggestions } from "./providers/index.ts";
+import { providerInfo, suggestions } from "./providers/index.ts";
+import { TerminalHub } from "./terminals.ts";
+import { version as tmuxVersion } from "./tmux.ts";
 
 const COOKIE = "rails_token";
-const hub = new LiveHub();
+const hub = new TerminalHub();
 const app = new Hono();
 
 // Services throw ServiceError for expected failures; anything else is a 500 (Hono's default behavior).
@@ -59,7 +60,7 @@ app.post("/api/projects", async (c) => {
 });
 
 app.delete("/api/projects/:id", (c) => {
-  detachProject(c.req.param("id"), (id) => hub.liveInfo().filter((l) => l.projectId === id).length);
+  detachProject(c.req.param("id"));
   return c.json({ ok: true });
 });
 
@@ -68,15 +69,22 @@ app.get("/api/project-suggestions", async (c) =>
 );
 
 app.get("/api/projects/:id/sessions", async (c) =>
-  c.json(await listProjectSessions(c.req.param("id"), (key) => hub.statusOf(key))),
+  c.json(await listProjectSessions(c.req.param("id"))),
 );
 
-app.get("/api/sessions/:provider/:id/messages", async (c) => {
-  const provider = c.req.param("provider") as ProviderId;
-  if (!discovery[provider]) return c.json({ error: "Unknown provider" }, 404);
-  const s = await findSession(provider, c.req.param("id"));
-  if (!s) return c.json([]); // brand-new live session whose transcript isn't on disk yet
-  return c.json(await discovery[provider].readTranscript(s.file));
+// ---- workspace: terminal panels (ADR 0003) ----
+app.get("/api/projects/:id/workspace", async (c) => c.json(await getWorkspace(c.req.param("id"))));
+
+app.post("/api/projects/:id/panels", async (c) => c.json(await openPanel(c.req.param("id"), await c.req.json<OpenPanel>()), 201));
+
+app.delete("/api/panels/:id", async (c) => {
+  await closePanel(c.req.param("id"));
+  return c.json({ ok: true });
+});
+
+app.put("/api/projects/:id/layout", async (c) => {
+  saveLayout(c.req.param("id"), (await c.req.json<{ layout: unknown }>()).layout);
+  return c.json({ ok: true });
 });
 
 // ---- git (read-only) ----
@@ -94,6 +102,10 @@ if (existsSync(webDist)) {
 }
 
 // ---- server + websocket ----
+void tmuxVersion().then((v) => {
+  if (!v) console.warn("warning: tmux isn't installed, so panels can't run. Run `make system-deps`.");
+});
+
 const server = serve({ fetch: app.fetch, hostname: HOST, port: PORT }, () => {
   const url = `http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}`;
   console.log(`rails server on ${url}`);
@@ -113,7 +125,7 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 const shutdown = () => {
-  hub.stopAll();
+  hub.detachAll(); // panel processes keep running in tmux
   process.exit(0);
 };
 process.on("SIGINT", shutdown);

@@ -1,62 +1,55 @@
 import { useEffect, useMemo, useState } from "react";
 import { FolderPlus } from "lucide-react";
-import type { PermissionMode, ProviderId } from "@rails/shared";
+import type { ProviderId } from "@rails/shared";
+import { api } from "../api.ts";
 import { href, navigate } from "../router.ts";
 import { useStore } from "../store.tsx";
-import { providerLabel, randomId, tildify, timeAgo } from "../util.ts";
-import { socket } from "../ws.ts";
+import { providerLabel, tildify, timeAgo } from "../util.ts";
 import { AddProjectDialog } from "./AddProjectDialog.tsx";
-import { Composer, MODE_OPTIONS, Select } from "./Composer.tsx";
+import { Composer, Select } from "./Composer.tsx";
 import { ProviderBadge } from "./ProviderBadge.tsx";
 
-export function Home({ projectId }: { projectId?: string }) {
+export function Home() {
   const { projects, providers, sessions } = useStore();
-  const [selected, setSelected] = useState(projectId ?? "");
+  const [selected, setSelected] = useState("");
   const [provider, setProvider] = useState<ProviderId>("claude");
-  const [mode, setMode] = useState<PermissionMode>("default");
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
 
   useEffect(() => {
-    if (projectId) setSelected(projectId);
-    else if (!projects.some((p) => p.id === selected)) setSelected(projects[0]?.id ?? "");
-  }, [projectId, projects, selected]);
+    if (!projects.some((p) => p.id === selected)) setSelected(projects[0]?.id ?? "");
+  }, [projects, selected]);
 
   const project = projects.find((p) => p.id === selected);
 
   const recent = useMemo(() => {
-    const ids = projectId ? [projectId] : projects.map((p) => p.id);
-    return ids
-      .flatMap((id) => (sessions[id] ?? []).map((s) => ({ ...s, projectId: id })))
+    return projects
+      .flatMap((p) => (sessions[p.id] ?? []).map((s) => ({ ...s, projectId: p.id })))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       .slice(0, 9);
-  }, [projects, sessions, projectId]);
+  }, [projects, sessions]);
 
-  const start = (text: string) => {
+  /** Start the chosen agent's TUI with the prompt as its first message, in a new panel. */
+  const start = async (text: string) => {
     if (!project) return;
-    const clientRef = randomId();
     setError("");
     setStarting(true);
-    const off = socket.on((m) => {
-      if (m.type === "session.started" && m.clientRef === clientRef) {
-        off();
-        navigate(href.session(m.projectId, m.key));
-      } else if (m.type === "error" && m.clientRef === clientRef) {
-        off();
-        setStarting(false);
-        setError(m.message);
-      }
-    });
-    socket.send({ type: "start", clientRef, projectId: project.id, provider, text, mode });
+    try {
+      await api.openPanel(project.id, { kind: provider, prompt: text });
+      navigate(href.project(project.id));
+    } catch (e: any) {
+      setError(e.message);
+      setStarting(false);
+    }
   };
 
   return (
     <div className="page">
-      <h1 className="hero">{project && projectId ? project.name : "Let's start building"}</h1>
+      <h1 className="hero">Let's start building</h1>
       <Composer
         placeholder="What do you want to build?"
-        onSubmit={start}
+        onSubmit={(text) => void start(text)}
         autoFocus
         disabled={!project || starting}
         disabledReason={!project ? "Add a project to start a chat" : "Starting…"}
@@ -71,13 +64,12 @@ export function Home({ projectId }: { projectId?: string }) {
           label="Agent"
           value={provider}
           onChange={setProvider}
-          options={(providers.length ? providers : [{ id: "claude" as const, live: true }]).map((p) => ({
+          options={(providers.length ? providers : [{ id: "claude" as const, installed: true }]).map((p) => ({
             value: p.id,
-            label: providerLabel[p.id] + (p.live ? "" : " (soon)"),
-            disabled: !p.live,
+            label: providerLabel[p.id] + (p.installed ? "" : " (not installed)"),
+            disabled: !p.installed,
           }))}
         />
-        <Select<PermissionMode> label="Permissions" value={mode} onChange={setMode} options={MODE_OPTIONS} />
       </Composer>
       {error && <p className="error" role="alert">{error}</p>}
 
@@ -89,7 +81,7 @@ export function Home({ projectId }: { projectId?: string }) {
       </div>
 
       <section className="section">
-        <h2>{projectId ? "Sessions" : "Recent sessions"}</h2>
+        <h2>Recent sessions</h2>
         {recent.length === 0 ? (
           <p className="muted">
             {projects.length ? "No agent sessions found for your projects yet." : "Add a project folder and rails will find its Claude Code, Codex and pi sessions."}
@@ -101,7 +93,7 @@ export function Home({ projectId }: { projectId?: string }) {
                 <div className="card-top">
                   <ProviderBadge provider={s.provider} />
                   <span className="muted small">{projects.find((p) => p.id === s.projectId)?.name}</span>
-                  {s.liveStatus && <span className={"dot " + (s.liveStatus === "running" ? "running" : "live")} aria-label="live" />}
+                  {s.panelId && <span className="dot live" aria-label="open in a panel" />}
                 </div>
                 <div className="card-title">{s.title}</div>
                 <div className="muted small">{timeAgo(s.updatedAt)}</div>

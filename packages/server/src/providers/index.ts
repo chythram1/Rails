@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { delimiter, join } from "node:path";
 import type { ProviderId, ProviderInfo, ProjectSuggestion } from "@rails/shared";
 import { claudeDiscovery } from "./claude.ts";
 import { codexDiscovery } from "./codex.ts";
@@ -10,15 +12,17 @@ export const discovery: Record<ProviderId, DiscoveryAdapter> = {
   codex: codexDiscovery,
 };
 
-/** Providers rails can drive live today. */
-export const LIVE_PROVIDERS: ProviderId[] = ["claude"];
+/** Whether a provider's CLI (`claude`, `pi`, `codex`) is on the server's PATH. */
+export function installed(provider: ProviderId): boolean {
+  return (process.env.PATH ?? "").split(delimiter).some((dir) => dir && existsSync(join(dir, provider)));
+}
 
 export function providerInfo(): ProviderInfo[] {
   return Object.values(discovery).map((a) => ({
     id: a.id,
     name: a.name,
     discoverable: a.available(),
-    live: LIVE_PROVIDERS.includes(a.id),
+    installed: installed(a.id),
   }));
 }
 

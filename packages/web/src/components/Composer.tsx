@@ -1,18 +1,16 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowUp, Square } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 
 interface Props {
   placeholder: string;
   onSubmit(text: string): void;
   disabled?: boolean;
   disabledReason?: string;
-  running?: boolean;
-  onInterrupt?(): void;
   autoFocus?: boolean;
   children?: ReactNode; // controls shown in the bottom row (selectors)
 }
 
-export function Composer({ placeholder, onSubmit, disabled, disabledReason, running, onInterrupt, autoFocus, children }: Props) {
+export function Composer({ placeholder, onSubmit, disabled, disabledReason, autoFocus, children }: Props) {
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -56,15 +54,9 @@ export function Composer({ placeholder, onSubmit, disabled, disabledReason, runn
       />
       <div className="composer-row">
         <div className="composer-controls">{children}</div>
-        {running && onInterrupt ? (
-          <button type="button" className="send-btn" aria-label="Interrupt" title="Interrupt" onClick={onInterrupt}>
-            <Square size={14} fill="currentColor" />
-          </button>
-        ) : (
-          <button className="send-btn" aria-label="Send" title="Send (Enter)" disabled={disabled || !text.trim()}>
-            <ArrowUp size={18} />
-          </button>
-        )}
+        <button className="send-btn" aria-label="Send" title="Send (Enter)" disabled={disabled || !text.trim()}>
+          <ArrowUp size={18} />
+        </button>
       </div>
     </form>
   );
@@ -84,10 +76,3 @@ export function Select<T extends string>({ label, value, options, onChange }: { 
     </label>
   );
 }
-
-export const MODE_OPTIONS = [
-  { value: "default" as const, label: "Ask before tools" },
-  { value: "acceptEdits" as const, label: "Auto-accept edits" },
-  { value: "plan" as const, label: "Plan only" },
-  { value: "bypassPermissions" as const, label: "Bypass permissions" },
-];

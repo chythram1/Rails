@@ -1,0 +1,294 @@
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import {
+  DockviewReact,
+  themeDark,
+  type DockviewApi,
+  type DockviewGroupPanel,
+  type IDockviewHeaderActionsProps,
+  type IDockviewPanelHeaderProps,
+  type IDockviewPanelProps,
+  type IWatermarkPanelProps,
+} from "dockview-react";
+import "dockview-react/dist/styles/dockview.css";
+import { GitBranch, X } from "lucide-react";
+import { parseSessionKey, type Panel, type PanelKind } from "@rails/shared";
+import { api } from "../api.ts";
+import { href } from "../router.ts";
+import { useStore } from "../store.tsx";
+import { tildify } from "../util.ts";
+import { GitPanel } from "./GitPanel.tsx";
+import { PanelIcon, PanelMenu } from "./PanelMenu.tsx";
+import { TerminalView } from "./TerminalView.tsx";
+import { useWorkspace, type WorkspaceState } from "./useWorkspace.ts";
+
+const MOBILE = "(max-width: 860px)";
+
+/** What the dockview tab / content / header components need from the workspace. */
+interface Ctx extends WorkspaceState {
+  /** Open a panel and place it in `group` (or the active group). */
+  openIn(kind: PanelKind, group?: DockviewGroupPanel): void;
+}
+const WorkspaceCtx = createContext<Ctx | null>(null);
+const useWs = () => useContext(WorkspaceCtx)!;
+
+/** A project's workspace: its agents and shells as terminal panels (ADR 0003). */
+export function Workspace({ projectId, openKey }: { projectId: string; openKey?: string }) {
+  const { projects } = useStore();
+  const project = projects.find((p) => p.id === projectId);
+  const ws = useWorkspace(projectId);
+  const [mobile, setMobile] = useState(() => matchMedia(MOBILE).matches);
+  const [gitOpen, setGitOpen] = useState(false);
+  const targetGroup = useRef<DockviewGroupPanel>(undefined);
+  const [focusId, setFocusId] = useState<string>();
+
+  useEffect(() => {
+    const mq = matchMedia(MOBILE);
+    const on = () => setMobile(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+
+  const openIn = (kind: PanelKind, group?: DockviewGroupPanel, sessionId?: string) => {
+    targetGroup.current = group;
+    void ws.open(kind, sessionId).then((p) => p && setFocusId(p.id));
+  };
+
+  // #/p/<id>/s/<key>: open (or focus) that session's panel, then drop the key from the URL.
+  useEffect(() => {
+    if (!openKey) return;
+    const { provider, id } = parseSessionKey(openKey);
+    openIn(provider, undefined, id);
+    location.replace(href.project(projectId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openKey, projectId]);
+
+  if (!project) return <div className="page center muted">Project not found.</div>;
+
+  return (
+    <WorkspaceCtx.Provider value={{ ...ws, openIn }}>
+      <div className="workspace">
+        <header className="workspace-head">
+          <h1 className="truncate">{project.name}</h1>
+          <span className="muted small truncate grow">{tildify(project.path)}</span>
+          <button className={"icon-btn" + (gitOpen ? " active" : "")} aria-label="Toggle git panel" aria-pressed={gitOpen} title="Git" onClick={() => setGitOpen((o) => !o)}>
+            <GitBranch size={18} />
+          </button>
+        </header>
+        {ws.error && (
+          <div className="workspace-error" role="alert">
+            {ws.error}
+            <button className="icon-btn" aria-label="Dismiss" onClick={() => ws.setError("")}>
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        <div className="workspace-body">
+          {ws.panels === null ? null : mobile ? <MobilePanels /> : <Dock projectId={projectId} targetGroup={targetGroup} focusId={focusId} onFocused={() => setFocusId(undefined)} />}
+          {gitOpen && <GitPanel projectId={projectId} refreshKey={String(ws.panels?.length)} onClose={() => setGitOpen(false)} />}
+        </div>
+      </div>
+    </WorkspaceCtx.Provider>
+  );
+}
+
+// ---- desktop: split panes with tabs (dockview) --------------------------------
+
+interface DockProps {
+  projectId: string;
+  /** Where the next new panel goes (the pane whose "+" was used). */
+  targetGroup: React.RefObject<DockviewGroupPanel | undefined>;
+  /** A panel to bring to the front once it exists. */
+  focusId?: string;
+  onFocused(): void;
+}
+
+function Dock({ projectId, targetGroup, focusId, onFocused }: DockProps) {
+  const ws = useWs();
+  const { setActivePanelId } = useStore();
+  const [dock, setDock] = useState<DockviewApi>();
+  const restored = useRef(false);
+
+  // Mirror the server's panel list into the layout: restore the saved layout once, then add/remove.
+  useEffect(() => {
+    if (!dock || !ws.panels) return;
+    const ids = new Set(ws.panels.map((p) => p.id));
+    if (!restored.current) {
+      restored.current = true;
+      if (ws.layout) {
+        try {
+          dock.fromJSON(ws.layout as any);
+        } catch {
+          dock.clear(); // incompatible layout: start fresh
+        }
+      }
+    }
+    for (const panel of [...dock.panels]) if (!ids.has(panel.id)) dock.removePanel(panel);
+    for (const p of ws.panels) {
+      if (dock.getPanel(p.id)) continue;
+      const group = targetGroup.current ?? dock.activeGroup;
+      dock.addPanel({ id: p.id, component: "terminal", tabComponent: "tab", title: p.title, position: group ? { referenceGroup: group } : undefined });
+    }
+    targetGroup.current = undefined;
+  }, [dock, ws.panels, ws.layout, targetGroup]);
+
+  useEffect(() => {
+    const panel = focusId && dock?.getPanel(focusId);
+    if (!panel) return;
+    panel.api.setActive();
+    onFocused();
+  }, [dock, focusId, ws.panels, onFocused]);
+
+  // Save the arrangement (debounced) so every device opens the same layout.
+  useEffect(() => {
+    if (!dock) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const save = dock.onDidLayoutChange(() => {
+      if (!restored.current) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => void api.saveLayout(projectId, dock.toJSON()).catch(() => {}), 400);
+    });
+    const active = dock.onDidActivePanelChange((e) => setActivePanelId(e.panel?.id));
+    return () => {
+      clearTimeout(timer);
+      save.dispose();
+      active.dispose();
+      setActivePanelId(undefined);
+    };
+  }, [dock, projectId, setActivePanelId]);
+
+  return (
+    <div className="dock">
+      <DockviewReact
+        theme={themeDark}
+        components={{ terminal: TerminalPanel }}
+        tabComponents={{ tab: PanelTab }}
+        leftHeaderActionsComponent={HeaderAdd}
+        watermarkComponent={EmptyWorkspace}
+        defaultRenderer="always"
+        disableFloatingGroups
+        onReady={(e) => setDock(e.api)}
+      />
+    </div>
+  );
+}
+
+function usePanel(id: string): Panel | undefined {
+  return useWs().panels?.find((p) => p.id === id);
+}
+
+function TerminalPanel(props: IDockviewPanelProps) {
+  const ws = useWs();
+  const panel = usePanel(props.api.id);
+  const [active, setActive] = useState(props.api.isActive);
+  useEffect(() => {
+    const d = props.api.onDidActiveChange((e) => setActive(e.isActive));
+    return () => d.dispose();
+  }, [props.api]);
+  if (!panel) return null;
+  return <PanelBody panel={panel} focused={active} ws={ws} />;
+}
+
+function PanelBody({ panel, focused, ws }: { panel: Panel; focused: boolean; ws: Ctx }) {
+  const exited = ws.exited.has(panel.id);
+  return (
+    <div className="panel-body">
+      <TerminalView panelId={panel.id} focused={focused} onExited={() => ws.markExited(panel.id)} />
+      {exited && (
+        <div className="exited-bar" role="status">
+          <span>The process exited.</span>
+          {panel.kind !== "shell" && panel.sessionId && (
+            <button className="btn small" onClick={() => void ws.open(panel.kind, panel.sessionId)}>
+              Resume
+            </button>
+          )}
+          <button className="btn small" onClick={() => void ws.close(panel)}>
+            Close panel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PanelTab(props: IDockviewPanelHeaderProps) {
+  const ws = useWs();
+  const panel = usePanel(props.api.id);
+  if (!panel) return null;
+  const title = ws.title(panel);
+  return (
+    <div className={"panel-tab" + (ws.exited.has(panel.id) ? " exited" : "")} title={title}>
+      <PanelIcon kind={panel.kind} />
+      <span className="truncate">{title}</span>
+      <button
+        className="tab-close"
+        aria-label={`Close ${title}`}
+        onPointerDown={(e) => e.stopPropagation()} // don't start a tab drag
+        onClick={(e) => {
+          e.stopPropagation();
+          void ws.close(panel);
+        }}
+      >
+        <X size={13} />
+      </button>
+    </div>
+  );
+}
+
+function HeaderAdd(props: IDockviewHeaderActionsProps) {
+  const ws = useWs();
+  return (
+    <div className="header-add">
+      <PanelMenu onPick={(kind) => ws.openIn(kind, props.group)} />
+    </div>
+  );
+}
+
+function EmptyWorkspace(_: IWatermarkPanelProps) {
+  const ws = useWs();
+  return (
+    <div className="empty-workspace">
+      <p className="muted">No panels open. Pick a session in the sidebar, or start something:</p>
+      <PanelMenu onPick={(kind) => ws.openIn(kind)} />
+    </div>
+  );
+}
+
+// ---- mobile: one panel at a time with a tab strip -----------------------------
+
+function MobilePanels() {
+  const ws = useWs();
+  const { setActivePanelId } = useStore();
+  const panels = ws.panels ?? [];
+  const [activeId, setActiveId] = useState<string>();
+  const active = panels.find((p) => p.id === activeId) ?? panels[panels.length - 1];
+  useEffect(() => {
+    setActivePanelId(active?.id);
+    return () => setActivePanelId(undefined);
+  }, [active?.id, setActivePanelId]);
+
+  return (
+    <div className="mobile-panels">
+      <div className="mobile-tabs" role="tablist">
+        {panels.map((p) => (
+          <div key={p.id} className={"panel-tab" + (p.id === active?.id ? " active" : "")}>
+            <button role="tab" aria-selected={p.id === active?.id} className="mobile-tab" onClick={() => setActiveId(p.id)}>
+              <PanelIcon kind={p.kind} />
+              <span className="truncate">{ws.title(p)}</span>
+            </button>
+            {p.id === active?.id && (
+              <button className="tab-close" aria-label={`Close ${ws.title(p)}`} onClick={() => void ws.close(p)}>
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        ))}
+        <PanelMenu onPick={(kind) => void ws.open(kind).then((p) => p && setActiveId(p.id))} />
+      </div>
+      {active ? (
+        <PanelBody key={active.id} panel={active} focused ws={ws} />
+      ) : (
+        <p className="muted pad">No panels open. Tap + to start an agent or shell.</p>
+      )}
+    </div>
+  );
+}

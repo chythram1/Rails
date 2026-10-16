@@ -1,4 +1,4 @@
-import { open, readFile, readdir, stat } from "node:fs/promises";
+import { open, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { DiscoveredSession } from "./types.ts";
 
@@ -38,10 +38,6 @@ export function parseLines(text: string): any[] {
     }
   }
   return out;
-}
-
-export async function readJsonl(file: string): Promise<any[]> {
-  return parseLines(await readFile(file, "utf8"));
 }
 
 /** Recursively list files matching `pred` (missing dirs => []). */
@@ -90,10 +86,3 @@ export const firstLine = (s: string, max = 80) => {
   const line = text.trim().split("\n")[0] ?? "";
   return line.length > max ? line.slice(0, max - 1) + "…" : line;
 };
-
-export function stringifyOutput(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content))
-    return content.map((b: any) => (b?.type === "text" ? b.text : b?.type ? `[${b.type}]` : String(b))).join("\n");
-  return content == null ? "" : JSON.stringify(content);
-}

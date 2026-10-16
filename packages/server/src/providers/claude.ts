@@ -1,9 +1,8 @@
 import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
-import type { Message } from "@rails/shared";
 import { CLAUDE_HOME } from "../config.ts";
 import type { DiscoveredSession, DiscoveryAdapter } from "./types.ts";
-import { cachedScanner, firstLine, headTail, readJsonl, stringifyOutput, walk } from "./util.ts";
+import { cachedScanner, firstLine, headTail, walk } from "./util.ts";
 
 const root = join(CLAUDE_HOME, "projects");
 
@@ -18,39 +17,6 @@ function userText(content: unknown): string | null {
 }
 
 const isMetaText = (t: string) => /^<(command-|local-command|system-reminder)/.test(t.trim());
-
-/**
- * Normalize one Claude entry. Works for both transcript lines and live SDK messages,
- * since both have the shape { type, uuid, message: { content } }.
- */
-export function normalizeClaude(e: any): Message[] {
-  if ((e.type !== "user" && e.type !== "assistant") || e.isSidechain || e.isMeta) return [];
-  const content = e.message?.content;
-  const id = e.uuid ?? e.message?.id ?? crypto.randomUUID();
-  const ts = e.timestamp;
-  if (e.type === "user") {
-    const text = userText(content);
-    if (text !== null) return isMetaText(text) ? [] : [{ kind: "user", id, text, ts }];
-    return (content as any[])
-      .filter((b) => b?.type === "tool_result")
-      .map((b, i) => ({
-        kind: "tool_result" as const,
-        id: `${id}:${i}`,
-        toolUseId: b.tool_use_id,
-        output: stringifyOutput(b.content),
-        isError: !!b.is_error,
-        ts,
-      }));
-  }
-  const out: Message[] = [];
-  (Array.isArray(content) ? content : []).forEach((b: any, i: number) => {
-    const bid = `${id}:${i}`;
-    if (b.type === "text" && b.text) out.push({ kind: "assistant", id: bid, text: b.text, ts });
-    else if (b.type === "thinking" && b.thinking) out.push({ kind: "thinking", id: bid, text: b.thinking, ts });
-    else if (b.type === "tool_use") out.push({ kind: "tool_use", id: bid, toolUseId: b.id, name: b.name, input: b.input, ts });
-  });
-  return out;
-}
 
 async function scanFile(file: string): Promise<DiscoveredSession | null> {
   const { head, tail, mtime } = await headTail(file);
@@ -85,8 +51,5 @@ export const claudeDiscovery: DiscoveryAdapter = {
   async scan() {
     // Top-level *.jsonl only; subdirectories hold subagent transcripts.
     return scanFiles(await walk(root, (n) => n.endsWith(".jsonl"), 1));
-  },
-  async readTranscript(file) {
-    return (await readJsonl(file)).flatMap(normalizeClaude);
   },
 };
