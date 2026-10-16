@@ -41,7 +41,10 @@ packages/
   `DELETE /api/panels/:id` kills the tmux session.
 - **Terminals:** each browser terminal sends `term.attach` with its size; the server spawns
   `tmux attach` in a PTY for it and streams bytes both ways. Killing that PTY only detaches. tmux
-  `window-size latest` sizes a shared window to the device that typed last.
+  `window-size latest` sizes a panel shown on several devices to the one used last. Typing counts, and
+  so does focusing a terminal: `TerminalView` sends a focus-in event (`ESC [ I`) when its terminal gains
+  focus, which tmux treats as activity and swallows (tmux only forwards it to programs that asked for
+  focus events).
 - **Exits:** a panel closes itself when its process exits (`exit`, `/exit`, a crash). tmux has
   `remain-on-exit off`, so the session ends with the process; the attached browsers' tmux clients then
   exit, and `panelEnded` deletes the panel and broadcasts `panels.changed` so every device drops the tab.

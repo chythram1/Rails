@@ -56,6 +56,11 @@ export function TerminalView({ panelId, focused }: Props) {
     const offConn = socket.onConnection((up) => up && attach());
     if (socket.connected) attach();
     const input = t.onData((data) => socket.send({ type: "term.input", panelId, data }));
+    // tmux sizes a panel shown on several devices to the one used last (`window-size latest`). A
+    // focus-in event counts as use, so clicking into a terminal or switching back to this browser
+    // makes it fit this device. tmux swallows the event; the program in the panel never sees it.
+    const onFocus = () => socket.send({ type: "term.input", panelId, data: "\x1b[I" });
+    t.textarea?.addEventListener("focus", onFocus);
 
     let frame = 0;
     const observer = new ResizeObserver(() => {
@@ -68,6 +73,7 @@ export function TerminalView({ panelId, focused }: Props) {
       observer.disconnect();
       cancelAnimationFrame(frame);
       input.dispose();
+      t.textarea?.removeEventListener("focus", onFocus);
       offData();
       offConn();
       socket.send({ type: "term.detach", panelId });
