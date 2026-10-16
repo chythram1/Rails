@@ -35,7 +35,9 @@ function useCollapsed() {
 
 // Sidebar width (desktop). Dragging the edge resizes it between MIN_W and MAX_W; dragging below
 // COLLAPSE_AT snaps it to the icon rail, and dragging the rail out past COLLAPSE_AT expands it again.
-const RAIL_W = 60;
+// 63px: with the sidebar's 10px padding and 1px border, the rail's centre line is x = 31, where the
+// icons already sit in the expanded sidebar, so collapsing doesn't move them.
+const RAIL_W = 63;
 const MIN_W = 220;
 const MAX_W = 480;
 const COLLAPSE_AT = 150;
@@ -117,7 +119,7 @@ export function Sidebar({ route }: { route: Route }) {
           onClick={() => setSize((s) => ({ ...s, rail: !s.rail }))}
         >
           {/* In the icon rail this button shows the logo, and the panel icon on hover/focus. */}
-          <img className="toggle-logo" src={logo} alt="" width={22} height={22} />
+          <img className="toggle-logo" src={logo} alt="" width={24} height={24} />
           <PanelLeft size={16} className="toggle-icon" />
         </button>
       </div>

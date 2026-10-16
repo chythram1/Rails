@@ -67,7 +67,7 @@ h1, h2 { font-weight: 500; margin: 0; }
   padding: 14px 10px 0;
 }
 /* right padding matches .project-row so the toggle lines up with the rows' + buttons */
-.brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px 8px 10px; }
+.brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 30px; box-sizing: content-box; padding: 0 4px 8px 9px; }
 .brand-logo { display: block; flex-shrink: 0; }
 .toggle-logo { display: none; }
 /* Invisible drag handle on the sidebar's right edge (see Sidebar.tsx for the width limits); only the cursor changes. */
@@ -76,8 +76,8 @@ body.resizing { cursor: col-resize; user-select: none; }
 body.resizing .main { pointer-events: none; } /* terminals would otherwise grab the drag */
 .nav { display: flex; flex-direction: column; gap: 2px; }
 .nav-item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 9px 12px; border-radius: 10px; color: #cfcfcf;
+  display: flex; align-items: center; gap: 12px; height: 40px;
+  padding: 0 12px; border-radius: 10px; color: #cfcfcf;
 }
 .nav-item:hover, .nav-item.active { background: var(--hover); color: var(--text); }
 .nav-item.primary { background: var(--surface-2); color: var(--text); }
@@ -115,7 +115,7 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .empty-hint { color: var(--muted); font-size: 14px; text-align: left; padding: 8px 12px; border-radius: 8px; }
 .empty-hint:hover { background: var(--hover); }
 .sidebar-foot {
-  border-top: 1px solid var(--border); margin: auto -10px 0; padding: 12px 20px;
+  border-top: 1px solid var(--border); margin: auto -10px 0; height: 44px; padding: 0 20px 0 27.5px; /* dot centred at x = 31, under the icons */
   font-size: 13px; display: flex; align-items: center; gap: 8px;
 }
 
@@ -307,18 +307,19 @@ button.chip:hover { background: var(--hover); }
 @media (min-width: 861px) {
   .sidebar.rail .label, .sidebar.rail .brand-logo, .sidebar.rail .section-head > span, .sidebar.rail .tree { display: none; }
   .sidebar.rail .brand, .sidebar.rail .section-head { justify-content: center; padding-left: 0; padding-right: 0; }
-  /* In the rail, the toggle and add-project buttons match the nav items (box, icon size, colour, spacing)
-     so all the icons form one evenly spaced column. */
+  /* Collapsing must not move or resize icons: every icon keeps its size and its x = 31 (see RAIL_W), and
+     rows keep their height. The add-project button matches the nav items so the icons form one evenly
+     spaced column (it moves up because the "Projects" heading is hidden). */
   .sidebar.rail .section-head { padding-top: 2px; padding-bottom: 0; }
-  .sidebar.rail :is(.brand, .section-head) .icon-btn { width: 100%; height: 36px; border-radius: 10px; color: #cfcfcf; }
+  .sidebar.rail :is(.brand, .section-head) .icon-btn { width: 100%; border-radius: 10px; color: #cfcfcf; }
+  .sidebar.rail .section-head .icon-btn { height: 40px; }
   .sidebar.rail :is(.brand, .section-head) .icon-btn:hover { color: var(--text); }
   .sidebar.rail :is(.brand, .section-head) .icon-btn svg { width: 18px; height: 18px; }
   /* Rail: the expand button shows the logo, and swaps to the panel icon on hover/focus. */
   .sidebar.rail .toggle-logo { display: block; }
   .sidebar.rail .brand .icon-btn:is(:hover, :focus-visible) .toggle-logo,
   .sidebar.rail .brand .icon-btn:not(:hover, :focus-visible) .toggle-icon { display: none; }
-  .sidebar.rail .nav-item { justify-content: center; padding: 9px 0; }
-  .sidebar.rail .sidebar-foot { justify-content: center; padding: 12px 0; }
+  .sidebar.rail .nav-item { justify-content: center; padding: 0; }
 }
 
 /* ---- small screens: sidebar becomes a drawer ---- */
