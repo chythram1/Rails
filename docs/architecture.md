@@ -62,6 +62,9 @@ packages/
 - **Auth:** one access token, generated on first run into `~/.rails/config.json` or set with `RAILS_TOKEN`.
   `POST /api/auth/login` exchanges it for an httpOnly cookie, and both `/api/*` and the WebSocket
   upgrade check that cookie. The web app also accepts `?token=` once, then removes it from the URL.
+  Cookies are shared across every port of a host, so the WebSocket upgrade and non-GET `/api` requests
+  also require `Origin` to match `Host` (when an Origin is sent). That's why the Vite dev proxy keeps the
+  browser's `Host` (`changeOrigin: false`).
   The server binds `127.0.0.1` by default. Panels are full shell access, so set `RAILS_HOST=0.0.0.0`
   only on networks you trust (LAN, Tailscale).
 - **Environment:** tmux and everything in it get the server's environment minus `RAILS_*` (the token),
