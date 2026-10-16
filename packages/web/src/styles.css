@@ -40,7 +40,6 @@ h1, h2 { font-weight: 500; margin: 0; }
 
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
-.nowrap { white-space: nowrap; }
 .grow { flex: 1; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .pre { white-space: pre-wrap; }
@@ -56,7 +55,14 @@ h1, h2 { font-weight: 500; margin: 0; }
 .scrim { display: none; }
 
 /* ---- sidebar ---- */
+/* The sidebar's icons sit in one column at x = --icon-x in both the expanded sidebar and the collapsed
+   rail, so collapsing doesn't move them. Everything that lines up with that column derives from these. */
 .sidebar {
+  --side-pad: 10px;
+  --nav-pad: 12px;
+  --icon: 18px;
+  --icon-x: calc(var(--side-pad) + var(--nav-pad) + var(--icon) / 2);
+  --rail-w: calc(2 * var(--icon-x) + 1px); /* +1px border: the rail's centre line is --icon-x */
   position: relative;
   width: var(--sidebar-w);
   flex-shrink: 0;
@@ -64,10 +70,13 @@ h1, h2 { font-weight: 500; margin: 0; }
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  padding: 14px 10px 0;
+  padding: 14px var(--side-pad) 0;
 }
 /* right padding matches .project-row so the toggle lines up with the rows' + buttons */
-.brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 30px; box-sizing: content-box; padding: 0 4px 8px 9px; }
+.brand {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 30px; box-sizing: content-box;
+  padding: 0 4px 8px calc(var(--icon-x) - var(--side-pad) - 12px); /* 24px logo centred on --icon-x */
+}
 .brand-logo { display: block; flex-shrink: 0; }
 .toggle-logo { display: none; }
 /* Invisible drag handle on the sidebar's right edge (see Sidebar.tsx for the width limits); only the cursor changes. */
@@ -77,8 +86,9 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .nav { display: flex; flex-direction: column; gap: 2px; }
 .nav-item {
   display: flex; align-items: center; gap: 12px; height: 40px;
-  padding: 0 12px; border-radius: 10px; color: #cfcfcf;
+  padding: 0 var(--nav-pad); border-radius: 10px; color: #cfcfcf;
 }
+.nav-item svg { width: var(--icon); height: var(--icon); flex-shrink: 0; }
 .nav-item:hover, .nav-item.active { background: var(--hover); color: var(--text); }
 .nav-item.primary { background: var(--surface-2); color: var(--text); }
 .section-head {
@@ -115,7 +125,8 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .empty-hint { color: var(--muted); font-size: 14px; text-align: left; padding: 8px 12px; border-radius: 8px; }
 .empty-hint:hover { background: var(--hover); }
 .sidebar-foot {
-  border-top: 1px solid var(--border); margin: auto -10px 0; height: 44px; padding: 0 20px 0 27.5px; /* dot centred at x = 31, under the icons */
+  border-top: 1px solid var(--border); margin: auto calc(-1 * var(--side-pad)) 0; height: 44px;
+  padding: 0 20px 0 calc(var(--icon-x) - 3.5px); /* 7px dot centred on --icon-x */
   font-size: 13px; display: flex; align-items: center; gap: 8px;
 }
 
@@ -305,16 +316,17 @@ button.chip:hover { background: var(--hover); }
 
 /* ---- desktop: collapsed sidebar shows an icon rail ---- */
 @media (min-width: 861px) {
+  .sidebar.rail { width: var(--rail-w); }
   .sidebar.rail .label, .sidebar.rail .brand-logo, .sidebar.rail .section-head > span, .sidebar.rail .tree { display: none; }
   .sidebar.rail .brand, .sidebar.rail .section-head { justify-content: center; padding-left: 0; padding-right: 0; }
-  /* Collapsing must not move or resize icons: every icon keeps its size and its x = 31 (see RAIL_W), and
-     rows keep their height. The add-project button matches the nav items so the icons form one evenly
+  /* Collapsing must not move or resize icons: every icon keeps its size and its x (--icon-x), and rows
+     keep their height. The add-project button matches the nav items so the icons form one evenly
      spaced column (it moves up because the "Projects" heading is hidden). */
   .sidebar.rail .section-head { padding-top: 2px; padding-bottom: 0; }
   .sidebar.rail :is(.brand, .section-head) .icon-btn { width: 100%; border-radius: 10px; color: #cfcfcf; }
   .sidebar.rail .section-head .icon-btn { height: 40px; }
   .sidebar.rail :is(.brand, .section-head) .icon-btn:hover { color: var(--text); }
-  .sidebar.rail :is(.brand, .section-head) .icon-btn svg { width: 18px; height: 18px; }
+  .sidebar.rail :is(.brand, .section-head) .icon-btn svg { width: var(--icon); height: var(--icon); }
   /* Rail: the expand button shows the logo, and swaps to the panel icon on hover/focus. */
   .sidebar.rail .toggle-logo { display: block; }
   .sidebar.rail .brand .icon-btn:is(:hover, :focus-visible) .toggle-logo,
