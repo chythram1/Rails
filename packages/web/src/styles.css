@@ -50,7 +50,9 @@ h1, h2 { font-weight: 500; margin: 0; }
 
 /* ---- shell ---- */
 .shell { display: flex; height: 100%; }
-.main { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; }
+/* overflow: hidden clips the workspace while it catches up with a resize (dockview and the terminals relayout
+   a frame later); otherwise their old, wider size overflows the page and scrollbars flash, shaking the layout. */
+.main { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; overflow: hidden; }
 .main > .nav-toggle { display: none; position: absolute; top: 5px; left: 10px; z-index: 5; }
 .scrim { display: none; }
 
