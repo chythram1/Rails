@@ -1,6 +1,7 @@
 import type { IPty } from "node-pty";
 import type WebSocket from "ws";
 import type { ClientMsg, ServerMsg } from "@rails/shared";
+import { watchBusy } from "./activity.ts";
 import { panels } from "./db.ts";
 import { onPanelsChanged, panelEnded } from "./panels.ts";
 import * as tmux from "./tmux.ts";
@@ -11,6 +12,9 @@ import * as tmux from "./tmux.ts";
  */
 export class TerminalHub {
   private clients = new Map<WebSocket, Map<string, IPty>>();
+  /** Busy panels (see activity.ts), watched while any browser is connected. */
+  private busy: string[] = [];
+  private stopWatching?: () => void;
 
   constructor() {
     onPanelsChanged((projectId) => this.broadcast({ type: "panels.changed", projectId }));
@@ -18,6 +22,11 @@ export class TerminalHub {
 
   connect(ws: WebSocket) {
     this.clients.set(ws, new Map());
+    send(ws, { type: "panels.busy", panelIds: this.busy });
+    this.stopWatching ??= watchBusy((ids) => {
+      this.busy = ids;
+      this.broadcast({ type: "panels.busy", panelIds: ids });
+    });
     ws.on("message", (raw) => {
       let msg: ClientMsg;
       try {
@@ -34,6 +43,11 @@ export class TerminalHub {
     ws.on("close", () => {
       for (const pty of this.clients.get(ws)?.values() ?? []) pty.kill();
       this.clients.delete(ws);
+      if (this.clients.size === 0) {
+        this.stopWatching?.();
+        this.stopWatching = undefined;
+        this.busy = [];
+      }
     });
   }
 

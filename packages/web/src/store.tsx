@@ -8,6 +8,8 @@ interface Store {
   projects: Project[];
   providers: ProviderInfo[];
   connected: boolean;
+  /** Panels whose agent is working right now (thinking or replying). */
+  busy: Set<string>;
   sessions: Record<string, SessionSummary[]>;
   /** The panel focused in the open workspace (highlights its session in the sidebar). */
   activePanelId?: string;
@@ -29,6 +31,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [connected, setConnected] = useState(socket.connected);
+  const [busy, setBusy] = useState<Set<string>>(new Set());
   const [sessions, setSessions] = useState<Record<string, SessionSummary[]>>({});
   const [activePanelId, setActivePanelId] = useState<string>();
   const [picking, setPicking] = useState(false);
@@ -50,10 +53,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     socket.connect();
     void refreshProjects();
     void api.providers().then(setProviders);
-    const offConn = socket.onConnection(setConnected);
-    // Opening or closing a panel changes which sessions are open.
+    const offConn = socket.onConnection((up) => {
+      setConnected(up);
+      if (!up) setBusy(new Set()); // unknown until the server sends it again
+    });
     const off = socket.on((m) => {
+      // Opening or closing a panel changes which sessions are open.
       if (m.type === "panels.changed") void refreshSessions(m.projectId);
+      if (m.type === "panels.busy") setBusy(new Set(m.panelIds));
     });
     // Pick up sessions started outside rails and new transcripts of freshly started panels.
     const poll = setInterval(() => projectsRef.current.forEach((p) => void refreshSessions(p.id)), 20_000);
@@ -95,6 +102,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     projects,
     providers,
     connected,
+    busy,
     sessions,
     activePanelId,
     setActivePanelId,

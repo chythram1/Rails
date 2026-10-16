@@ -57,7 +57,7 @@ function useSidebarSize() {
 const clamp = (w: number) => Math.min(MAX_W, Math.max(MIN_W, Math.round(w)));
 
 export function Sidebar({ route }: { route: Route }) {
-  const { projects, sessions, connected, activePanelId, refreshProjects } = useStore();
+  const { projects, sessions, connected, busy, activePanelId, refreshProjects } = useStore();
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
   const [collapsed, toggleCollapsed] = useCollapsed();
   const [{ width, rail }, setSize] = useSidebarSize();
@@ -168,7 +168,7 @@ export function Sidebar({ route }: { route: Route }) {
               {isOpen && (
                 <>
                   {shown.map((s) => (
-                    <SessionRow key={s.key} s={s} projectId={p.id} active={!!s.panelId && s.panelId === activePanelId} />
+                    <SessionRow key={s.key} s={s} projectId={p.id} active={!!s.panelId && s.panelId === activePanelId} busy={!!s.panelId && busy.has(s.panelId)} />
                   ))}
                   {list.length > PAGE && (
                     <button className="more" onClick={() => setShowAll((e) => ({ ...e, [p.id]: !e[p.id] }))}>
@@ -204,11 +204,12 @@ function NavItem({ href, icon, label, rail, className }: { href: string; icon: R
   );
 }
 
-function SessionRow({ s, projectId, active }: { s: SessionSummary; projectId: string; active: boolean }) {
-  const state = s.panelId ? "live" : "idle";
+/** A session in the sidebar. Its dot: grey = not open, green = open in a panel, yellow = the agent is working. */
+function SessionRow({ s, projectId, active, busy }: { s: SessionSummary; projectId: string; active: boolean; busy: boolean }) {
+  const state = busy ? "busy" : s.panelId ? "live" : "idle";
   return (
     <a className={"session-row" + (active ? " active" : "")} href={href.session(projectId, s.key)} title={s.title}>
-      <span className={"dot " + state} aria-label={s.panelId ? "open in a panel" : undefined} />
+      <span className={"dot " + state} aria-label={busy ? "working" : s.panelId ? "open in a panel" : undefined} />
       <span className="truncate grow">{s.title}</span>
       <ProviderIcon provider={s.provider} />
       <span className="muted small session-time">{timeAgo(s.updatedAt)}</span>

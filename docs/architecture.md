@@ -54,6 +54,11 @@ packages/
   `remain-on-exit off`, so the session ends with the process; the attached browsers' tmux clients then
   exit, and `panelEnded` deletes the panel and broadcasts `panels.changed` so every device drops the tab.
   Panels that ended while no browser was attached are dropped on the next workspace read.
+- **Busy:** while any browser is connected, `activity.ts` reads each panel's last-output time from tmux
+  (`window_activity`, whole seconds, kept even with no client attached) once a second. A panel turns busy
+  after printing in two polls in a row (idle agents print the odd one-off update) and idle after 2s
+  without output. Changes are broadcast as `panels.busy`, and the sidebar shows those sessions' dots
+  yellow. Typing into an agent also counts as output, and an agent waiting on a permission prompt is idle.
 - **Persistence:** panels survive browser disconnects and server restarts (`tsx watch` included).
   On a reboot the tmux server is gone; the next workspace read drops panels whose tmux session no
   longer exists. Their transcripts remain, so sessions can be resumed from the sidebar.

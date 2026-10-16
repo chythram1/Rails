@@ -104,4 +104,6 @@ export type ServerMsg =
   | { type: "term.data"; panelId: string; attachId: number; data: string }
   /** A project's panels changed: opened, closed, or ended on their own (possibly on another device). */
   | { type: "panels.changed"; projectId: string }
+  /** Every busy panel (its agent is thinking or replying), across all projects. Sent on connect and on change. */
+  | { type: "panels.busy"; panelIds: string[] }
   | { type: "error"; message: string };

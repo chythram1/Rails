@@ -76,18 +76,29 @@ export async function killSession(panelId: string): Promise<void> {
   await tmux("kill-session", "-t", sessionName(panelId)).catch(() => {}); // already gone is fine
 }
 
-/** Panel ids whose process is still running (a panel's tmux session ends with its process). */
-export async function runningPanels(): Promise<Set<string>> {
-  const out = new Set<string>();
+/**
+ * Every running panel (a panel's tmux session ends with its process), with the time its program last
+ * printed output (unix seconds). tmux tracks that even when no client is attached.
+ */
+export async function panelActivity(): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
   let stdout = "";
   try {
-    ({ stdout } = await tmux("list-sessions", "-F", "#{session_name}"));
+    ({ stdout } = await tmux("list-windows", "-a", "-F", "#{session_name} #{window_activity}"));
   } catch (e) {
     if (e instanceof ServiceError) throw e; // tmux missing: don't mistake that for "no panels"
     return out; // no tmux server running yet
   }
-  for (const name of stdout.split("\n")) if (name.startsWith("p-")) out.add(name.slice(2));
+  for (const line of stdout.split("\n")) {
+    const [name, time] = line.split(" ");
+    if (name?.startsWith("p-")) out.set(name.slice(2), Number(time));
+  }
   return out;
+}
+
+/** Ids of the panels whose process is still running. */
+export async function runningPanels(): Promise<Set<string>> {
+  return new Set((await panelActivity()).keys());
 }
 
 /** Attach a new tmux client in a PTY. Killing the PTY only detaches; the process keeps running. */
