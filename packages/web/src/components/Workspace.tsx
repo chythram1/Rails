@@ -11,9 +11,9 @@ import {
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
 import { GitBranch, X } from "lucide-react";
-import { parseSessionKey, type Panel, type PanelKind } from "@rails/shared";
+import { parseSessionKey, sessionKey, type Panel, type PanelKind, type ProviderId } from "@rails/shared";
 import { api } from "../api.ts";
-import { href } from "../router.ts";
+import { href, navigate } from "../router.ts";
 import { useStore } from "../store.tsx";
 import { GitPanel } from "./GitPanel.tsx";
 import { PanelIcon, PanelMenu } from "./PanelMenu.tsx";
@@ -51,7 +51,13 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
 
   const openIn = (kind: PanelKind, group?: DockviewGroupPanel, sessionId?: string) => {
     targetGroup.current = group;
-    void ws.open(kind, sessionId).then((p) => p && setFocusId(p.id));
+    void ws.open(kind, sessionId).then((p) => {
+      if (!p) return;
+      // A session inside two projects (one folder nested in the other) has one panel, which may live in
+      // the other project's workspace: go there and focus it.
+      if (p.projectId !== projectId && p.sessionId) navigate(href.session(p.projectId, sessionKey(kind as ProviderId, p.sessionId)));
+      else setFocusId(p.id);
+    });
   };
 
   // #/p/<id>/s/<key>: open (or focus) that session's panel, then drop the key from the URL.
