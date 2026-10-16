@@ -69,10 +69,8 @@ h1, h2 { font-weight: 500; margin: 0; }
 /* right padding matches .project-row so the toggle lines up with the rows' + buttons */
 .brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px 8px 10px; }
 .brand-name { font-weight: 600; letter-spacing: -0.02em; font-size: 18px; }
-/* Drag handle on the sidebar's right edge (see Sidebar.tsx for the width limits). */
+/* Invisible drag handle on the sidebar's right edge (see Sidebar.tsx for the width limits); only the cursor changes. */
 .sidebar-resize { position: absolute; top: 0; right: -3px; width: 6px; height: 100%; cursor: col-resize; z-index: 6; }
-.sidebar-resize::after { content: ""; position: absolute; inset: 0 2px; }
-.sidebar-resize:hover::after, .sidebar.dragging .sidebar-resize::after { background: var(--blue); }
 body.resizing { cursor: col-resize; user-select: none; }
 body.resizing .main { pointer-events: none; } /* terminals would otherwise grab the drag */
 .nav { display: flex; flex-direction: column; gap: 2px; }
