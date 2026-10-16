@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 export type MenuItem = "separator" | MenuAction;
 
@@ -78,6 +78,13 @@ export function MenuButton({ label, title, icon, className, align = "left", item
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [at, items]);
+
+  // A right-aligned menu under a trigger near the left edge (e.g. a narrow sidebar) would start
+  // off-screen; pin it to the left edge instead, before it's painted.
+  useLayoutEffect(() => {
+    const left = menu.current?.getBoundingClientRect().left;
+    if (at && left !== undefined && left < 8) setAt({ top: at.top, left: 8 });
+  }, [at]);
 
   const toggle = () => {
     if (at) return close(false);

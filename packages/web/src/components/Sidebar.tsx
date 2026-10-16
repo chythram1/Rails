@@ -156,7 +156,7 @@ export function Sidebar({ route }: { route: Route }) {
                     icon={<EllipsisVertical size={16} />}
                     className="reveal"
                     align="right"
-                    items={[{ label: "Remove from rails", shortcut: "r", danger: true, onSelect: () => void remove(p) }]}
+                    items={[{ label: "Remove", shortcut: "r", danger: true, onSelect: () => void remove(p) }]}
                   />
                   <PanelMenu onPick={(kind) => void startPanel(p, kind)} />
                 </span>
