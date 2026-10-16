@@ -12,11 +12,11 @@ import * as tmux from "./tmux.ts";
  * bash, which would make every shell panel bash instead of the user's shell.
  */
 function loginShell(): string {
+  let shell: string | null = null;
   try {
-    return userInfo().shell || process.env.SHELL || "/bin/sh";
-  } catch {
-    return process.env.SHELL || "/bin/sh";
-  }
+    shell = userInfo().shell; // throws if the user has no passwd entry (rare, e.g. some containers)
+  } catch {}
+  return shell || process.env.SHELL || "/bin/sh";
 }
 
 /** Command line that reopens an existing session in its agent's TUI. */

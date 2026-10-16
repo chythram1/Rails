@@ -290,18 +290,17 @@ button.chip:hover { background: var(--hover); }
   /* In the rail, the toggle and add-project buttons match the nav items (box, icon size, colour, spacing)
      so all the icons form one evenly spaced column. */
   .sidebar.rail .section-head { padding-top: 2px; padding-bottom: 0; }
-  .sidebar.rail .brand .icon-btn, .sidebar.rail .section-head .icon-btn { width: 100%; height: 36px; border-radius: 10px; color: #cfcfcf; }
-  .sidebar.rail .brand .icon-btn:hover, .sidebar.rail .section-head .icon-btn:hover { color: var(--text); }
-  .sidebar.rail .brand .icon-btn svg, .sidebar.rail .section-head .icon-btn svg { width: 18px; height: 18px; }
+  .sidebar.rail :is(.brand, .section-head) .icon-btn { width: 100%; height: 36px; border-radius: 10px; color: #cfcfcf; }
+  .sidebar.rail :is(.brand, .section-head) .icon-btn:hover { color: var(--text); }
+  .sidebar.rail :is(.brand, .section-head) .icon-btn svg { width: 18px; height: 18px; }
   .sidebar.rail .nav-item { justify-content: center; padding: 9px 0; }
   .sidebar.rail .sidebar-foot { justify-content: center; padding: 12px 0; }
 }
 
 /* ---- small screens: sidebar becomes a drawer ---- */
 @media (max-width: 860px) {
-  .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 20; transform: translateX(-100%); transition: transform 0.2s ease; }
-  /* the drawer is always full width: ignore the desktop width (set inline) and the rail */
-  .sidebar { width: var(--sidebar-w) !important; }
+  /* The drawer is always full width: !important overrides the desktop width set inline (and the rail). */
+  .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 20; transform: translateX(-100%); transition: transform 0.2s ease; width: var(--sidebar-w) !important; }
   .sidebar-resize, .brand .icon-btn { display: none; }
   .brand { padding-top: 6px; padding-bottom: 12px; }
   .nav-open .sidebar { transform: none; }

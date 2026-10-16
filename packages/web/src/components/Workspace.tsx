@@ -11,7 +11,7 @@ import {
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
 import { GitBranch, X } from "lucide-react";
-import { parseSessionKey, sessionKey, type Panel, type PanelKind, type ProviderId } from "@rails/shared";
+import { parseSessionKey, sessionKey, type Panel, type PanelKind } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate } from "../router.ts";
 import { useStore } from "../store.tsx";
@@ -55,7 +55,7 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
       if (!p) return;
       // A session inside two projects (one folder nested in the other) has one panel, which may live in
       // the other project's workspace: go there and focus it.
-      if (p.projectId !== projectId && p.sessionId) navigate(href.session(p.projectId, sessionKey(kind as ProviderId, p.sessionId)));
+      if (p.projectId !== projectId && p.kind !== "shell" && p.sessionId) navigate(href.session(p.projectId, sessionKey(p.kind, p.sessionId)));
       else setFocusId(p.id);
     });
   };
