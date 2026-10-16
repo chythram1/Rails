@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import type { Panel, PanelKind, Workspace } from "@rails/shared";
 import { api } from "../api.ts";
 import { useStore } from "../store.tsx";
-import { providerLabel } from "../util.ts";
 import { socket } from "../ws.ts";
 
 /**
@@ -54,8 +53,6 @@ export function useWorkspace(projectId: string) {
   /** Close a panel, which stops its process. (A process that exits on its own closes its panel.) */
   const close = useCallback(
     async (p: Panel) => {
-      const what = p.kind === "shell" ? "Anything running in this shell stops." : `This stops ${providerLabel[p.kind]}. You can resume the session from the sidebar.`;
-      if (!confirm(`Close "${title(p)}"?\n\n${what}`)) return;
       try {
         await api.closePanel(p.id);
       } catch (e: any) {
@@ -64,7 +61,7 @@ export function useWorkspace(projectId: string) {
       await load();
       void refreshSessions(projectId);
     },
-    [title, load, refreshSessions, projectId],
+    [load, refreshSessions, projectId],
   );
 
   return { panels: workspace?.panels ?? null, layout: workspace?.layout ?? null, error, setError, open, close, title };

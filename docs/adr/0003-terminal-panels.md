@@ -20,7 +20,7 @@ Decisions:
 4. **One workspace per project.** The layout is saved on the server (SQLite), so every device opens the
    same arrangement. Narrow screens show one panel at a time with a tab strip.
 5. **Panel kinds:** `claude`, `codex`, `pi`, and a plain `shell` in the project folder.
-6. **Closing a tab stops its process** (after a confirm if it is still running). Transcripts stay on
+6. **Closing a tab stops its process**, without a confirmation prompt (*amended*; it used to ask). Transcripts stay on
    disk, so the session can be resumed from the sidebar.
 7. **Starting agents:** a sidebar session opens (or focuses) its panel; each pane's `+` starts a new
    agent or shell; the home composer starts the chosen agent with the prompt as its first message.
