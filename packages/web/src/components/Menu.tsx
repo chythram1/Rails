@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-export type MenuItem =
-  | "separator"
-  | {
-      label: string;
-      icon?: ReactNode;
-      /** Single key that picks this item while the menu is open, shown on the right. */
-      shortcut?: string;
-      danger?: boolean;
-      disabled?: boolean;
-      /** Muted text after the label, e.g. why an item is disabled. */
-      note?: string;
-      onSelect(): void;
-    };
+export type MenuItem = "separator" | MenuAction;
+
+interface MenuAction {
+  label: string;
+  icon?: ReactNode;
+  /** Single key that picks this item while the menu is open, shown on the right. */
+  shortcut?: string;
+  danger?: boolean;
+  disabled?: boolean;
+  /** Muted text after the label, e.g. why an item is disabled. */
+  note?: string;
+  onSelect(): void;
+}
 
 interface Props {
   /** Accessible name of the trigger button. */
@@ -40,7 +40,7 @@ export function MenuButton({ label, title, icon, className, align = "left", item
     if (refocus) trigger.current?.focus();
   };
 
-  const pick = (item: Exclude<MenuItem, "separator">) => {
+  const pick = (item: MenuAction) => {
     if (item.disabled) return;
     close(false);
     item.onSelect();
@@ -62,8 +62,10 @@ export function MenuButton({ label, title, icon, className, align = "left", item
         list[(i + (e.key === "ArrowDown" ? 1 : list.length - 1)) % list.length]?.focus();
         return;
       }
-      const hit = items.find((it) => it !== "separator" && it.shortcut?.toLowerCase() === e.key.toLowerCase());
-      if (hit && hit !== "separator" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const actions = items.filter((it): it is MenuAction => it !== "separator");
+      const hit = actions.find((it) => it.shortcut?.toLowerCase() === e.key.toLowerCase());
+      if (hit) {
         e.preventDefault();
         pick(hit);
       }
