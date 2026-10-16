@@ -12,6 +12,11 @@ Requires Node 24+, **tmux 3.2+** (every panel runs in it) and the agents' CLIs o
 it's missing (`make system-deps` does only that step). On Linux, node-pty compiles during `npm install`,
 so you also need python3, make and a C++ compiler.
 
+With Nix you can skip all of that: `nix develop` gives a shell with the pinned Node, tmux and (on Linux)
+build tools from `flake.lock`; then use `make` as usual. The agent CLIs still come from your own `PATH`.
+If flakes aren't enabled in your Nix config, run
+`nix --extra-experimental-features 'nix-command flakes' develop`.
+
 ```sh
 make dev               # installs deps if needed; server on :4317, UI on http://localhost:5173
 # open the "open: …?token=…" URL printed in the terminal

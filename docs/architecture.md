@@ -94,6 +94,9 @@ Transcript format notes are in [providers.md](./providers.md).
   `make system-deps` checks the tmux version and installs tmux with Homebrew, apt or dnf when it's missing;
   `make dev` / `start` / `install` run it first. Without tmux the server logs a warning at startup and the
   panel endpoints answer 503 with that hint. It never treats a missing tmux as "no panels".
+- Optional: `nix develop` (`flake.nix` / `flake.lock`) provides pinned Node 24, tmux and the Linux build
+  tools instead of `make system-deps`. npm still installs the JS dependencies from `package-lock.json`,
+  and the agent CLIs come from the user's `PATH`, never from Nix (they self-update and hold logins).
 - node-pty ships prebuilt binaries only for macOS and Windows. On Linux it compiles during `npm install`
   (python3, make, a C++ compiler).
 - `npm install` runs a root `postinstall` that marks node-pty's `spawn-helper` executable
