@@ -2,11 +2,19 @@ import type { GitStatus, Message, Project, ProjectSuggestion, ProviderInfo, Sess
 
 export class Unauthorized extends Error {}
 
+const UNREACHABLE = "Can't reach the rails server. Check that it's running (make dev).";
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    headers: init?.body ? { "content-type": "application/json" } : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      ...init,
+      headers: init?.body ? { "content-type": "application/json" } : undefined,
+    });
+  } catch {
+    throw new Error(UNREACHABLE); // fetch only rejects on network failure
+  }
+  if (res.status === 502) throw new Error(UNREACHABLE); // Vite dev proxy: API server is down
   if (res.status === 401) throw new Unauthorized();
   const type = res.headers.get("content-type") ?? "";
   const body = type.includes("json") ? await res.json() : await res.text();

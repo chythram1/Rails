@@ -12,10 +12,14 @@ export function AddProjectDialog({ onClose }: { onClose: () => void }) {
   const [path, setPath] = useState("");
   const [error, setError] = useState("");
   const [suggestions, setSuggestions] = useState<ProjectSuggestion[] | null>(null);
+  const [suggestError, setSuggestError] = useState("");
 
   useEffect(() => {
     ref.current?.showModal();
-    void api.suggestions().then(setSuggestions).catch(() => setSuggestions([]));
+    void api.suggestions().then(setSuggestions, (e) => {
+      setSuggestions([]);
+      setSuggestError(e.message);
+    });
   }, []);
 
   const add = async (p: string) => {
@@ -48,7 +52,8 @@ export function AddProjectDialog({ onClose }: { onClose: () => void }) {
         <div className="suggest-head muted small">Folders with existing agent sessions</div>
         <ul className="suggest">
           {suggestions === null && <li className="muted small">Scanning…</li>}
-          {suggestions?.length === 0 && <li className="muted small">None found.</li>}
+          {suggestError && <li className="error small">{suggestError}</li>}
+          {suggestions?.length === 0 && !suggestError && <li className="muted small">None found.</li>}
           {suggestions?.map((s) => (
             <li key={s.path}>
               <button type="button" className="suggest-item" onClick={() => void add(s.path)}>
