@@ -211,7 +211,6 @@ button.chip:hover { background: var(--hover); }
   --dv-separator-border: var(--border);
   --dv-tab-divider-color: var(--border);
   --dv-drag-over-background-color: rgb(106 167 255 / 0.15);
-  --dv-active-sash-color: var(--blue);
   font-family: var(--font);
 }
 /* Pane separators. Dockview draws a 1px line over the next pane's edge; widen it into a gutter and pad
