@@ -2,11 +2,10 @@
 # Env vars (RAILS_HOME, RAILS_HOST, RAILS_PORT, RAILS_TOKEN) pass through, e.g. `RAILS_PORT=5000 make dev`.
 
 .DEFAULT_GOAL := help
-.PHONY: help install system-deps dev dev-lan dev-tmp typecheck build start token cli clean distclean
+.PHONY: help install system-deps dev dev-lan dev-tmp typecheck build start token clean distclean
 
 TMP_HOME ?= /tmp/rails-dev
 TMUX_MIN := 3.2
-BIN_DIR ?= $(HOME)/.local/bin
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -51,11 +50,6 @@ start: build system-deps ## Build, then run prod (server serves the UI on :4317)
 
 token: ## Print the access token
 	@node -e 'const p=require("path"),h=process.env.RAILS_HOME||p.join(require("os").homedir(),".rails");console.log(process.env.RAILS_TOKEN||(()=>{try{return JSON.parse(require("fs").readFileSync(p.join(h,"config.json"))).token}catch{console.error("No token yet in "+h+" (start the server once)");process.exit(1)}})())'
-
-cli: ## Link bin/rails-agent into ~/.local/bin (override with BIN_DIR=...)
-	@mkdir -p "$(BIN_DIR)"
-	ln -sf "$(CURDIR)/bin/rails-agent.mjs" "$(BIN_DIR)/rails-agent"
-	@echo "rails-agent -> $(BIN_DIR)/rails-agent (make sure $(BIN_DIR) is on your PATH)"
 
 clean: ## Remove build output and the dev-tmp state
 	rm -rf packages/web/dist $(TMP_HOME)

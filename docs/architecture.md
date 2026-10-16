@@ -114,9 +114,5 @@ Transcript format notes are in [providers.md](./providers.md).
 | `RAILS_TOKEN` | generated | access token override |
 | `CLAUDE_HOME` / `PI_HOME` / `CODEX_HOME` | `~/.claude`, `~/.pi/agent`, `~/.codex` | provider store roots |
 
-`bin/rails-agent.mjs` (`make cli` links it as `rails-agent`) starts a panel for the current folder
-through the REST API (token from `RAILS_HOME`, project = innermost one containing the folder, attached
-if missing) and runs `tmux attach` on it, so a terminal and the app share one agent process.
-
 Attach to a panel from a normal terminal: `tmux -S ~/.rails/tmux.sock ls`, then
 `tmux -S ~/.rails/tmux.sock attach -t p-<panelId>`.
