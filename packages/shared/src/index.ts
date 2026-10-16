@@ -73,6 +73,9 @@ export interface GitStatus {
   files: GitFile[];
 }
 
+/** Error codes the REST API returns alongside `error` so the client can offer a specific action. */
+export type ErrorCode = "session_active";
+
 // ---- WebSocket protocol ----------------------------------------------------
 // Each attached panel gets its own tmux client on the server, sized to that browser's terminal.
 

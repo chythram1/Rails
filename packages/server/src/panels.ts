@@ -55,8 +55,30 @@ const listeners = new Set<(projectId: string) => void>();
 export const onPanelsChanged = (fn: (projectId: string) => void) => listeners.add(fn);
 const changed = (projectId: string) => listeners.forEach((fn) => fn(projectId));
 
+// ---- experimental: warn before resuming a session that's running in another terminal ----
+// A transcript written very recently, and not by a rails panel, probably belongs to an agent running
+// elsewhere; resuming it here would start a second process on the same session. Heuristic: an agent
+// idling in another terminal for longer than ACTIVE_MS isn't detected.
+const ACTIVE_MS = 2 * 60_000;
+/** sessionId -> when a rails panel for it last stopped, so rails' own recent writes don't count. */
+const stoppedInRails = new Map<string, number>();
+
+function refuseIfActiveElsewhere(sessionId: string, updatedAt: string) {
+  const written = Date.parse(updatedAt);
+  const ours = written <= (stoppedInRails.get(sessionId) ?? 0) + 5_000;
+  const age = Date.now() - written;
+  if (ours || age > ACTIVE_MS) return;
+  const ago = age < 60_000 ? `${Math.max(1, Math.round(age / 1000))}s` : `${Math.round(age / 60_000)}m`;
+  throw new ServiceError(
+    `This session was updated ${ago} ago, probably by an agent running in another terminal. Opening it here starts a second copy that won't see the other's new messages.`,
+    409,
+    "session_active",
+  );
+}
+
 /** Drop a panel whose process ended (`exit`, a crash, a reboot) and tell every browser. */
 async function removeEnded(panel: Panel): Promise<void> {
+  if (panel.sessionId) stoppedInRails.set(panel.sessionId, Date.now());
   await tmux.killSession(panel.id); // clears a dead pane left by older rails versions
   panels.remove(panel.id);
   changed(panel.projectId);
@@ -86,6 +108,8 @@ export interface OpenPanel {
   sessionId?: string;
   /** First message for a new agent session. */
   prompt?: string;
+  /** Resume even if the session looks active in another terminal (experimental check). */
+  force?: boolean;
 }
 
 /** Open a panel. Opening a session that already has a running panel returns that panel. */
@@ -103,6 +127,7 @@ export async function openPanel(projectId: string, req: OpenPanel): Promise<Pane
       await removeEnded(existing); // its process ended but nobody noticed yet; start a fresh panel
     }
     if (!found) throw new ServiceError("Session transcript not found", 404);
+    if (!req.force) refuseIfActiveElsewhere(req.sessionId, found.updatedAt);
     return start(project.id, req.kind, req.sessionId, found.title, found.cwd, resumeCommand(req.kind, req.sessionId));
   }
 
@@ -127,6 +152,7 @@ async function start(projectId: string, kind: PanelKind, sessionId: string | und
 export async function closePanel(id: string): Promise<void> {
   const panel = panels.get(id);
   if (!panel) throw new ServiceError("Not found", 404);
+  if (panel.sessionId) stoppedInRails.set(panel.sessionId, Date.now());
   await tmux.killSession(id);
   panels.remove(id);
   changed(panel.projectId);

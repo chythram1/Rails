@@ -23,7 +23,7 @@ const app = new Hono();
 
 // Services throw ServiceError for expected failures; anything else is a 500 (Hono's default behavior).
 app.onError((err, c) => {
-  if (err instanceof ServiceError) return c.json({ error: err.message }, err.status);
+  if (err instanceof ServiceError) return c.json({ error: err.message, code: err.code }, err.status);
   console.error(err);
   return c.text("Internal Server Error", 500);
 });

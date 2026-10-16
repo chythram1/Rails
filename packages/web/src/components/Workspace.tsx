@@ -49,9 +49,9 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
     return () => mq.removeEventListener("change", on);
   }, []);
 
-  const openIn = (kind: PanelKind, group?: DockviewGroupPanel, sessionId?: string) => {
+  const openIn = (kind: PanelKind, group?: DockviewGroupPanel, sessionId?: string, force = false) => {
     targetGroup.current = group;
-    void ws.open(kind, sessionId).then((p) => {
+    void ws.open(kind, sessionId, force).then((p) => {
       if (!p) return;
       // A session inside two projects (one folder nested in the other) has one panel, which may live in
       // the other project's workspace: go there and focus it.
@@ -78,6 +78,17 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
           <div className="workspace-error" role="alert">
             {ws.error}
             <button className="icon-btn" aria-label="Dismiss" onClick={() => ws.setError("")}>
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        {ws.activeElsewhere && (
+          <div className="workspace-error warn" role="alert">
+            <span className="grow">{ws.activeElsewhere.message}</span>
+            <button className="btn small" onClick={() => openIn(ws.activeElsewhere!.kind, undefined, ws.activeElsewhere!.sessionId, true)}>
+              Open anyway
+            </button>
+            <button className="icon-btn" aria-label="Dismiss" onClick={ws.dismissActiveElsewhere}>
               <X size={14} />
             </button>
           </div>

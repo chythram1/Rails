@@ -204,6 +204,7 @@ button.chip:hover { background: var(--hover); }
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 4px 12px 4px 20px; color: var(--red); font-size: 13px; border-bottom: 1px solid var(--border);
 }
+.workspace-error.warn { color: var(--amber); }
 .workspace-body { flex: 1; display: flex; min-height: 0; }
 .dock { flex: 1; min-width: 0; }
 .dock > * { height: 100%; }
