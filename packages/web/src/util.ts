@@ -6,7 +6,7 @@ export function timeAgo(iso: string): string {
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   if (s < 86400 * 30) return `${Math.floor(s / 86400)}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }); // e.g. "Oct 3"
 }
 
 export const providerLabel: Record<ProviderId, string> = { claude: "Claude Code", codex: "Codex", pi: "pi" };

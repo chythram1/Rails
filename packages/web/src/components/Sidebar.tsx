@@ -208,7 +208,7 @@ function SessionRow({ s, projectId, active }: { s: SessionSummary; projectId: st
       <span className={"dot " + state} aria-label={s.panelId ? "open in a panel" : undefined} />
       <span className="truncate grow">{s.title}</span>
       <ProviderIcon provider={s.provider} />
-      <span className="muted small nowrap">{timeAgo(s.updatedAt)}</span>
+      <span className="muted small session-time">{timeAgo(s.updatedAt)}</span>
     </a>
   );
 }

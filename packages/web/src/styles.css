@@ -107,6 +107,8 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 }
 .session-row:hover { background: var(--hover); }
 .session-row.active { background: var(--surface-2); }
+/* Fixed width (fits "just now" and "13h ago") so the agent logos before it line up across rows. */
+.session-time { flex-shrink: 0; width: 56px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .more { color: var(--muted); font-size: 13px; padding: 4px 12px 4px 34px; }
 .more:hover { color: var(--text); }
 .empty-hint { color: var(--muted); font-size: 14px; text-align: left; padding: 8px 12px; border-radius: 8px; }
