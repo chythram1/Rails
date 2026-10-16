@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Boxes, CircleGauge, FolderOpen, FolderPlus, Plus } from "lucide-react";
-import type { LiveStatus, SessionSummary } from "@rails/shared";
-import { href, type Route } from "../router.ts";
+import { Boxes, CircleGauge, FolderMinus, FolderOpen, FolderPlus, Plus } from "lucide-react";
+import type { LiveStatus, Project, SessionSummary } from "@rails/shared";
+import { api } from "../api.ts";
+import { href, navigate, type Route } from "../router.ts";
 import { useStore } from "../store.tsx";
 import { timeAgo } from "../util.ts";
 import { AddProjectDialog } from "./AddProjectDialog.tsx";
@@ -10,10 +11,24 @@ import { ProviderIcon } from "./ProviderIcon.tsx";
 const PAGE = 5;
 
 export function Sidebar({ route }: { route: Route }) {
-  const { projects, sessions, connected, live } = useStore();
+  const { projects, sessions, connected, live, refreshProjects } = useStore();
   const [adding, setAdding] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const activeKey = route.name === "session" ? route.key : undefined;
+
+  // Detach only: transcripts stay on disk, and adding the folder again brings the sessions back.
+  const remove = async (p: Project) => {
+    const running = [...live.values()].filter((l) => l.projectId === p.id).length;
+    if (running > 0) return alert(`Stop the ${running} live agent${running === 1 ? "" : "s"} in "${p.name}" before removing it.`);
+    if (!confirm(`Remove "${p.name}" from rails?\n\nIts agent sessions stay on disk. Add the folder again anytime to bring them back.`)) return;
+    try {
+      await api.removeProject(p.id);
+    } catch (e: any) {
+      return alert(e.message);
+    }
+    if ((route.name === "home" || route.name === "session") && route.projectId === p.id) navigate(href.home());
+    await refreshProjects();
+  };
 
   return (
     <aside className="sidebar">
@@ -52,6 +67,9 @@ export function Sidebar({ route }: { route: Route }) {
                 <a className="project-name" href={href.home(p.id)} title={p.path}>
                   <FolderOpen size={16} /> <span className="truncate">{p.name}</span>
                 </a>
+                <button className="icon-btn reveal" aria-label={`Remove ${p.name} from rails`} title="Remove project" onClick={() => void remove(p)}>
+                  <FolderMinus size={16} />
+                </button>
                 <a className="icon-btn" aria-label={`New chat in ${p.name}`} title="New chat" href={href.home(p.id)}>
                   <Plus size={16} />
                 </a>

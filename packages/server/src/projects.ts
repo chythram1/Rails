@@ -30,6 +30,17 @@ export function attachProject(rawPath: string | undefined, name?: string): Proje
   return projects.create(name?.trim() || basename(path), path);
 }
 
+/**
+ * Remove a project from rails. Transcripts are untouched, so attaching the same path later brings
+ * every session back. Refused while the project has live agents, so nothing is stopped by surprise.
+ */
+export function detachProject(id: string, liveAgents: (projectId: string) => number): void {
+  getProject(id);
+  const n = liveAgents(id);
+  if (n > 0) throw new ServiceError(`Stop the ${n} live agent${n === 1 ? "" : "s"} in this project first.`, 409);
+  projects.remove(id);
+}
+
 /** Sessions discovered inside a project's directory, newest first, with live status attached. */
 export async function listProjectSessions(
   projectId: string,

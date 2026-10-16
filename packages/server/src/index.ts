@@ -12,7 +12,7 @@ import { HOST, PORT, TOKEN } from "./config.ts";
 import { projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
 import { LiveHub } from "./live/hub.ts";
-import { attachProject, getProject, listProjectSessions, ServiceError } from "./projects.ts";
+import { attachProject, detachProject, getProject, listProjectSessions, ServiceError } from "./projects.ts";
 import { discovery, findSession, providerInfo, suggestions } from "./providers/index.ts";
 
 const COOKIE = "rails_token";
@@ -59,7 +59,7 @@ app.post("/api/projects", async (c) => {
 });
 
 app.delete("/api/projects/:id", (c) => {
-  projects.remove(c.req.param("id"));
+  detachProject(c.req.param("id"), (id) => hub.liveInfo().filter((l) => l.projectId === id).length);
   return c.json({ ok: true });
 });
 

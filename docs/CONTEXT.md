@@ -5,7 +5,7 @@ domain concept, add it here first.
 
 | Term | Meaning | Not to be confused with |
 | --- | --- | --- |
-| **Project** | A local directory attached to rails by absolute path. All sessions belong to exactly one project. Stored in our DB. | A git repository. A project _may_ be a git repo, but doesn't have to be. |
+| **Project** | A local directory attached to rails by absolute path. All sessions belong to exactly one project. Stored in our DB. Removing a project only *detaches* it: transcripts stay on disk, and attaching the same path again brings its sessions back. Removal is refused while the project has live sessions. | A git repository. A project _may_ be a git repo, but doesn't have to be. |
 | **Provider** | A coding-agent product rails can read and/or drive: `claude` (Claude Code), `codex` (OpenAI Codex CLI), `pi`. Identified by a `ProviderId`. | The LLM vendor or model. Pi can talk to Anthropic models, but its provider here is still `pi`. |
 | **Session** | One agent conversation, identified by `(provider, providerSessionId)`. The provider's on-disk transcript is the source of truth for its history. The UI may call these "chats". | A browser connection or login session. |
 | **Transcript** | The provider-owned file on disk that records a session (for example `~/.claude/projects/<enc>/<id>.jsonl`). rails reads transcripts and never writes them. | Our own DB rows, which are only an index. |

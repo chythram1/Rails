@@ -20,7 +20,7 @@ export function Home({ projectId }: { projectId?: string }) {
 
   useEffect(() => {
     if (projectId) setSelected(projectId);
-    else if (!selected && projects[0]) setSelected(projects[0].id);
+    else if (!projects.some((p) => p.id === selected)) setSelected(projects[0]?.id ?? "");
   }, [projectId, projects, selected]);
 
   const project = projects.find((p) => p.id === selected);
