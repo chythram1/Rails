@@ -120,6 +120,12 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - Never resume or open the user's real sessions in tests: `claude --resume` appends lines to the transcript even if you type nothing. Create scratch sessions instead.
 - Never kill tmux servers or rails processes you didn't start: the user's own `make dev` may be running on :4317/:5173, so test on other ports (`RAILS_PORT=4319`, `npx vite --port 5180`).
 
+## Branching
+- Work that's experimental, likely to be rolled back, or large (a new subsystem, a change across server and web, anything the user calls "try" or "experimental") goes on its own branch: `git switch -c <short-name>`. Use a worktree (`git worktree add ../rails-<name> -b <name>`) if `make dev` is running on main.
+- Small, clearly requested changes go straight to main as small commits.
+- Merge into main only when the user says to keep it. If it's dropped, delete the branch instead of reverting on main.
+- If it's unclear whether something counts as experimental, ask before starting.
+
 ## Invariants
 - Provider transcripts are the source of truth for sessions. rails reads them and **never writes** them (the agents do, inside panels). The DB only stores projects, panels and layouts.
 - Panel processes live in tmux, not in the server. A browser disconnecting or the server restarting must never kill an agent; only closing the panel does.
