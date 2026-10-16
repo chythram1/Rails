@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Boxes, CircleGauge, EllipsisVertical, Folder, FolderOpen, FolderPlus, Plus } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Boxes, CircleGauge, EllipsisVertical, Folder, FolderOpen, FolderPlus, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
 import type { PanelKind, Project, SessionSummary } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate, type Route } from "../router.ts";
@@ -31,10 +31,55 @@ function useCollapsed() {
   return [collapsed, toggle] as const;
 }
 
+// Sidebar width (desktop). Dragging the edge resizes it between MIN_W and MAX_W; dragging below
+// COLLAPSE_AT snaps it to the icon rail, and dragging the rail out past COLLAPSE_AT expands it again.
+const RAIL_W = 60;
+const MIN_W = 220;
+const MAX_W = 480;
+const COLLAPSE_AT = 150;
+const SIZE_KEY = "rails.sidebar";
+
+/** Sidebar width and icon-rail state, remembered per device. */
+function useSidebarSize() {
+  const [size, setSize] = useState<{ width: number; rail: boolean }>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SIZE_KEY) ?? "null");
+      if (typeof saved?.width === "number") return { width: clamp(saved.width), rail: !!saved.rail };
+    } catch {}
+    return { width: 300, rail: false };
+  });
+  useEffect(() => localStorage.setItem(SIZE_KEY, JSON.stringify(size)), [size]);
+  return [size, setSize] as const;
+}
+
+const clamp = (w: number) => Math.min(MAX_W, Math.max(MIN_W, Math.round(w)));
+
 export function Sidebar({ route }: { route: Route }) {
   const { projects, sessions, connected, activePanelId, refreshProjects, picking, addProject } = useStore();
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
   const [collapsed, toggleCollapsed] = useCollapsed();
+  const [{ width, rail }, setSize] = useSidebarSize();
+  const [dragging, setDragging] = useState(false);
+  const aside = useRef<HTMLElement>(null);
+
+  const startResize = (e: React.PointerEvent) => {
+    e.preventDefault(); // no text selection while dragging
+    const left = aside.current!.getBoundingClientRect().left;
+    setDragging(true);
+    document.body.classList.add("resizing");
+    const move = (ev: PointerEvent) => {
+      const w = ev.clientX - left;
+      setSize((s) => (w < COLLAPSE_AT ? { ...s, rail: true } : { width: clamp(w), rail: false }));
+    };
+    const up = () => {
+      setDragging(false);
+      document.body.classList.remove("resizing");
+      removeEventListener("pointermove", move);
+      removeEventListener("pointerup", up);
+    };
+    addEventListener("pointermove", move);
+    addEventListener("pointerup", up);
+  };
 
   // Detach only: transcripts stay on disk, and adding the folder again brings the sessions back.
   const remove = async (p: Project) => {
@@ -60,18 +105,22 @@ export function Sidebar({ route }: { route: Route }) {
   };
 
   return (
-    <aside className="sidebar">
-      <div className="brand">rails</div>
+    <aside ref={aside} className={"sidebar" + (rail ? " rail" : "") + (dragging ? " dragging" : "")} style={{ width: rail ? RAIL_W : width }}>
+      <div className="brand">
+        <span className="brand-name">rails</span>
+        <button
+          className="icon-btn"
+          aria-label={rail ? "Expand sidebar" : "Collapse sidebar"}
+          title={rail ? "Expand sidebar" : "Collapse sidebar"}
+          onClick={() => setSize((s) => ({ ...s, rail: !s.rail }))}
+        >
+          {rail ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </button>
+      </div>
       <nav className="nav">
-        <a className={"nav-item" + (route.name === "home" ? " primary" : "")} href={href.home()}>
-          <Plus size={18} /> New chat
-        </a>
-        <a className={"nav-item" + (route.name === "customize" ? " active" : "")} href="#/customize">
-          <Boxes size={18} /> Customize
-        </a>
-        <a className={"nav-item" + (route.name === "automate" ? " active" : "")} href="#/automate">
-          <CircleGauge size={18} /> Automate
-        </a>
+        <NavItem href={href.home()} icon={<Plus size={18} />} label="New chat" rail={rail} className={route.name === "home" ? "primary" : ""} />
+        <NavItem href="#/customize" icon={<Boxes size={18} />} label="Customize" rail={rail} className={route.name === "customize" ? "active" : ""} />
+        <NavItem href="#/automate" icon={<CircleGauge size={18} />} label="Automate" rail={rail} className={route.name === "automate" ? "active" : ""} />
       </nav>
 
       <div className="section-head">
@@ -130,12 +179,24 @@ export function Sidebar({ route }: { route: Route }) {
         })}
       </div>
 
-      <div className="sidebar-foot">
+      <div className="sidebar-foot" title={rail ? (connected ? "Connected" : "Reconnecting…") : undefined}>
         <span className={"dot " + (connected ? "on" : "off")} aria-hidden />
-        {connected ? "Connected" : "Reconnecting…"}
-        <span className="muted"> · {location.hostname}</span>
+        <span className="label">
+          {connected ? "Connected" : "Reconnecting…"}
+          <span className="muted"> · {location.hostname}</span>
+        </span>
       </div>
+      <div className="sidebar-resize" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" onPointerDown={startResize} />
     </aside>
+  );
+}
+
+/** A main navigation link. In the icon rail only the icon shows, so the label moves to a tooltip. */
+function NavItem({ href, icon, label, rail, className }: { href: string; icon: ReactNode; label: string; rail: boolean; className: string }) {
+  return (
+    <a className={"nav-item " + className} href={href} title={rail ? label : undefined} aria-label={rail ? label : undefined}>
+      {icon} <span className="label">{label}</span>
+    </a>
   );
 }
 
