@@ -71,7 +71,7 @@ h1, h2 { font-weight: 500; margin: 0; }
 .brand-name { font-weight: 600; letter-spacing: -0.02em; font-size: 18px; }
 /* Drag handle on the sidebar's right edge (see Sidebar.tsx for the width limits). */
 .sidebar-resize { position: absolute; top: 0; right: -3px; width: 6px; height: 100%; cursor: col-resize; z-index: 6; }
-.sidebar-resize::after { content: ""; position: absolute; inset: 0 2px; transition: background 0.15s; }
+.sidebar-resize::after { content: ""; position: absolute; inset: 0 2px; }
 .sidebar-resize:hover::after, .sidebar.dragging .sidebar-resize::after { background: var(--blue); }
 body.resizing { cursor: col-resize; user-select: none; }
 body.resizing .main { pointer-events: none; } /* terminals would otherwise grab the drag */
@@ -287,7 +287,6 @@ button.chip:hover { background: var(--hover); }
 
 /* ---- desktop: collapsed sidebar shows an icon rail ---- */
 @media (min-width: 861px) {
-  .sidebar:not(.dragging) { transition: width 0.15s ease; }
   .sidebar.rail .label, .sidebar.rail .brand-name, .sidebar.rail .section-head > span, .sidebar.rail .tree { display: none; }
   .sidebar.rail .brand, .sidebar.rail .section-head { justify-content: center; padding-left: 0; padding-right: 0; }
   .sidebar.rail .nav-item { justify-content: center; padding: 9px 0; }

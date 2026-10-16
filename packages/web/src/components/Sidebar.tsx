@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Boxes, CircleGauge, EllipsisVertical, Folder, FolderOpen, FolderPlus, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
+import { Boxes, CircleGauge, EllipsisVertical, Folder, FolderOpen, FolderPlus, PanelLeft, Plus } from "lucide-react";
 import type { PanelKind, Project, SessionSummary } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate, type Route } from "../router.ts";
@@ -114,7 +114,7 @@ export function Sidebar({ route }: { route: Route }) {
           title={rail ? "Expand sidebar" : "Collapse sidebar"}
           onClick={() => setSize((s) => ({ ...s, rail: !s.rail }))}
         >
-          {rail ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+          <PanelLeft size={16} />
         </button>
       </div>
       <nav className="nav">
