@@ -16,6 +16,12 @@ Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
 - Show the session's model in the composer and let the user pick it
 
 ## Later
+- **Final form: a single Rust binary that runs as a desktop app.** Near the end, port the server to Rust
+  and ship it with the UI as one desktop app (likely a webview shell such as Tauri, so the React UI can
+  stay). Things that map over: the REST + WebSocket contract in `packages/shared`, SQLite, tmux, and the
+  native folder picker (ADR 0004, which fits a desktop app well). Things that need Rust replacements:
+  Hono, `node:sqlite`, node-pty (e.g. `portable-pty`), and the TypeScript discovery adapters. This is a
+  goal, not a decision yet; write an ADR when the port starts.
 - **Customize:** agent profiles (model, system prompt, tools, permission mode)
 - **Automate:** saved prompts on a schedule or trigger (PR opened, Slack mention), with run history
   (see the "Pinned automations" cards in `ref/style.png`)

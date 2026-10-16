@@ -137,6 +137,11 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - Native `<select>` can't show images, so the home agent picker shows text.
 - Codex panels and Codex parsing are untested on this machine (Codex isn't installed).
 
+## Long-term direction
+The end goal is to port rails to a single Rust binary that runs as a desktop app (see `docs/roadmap.md`).
+Until then, keep the server easy to port: logic in plain service functions, the client/server contract
+fully described by the types in `packages/shared`, and no new Node-only dependencies without a good reason.
+
 ## Keeping docs current
 Update the docs in the same change as the code:
 - Provider capability changes go in the matrix in `architecture.md` and the status list in `README.md`.
