@@ -15,7 +15,6 @@ import { parseSessionKey, type Panel, type PanelKind } from "@rails/shared";
 import { api } from "../api.ts";
 import { href } from "../router.ts";
 import { useStore } from "../store.tsx";
-import { tildify } from "../util.ts";
 import { GitPanel } from "./GitPanel.tsx";
 import { PanelIcon, PanelMenu } from "./PanelMenu.tsx";
 import { TerminalView } from "./TerminalView.tsx";
@@ -27,6 +26,8 @@ const MOBILE = "(max-width: 860px)";
 interface Ctx extends WorkspaceState {
   /** Open a panel and place it in `group` (or the active group). */
   openIn(kind: PanelKind, group?: DockviewGroupPanel): void;
+  gitOpen: boolean;
+  toggleGit(): void;
 }
 const WorkspaceCtx = createContext<Ctx | null>(null);
 const useWs = () => useContext(WorkspaceCtx)!;
@@ -65,15 +66,8 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
   if (!project) return <div className="page center muted">Project not found.</div>;
 
   return (
-    <WorkspaceCtx.Provider value={{ ...ws, openIn }}>
+    <WorkspaceCtx.Provider value={{ ...ws, openIn, gitOpen, toggleGit: () => setGitOpen((o) => !o) }}>
       <div className="workspace">
-        <header className="workspace-head">
-          <h1 className="truncate">{project.name}</h1>
-          <span className="muted small truncate grow">{tildify(project.path)}</span>
-          <button className={"icon-btn" + (gitOpen ? " active" : "")} aria-label="Toggle git panel" aria-pressed={gitOpen} title="Git" onClick={() => setGitOpen((o) => !o)}>
-            <GitBranch size={18} />
-          </button>
-        </header>
         {ws.error && (
           <div className="workspace-error" role="alert">
             {ws.error}
@@ -163,6 +157,7 @@ function Dock({ projectId, targetGroup, focusId, onFocused }: DockProps) {
         components={{ terminal: TerminalPanel }}
         tabComponents={{ tab: PanelTab }}
         leftHeaderActionsComponent={HeaderAdd}
+        rightHeaderActionsComponent={HeaderGit}
         watermarkComponent={EmptyWorkspace}
         defaultRenderer="always"
         disableFloatingGroups
@@ -228,10 +223,45 @@ function HeaderAdd(props: IDockviewHeaderActionsProps) {
   );
 }
 
+/** The Git panel toggle. Desktop shows it once, at the right end of the top-right pane's tab bar. */
+function GitToggle() {
+  const { gitOpen, toggleGit } = useWs();
+  return (
+    <button className={"icon-btn" + (gitOpen ? " active" : "")} aria-label="Toggle git panel" aria-pressed={gitOpen} title="Git" onClick={toggleGit}>
+      <GitBranch size={16} />
+    </button>
+  );
+}
+
+function HeaderGit(props: IDockviewHeaderActionsProps) {
+  const [topRight, setTopRight] = useState(false);
+  useEffect(() => {
+    // Recompute whenever panes are split, moved or resized.
+    const check = () => {
+      const rects = props.containerApi.groups.map((g) => g.element.getBoundingClientRect());
+      const own = props.group.element.getBoundingClientRect();
+      const top = Math.min(...rects.map((r) => r.top));
+      const right = Math.max(...rects.map((r) => r.right));
+      setTopRight(Math.abs(own.top - top) < 1 && Math.abs(own.right - right) < 1);
+    };
+    check();
+    const d = props.containerApi.onDidLayoutChange(check);
+    return () => d.dispose();
+  }, [props.containerApi, props.group]);
+  return topRight ? (
+    <div className="header-git">
+      <GitToggle />
+    </div>
+  ) : null;
+}
+
 function EmptyWorkspace(_: IWatermarkPanelProps) {
   const ws = useWs();
   return (
     <div className="empty-workspace">
+      <div className="empty-git">
+        <GitToggle />
+      </div>
       <p className="muted">No panels open. Pick a session in the sidebar, or start something:</p>
       <PanelMenu onPick={(kind) => ws.openIn(kind)} />
     </div>
@@ -268,6 +298,8 @@ function MobilePanels() {
           </div>
         ))}
         <PanelMenu onPick={(kind) => void ws.open(kind).then((p) => p && setActiveId(p.id))} />
+        <span className="grow" />
+        <GitToggle />
       </div>
       {active ? (
         <PanelBody key={active.id} panel={active} focused />

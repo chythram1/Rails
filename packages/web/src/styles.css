@@ -52,7 +52,7 @@ h1, h2 { font-weight: 500; margin: 0; }
 /* ---- shell ---- */
 .shell { display: flex; height: 100%; }
 .main { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; }
-.main > .nav-toggle { display: none; position: absolute; top: 10px; left: 10px; z-index: 5; }
+.main > .nav-toggle { display: none; position: absolute; top: 5px; left: 10px; z-index: 5; }
 .scrim { display: none; }
 
 /* ---- sidebar ---- */
@@ -199,11 +199,6 @@ button.chip:hover { background: var(--hover); }
 
 /* ---- workspace: terminal panels (dockview + xterm) ---- */
 .workspace { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.workspace-head {
-  display: flex; align-items: center; gap: 12px; padding: 6px 12px 6px 20px;
-  border-bottom: 1px solid var(--border);
-}
-.workspace-head h1 { font-size: 15px; flex-shrink: 0; max-width: 40%; }
 .workspace-error {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 4px 12px 4px 20px; color: var(--red); font-size: 13px; border-bottom: 1px solid var(--border);
@@ -238,6 +233,8 @@ button.chip:hover { background: var(--hover); }
 .dv-tab:hover .tab-close, .dv-active-tab .tab-close, .tab-close:focus-visible { opacity: 1; }
 .tab-close:hover { background: var(--hover); color: var(--text); }
 .header-add { display: flex; align-items: center; height: 100%; padding: 0 4px; }
+.header-git { display: flex; align-items: center; height: 100%; padding: 0 6px; }
+.empty-git { position: absolute; top: 6px; right: 8px; }
 .shell-icon { color: var(--muted); flex-shrink: 0; }
 /* The padding lives here, not on .term-host: xterm's fit addon sizes the terminal from its container's
    CSS width, which (with border-box) would include the padding and clip the last column and row. */
@@ -245,7 +242,7 @@ button.chip:hover { background: var(--hover); }
 .term-host { flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
 .empty-workspace {
   height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; padding: 24px; text-align: center;
+  gap: 12px; padding: 24px; text-align: center; position: relative;
 }
 .menu {
   position: fixed; z-index: 50; min-width: 220px; padding: 6px; display: flex; flex-direction: column;
@@ -275,7 +272,7 @@ button.chip:hover { background: var(--hover); }
   width: 380px; flex-shrink: 0; border-left: 1px solid var(--border); background: var(--sidebar);
   display: flex; flex-direction: column; min-height: 0;
 }
-.git-head { display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 16px; border-bottom: 1px solid var(--border); }
+.git-head { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 6px 0 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .git-files { list-style: none; margin: 0; padding: 6px; max-height: 40%; overflow-y: auto; border-bottom: 1px solid var(--border); }
 .git-file { width: 100%; display: flex; gap: 10px; align-items: center; padding: 5px 10px; border-radius: 6px; font-size: 13px; text-align: left; }
 .git-file:hover, .git-file.active { background: var(--hover); }
@@ -300,7 +297,7 @@ button.chip:hover { background: var(--hover); }
   .nav-open .sidebar { transform: none; }
   .nav-open .scrim { display: block; position: fixed; inset: 0; background: rgb(0 0 0 / 0.5); z-index: 10; }
   .main > .nav-toggle { display: inline-grid; }
-  .workspace-head { padding-left: 52px; }
+  .mobile-tabs { padding-left: 48px; } /* room for the sidebar toggle */
   .page { padding: 64px 16px 32px; }
   .hero { font-size: 28px; }
   .git-panel { position: fixed; inset: 0 0 0 auto; width: min(380px, 100vw); z-index: 15; }
