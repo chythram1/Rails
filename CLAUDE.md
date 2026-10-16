@@ -69,20 +69,20 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 # Project: rails
 
 rails is a self-hosted web app that acts as a multiplexer for coding agents. You attach project
-directories, it finds the Claude Code, Codex and pi sessions that already exist for them, and you can
-read those sessions or chat with the agents live from any device. "rails" is only a name. This is
-**not** Ruby on Rails.
+directories, it finds the Claude Code, Codex and pi sessions that already exist for them, and each
+project gets a workspace of terminal panels running the agents' own TUIs (split, resize, drag), shared
+across devices (ADR 0003). "rails" is only a name. This is **not** Ruby on Rails.
 
-Scope is exactly three agents: Claude Code, Codex and pi (ADR 0002). Put effort into deeper chat
-support for these three, not into adding providers.
+Scope is exactly three agents: Claude Code, Codex and pi (ADR 0002). Put effort into deeper support
+for these three, not into adding providers.
 
 ## Read first
-1. `docs/CONTEXT.md` is the glossary. Use its terms (Project, Provider, Session, Transcript, Live session…) in code and UI. Add a new concept there before using it.
-2. `docs/architecture.md` covers the runtime picture, live-session lifecycle, provider support matrix and env vars.
+1. `docs/CONTEXT.md` is the glossary. Use its terms (Project, Provider, Session, Transcript, Workspace, Panel…) in code and UI. Add a new concept there before using it.
+2. `docs/architecture.md` covers the runtime picture, panel lifecycle, provider support matrix, requirements and env vars.
 3. `docs/adr/` holds the decisions. Read the ADRs before changing anything foundational.
 
 Read these when relevant: `docs/providers.md` before touching a parser or adapter, and `docs/roadmap.md`
-for future ideas, which aren't commitments. `ref/style.png` is the visual reference for the UI (`ref/` is gitignored, so it may be missing in a fresh clone).
+for future ideas, which aren't commitments. `ref/style.png` (overall look) and `ref/panels.png` (workspace panels) are the visual references (`ref/` is gitignored, so they may be missing in a fresh clone).
 
 ## Code map
 | Path | What lives there |
@@ -90,43 +90,59 @@ for future ideas, which aren't commitments. `ref/style.png` is the visual refere
 | `packages/shared/src/index.ts` | All domain and wire types, including the WebSocket protocol (`ClientMsg` / `ServerMsg`). No runtime deps. |
 | `packages/server/src/index.ts` | Hono routes, token auth, WebSocket upgrade, static serving in prod. |
 | `packages/server/src/config.ts` | Env vars and paths, plus the token in `~/.rails/config.json`. |
-| `packages/server/src/projects.ts` | Project services (`attachProject`, `getProject`, `listProjectSessions`). `ServiceError` carries an HTTP status, and `app.onError` turns it into a JSON error. |
-| `packages/server/src/db.ts` | SQLite via `node:sqlite`. Only stores projects. |
+| `packages/server/src/projects.ts` | Project services (`attachProject`, `attachPickedFolder`, `detachProject`, `getProject`, `listProjectSessions`). Expected failures throw `ServiceError` (`errors.ts`), which carries an HTTP status; `app.onError` turns it into a JSON error. |
+| `packages/server/src/picker.ts` | The OS-native folder picker for Add project (macOS osascript, Linux zenity/kdialog, Windows PowerShell). It opens on the server's screen (ADR 0004). |
+| `packages/server/src/panels.ts` | Panel services (`getWorkspace`, `openPanel`, `closePanel`, `saveLayout`) and the CLI command line for each panel kind. Emits `onPanelsChanged`. |
+| `packages/server/src/tmux.ts` | Everything tmux: private socket and config in `RAILS_HOME`, start/kill sessions, which panels are still running, `attach()` in a node-pty PTY, the cleaned environment. |
+| `packages/server/src/terminals.ts` | `TerminalHub`: one tmux client per (browser, panel), streams `term.*` messages, removes panels whose process exited (`panelEnded`), broadcasts `panels.changed`. |
+| `packages/server/src/db.ts` | SQLite via `node:sqlite`: projects, panels, layouts. |
 | `packages/server/src/git.ts` | Read-only git status and diff through the git CLI. |
-| `packages/server/src/providers/` | One discovery adapter per provider (`scan`, `readTranscript`) that maps native JSONL to `Message`. `index.ts` holds the registry, `LIVE_PROVIDERS` and the project-suggestion logic. |
-| `packages/server/src/live/claude.ts` | `ClaudeLive`: one Claude Agent SDK `query()` per live session, with permission handling. |
-| `packages/server/src/live/hub.ts` | `LiveHub`: owns live sessions and sends their events to every subscribed WebSocket client. |
+| `packages/server/src/providers/` | One discovery adapter per provider (`scan`: cwd, title, dates from the head/tail of each transcript). `index.ts` holds the registry and `installed()`. |
+| `packages/web/src/components/Workspace.tsx` | The workspace: dockview layout (`Dock`), tabs, `+` menu, and the one-panel-at-a-time mobile view. Data comes from `useWorkspace.ts`. |
+| `packages/web/src/components/TerminalView.tsx` | One xterm.js terminal attached to a panel over the shared socket; re-attaches on reconnect, reports resizes. |
 | `packages/web/src/` | React SPA. `store.tsx` holds global state, `ws.ts` the shared socket with reconnect, `router.ts` hash routing, `api.ts` the REST client, `styles.css` all CSS (tokens at the top), `components/` the UI. |
 
 ## Where to change what
-- **New WebSocket message:** add the type in `shared`, handle it in `LiveHub.handle`, then handle it in the web listener (usually `SessionView.tsx` or `store.tsx`).
+- **New WebSocket message:** add the type in `shared`, handle it in `TerminalHub.handle`, then handle it in the web listener (usually `TerminalView.tsx`, `useWorkspace.ts` or `store.tsx`).
 - **New REST endpoint:** put the logic in a service module, add a thin route in `server/src/index.ts`, then add the client method in `web/src/api.ts`.
-- **Make pi or Codex live:** add a class with the same shape as `ClaudeLive` under `live/`, branch on provider in `LiveHub.spawn`, then add the provider to `LIVE_PROVIDERS`. Message ids must match the ones `readTranscript` produces (see Invariants).
+- **How an agent is launched:** `command()` in `panels.ts` (flags for new vs resumed sessions). tmux behaviour (mouse, keys, sizing) lives in the config written by `tmux.ts`.
 - **Transcript parsing:** edit `providers/<id>.ts`, and update `docs/providers.md` with anything you learn about the format.
-- **UI:** reuse the tokens in `styles.css`, use `lucide-react` for icons and `ProviderIcon` for agent logos. The `better-*` skills in `.agents/skills/` cover UI review work.
+- **UI:** reuse the tokens in `styles.css`, use `lucide-react` for icons, `ProviderIcon` for agent logos and `MenuButton` (`components/Menu.tsx`) for dropdown menus (style: `ref/project-menu.png`). The `better-*` skills in `.agents/skills/` cover UI review work.
 
 ## Commands and verification
-- `make` lists the targets, which wrap the npm scripts. `make dev` runs the server on :4317 and Vite on :5173. Open the printed `?token=` URL.
+- `make` lists the targets, which wrap the npm scripts. `make dev`/`start`/`install` first run `make system-deps`, which installs tmux (required) if it's missing. `make dev` runs the server on :4317 and Vite on :5173. Open the printed `?token=` URL.
 - `make typecheck` must pass. `make start` builds and runs prod, where the server serves `web/dist`. `make token` prints the access token.
 - There's no automated test suite yet. Verify with typecheck, `curl` against the API and a browser check. Don't add a test framework without asking.
 - Use throwaway state with `make dev-tmp` (LAN-reachable, `/tmp/rails-dev`, token `t`) or `RAILS_HOME=/tmp/x RAILS_TOKEN=t`. For `curl`, log in first with `POST /api/auth/login {"token":…}` and keep the cookie.
 - Browser testing on this machine: use `agent-browser-remote` (see the global AGENTS.md). Start dev with `make dev-tmp` (or `make dev-lan`) and open `http://100.101.76.38:5173/?token=…`. The mac-mini reaches it over Tailscale.
-- Live Claude tests run real agents with your Claude login. Use a scratch directory and delete the transcripts they leave in `~/.claude/projects/` afterwards.
+- Panel tests run real agents with your logins. Use a scratch directory, then delete the transcripts they leave (`~/.claude/projects/-private-tmp-…`, `~/.pi/agent/sessions/--private-tmp-…--`) and kill the throwaway tmux server (`tmux -S $RAILS_HOME/tmux.sock kill-server`).
+- Never resume or open the user's real sessions in tests: `claude --resume` appends lines to the transcript even if you type nothing. Create scratch sessions instead.
+- Never kill tmux servers or rails processes you didn't start: the user's own `make dev` may be running on :4317/:5173, so test on other ports (`RAILS_PORT=4319`, `npx vite --port 5180`).
 
 ## Invariants
-- Provider transcripts are the source of truth. rails reads them and **never writes** them. The DB only stores projects and settings.
-- The server owns live agent processes. Every WS client subscribed to a session sees the same events. A client disconnecting must never kill an agent.
-- Message ids must be the same in the transcript and the live stream, because the client dedupes history against live messages by id. Claude uses `<entry uuid>:<blockIndex>`, and the SDK's `uuid` matches the transcript's (verified).
+- Provider transcripts are the source of truth for sessions. rails reads them and **never writes** them (the agents do, inside panels). The DB only stores projects, panels and layouts.
+- Panel processes live in tmux, not in the server. A browser disconnecting or the server restarting must never kill an agent; only closing the panel does.
+- The server's panel list is the source of truth; the saved layout is only an arrangement. Reconcile layout against the list, never the other way round.
+- The access token must never reach panel processes: keep the env cleaning in `tmux.ts`.
 - Discovery must stay cheap. Provider stores can be huge (pi is about 600MB here), so scans read only the head and tail of each file and cache by mtime and size. Never read whole files during a scan.
-- The web client must work over plain HTTP on the LAN or Tailscale, so don't use secure-context-only browser APIs (for example `crypto.randomUUID`). Use `randomId()` from `web/src/util.ts`.
+- The web client must work over plain HTTP on the LAN or Tailscale, so don't use secure-context-only browser APIs (for example `crypto.randomUUID` or the async clipboard API).
 - Keep server logic in plain service functions, not inside Hono route handlers. Routes should only parse input and call services, so the future home agent can reuse those services as tools.
 - Project paths are stored as realpaths, because agents record the real cwd (on macOS, `/tmp` is really `/private/tmp`).
 
 ## Gotchas
-- Live sessions exist only in server memory. Restarting the server stops them all, and `tsx watch` restarts it on every server file save. The transcripts survive, so the user can resume.
+- The server needs tmux >= 3.2 (`make system-deps`). Every rails home has its own tmux server (`$RAILS_HOME/tmux.sock`); panels survive server restarts but not a reboot.
+- node-pty's `spawn-helper` must be executable; the root `postinstall` fixes it. "posix_spawnp failed" means it didn't run.
+- xterm.js puts the class `terminal` on its own root, so don't use that class name for wrappers.
+- Terminals render with WebGL (`@xterm/addon-webgl`). xterm's DOM renderer lets rows drift wider than the grid (fallback glyphs like `─` and `•`), which clips the right edge. Keep padding off `.term-host`: the fit addon sizes from that element's CSS width.
+- Agent TUIs hard-wrap their output, so lines printed before a pane was narrowed stay clipped. That's normal terminal behaviour.
 - Imports use explicit `.ts` / `.tsx` extensions (`allowImportingTsExtensions`). The server runs TypeScript directly through `tsx` and has no build step.
-- Native `<select>` can't show images, so the agent picker shows text.
-- Only `claude` can run live today. pi and Codex are discovery plus read-only transcripts. Codex parsing is written from public docs and hasn't been tested on this machine.
+- Native `<select>` can't show images, so the home agent picker shows text.
+- Codex panels and Codex parsing are untested on this machine (Codex isn't installed).
+
+## Long-term direction
+The end goal is to port rails to a single Rust binary that runs as a desktop app (see `docs/roadmap.md`).
+Until then, keep the server easy to port: logic in plain service functions, the client/server contract
+fully described by the types in `packages/shared`, and no new Node-only dependencies without a good reason.
 
 ## Keeping docs current
 Update the docs in the same change as the code:
