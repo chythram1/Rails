@@ -25,6 +25,6 @@ These were decided in the initial design interview. Each one can be revisited in
    Commit and worktree-per-session come later.
 10. _(Superseded by ADR 0003: approvals happen inside each agent's TUI.)_ **Tool approvals happen in the UI.** Permission requests show up as cards that any client can answer.
     Each live session has a permission-mode selector.
-11. **Project suggestions:** the "Add project" dialog lists directories found in provider stores and also
+11. _(Superseded by ADR 0004: projects are added with the native folder picker.)_ **Project suggestions:** the "Add project" dialog lists directories found in provider stores and also
     accepts a manual path. Nothing is attached automatically.
 12. **No project-less sessions in v1.** Every session belongs to a project.

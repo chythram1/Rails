@@ -18,13 +18,6 @@ export interface Project {
   createdAt: string;
 }
 
-export interface ProjectSuggestion {
-  path: string;
-  providers: ProviderId[];
-  sessionCount: number;
-  lastActive: string;
-}
-
 /** `${provider}:${providerSessionId}` */
 export type SessionKey = string;
 export const sessionKey = (provider: ProviderId, id: string): SessionKey => `${provider}:${id}`;

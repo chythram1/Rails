@@ -1,4 +1,4 @@
-import type { GitStatus, Panel, PanelKind, Project, ProjectSuggestion, ProviderInfo, SessionSummary, Workspace } from "@rails/shared";
+import type { GitStatus, Panel, PanelKind, Project, ProviderInfo, SessionSummary, Workspace } from "@rails/shared";
 
 export class Unauthorized extends Error {}
 
@@ -29,9 +29,9 @@ export const api = {
   me: () => req<{ ok: true }>("/api/auth/me"),
   providers: () => req<ProviderInfo[]>("/api/providers"),
   projects: () => req<Project[]>("/api/projects"),
-  addProject: (path: string) => req<Project>("/api/projects", { method: "POST", body: JSON.stringify({ path }) }),
+  /** Opens the native folder picker on the server; null project means the user cancelled. */
+  pickProject: () => req<{ project: Project | null }>("/api/projects/pick", { method: "POST" }),
   removeProject: (id: string) => req("/api/projects/" + enc(id), { method: "DELETE" }),
-  suggestions: () => req<ProjectSuggestion[]>("/api/project-suggestions"),
   sessions: (projectId: string) => req<SessionSummary[]>(`/api/projects/${enc(projectId)}/sessions`),
   workspace: (projectId: string) => req<Workspace>(`/api/projects/${enc(projectId)}/workspace`),
   openPanel: (projectId: string, body: { kind: PanelKind; sessionId?: string; prompt?: string }) =>

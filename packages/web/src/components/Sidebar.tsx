@@ -5,15 +5,13 @@ import { api } from "../api.ts";
 import { href, navigate, type Route } from "../router.ts";
 import { useStore } from "../store.tsx";
 import { timeAgo } from "../util.ts";
-import { AddProjectDialog } from "./AddProjectDialog.tsx";
 import { PanelMenu } from "./PanelMenu.tsx";
 import { ProviderIcon } from "./ProviderIcon.tsx";
 
 const PAGE = 5;
 
 export function Sidebar({ route }: { route: Route }) {
-  const { projects, sessions, connected, activePanelId, refreshProjects } = useStore();
-  const [adding, setAdding] = useState(false);
+  const { projects, sessions, connected, activePanelId, refreshProjects, picking, addProject } = useStore();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   // Detach only: transcripts stay on disk, and adding the folder again brings the sessions back.
@@ -56,14 +54,14 @@ export function Sidebar({ route }: { route: Route }) {
 
       <div className="section-head">
         <span>Projects</span>
-        <button className="icon-btn" aria-label="Add project" title="Add project" onClick={() => setAdding(true)}>
+        <button className="icon-btn" aria-label="Add project" title={picking ? "Choose a folder in the window that opened" : "Add project"} disabled={picking} onClick={() => void addProject()}>
           <FolderPlus size={16} />
         </button>
       </div>
 
       <div className="tree">
         {projects.length === 0 && (
-          <button className="empty-hint" onClick={() => setAdding(true)}>
+          <button className="empty-hint" disabled={picking} onClick={() => void addProject()}>
             Add a project folder to see its agent sessions.
           </button>
         )}
@@ -100,7 +98,6 @@ export function Sidebar({ route }: { route: Route }) {
         {connected ? "Connected" : "Reconnecting…"}
         <span className="muted"> · {location.hostname}</span>
       </div>
-      {adding && <AddProjectDialog onClose={() => setAdding(false)} />}
     </aside>
   );
 }

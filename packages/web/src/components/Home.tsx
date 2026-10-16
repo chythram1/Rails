@@ -5,15 +5,13 @@ import { api } from "../api.ts";
 import { href, navigate } from "../router.ts";
 import { useStore } from "../store.tsx";
 import { providerLabel, tildify, timeAgo } from "../util.ts";
-import { AddProjectDialog } from "./AddProjectDialog.tsx";
 import { Composer, Select } from "./Composer.tsx";
 import { ProviderBadge } from "./ProviderBadge.tsx";
 
 export function Home() {
-  const { projects, providers, sessions } = useStore();
+  const { projects, providers, sessions, picking, addProject } = useStore();
   const [selected, setSelected] = useState("");
   const [provider, setProvider] = useState<ProviderId>("claude");
-  const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
 
@@ -74,8 +72,8 @@ export function Home() {
       {error && <p className="error" role="alert">{error}</p>}
 
       <div className="chips">
-        <button className="chip" onClick={() => setAdding(true)}>
-          <FolderPlus size={16} /> Add project
+        <button className="chip" disabled={picking} onClick={() => void addProject()}>
+          <FolderPlus size={16} /> {picking ? "Choose a folder in the window that opened…" : "Add project"}
         </button>
         {project && <span className="chip static" title={project.path}>{tildify(project.path)}</span>}
       </div>
@@ -102,7 +100,6 @@ export function Home() {
           </div>
         )}
       </section>
-      {adding && <AddProjectDialog onClose={() => setAdding(false)} />}
     </div>
   );
 }

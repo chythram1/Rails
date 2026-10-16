@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
-import type { ProviderId, ProviderInfo, ProjectSuggestion } from "@rails/shared";
+import type { ProviderId, ProviderInfo } from "@rails/shared";
 import { claudeDiscovery } from "./claude.ts";
 import { codexDiscovery } from "./codex.ts";
 import { piDiscovery } from "./pi.ts";
@@ -41,17 +41,4 @@ export async function findSession(provider: ProviderId, id: string): Promise<Dis
   const a = discovery[provider];
   if (!a?.available()) return undefined;
   return (await a.scan()).find((s) => s.id === id);
-}
-
-export async function suggestions(exclude: string[]): Promise<ProjectSuggestion[]> {
-  const byCwd = new Map<string, ProjectSuggestion>();
-  for (const s of await scanAll()) {
-    if (exclude.includes(s.cwd)) continue;
-    const g = byCwd.get(s.cwd) ?? { path: s.cwd, providers: [], sessionCount: 0, lastActive: s.updatedAt };
-    g.sessionCount++;
-    if (!g.providers.includes(s.provider)) g.providers.push(s.provider);
-    if (s.updatedAt > g.lastActive) g.lastActive = s.updatedAt;
-    byCwd.set(s.cwd, g);
-  }
-  return [...byCwd.values()].sort((a, b) => b.lastActive.localeCompare(a.lastActive)).slice(0, 30);
 }

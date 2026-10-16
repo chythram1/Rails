@@ -2,6 +2,7 @@ import { existsSync, realpathSync, statSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { sessionKey, type Project, type SessionSummary } from "@rails/shared";
 import { layouts, panels, projects } from "./db.ts";
+import { pickFolder } from "./picker.ts";
 import { sessionsFor } from "./providers/index.ts";
 
 /** An expected failure with the HTTP status the route should answer with. */
@@ -40,6 +41,17 @@ export function detachProject(id: string): void {
   if (n > 0) throw new ServiceError(`Close the ${n} open panel${n === 1 ? "" : "s"} in this project first.`, 409);
   layouts.remove(id);
   projects.remove(id);
+}
+
+/**
+ * Let the user choose a folder in the server's native folder picker and attach it. Picking a folder
+ * that is already a project returns that project. Returns null if the user cancelled.
+ */
+export async function attachPickedFolder(): Promise<Project | null> {
+  const path = await pickFolder();
+  if (!path) return null;
+  const real = realpathSync(path);
+  return projects.list().find((p) => p.path === real) ?? attachProject(real);
 }
 
 /** Sessions discovered inside a project's directory, newest first, with their open panel (if any). */

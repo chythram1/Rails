@@ -58,6 +58,10 @@ packages/
   only on networks you trust (LAN, Tailscale).
 - **Environment:** tmux and everything in it get the server's environment minus `RAILS_*` (the token),
   `npm_*`, `PI_*`, `CLAUDE_CODE_*`, `CLAUDECODE`, `NODE_ENV` and `INIT_CWD`.
+- **Adding projects** (ADR 0004): `POST /api/projects/pick` runs the OS folder picker on the server
+  (`picker.ts`: osascript on macOS, zenity then kdialog on Linux, PowerShell on Windows) and waits for
+  the user. Cancel returns `{project: null}`; a folder that's already a project returns that project.
+  The dialog shows on the server's screen, so it's meant for using rails on the host machine.
 - **Discovery** runs on request (sidebar refresh, about every 20s while the app is open, and after
   panel changes). It scans every provider store and keeps sessions whose cwd is the project directory
   or inside it. Per-file results are cached by mtime and size.
@@ -83,6 +87,8 @@ Transcript format notes are in [providers.md](./providers.md).
   (python3, make, a C++ compiler).
 - `npm install` runs a root `postinstall` that marks node-pty's `spawn-helper` executable
   (without it, spawning fails with `posix_spawnp failed`).
+- A desktop session on the server for the Add project folder picker. On Linux that means zenity or kdialog
+  and `DISPLAY` / `WAYLAND_DISPLAY`.
 
 ## Config / env
 

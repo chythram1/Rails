@@ -11,8 +11,8 @@ import { HOST, PORT, TOKEN } from "./config.ts";
 import { projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
 import { closePanel, getWorkspace, openPanel, saveLayout, type OpenPanel } from "./panels.ts";
-import { attachProject, detachProject, getProject, listProjectSessions, ServiceError } from "./projects.ts";
-import { providerInfo, suggestions } from "./providers/index.ts";
+import { attachPickedFolder, attachProject, detachProject, getProject, listProjectSessions, ServiceError } from "./projects.ts";
+import { providerInfo } from "./providers/index.ts";
 import { TerminalHub } from "./terminals.ts";
 import { version as tmuxVersion } from "./tmux.ts";
 
@@ -64,9 +64,8 @@ app.delete("/api/projects/:id", (c) => {
   return c.json({ ok: true });
 });
 
-app.get("/api/project-suggestions", async (c) =>
-  c.json(await suggestions(projects.list().map((p) => p.path))),
-);
+// Opens the native folder picker on the server's screen and waits for the user's choice.
+app.post("/api/projects/pick", async (c) => c.json({ project: await attachPickedFolder() }));
 
 app.get("/api/projects/:id/sessions", async (c) =>
   c.json(await listProjectSessions(c.req.param("id"))),
