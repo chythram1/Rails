@@ -1,15 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { FolderPlus } from "lucide-react";
 import type { ProviderId } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate } from "../router.ts";
 import { useStore } from "../store.tsx";
-import { providerLabel, tildify, timeAgo } from "../util.ts";
+import { providerLabel, tildify } from "../util.ts";
 import { Composer, Select } from "./Composer.tsx";
-import { ProviderBadge } from "./ProviderBadge.tsx";
 
 export function Home() {
-  const { projects, providers, sessions, picking, addProject } = useStore();
+  const { projects, providers, picking, addProject } = useStore();
   const [selected, setSelected] = useState("");
   const [provider, setProvider] = useState<ProviderId>("claude");
   const [error, setError] = useState("");
@@ -20,13 +19,6 @@ export function Home() {
   }, [projects, selected]);
 
   const project = projects.find((p) => p.id === selected);
-
-  const recent = useMemo(() => {
-    return projects
-      .flatMap((p) => (sessions[p.id] ?? []).map((s) => ({ ...s, projectId: p.id })))
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .slice(0, 9);
-  }, [projects, sessions]);
 
   /** Start the chosen agent's TUI with the prompt as its first message, in a new panel. */
   const start = async (text: string) => {
@@ -78,28 +70,6 @@ export function Home() {
         {project && <span className="chip static" title={project.path}>{tildify(project.path)}</span>}
       </div>
 
-      <section className="section">
-        <h2>Recent sessions</h2>
-        {recent.length === 0 ? (
-          <p className="muted">
-            {projects.length ? "No agent sessions found for your projects yet." : "Add a project folder and rails will find its Claude Code, Codex and pi sessions."}
-          </p>
-        ) : (
-          <div className="cards">
-            {recent.map((s) => (
-              <a key={s.key} className="card" href={href.session(s.projectId, s.key)}>
-                <div className="card-top">
-                  <ProviderBadge provider={s.provider} />
-                  <span className="muted small">{projects.find((p) => p.id === s.projectId)?.name}</span>
-                  {s.panelId && <span className="dot live" aria-label="open in a panel" />}
-                </div>
-                <div className="card-title">{s.title}</div>
-                <div className="muted small">{timeAgo(s.updatedAt)}</div>
-              </a>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 }
