@@ -40,7 +40,9 @@ packages/
   session id. Opening a session that already has a running panel returns that panel.
   `DELETE /api/panels/:id` kills the tmux session.
 - **Terminals:** each browser terminal sends `term.attach` with its size and a page-unique `attachId`; the server spawns
-  `tmux attach` in a PTY for it and streams bytes both ways. Killing that PTY only detaches. tmux
+  `tmux attach` in a PTY for it and streams bytes both ways. Killing that PTY only detaches. While a
+  browser terminal is being resized it refits (and reports `term.resize`) at most every 100ms, plus once at
+  the end, so dragging a divider doesn't make the agent redraw on every frame. tmux
   `window-size latest` sizes a panel shown on several devices to the one used last. Typing counts, and
   so does focusing a terminal: `TerminalView` sends a focus-in event (`ESC [ I`) when its terminal gains
   focus, which tmux treats as activity and swallows (tmux only forwards it to programs that asked for

@@ -5,6 +5,9 @@ import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { socket } from "../ws.ts";
 
+/** While a terminal is being resized (e.g. a divider drag), it refits at most this often (see below). */
+const RESIZE_THROTTLE_MS = 100;
+
 /** Ids for term.attach, unique across every terminal in this page (see `attach` below). */
 let lastAttachId = 0;
 
@@ -81,16 +84,27 @@ export function TerminalView({ panelId, focused }: Props) {
     const onFocus = () => socket.send({ type: "term.input", panelId, data: "\x1b[I" });
     t.textarea?.addEventListener("focus", onFocus);
 
-    let frame = 0;
+    // Refit at most every RESIZE_THROTTLE_MS during a drag (plus once at the end), not on every frame:
+    // each refit clears the terminal and makes tmux resize the window, so the agent redraws its whole
+    // screen, which flickers. Between refits the terminal keeps its size (clipped by .term-host, or with
+    // spare room at the edge).
+    let lastFit = 0;
+    let pending: ReturnType<typeof setTimeout> | undefined;
+    const fitThrottled = () => {
+      lastFit = performance.now();
+      fitNow();
+    };
     const observer = new ResizeObserver(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(fitNow);
+      clearTimeout(pending);
+      const wait = RESIZE_THROTTLE_MS - (performance.now() - lastFit);
+      if (wait <= 0) fitThrottled();
+      else pending = setTimeout(fitThrottled, wait);
     });
     observer.observe(el.current!);
 
     return () => {
       observer.disconnect();
-      cancelAnimationFrame(frame);
+      clearTimeout(pending);
       input.dispose();
       t.textarea?.removeEventListener("focus", onFocus);
       offData();
