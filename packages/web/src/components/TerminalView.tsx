@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { FitAddon } from "@xterm/addon-fit";
+import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { socket } from "../ws.ts";
@@ -37,6 +38,16 @@ export function TerminalView({ panelId, focused }: Props) {
     t.loadAddon(fit);
     t.open(el.current!);
     term.current = t;
+    // Draw with WebGL: every glyph lands on its exact cell. The default DOM renderer lays rows out as
+    // text, so fallback glyphs (─, •) that are slightly wider than a cell push the end of long rows past
+    // the edge, where they get clipped. Without WebGL (or if the context is lost) xterm keeps using the DOM.
+    try {
+      const webgl = new WebglAddon();
+      webgl.onContextLoss(() => webgl.dispose());
+      t.loadAddon(webgl);
+    } catch {
+      // no WebGL2: stay on the DOM renderer
+    }
 
     const fitNow = () => {
       if (!el.current?.clientWidth || !el.current.clientHeight) return; // hidden

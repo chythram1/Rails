@@ -133,6 +133,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - The server needs tmux >= 3.2 (`make system-deps`). Every rails home has its own tmux server (`$RAILS_HOME/tmux.sock`); panels survive server restarts but not a reboot.
 - node-pty's `spawn-helper` must be executable; the root `postinstall` fixes it. "posix_spawnp failed" means it didn't run.
 - xterm.js puts the class `terminal` on its own root, so don't use that class name for wrappers.
+- Terminals render with WebGL (`@xterm/addon-webgl`). xterm's DOM renderer lets rows drift wider than the grid (fallback glyphs like `─` and `•`), which clips the right edge. Keep padding off `.term-host`: the fit addon sizes from that element's CSS width.
 - Agent TUIs hard-wrap their output, so lines printed before a pane was narrowed stay clipped. That's normal terminal behaviour.
 - Imports use explicit `.ts` / `.tsx` extensions (`allowImportingTsExtensions`). The server runs TypeScript directly through `tsx` and has no build step.
 - Native `<select>` can't show images, so the home agent picker shows text.

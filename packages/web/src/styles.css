@@ -239,8 +239,10 @@ button.chip:hover { background: var(--hover); }
 .tab-close:hover { background: var(--hover); color: var(--text); }
 .header-add { display: flex; align-items: center; height: 100%; padding: 0 4px; }
 .shell-icon { color: var(--muted); flex-shrink: 0; }
-.panel-body { height: 100%; display: flex; flex-direction: column; background: var(--bg); }
-.term-host { flex: 1; min-height: 0; padding: 6px 0 0 10px; }
+/* The padding lives here, not on .term-host: xterm's fit addon sizes the terminal from its container's
+   CSS width, which (with border-box) would include the padding and clip the last column and row. */
+.panel-body { height: 100%; display: flex; flex-direction: column; padding: 6px 0 0 10px; background: var(--bg); }
+.term-host { flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
 .empty-workspace {
   height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 12px; padding: 24px; text-align: center;
