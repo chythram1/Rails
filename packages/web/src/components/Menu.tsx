@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 export type MenuItem = "separator" | MenuAction;
 
@@ -26,19 +26,55 @@ interface Props {
   items: MenuItem[];
 }
 
-/**
- * An icon button that opens a menu (see ref/project-menu.png). The menu is fixed-positioned so pane
- * headers and the sidebar can't clip it. Arrow keys move, a shortcut key picks, Escape closes.
- */
-export function MenuButton({ label, title, icon, className, align = "left", items }: Props) {
-  const [at, setAt] = useState<{ top: number; left?: number; right?: number } | null>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const menu = useRef<HTMLDivElement>(null);
+type Position = { top: number; left?: number; right?: number };
 
-  const close = (refocus: boolean) => {
+/**
+ * Open/close state and placement for a popover under a trigger button. The popover is fixed-positioned
+ * (so pane headers and the sidebar can't clip it), kept on screen, and closes on a click outside.
+ * Callers handle their own keys (Escape: `close(true)`).
+ */
+export function usePopover(align: "left" | "right") {
+  const [at, setAt] = useState<Position | null>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+
+  const close = useCallback((refocus: boolean) => {
     setAt(null);
     if (refocus) trigger.current?.focus();
+  }, []);
+
+  const toggle = () => {
+    if (at) return close(false);
+    const r = trigger.current!.getBoundingClientRect();
+    setAt(align === "right" ? { top: r.bottom + 6, right: innerWidth - r.right } : { top: r.bottom + 6, left: r.left });
   };
+
+  useEffect(() => {
+    if (!at) return;
+    const onPointer = (e: PointerEvent) => {
+      if (!panel.current?.contains(e.target as Node) && !trigger.current?.contains(e.target as Node)) close(false);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    return () => document.removeEventListener("pointerdown", onPointer);
+  }, [at, close]);
+
+  // Keep the popover on screen (e.g. right-aligned under a trigger in a narrow sidebar), before it's painted.
+  useLayoutEffect(() => {
+    const r = panel.current?.getBoundingClientRect();
+    if (!at || !r) return;
+    if (r.left < 8) setAt({ top: at.top, left: 8 });
+    else if (r.right > innerWidth - 8) setAt({ top: at.top, left: Math.max(8, innerWidth - 8 - r.width) });
+  }, [at]);
+
+  return { at, trigger, panel, close, toggle };
+}
+
+/**
+ * An icon button that opens a menu (see ref/project-menu.png). Arrow keys move, a shortcut key picks,
+ * Escape closes.
+ */
+export function MenuButton({ label, title, icon, className, align = "left", items }: Props) {
+  const { at, trigger, panel: menu, close, toggle } = usePopover(align);
 
   const pick = (item: MenuAction) => {
     if (item.disabled) return;
@@ -50,9 +86,6 @@ export function MenuButton({ label, title, icon, className, align = "left", item
     if (!at) return;
     const buttons = () => [...(menu.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [])];
     buttons()[0]?.focus();
-    const onPointer = (e: PointerEvent) => {
-      if (!menu.current?.contains(e.target as Node) && !trigger.current?.contains(e.target as Node)) close(false);
-    };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") return close(true);
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -70,27 +103,10 @@ export function MenuButton({ label, title, icon, className, align = "left", item
         pick(hit);
       }
     };
-    document.addEventListener("pointerdown", onPointer);
     document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
+    return () => document.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [at, items]);
-
-  // A right-aligned menu under a trigger near the left edge (e.g. a narrow sidebar) would start
-  // off-screen; pin it to the left edge instead, before it's painted.
-  useLayoutEffect(() => {
-    const left = menu.current?.getBoundingClientRect().left;
-    if (at && left !== undefined && left < 8) setAt({ top: at.top, left: 8 });
-  }, [at]);
-
-  const toggle = () => {
-    if (at) return close(false);
-    const r = trigger.current!.getBoundingClientRect();
-    setAt(align === "right" ? { top: r.bottom + 6, right: innerWidth - r.right } : { top: r.bottom + 6, left: Math.min(r.left, innerWidth - 240) });
-  };
 
   return (
     <>

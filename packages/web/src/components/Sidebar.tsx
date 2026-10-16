@@ -5,6 +5,7 @@ import { api } from "../api.ts";
 import { href, navigate, type Route } from "../router.ts";
 import { useStore } from "../store.tsx";
 import { timeAgo } from "../util.ts";
+import { FolderMenu } from "./FolderMenu.tsx";
 import { MenuButton } from "./Menu.tsx";
 import { PanelMenu } from "./PanelMenu.tsx";
 import { ProviderIcon } from "./ProviderIcon.tsx";
@@ -55,7 +56,7 @@ function useSidebarSize() {
 const clamp = (w: number) => Math.min(MAX_W, Math.max(MIN_W, Math.round(w)));
 
 export function Sidebar({ route }: { route: Route }) {
-  const { projects, sessions, connected, activePanelId, refreshProjects, picking, addProject } = useStore();
+  const { projects, sessions, connected, activePanelId, refreshProjects } = useStore();
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
   const [collapsed, toggleCollapsed] = useCollapsed();
   const [{ width, rail }, setSize] = useSidebarSize();
@@ -125,16 +126,16 @@ export function Sidebar({ route }: { route: Route }) {
 
       <div className="section-head">
         <span>Projects</span>
-        <button className="icon-btn" aria-label="Add project" title={picking ? "Choose a folder in the window that opened" : "Add project"} disabled={picking} onClick={() => void addProject()}>
+        <FolderMenu label="Add project" className="icon-btn">
           <FolderPlus size={16} />
-        </button>
+        </FolderMenu>
       </div>
 
       <div className="tree">
         {projects.length === 0 && (
-          <button className="empty-hint" disabled={picking} onClick={() => void addProject()}>
+          <FolderMenu label="Add project" className="empty-hint">
             Add a project folder to see its agent sessions.
-          </button>
+          </FolderMenu>
         )}
         {projects.map((p) => {
           const list = sessions[p.id] ?? [];

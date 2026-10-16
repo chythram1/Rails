@@ -10,6 +10,11 @@ suggested folders. Picking a folder that is already a project opens that project
 Why: the in-app dialog (path field, suggestions from provider stores, later a server-side folder browser)
 felt clunky, and suggestions kept offering projects the user had just removed.
 
+*Amended:* "Add project" now opens a small menu first (`ref/new-project.png`): a search field, a
+"Recent" list of folders where agents have sessions and that aren't projects yet (names only, newest
+first, at most 8 rows; picking one adds it), and "Open folder…", which runs the native picker as
+before. A removed project's folder shows up in Recent again, so re-adding it is one click.
+
 Consequences:
 - The picker appears on the **server's** screen. From another device (a phone over Tailscale) you can
   click Add project, but the dialog opens on the host machine. That's fine while rails is used on the host.

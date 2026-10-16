@@ -9,7 +9,7 @@ Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
 - "Needs attention" signal for panels (e.g. Claude Code hooks or terminal bell), lost with the chat UI
 - Provider logos in the home agent picker (needs a custom dropdown)
 - Adopt sessions running in the user's own terminal (today only panels started by rails are shared)
-- Adding projects from another device: the native folder picker opens on the server's screen (ADR 0004)
+- Adding projects from another device: Recent works anywhere, but "Open folder…" opens on the server's screen (ADR 0004)
 - Git actions: stage/commit, branch, and a worktree per session
 - Session search across projects
 - Show the session's model in the composer and let the user pick it

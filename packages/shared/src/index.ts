@@ -18,6 +18,14 @@ export interface Project {
   createdAt: string;
 }
 
+/** A folder where agents have sessions and that isn't a project yet, offered when adding a project. */
+export interface RecentFolder {
+  path: string;
+  /** The folder's own name (UI shows names, not paths). */
+  name: string;
+  lastActive: string;
+}
+
 /** `${provider}:${providerSessionId}` */
 export type SessionKey = string;
 export const sessionKey = (provider: ProviderId, id: string): SessionKey => `${provider}:${id}`;

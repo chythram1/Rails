@@ -155,7 +155,6 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
   border: 1px solid var(--border-strong); border-radius: 999px; font-size: 14px;
 }
 button.chip:hover { background: var(--hover); }
-.chip.static { color: var(--muted); font-family: var(--mono); font-size: 12px; }
 
 /* ---- composer ---- */
 .composer {
@@ -259,6 +258,14 @@ button.chip:hover { background: var(--hover); }
 .menu button.danger { color: var(--red); }
 .menu-key { margin-left: auto; padding-left: 16px; font: 13px var(--font); color: var(--muted); }
 .menu-sep { height: 1px; margin: 5px 10px; background: var(--border-strong); }
+.menu-heading { padding: 6px 10px 2px; font-size: 12px; color: var(--muted); }
+.menu-empty { padding: 5px 10px; font-size: 13px; color: var(--muted); }
+.menu button.active { background: var(--hover); }
+.folder-menu { width: 180px; min-width: 0; }
+.folder-menu button { padding: 5px 10px; font-size: 13px; }
+.folder-search { background: none; border: 0; outline: none; padding: 5px 10px; font-size: 13px; }
+.folder-search::placeholder { color: var(--muted); }
+.folder-list { display: flex; flex-direction: column; }
 .mobile-panels { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .mobile-tabs {
   display: flex; align-items: center; gap: 2px; padding: 0 4px; overflow-x: auto;

@@ -12,7 +12,7 @@ import { projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
 import { closePanel, getWorkspace, openPanel, saveLayout, type OpenPanel } from "./panels.ts";
 import { ServiceError } from "./errors.ts";
-import { attachPickedFolder, attachProject, detachProject, getProject, listProjectSessions } from "./projects.ts";
+import { attachPickedFolder, attachProject, detachProject, getProject, listProjectSessions, recentFolders } from "./projects.ts";
 import { providerInfo } from "./providers/index.ts";
 import { TerminalHub } from "./terminals.ts";
 import { version as tmuxVersion } from "./tmux.ts";
@@ -86,6 +86,8 @@ app.delete("/api/projects/:id", (c) => {
   detachProject(c.req.param("id"));
   return c.json({ ok: true });
 });
+
+app.get("/api/recent-folders", async (c) => c.json(await recentFolders()));
 
 // Opens the native folder picker on the server's screen and waits for the user's choice.
 app.post("/api/projects/pick", async (c) => c.json({ project: await attachPickedFolder() }));

@@ -10,5 +10,3 @@ export function timeAgo(iso: string): string {
 }
 
 export const providerLabel: Record<ProviderId, string> = { claude: "Claude Code", codex: "Codex", pi: "pi" };
-
-export const tildify = (p: string) => p.replace(/^\/Users\/[^/]+|^\/home\/[^/]+/, "~");

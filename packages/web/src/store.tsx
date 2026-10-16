@@ -16,7 +16,9 @@ interface Store {
   /** A native folder picker is open on the server, waiting for the user. */
   picking: boolean;
   /** Add a project by choosing its folder in the server's native folder picker, then open it. */
-  addProject(): Promise<void>;
+  openFolder(): Promise<void>;
+  /** Add a folder as a project and open it. */
+  chooseFolder(path: string): Promise<void>;
   refreshSessions(projectId: string): Promise<void>;
 }
 
@@ -62,7 +64,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, [refreshProjects, refreshSessions]);
 
-  const addProject = useCallback(async () => {
+  const openFolder = useCallback(async () => {
     setPicking(true);
     try {
       const { project } = await api.pickProject();
@@ -76,6 +78,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshProjects]);
 
-  const value: Store = { projects, providers, connected, sessions, activePanelId, setActivePanelId, refreshProjects, refreshSessions, picking, addProject };
+  const chooseFolder = useCallback(
+    async (path: string) => {
+      try {
+        const { id } = await api.addProject(path);
+        await refreshProjects();
+        navigate(href.project(id));
+      } catch (e: any) {
+        alert(e.message);
+      }
+    },
+    [refreshProjects],
+  );
+
+  const value: Store = {
+    projects,
+    providers,
+    connected,
+    sessions,
+    activePanelId,
+    setActivePanelId,
+    refreshProjects,
+    refreshSessions,
+    picking,
+    openFolder,
+    chooseFolder,
+  };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

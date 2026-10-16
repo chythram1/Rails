@@ -1,10 +1,10 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { basename, resolve } from "node:path";
-import { sessionKey, type Project, type SessionSummary } from "@rails/shared";
+import { sessionKey, type Project, type RecentFolder, type SessionSummary } from "@rails/shared";
 import { layouts, panels, projects } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { pickFolder } from "./picker.ts";
-import { sessionsFor } from "./providers/index.ts";
+import { scanAll, sessionsFor } from "./providers/index.ts";
 
 export function getProject(id: string): Project {
   const project = projects.get(id);
@@ -43,6 +43,23 @@ export async function attachPickedFolder(): Promise<Project | null> {
   if (!path) return null;
   const real = realpathSync(path);
   return projects.list().find((p) => p.path === real) ?? attachProject(real);
+}
+
+/**
+ * Folders where agents have sessions and that aren't projects yet, most recently active first. Folders
+ * that no longer exist are skipped.
+ */
+export async function recentFolders(): Promise<RecentFolder[]> {
+  const lastActive = new Map<string, string>();
+  for (const s of await scanAll()) {
+    const prev = lastActive.get(s.cwd);
+    if (!prev || s.updatedAt > prev) lastActive.set(s.cwd, s.updatedAt);
+  }
+  const attached = new Set(projects.list().map((p) => p.path));
+  return [...lastActive]
+    .filter(([path]) => !attached.has(path) && existsSync(path))
+    .sort((a, b) => b[1].localeCompare(a[1]))
+    .map(([path, active]) => ({ path, name: basename(path) || path, lastActive: active }));
 }
 
 /** Sessions discovered inside a project's directory, newest first, with their open panel (if any). */

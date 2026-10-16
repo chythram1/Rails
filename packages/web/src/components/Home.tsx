@@ -4,11 +4,12 @@ import type { ProviderId } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate } from "../router.ts";
 import { useStore } from "../store.tsx";
-import { providerLabel, tildify } from "../util.ts";
+import { providerLabel } from "../util.ts";
 import { Composer, Select } from "./Composer.tsx";
+import { FolderMenu } from "./FolderMenu.tsx";
 
 export function Home() {
-  const { projects, providers, picking, addProject } = useStore();
+  const { projects, providers, picking } = useStore();
   const [selected, setSelected] = useState("");
   const [provider, setProvider] = useState<ProviderId>("claude");
   const [error, setError] = useState("");
@@ -64,10 +65,9 @@ export function Home() {
       {error && <p className="error" role="alert">{error}</p>}
 
       <div className="chips">
-        <button className="chip" disabled={picking} onClick={() => void addProject()}>
+        <FolderMenu label="Add project" className="chip">
           <FolderPlus size={16} /> {picking ? "Choose a folder in the window that opened…" : "Add project"}
-        </button>
-        {project && <span className="chip static" title={project.path}>{tildify(project.path)}</span>}
+        </FolderMenu>
       </div>
 
     </div>
