@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Panel, PanelKind, Workspace } from "@rails/shared";
-import { api, ApiError } from "../api.ts";
+import { api } from "../api.ts";
 import { useStore } from "../store.tsx";
 import { socket } from "../ws.ts";
 
@@ -12,8 +12,6 @@ export function useWorkspace(projectId: string) {
   const { sessions, refreshSessions } = useStore();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [error, setError] = useState("");
-  /** A resume the server held back because the session looks active in another terminal (experimental). */
-  const [activeElsewhere, setActiveElsewhere] = useState<{ kind: PanelKind; sessionId: string; message: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -33,17 +31,15 @@ export function useWorkspace(projectId: string) {
 
   /** Open a new panel, or focus the panel an existing session is already open in. */
   const open = useCallback(
-    async (kind: PanelKind, sessionId?: string, force = false): Promise<Panel | undefined> => {
+    async (kind: PanelKind, sessionId?: string): Promise<Panel | undefined> => {
       setError("");
-      setActiveElsewhere(null);
       try {
-        const panel = await api.openPanel(projectId, { kind, sessionId, force });
+        const panel = await api.openPanel(projectId, { kind, sessionId });
         await load();
         void refreshSessions(projectId);
         return panel;
       } catch (e: any) {
-        if (e instanceof ApiError && e.code === "session_active" && sessionId) setActiveElsewhere({ kind, sessionId, message: e.message });
-        else setError(e.message);
+        setError(e.message);
       }
     },
     [projectId, load, refreshSessions],
@@ -68,17 +64,7 @@ export function useWorkspace(projectId: string) {
     [load, refreshSessions, projectId],
   );
 
-  return {
-    panels: workspace?.panels ?? null,
-    layout: workspace?.layout ?? null,
-    error,
-    setError,
-    activeElsewhere,
-    dismissActiveElsewhere: () => setActiveElsewhere(null),
-    open,
-    close,
-    title,
-  };
+  return { panels: workspace?.panels ?? null, layout: workspace?.layout ?? null, error, setError, open, close, title };
 }
 
 export type WorkspaceState = ReturnType<typeof useWorkspace>;

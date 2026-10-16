@@ -1,16 +1,6 @@
-import type { ErrorCode, GitStatus, Panel, PanelKind, Project, ProviderInfo, SessionSummary, Workspace } from "@rails/shared";
+import type { GitStatus, Panel, PanelKind, Project, ProviderInfo, SessionSummary, Workspace } from "@rails/shared";
 
 export class Unauthorized extends Error {}
-
-/** A failed API call. `code` is set when the server gives a reason the UI can act on. */
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    readonly code?: ErrorCode,
-  ) {
-    super(message);
-  }
-}
 
 const UNREACHABLE = "Can't reach the rails server. Check that it's running (make dev).";
 
@@ -28,7 +18,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   if (res.status === 401) throw new Unauthorized();
   const type = res.headers.get("content-type") ?? "";
   const body = type.includes("json") ? await res.json() : await res.text();
-  if (!res.ok) throw new ApiError((body as any)?.error ?? res.statusText, (body as any)?.code);
+  if (!res.ok) throw new Error((body as any)?.error ?? res.statusText);
   return body as T;
 }
 
@@ -44,7 +34,7 @@ export const api = {
   removeProject: (id: string) => req("/api/projects/" + enc(id), { method: "DELETE" }),
   sessions: (projectId: string) => req<SessionSummary[]>(`/api/projects/${enc(projectId)}/sessions`),
   workspace: (projectId: string) => req<Workspace>(`/api/projects/${enc(projectId)}/workspace`),
-  openPanel: (projectId: string, body: { kind: PanelKind; sessionId?: string; prompt?: string; force?: boolean }) =>
+  openPanel: (projectId: string, body: { kind: PanelKind; sessionId?: string; prompt?: string }) =>
     req<Panel>(`/api/projects/${enc(projectId)}/panels`, { method: "POST", body: JSON.stringify(body) }),
   closePanel: (id: string) => req("/api/panels/" + enc(id), { method: "DELETE" }),
   saveLayout: (projectId: string, layout: unknown) =>

@@ -8,7 +8,6 @@ Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
 - Verify Codex panels on a machine with Codex installed; map new Codex panels to their session id
 - "Needs attention" signal for panels (e.g. Claude Code hooks or terminal bell), lost with the chat UI
 - Provider logos in the home cards and agent picker (the picker needs a custom dropdown)
-- Decide whether to keep the experimental "session active elsewhere" warning (or detect the other process instead of using transcript age)
 - Adopt sessions already running in another terminal (can't take over a process; `rails-agent` covers new ones)
 - Adding projects from another device: the native folder picker opens on the server's screen (ADR 0004)
 - Git actions: stage/commit, branch, and a worktree per session
