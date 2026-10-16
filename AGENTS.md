@@ -107,7 +107,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - **New REST endpoint:** put the logic in a service module, add a thin route in `server/src/index.ts`, then add the client method in `web/src/api.ts`.
 - **How an agent is launched:** `command()` in `panels.ts` (flags for new vs resumed sessions). tmux behaviour (mouse, keys, sizing) lives in the config written by `tmux.ts`.
 - **Transcript parsing:** edit `providers/<id>.ts`, and update `docs/providers.md` with anything you learn about the format.
-- **UI:** reuse the tokens in `styles.css`, use `lucide-react` for icons and `ProviderIcon` for agent logos. The `better-*` skills in `.agents/skills/` cover UI review work.
+- **UI:** reuse the tokens in `styles.css`, use `lucide-react` for icons, `ProviderIcon` for agent logos and `MenuButton` (`components/Menu.tsx`) for dropdown menus (style: `ref/project-menu.png`). The `better-*` skills in `.agents/skills/` cover UI review work.
 
 ## Commands and verification
 - `make` lists the targets, which wrap the npm scripts. `make dev`/`start`/`install` first run `make system-deps`, which installs tmux (required) if it's missing. `make dev` runs the server on :4317 and Vite on :5173. Open the printed `?token=` URL.

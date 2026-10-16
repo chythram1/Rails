@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Boxes, CircleGauge, FolderMinus, FolderOpen, FolderPlus, Plus } from "lucide-react";
+import { Boxes, CircleGauge, EllipsisVertical, FolderOpen, FolderPlus, Plus } from "lucide-react";
 import type { PanelKind, Project, SessionSummary } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate, type Route } from "../router.ts";
 import { useStore } from "../store.tsx";
 import { timeAgo } from "../util.ts";
+import { MenuButton } from "./Menu.tsx";
 import { PanelMenu } from "./PanelMenu.tsx";
 import { ProviderIcon } from "./ProviderIcon.tsx";
 
@@ -74,9 +75,14 @@ export function Sidebar({ route }: { route: Route }) {
                 <a className={"project-name" + (route.name === "workspace" && route.projectId === p.id ? " active" : "")} href={href.project(p.id)} title={p.path}>
                   <FolderOpen size={16} /> <span className="truncate">{p.name}</span>
                 </a>
-                <button className="icon-btn reveal" aria-label={`Remove ${p.name} from rails`} title="Remove project" onClick={() => void remove(p)}>
-                  <FolderMinus size={16} />
-                </button>
+                <MenuButton
+                  label={`${p.name} actions`}
+                  title="More"
+                  icon={<EllipsisVertical size={16} />}
+                  className="reveal"
+                  align="right"
+                  items={[{ label: "Remove from rails", shortcut: "r", danger: true, onSelect: () => void remove(p) }]}
+                />
                 <PanelMenu onPick={(kind) => void startPanel(p, kind)} />
               </div>
               {shown.map((s) => (
