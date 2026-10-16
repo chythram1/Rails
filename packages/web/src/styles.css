@@ -214,6 +214,17 @@ button.chip:hover { background: var(--hover); }
   --dv-active-sash-color: var(--blue);
   font-family: var(--font);
 }
+/* Pane separators. Dockview draws a 1px line over the next pane's edge; widen it into a gutter and pad
+   that pane by the same amount so nothing is covered. Vertical (side-by-side) gutters are a bit wider
+   than horizontal (stacked) ones. Dockview positions the 4px drag handle centred on the pane boundary,
+   so it's widened to the gutter and shifted 2px to cover it exactly. */
+.dock { --gutter-v: 6px; --gutter-h: 4px; }
+.dock .dv-split-view-container.dv-horizontal > .dv-view-container > .dv-view:not(:first-child) { padding-left: var(--gutter-v); }
+.dock .dv-split-view-container.dv-horizontal > .dv-view-container > .dv-view:not(:first-child)::before { width: var(--gutter-v); }
+.dock .dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash { width: var(--gutter-v); transform: translateX(2px); }
+.dock .dv-split-view-container.dv-vertical > .dv-view-container > .dv-view:not(:first-child) { padding-top: var(--gutter-h); }
+.dock .dv-split-view-container.dv-vertical > .dv-view-container > .dv-view:not(:first-child)::before { height: var(--gutter-h); }
+.dock .dv-split-view-container.dv-vertical > .dv-sash-container > .dv-sash { height: var(--gutter-h); transform: translateY(2px); }
 .panel-tab { display: flex; align-items: center; gap: 8px; height: 100%; max-width: 240px; padding: 0 6px 0 12px; font-size: 13px; }
 .tab-close {
   display: grid; place-items: center; width: 20px; height: 20px; border-radius: 5px;
