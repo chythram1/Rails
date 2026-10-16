@@ -27,6 +27,12 @@ Production: `make start`, then open `http://<host>:4317/?token=…` (`make token
 Use `make dev-lan`, or set `RAILS_HOST=0.0.0.0`, to reach it from other devices (for example over Tailscale). The token is stored in
 `~/.rails/config.json`.
 
+Agents from your own terminal: `make cli` links `rails-agent` into `~/.local/bin`. Then
+`rails-agent claude` (or `codex`, `pi`, `shell`, optionally followed by a first prompt) starts the agent as
+a rails panel for the current folder and attaches your terminal to it. It's one process, so the terminal
+and the app stay in sync; detach with Ctrl-b d. An agent started with plain `claude` in another
+terminal is a separate process that rails can't follow live.
+
 Status:
 - Discovery for Claude Code, pi and Codex (Codex is untested)
 - Terminal panels running `claude`, `pi`, `codex` (untested) or a shell, backed by tmux so they survive

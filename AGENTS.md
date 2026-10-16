@@ -98,6 +98,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 | `packages/server/src/db.ts` | SQLite via `node:sqlite`: projects, panels, layouts. |
 | `packages/server/src/git.ts` | Read-only git status and diff through the git CLI. |
 | `packages/server/src/providers/` | One discovery adapter per provider (`scan`: cwd, title, dates from the head/tail of each transcript). `index.ts` holds the registry and `installed()`. |
+| `bin/rails-agent.mjs` | Terminal CLI (`make cli`): starts a panel for the current folder via the REST API and `tmux attach`es to it. No npm deps. |
 | `packages/web/src/components/Workspace.tsx` | The workspace: dockview layout (`Dock`), tabs, `+` menu, and the one-panel-at-a-time mobile view. Data comes from `useWorkspace.ts`. |
 | `packages/web/src/components/TerminalView.tsx` | One xterm.js terminal attached to a panel over the shared socket; re-attaches on reconnect, reports resizes. |
 | `packages/web/src/` | React SPA. `store.tsx` holds global state, `ws.ts` the shared socket with reconnect, `router.ts` hash routing, `api.ts` the REST client, `styles.css` all CSS (tokens at the top), `components/` the UI. |
