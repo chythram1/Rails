@@ -68,7 +68,8 @@ h1, h2 { font-weight: 500; margin: 0; }
 }
 /* right padding matches .project-row so the toggle lines up with the rows' + buttons */
 .brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px 8px 10px; }
-.brand-name { font-weight: 600; letter-spacing: -0.02em; font-size: 18px; }
+.brand-logo { display: block; flex-shrink: 0; }
+.toggle-logo { display: none; }
 /* Invisible drag handle on the sidebar's right edge (see Sidebar.tsx for the width limits); only the cursor changes. */
 .sidebar-resize { position: absolute; top: 0; right: -3px; width: 6px; height: 100%; cursor: col-resize; z-index: 6; }
 body.resizing { cursor: col-resize; user-select: none; }
@@ -304,7 +305,7 @@ button.chip:hover { background: var(--hover); }
 
 /* ---- desktop: collapsed sidebar shows an icon rail ---- */
 @media (min-width: 861px) {
-  .sidebar.rail .label, .sidebar.rail .brand-name, .sidebar.rail .section-head > span, .sidebar.rail .tree { display: none; }
+  .sidebar.rail .label, .sidebar.rail .brand-logo, .sidebar.rail .section-head > span, .sidebar.rail .tree { display: none; }
   .sidebar.rail .brand, .sidebar.rail .section-head { justify-content: center; padding-left: 0; padding-right: 0; }
   /* In the rail, the toggle and add-project buttons match the nav items (box, icon size, colour, spacing)
      so all the icons form one evenly spaced column. */
@@ -312,6 +313,10 @@ button.chip:hover { background: var(--hover); }
   .sidebar.rail :is(.brand, .section-head) .icon-btn { width: 100%; height: 36px; border-radius: 10px; color: #cfcfcf; }
   .sidebar.rail :is(.brand, .section-head) .icon-btn:hover { color: var(--text); }
   .sidebar.rail :is(.brand, .section-head) .icon-btn svg { width: 18px; height: 18px; }
+  /* Rail: the expand button shows the logo, and swaps to the panel icon on hover/focus. */
+  .sidebar.rail .toggle-logo { display: block; }
+  .sidebar.rail .brand .icon-btn:is(:hover, :focus-visible) .toggle-logo,
+  .sidebar.rail .brand .icon-btn:not(:hover, :focus-visible) .toggle-icon { display: none; }
   .sidebar.rail .nav-item { justify-content: center; padding: 9px 0; }
   .sidebar.rail .sidebar-foot { justify-content: center; padding: 12px 0; }
 }

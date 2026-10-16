@@ -3,6 +3,7 @@ import { Boxes, CircleGauge, EllipsisVertical, Folder, FolderOpen, FolderPlus, P
 import type { PanelKind, Project, SessionSummary } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate, type Route } from "../router.ts";
+import logo from "../assets/logo.svg";
 import { useStore } from "../store.tsx";
 import { timeAgo } from "../util.ts";
 import { FolderMenu } from "./FolderMenu.tsx";
@@ -108,14 +109,16 @@ export function Sidebar({ route }: { route: Route }) {
   return (
     <aside ref={aside} className={"sidebar" + (rail ? " rail" : "") + (dragging ? " dragging" : "")} style={{ width: rail ? RAIL_W : width }}>
       <div className="brand">
-        <span className="brand-name">rails</span>
+        <img className="brand-logo" src={logo} alt="rails" width={24} height={24} />
         <button
           className="icon-btn"
           aria-label={rail ? "Expand sidebar" : "Collapse sidebar"}
           title={rail ? "Expand sidebar" : "Collapse sidebar"}
           onClick={() => setSize((s) => ({ ...s, rail: !s.rail }))}
         >
-          <PanelLeft size={16} />
+          {/* In the icon rail this button shows the logo, and the panel icon on hover/focus. */}
+          <img className="toggle-logo" src={logo} alt="" width={22} height={22} />
+          <PanelLeft size={16} className="toggle-icon" />
         </button>
       </div>
       <nav className="nav">
