@@ -287,6 +287,12 @@ button.chip:hover { background: var(--hover); }
 @media (min-width: 861px) {
   .sidebar.rail .label, .sidebar.rail .brand-name, .sidebar.rail .section-head > span, .sidebar.rail .tree { display: none; }
   .sidebar.rail .brand, .sidebar.rail .section-head { justify-content: center; padding-left: 0; padding-right: 0; }
+  /* In the rail, the toggle and add-project buttons match the nav items (box, icon size, colour, spacing)
+     so all the icons form one evenly spaced column. */
+  .sidebar.rail .section-head { padding-top: 2px; padding-bottom: 0; }
+  .sidebar.rail .brand .icon-btn, .sidebar.rail .section-head .icon-btn { width: 100%; height: 36px; border-radius: 10px; color: #cfcfcf; }
+  .sidebar.rail .brand .icon-btn:hover, .sidebar.rail .section-head .icon-btn:hover { color: var(--text); }
+  .sidebar.rail .brand .icon-btn svg, .sidebar.rail .section-head .icon-btn svg { width: 18px; height: 18px; }
   .sidebar.rail .nav-item { justify-content: center; padding: 9px 0; }
   .sidebar.rail .sidebar-foot { justify-content: center; padding: 12px 0; }
 }
