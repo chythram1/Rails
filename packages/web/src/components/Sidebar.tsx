@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Boxes, CircleGauge, EllipsisVertical, FolderOpen, FolderPlus, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Boxes, CircleGauge, EllipsisVertical, Folder, FolderOpen, FolderPlus, Plus } from "lucide-react";
 import type { PanelKind, Project, SessionSummary } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate, type Route } from "../router.ts";
@@ -10,10 +10,31 @@ import { PanelMenu } from "./PanelMenu.tsx";
 import { ProviderIcon } from "./ProviderIcon.tsx";
 
 const PAGE = 5;
+const COLLAPSED_KEY = "rails.collapsedProjects";
+
+/** Ids of collapsed projects, remembered per device. */
+function useCollapsed() {
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "[]"));
+    } catch {
+      return new Set();
+    }
+  });
+  useEffect(() => localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsed])), [collapsed]);
+  const toggle = (id: string) =>
+    setCollapsed((s) => {
+      const next = new Set(s);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  return [collapsed, toggle] as const;
+}
 
 export function Sidebar({ route }: { route: Route }) {
   const { projects, sessions, connected, activePanelId, refreshProjects, picking, addProject } = useStore();
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [showAll, setShowAll] = useState<Record<string, boolean>>({});
+  const [collapsed, toggleCollapsed] = useCollapsed();
 
   // Detach only: transcripts stay on disk, and adding the folder again brings the sessions back.
   const remove = async (p: Project) => {
@@ -68,32 +89,42 @@ export function Sidebar({ route }: { route: Route }) {
         )}
         {projects.map((p) => {
           const list = sessions[p.id] ?? [];
-          const shown = expanded[p.id] ? list : list.slice(0, PAGE);
+          const shown = showAll[p.id] ? list : list.slice(0, PAGE);
+          const isOpen = !collapsed.has(p.id);
+          const active = route.name === "workspace" && route.projectId === p.id;
           return (
             <div key={p.id} className="project">
-              <div className="project-row">
-                <a className={"project-name" + (route.name === "workspace" && route.projectId === p.id ? " active" : "")} href={href.project(p.id)} title={p.path}>
-                  <FolderOpen size={16} /> <span className="truncate">{p.name}</span>
-                </a>
-                <MenuButton
+              {/* The whole row toggles the project's session list. Workspaces open from sessions and +. */}
+              <div className="project-row" onClick={() => toggleCollapsed(p.id)}>
+                <button className={"project-name" + (active ? " active" : "")} aria-expanded={isOpen} title={p.path}>
+                  {isOpen ? <FolderOpen size={16} /> : <Folder size={16} />} <span className="truncate">{p.name}</span>
+                </button>
+                {/* Row actions keep their own behaviour and don't toggle the row. */}
+                <span className="row-actions" onClick={(e) => e.stopPropagation()}>
+                  <MenuButton
                   label={`${p.name} actions`}
                   title="More"
                   icon={<EllipsisVertical size={16} />}
                   className="reveal"
                   align="right"
-                  items={[{ label: "Remove from rails", shortcut: "r", danger: true, onSelect: () => void remove(p) }]}
-                />
-                <PanelMenu onPick={(kind) => void startPanel(p, kind)} />
+                    items={[{ label: "Remove from rails", shortcut: "r", danger: true, onSelect: () => void remove(p) }]}
+                  />
+                  <PanelMenu onPick={(kind) => void startPanel(p, kind)} />
+                </span>
               </div>
-              {shown.map((s) => (
-                <SessionRow key={s.key} s={s} projectId={p.id} active={!!s.panelId && s.panelId === activePanelId} />
-              ))}
-              {list.length > PAGE && (
-                <button className="more" onClick={() => setExpanded((e) => ({ ...e, [p.id]: !e[p.id] }))}>
-                  {expanded[p.id] ? "Show less" : `Show ${list.length - PAGE} more`}
-                </button>
+              {isOpen && (
+                <>
+                  {shown.map((s) => (
+                    <SessionRow key={s.key} s={s} projectId={p.id} active={!!s.panelId && s.panelId === activePanelId} />
+                  ))}
+                  {list.length > PAGE && (
+                    <button className="more" onClick={() => setShowAll((e) => ({ ...e, [p.id]: !e[p.id] }))}>
+                      {showAll[p.id] ? "Show less" : `Show ${list.length - PAGE} more`}
+                    </button>
+                  )}
+                  {list.length === 0 && <div className="muted small indent">No sessions yet</div>}
+                </>
               )}
-              {list.length === 0 && <div className="muted small indent">No sessions yet</div>}
             </div>
           );
         })}

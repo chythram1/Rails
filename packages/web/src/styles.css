@@ -79,12 +79,15 @@ h1, h2 { font-weight: 500; margin: 0; }
 }
 .tree { flex: 1; overflow-y: auto; padding-bottom: 12px; }
 .project { margin-top: 6px; }
-.project-row { display: flex; align-items: center; padding-right: 4px; }
+.project-row { display: flex; align-items: center; padding-right: 4px; border-radius: 8px; cursor: pointer; }
+.project-row:hover { background: var(--hover); }
 .project-name {
   flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0;
-  padding: 7px 12px; color: #cfcfcf; border-radius: 8px;
+  padding: 7px 12px; color: #cfcfcf; text-align: left;
 }
-.project-name:hover, .project-name.active { color: var(--text); }
+.project-row:hover .project-name, .project-name.active { color: var(--text); }
+.row-actions { display: flex; align-items: center; }
+.project-row .icon-btn:hover, .project-row .icon-btn[aria-expanded="true"] { background: var(--border-strong); }
 /* Secondary row actions appear on hover or keyboard focus; always visible on touch screens. */
 .project-row .reveal { opacity: 0; }
 .project-row:hover .reveal, .project-row:focus-within .reveal, .reveal[aria-expanded="true"] { opacity: 1; }
