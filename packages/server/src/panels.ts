@@ -1,10 +1,23 @@
 import { randomUUID } from "node:crypto";
+import { userInfo } from "node:os";
 import type { Panel, PanelKind, ProviderId, Workspace } from "@rails/shared";
 import { layouts, panels } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { getProject } from "./projects.ts";
 import { discovery, findSession, installed } from "./providers/index.ts";
 import * as tmux from "./tmux.ts";
+
+/**
+ * The user's login shell from their account. Not $SHELL: shells like `nix develop` set it to their own
+ * bash, which would make every shell panel bash instead of the user's shell.
+ */
+function loginShell(): string {
+  try {
+    return userInfo().shell || process.env.SHELL || "/bin/sh";
+  } catch {
+    return process.env.SHELL || "/bin/sh";
+  }
+}
 
 /** Command line that reopens an existing session in its agent's TUI. */
 function resumeCommand(provider: ProviderId, sessionId: string): string[] {
@@ -33,7 +46,7 @@ function newCommand(kind: PanelKind, prompt: string | undefined): { argv: string
     case "codex":
       return { argv: ["codex", ...first] };
     case "shell":
-      return { argv: [process.env.SHELL || "/bin/sh", "-l"] };
+      return { argv: [loginShell(), "-l"] };
   }
 }
 
