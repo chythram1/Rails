@@ -10,7 +10,8 @@ import { WebSocketServer } from "ws";
 import { HOST, PORT, TOKEN } from "./config.ts";
 import { projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
-import { closePanel, getWorkspace, openPanel, saveLayout, type OpenPanel } from "./panels.ts";
+import type { OpenPanel } from "@rails/shared";
+import { closePanel, getWorkspace, openPanel, saveLayout } from "./panels.ts";
 import { ServiceError } from "./errors.ts";
 import { attachPickedFolder, attachProject, detachProject, getProject, listProjectSessions, recentFolders } from "./projects.ts";
 import { providerInfo } from "./providers/index.ts";
@@ -139,7 +140,7 @@ const server = serve({ fetch: app.fetch, hostname: HOST, port: PORT }, () => {
 const wss = new WebSocketServer({ noServer: true });
 server.on("upgrade", (req, socket, head) => {
   const url = new URL(req.url ?? "/", "http://x");
-  const cookie = /(?:^|;\s*)rails_token=([^;]+)/.exec(req.headers.cookie ?? "")?.[1];
+  const cookie = new RegExp(`(?:^|;\\s*)${COOKIE}=([^;]+)`).exec(req.headers.cookie ?? "")?.[1];
   const authorized = tokenOk(cookie && decodeURIComponent(cookie)) && sameOrigin(req.headers.origin, req.headers.host);
   if (url.pathname !== "/ws" || !authorized) {
     socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");

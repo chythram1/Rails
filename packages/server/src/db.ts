@@ -59,11 +59,8 @@ const toPanel = (r: PanelRow): Panel => ({
 });
 
 export const panels = {
-  list(projectId?: string): Panel[] {
-    const rows = projectId
-      ? db.prepare("SELECT * FROM panels WHERE project_id = ? ORDER BY created_at").all(projectId)
-      : db.prepare("SELECT * FROM panels ORDER BY created_at").all();
-    return (rows as PanelRow[]).map(toPanel);
+  list(projectId: string): Panel[] {
+    return (db.prepare("SELECT * FROM panels WHERE project_id = ? ORDER BY created_at").all(projectId) as PanelRow[]).map(toPanel);
   },
   get(id: string): Panel | undefined {
     const r = db.prepare("SELECT * FROM panels WHERE id = ?").get(id) as PanelRow | undefined;

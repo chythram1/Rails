@@ -31,7 +31,7 @@ export async function scanAll(): Promise<DiscoveredSession[]> {
   return results.flat();
 }
 
-export const isWithin = (cwd: string, dir: string) => cwd === dir || cwd.startsWith(dir.endsWith("/") ? dir : dir + "/");
+const isWithin = (cwd: string, dir: string) => cwd === dir || cwd.startsWith(dir.endsWith("/") ? dir : dir + "/");
 
 export async function sessionsFor(dir: string): Promise<DiscoveredSession[]> {
   return (await scanAll()).filter((s) => isWithin(s.cwd, dir)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));

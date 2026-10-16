@@ -1,4 +1,4 @@
-import type { GitStatus, Panel, PanelKind, Project, ProviderInfo, RecentFolder, SessionSummary, Workspace } from "@rails/shared";
+import type { GitStatus, OpenPanel, Panel, Project, ProviderInfo, RecentFolder, SessionSummary, Workspace } from "@rails/shared";
 
 export class Unauthorized extends Error {}
 
@@ -36,7 +36,7 @@ export const api = {
   removeProject: (id: string) => req("/api/projects/" + enc(id), { method: "DELETE" }),
   sessions: (projectId: string) => req<SessionSummary[]>(`/api/projects/${enc(projectId)}/sessions`),
   workspace: (projectId: string) => req<Workspace>(`/api/projects/${enc(projectId)}/workspace`),
-  openPanel: (projectId: string, body: { kind: PanelKind; sessionId?: string; prompt?: string }) =>
+  openPanel: (projectId: string, body: OpenPanel) =>
     req<Panel>(`/api/projects/${enc(projectId)}/panels`, { method: "POST", body: JSON.stringify(body) }),
   closePanel: (id: string) => req("/api/panels/" + enc(id), { method: "DELETE" }),
   saveLayout: (projectId: string, layout: unknown) =>

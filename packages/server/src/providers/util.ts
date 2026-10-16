@@ -5,7 +5,7 @@ import type { DiscoveredSession } from "./types.ts";
 const CHUNK = 64 * 1024;
 
 /** Parsed JSON lines from the first and last ~64KB of a JSONL file (partial lines dropped). */
-export async function headTail(file: string): Promise<{ head: any[]; tail: any[]; size: number; mtime: Date }> {
+export async function headTail(file: string): Promise<{ head: any[]; tail: any[]; mtime: Date }> {
   const st = await stat(file);
   const fh = await open(file, "r");
   try {
@@ -21,13 +21,13 @@ export async function headTail(file: string): Promise<{ head: any[]; tail: any[]
       const tailText = await read(Math.max(0, st.size - CHUNK), Math.min(CHUNK, st.size));
       tail = parseLines(tailText.slice(tailText.indexOf("\n") + 1));
     }
-    return { head, tail, size: st.size, mtime: st.mtime };
+    return { head, tail, mtime: st.mtime };
   } finally {
     await fh.close();
   }
 }
 
-export function parseLines(text: string): any[] {
+function parseLines(text: string): any[] {
   const out: any[] = [];
   for (const line of text.split("\n")) {
     if (!line.trim()) continue;
@@ -57,25 +57,20 @@ export async function walk(dir: string, pred: (name: string) => boolean, depth =
   return out;
 }
 
-/** Memoize per-file scan results by (mtime, size). */
-export function fileCache<T>() {
-  const cache = new Map<string, { key: string; value: T }>();
-  return async (file: string, compute: () => Promise<T>): Promise<T> => {
+/** Scan files with `scanFile`, caching each result by (mtime, size). Unreadable or unrecognized files are skipped. */
+export function cachedScanner(scanFile: (file: string) => Promise<DiscoveredSession | null>) {
+  const cache = new Map<string, { key: string; session: DiscoveredSession | null }>();
+  const scanCached = async (file: string) => {
     const st = await stat(file);
     const key = `${st.mtimeMs}:${st.size}`;
     const hit = cache.get(file);
-    if (hit?.key === key) return hit.value;
-    const value = await compute();
-    cache.set(file, { key, value });
-    return value;
+    if (hit?.key === key) return hit.session;
+    const session = await scanFile(file);
+    cache.set(file, { key, session });
+    return session;
   };
-}
-
-/** Scan files with `scanFile`, caching each result by (mtime, size). Unreadable or unrecognized files are skipped. */
-export function cachedScanner(scanFile: (file: string) => Promise<DiscoveredSession | null>) {
-  const cache = fileCache<DiscoveredSession | null>();
   return async (files: string[]): Promise<DiscoveredSession[]> => {
-    const out = await Promise.all(files.map((f) => cache(f, () => scanFile(f)).catch(() => null)));
+    const out = await Promise.all(files.map((f) => scanCached(f).catch(() => null)));
     return out.filter((s): s is DiscoveredSession => !!s);
   };
 }

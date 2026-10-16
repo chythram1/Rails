@@ -41,18 +41,18 @@ export class TerminalHub {
     const ptys = this.clients.get(ws)!;
     switch (msg.type) {
       case "term.attach": {
-        ptys.get(msg.panelId)?.kill();
-        if (!panels.get(msg.panelId)) return; // closed meanwhile; panels.changed updates the browser
-        const pty = tmux.attach(msg.panelId, msg.cols, msg.rows);
-        ptys.set(msg.panelId, pty);
         const { panelId, attachId } = msg;
+        ptys.get(panelId)?.kill();
+        if (!panels.get(panelId)) return; // closed meanwhile; panels.changed updates the browser
+        const pty = tmux.attach(panelId, msg.cols, msg.rows);
+        ptys.set(panelId, pty);
         pty.onData((data) => send(ws, { type: "term.data", panelId, attachId, data }));
         // A tmux client only exits on its own when its session ended: the process exited (`exit`, a
         // crash) or the panel was closed elsewhere. panelEnded removes the panel in the first case.
         pty.onExit(() => {
-          if (ptys.get(msg.panelId) !== pty) return; // replaced or detached on purpose
-          ptys.delete(msg.panelId);
-          void panelEnded(msg.panelId).catch(() => {});
+          if (ptys.get(panelId) !== pty) return; // replaced or detached on purpose
+          ptys.delete(panelId);
+          void panelEnded(panelId).catch(() => {});
         });
         return;
       }

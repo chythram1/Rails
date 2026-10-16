@@ -60,6 +60,15 @@ export interface Panel {
   createdAt: string;
 }
 
+/** Body of "open a panel" (POST /api/projects/:id/panels). */
+export interface OpenPanel {
+  kind: PanelKind;
+  /** Resume this existing session instead of starting a new one. */
+  sessionId?: string;
+  /** First message for a new agent session. */
+  prompt?: string;
+}
+
 /** A project's panels plus the saved dockview layout (opaque to the server). */
 export interface Workspace {
   panels: Panel[];
