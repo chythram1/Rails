@@ -39,12 +39,15 @@ packages/
   front (`--session-id`), so the panel knows its session immediately. New Codex panels don't know their
   session id. Opening a session that already has a running panel returns that panel.
   `DELETE /api/panels/:id` kills the tmux session.
-- **Terminals:** each browser terminal sends `term.attach` with its size; the server spawns
+- **Terminals:** each browser terminal sends `term.attach` with its size and a page-unique `attachId`; the server spawns
   `tmux attach` in a PTY for it and streams bytes both ways. Killing that PTY only detaches. tmux
   `window-size latest` sizes a panel shown on several devices to the one used last. Typing counts, and
   so does focusing a terminal: `TerminalView` sends a focus-in event (`ESC [ I`) when its terminal gains
   focus, which tmux treats as activity and swallows (tmux only forwards it to programs that asked for
   focus events).
+  Output is tagged with its `attachId`, and a terminal drops output from an earlier attach. Otherwise a
+  quick re-attach (remount, React StrictMode, reconnect) answers the old tmux client's terminal queries
+  too, and the new client types the extra reply (`?1;2c>0;276;0c`) into the program.
 - **Exits:** a panel closes itself when its process exits (`exit`, `/exit`, a crash). tmux has
   `remain-on-exit off`, so the session ends with the process; the attached browsers' tmux clients then
   exit, and `panelEnded` deletes the panel and broadcasts `panels.changed` so every device drops the tab.

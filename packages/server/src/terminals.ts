@@ -45,7 +45,8 @@ export class TerminalHub {
         if (!panels.get(msg.panelId)) return; // closed meanwhile; panels.changed updates the browser
         const pty = tmux.attach(msg.panelId, msg.cols, msg.rows);
         ptys.set(msg.panelId, pty);
-        pty.onData((data) => send(ws, { type: "term.data", panelId: msg.panelId, data }));
+        const { panelId, attachId } = msg;
+        pty.onData((data) => send(ws, { type: "term.data", panelId, attachId, data }));
         // A tmux client only exits on its own when its session ended: the process exited (`exit`, a
         // crash) or the panel was closed elsewhere. panelEnded removes the panel in the first case.
         pty.onExit(() => {

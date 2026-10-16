@@ -5,6 +5,9 @@ import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { socket } from "../ws.ts";
 
+/** Ids for term.attach, unique across every terminal in this page (see `attach` below). */
+let lastAttachId = 0;
+
 const THEME = {
   background: "#121212",
   foreground: "#ececec",
@@ -55,14 +58,19 @@ export function TerminalView({ panelId, focused }: Props) {
       fit.fit();
       if (t.cols !== cols || t.rows !== rows) socket.send({ type: "term.resize", panelId, cols: t.cols, rows: t.rows });
     };
+    // Only show output from this terminal's latest attach. Output still in flight from an earlier tmux
+    // client (a remount, React StrictMode's double effect, a reconnect) includes tmux's terminal queries;
+    // answering those too would send the new client a second reply, which tmux types into the program.
+    let attachId = 0;
     const attach = () => {
       fitNow();
       t.reset(); // tmux redraws the whole screen on attach
-      socket.send({ type: "term.attach", panelId, cols: t.cols, rows: t.rows });
+      attachId = ++lastAttachId;
+      socket.send({ type: "term.attach", panelId, attachId, cols: t.cols, rows: t.rows });
     };
 
     const offData = socket.on((m) => {
-      if (m.type === "term.data" && m.panelId === panelId) t.write(m.data);
+      if (m.type === "term.data" && m.panelId === panelId && m.attachId === attachId) t.write(m.data);
     });
     const offConn = socket.onConnection((up) => up && attach());
     if (socket.connected) attach();

@@ -77,13 +77,14 @@ export interface GitStatus {
 // Each attached panel gets its own tmux client on the server, sized to that browser's terminal.
 
 export type ClientMsg =
-  | { type: "term.attach"; panelId: string; cols: number; rows: number }
+  /** `attachId` is unique per attach; output is tagged with it so a terminal can ignore a previous attach's. */
+  | { type: "term.attach"; panelId: string; attachId: number; cols: number; rows: number }
   | { type: "term.detach"; panelId: string }
   | { type: "term.input"; panelId: string; data: string }
   | { type: "term.resize"; panelId: string; cols: number; rows: number };
 
 export type ServerMsg =
-  | { type: "term.data"; panelId: string; data: string }
+  | { type: "term.data"; panelId: string; attachId: number; data: string }
   /** A project's panels changed: opened, closed, or ended on their own (possibly on another device). */
   | { type: "panels.changed"; projectId: string }
   | { type: "error"; message: string };
