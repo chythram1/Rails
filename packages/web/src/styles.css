@@ -75,7 +75,8 @@ h1, h2 { font-weight: 500; margin: 0; }
 .nav-item.primary { background: var(--surface-2); color: var(--text); }
 .section-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 18px 12px 6px; color: var(--muted); font-size: 14px;
+  /* right padding matches .project-row so the add-project button lines up with the rows' + buttons */
+  padding: 18px 4px 6px 12px; color: var(--muted); font-size: 14px;
 }
 .tree { flex: 1; overflow-y: auto; padding-bottom: 12px; }
 .project { margin-top: 6px; }
