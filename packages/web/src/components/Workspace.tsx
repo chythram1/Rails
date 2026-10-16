@@ -177,7 +177,6 @@ function usePanel(id: string): Panel | undefined {
 }
 
 function TerminalPanel(props: IDockviewPanelProps) {
-  const ws = useWs();
   const panel = usePanel(props.api.id);
   const [active, setActive] = useState(props.api.isActive);
   useEffect(() => {
@@ -185,10 +184,11 @@ function TerminalPanel(props: IDockviewPanelProps) {
     return () => d.dispose();
   }, [props.api]);
   if (!panel) return null;
-  return <PanelBody panel={panel} focused={active} ws={ws} />;
+  return <PanelBody panel={panel} focused={active} />;
 }
 
-function PanelBody({ panel, focused, ws }: { panel: Panel; focused: boolean; ws: Ctx }) {
+function PanelBody({ panel, focused }: { panel: Panel; focused: boolean }) {
+  const ws = useWs();
   const exited = ws.exited.has(panel.id);
   return (
     <div className="panel-body">
@@ -285,7 +285,7 @@ function MobilePanels() {
         <PanelMenu onPick={(kind) => void ws.open(kind).then((p) => p && setActiveId(p.id))} />
       </div>
       {active ? (
-        <PanelBody key={active.id} panel={active} focused ws={ws} />
+        <PanelBody key={active.id} panel={active} focused />
       ) : (
         <p className="muted pad">No panels open. Tap + to start an agent or shell.</p>
       )}

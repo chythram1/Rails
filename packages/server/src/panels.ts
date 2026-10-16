@@ -1,22 +1,39 @@
 import { randomUUID } from "node:crypto";
-import type { Panel, PanelKind, Workspace } from "@rails/shared";
+import type { Panel, PanelKind, ProviderId, Workspace } from "@rails/shared";
 import { layouts, panels } from "./db.ts";
-import { getProject, ServiceError } from "./projects.ts";
+import { ServiceError } from "./errors.ts";
+import { getProject } from "./projects.ts";
 import { discovery, findSession, installed } from "./providers/index.ts";
 import * as tmux from "./tmux.ts";
 
-/** Command line for a panel. `resume` reopens an existing session; otherwise a new one starts. */
-function command(kind: PanelKind, sessionId: string | undefined, resume: boolean, prompt?: string): string[] {
+/** Command line that reopens an existing session in its agent's TUI. */
+function resumeCommand(provider: ProviderId, sessionId: string): string[] {
+  switch (provider) {
+    case "claude":
+      return ["claude", "--resume", sessionId];
+    case "pi":
+      return ["pi", "--session", sessionId];
+    case "codex":
+      return ["codex", "resume", sessionId];
+  }
+}
+
+/**
+ * Command line for a new panel; `prompt` becomes the agent's first message. Claude and pi accept a
+ * session id up front, so for them the panel knows its session immediately.
+ */
+function newCommand(kind: PanelKind, prompt: string | undefined): { argv: string[]; sessionId?: string } {
   const first = prompt ? ["--", prompt] : [];
+  const sessionId = randomUUID();
   switch (kind) {
     case "claude":
-      return resume ? ["claude", "--resume", sessionId!] : ["claude", "--session-id", sessionId!, ...first];
+      return { sessionId, argv: ["claude", "--session-id", sessionId, ...first] };
     case "pi":
-      return resume ? ["pi", "--session", sessionId!] : ["pi", "--session-id", sessionId!, ...first];
+      return { sessionId, argv: ["pi", "--session-id", sessionId, ...first] };
     case "codex":
-      return resume ? ["codex", "resume", sessionId!] : ["codex", ...first];
+      return { argv: ["codex", ...first] };
     case "shell":
-      return [process.env.SHELL || "/bin/sh", "-l"];
+      return { argv: [process.env.SHELL || "/bin/sh", "-l"] };
   }
 }
 
@@ -62,19 +79,18 @@ export async function openPanel(projectId: string, req: OpenPanel): Promise<Pane
     if (existing) {
       const state = (await tmux.sessionStates()).get(existing.id);
       const cwd = found?.cwd ?? project.path;
-      const argv = command(req.kind, req.sessionId, true);
+      const argv = resumeCommand(req.kind, req.sessionId);
       if (!state) await tmux.startSession(existing.id, cwd, argv);
       else if (state.dead) await tmux.respawn(existing.id, cwd, argv);
       return existing;
     }
     if (!found) throw new ServiceError("Session transcript not found", 404);
-    return start(project.id, req.kind, req.sessionId, found.title, found.cwd, command(req.kind, req.sessionId, true));
+    return start(project.id, req.kind, req.sessionId, found.title, found.cwd, resumeCommand(req.kind, req.sessionId));
   }
 
-  // Claude and pi accept a session id up front, so the panel knows its session immediately.
-  const sessionId = req.kind === "claude" || req.kind === "pi" ? randomUUID() : undefined;
+  const { argv, sessionId } = newCommand(req.kind, req.prompt?.trim() || undefined);
   const title = req.kind === "shell" ? "Shell" : discovery[req.kind].name;
-  return start(project.id, req.kind, sessionId, title, project.path, command(req.kind, sessionId, false, req.prompt?.trim() || undefined));
+  return start(project.id, req.kind, sessionId, title, project.path, argv);
 }
 
 async function start(projectId: string, kind: PanelKind, sessionId: string | undefined, title: string, cwd: string, argv: string[]) {

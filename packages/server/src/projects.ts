@@ -2,18 +2,9 @@ import { existsSync, realpathSync, statSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { sessionKey, type Project, type SessionSummary } from "@rails/shared";
 import { layouts, panels, projects } from "./db.ts";
+import { ServiceError } from "./errors.ts";
 import { pickFolder } from "./picker.ts";
 import { sessionsFor } from "./providers/index.ts";
-
-/** An expected failure with the HTTP status the route should answer with. */
-export class ServiceError extends Error {
-  constructor(
-    message: string,
-    readonly status: 400 | 404 | 409 | 503,
-  ) {
-    super(message);
-  }
-}
 
 export function getProject(id: string): Project {
   const project = projects.get(id);

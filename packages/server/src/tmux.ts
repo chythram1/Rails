@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { spawn, type IPty } from "node-pty";
 import { RAILS_HOME } from "./config.ts";
-import { ServiceError } from "./projects.ts";
+import { ServiceError } from "./errors.ts";
 
 const run = promisify(execFile);
 

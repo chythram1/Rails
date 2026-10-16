@@ -15,6 +15,8 @@ only reads transcripts for discovery (cwd, title, dates); the agents' TUIs rende
   - Also seen (ignored): `attachment`, `queue-operation`, `file-history-snapshot`, `system`, `last-prompt`, `agent-name`, `cost-state`, `mode`, `permission-mode`.
 - Common fields: `uuid`, `parentUuid`, `timestamp`, `cwd`, `sessionId`, `gitBranch`, `isSidechain`. Skip lines with `isSidechain: true`, which are subagent traffic.
 - For titles, lines with `isMeta: true` and user text starting with `<command-`, `<local-command` or `<system-reminder` are harness noise and get skipped.
+- `claude --resume` appends `mode`, `permission-mode` and `cost-state` lines on start, even without a
+  message, so the transcript's mtime (and its "last active" in rails) changes just from reopening it.
 - CLI (verified): `claude --session-id <uuid> [-- prompt]` starts a session with a known id; `claude --resume <id>` reopens one. The first run in a new folder shows Claude's folder-trust prompt.
 
 ## pi — `~/.pi/agent/sessions/--<cwd with / → ->--/<iso>_<sessionId>.jsonl`

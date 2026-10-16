@@ -90,7 +90,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 | `packages/shared/src/index.ts` | All domain and wire types, including the WebSocket protocol (`ClientMsg` / `ServerMsg`). No runtime deps. |
 | `packages/server/src/index.ts` | Hono routes, token auth, WebSocket upgrade, static serving in prod. |
 | `packages/server/src/config.ts` | Env vars and paths, plus the token in `~/.rails/config.json`. |
-| `packages/server/src/projects.ts` | Project services (`attachProject`, `attachPickedFolder`, `detachProject`, `getProject`, `listProjectSessions`). `ServiceError` carries an HTTP status, and `app.onError` turns it into a JSON error. |
+| `packages/server/src/projects.ts` | Project services (`attachProject`, `attachPickedFolder`, `detachProject`, `getProject`, `listProjectSessions`). Expected failures throw `ServiceError` (`errors.ts`), which carries an HTTP status; `app.onError` turns it into a JSON error. |
 | `packages/server/src/picker.ts` | The OS-native folder picker for Add project (macOS osascript, Linux zenity/kdialog, Windows PowerShell). It opens on the server's screen (ADR 0004). |
 | `packages/server/src/panels.ts` | Panel services (`getWorkspace`, `openPanel`, `closePanel`, `saveLayout`) and the CLI command line for each panel kind. Emits `onPanelsChanged`. |
 | `packages/server/src/tmux.ts` | Everything tmux: private socket and config in `RAILS_HOME`, start/kill/respawn sessions, exit states, `attach()` in a node-pty PTY, the cleaned environment. |
@@ -116,6 +116,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - Use throwaway state with `make dev-tmp` (LAN-reachable, `/tmp/rails-dev`, token `t`) or `RAILS_HOME=/tmp/x RAILS_TOKEN=t`. For `curl`, log in first with `POST /api/auth/login {"token":…}` and keep the cookie.
 - Browser testing on this machine: use `agent-browser-remote` (see the global AGENTS.md). Start dev with `make dev-tmp` (or `make dev-lan`) and open `http://100.101.76.38:5173/?token=…`. The mac-mini reaches it over Tailscale.
 - Panel tests run real agents with your logins. Use a scratch directory, then delete the transcripts they leave (`~/.claude/projects/-private-tmp-…`, `~/.pi/agent/sessions/--private-tmp-…--`) and kill the throwaway tmux server (`tmux -S $RAILS_HOME/tmux.sock kill-server`).
+- Never resume or open the user's real sessions in tests: `claude --resume` appends lines to the transcript even if you type nothing. Create scratch sessions instead.
 - Never kill tmux servers or rails processes you didn't start: the user's own `make dev` may be running on :4317/:5173, so test on other ports (`RAILS_PORT=4319`, `npx vite --port 5180`).
 
 ## Invariants
