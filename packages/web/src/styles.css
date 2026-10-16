@@ -240,6 +240,9 @@ button.chip:hover { background: var(--hover); }
    CSS width, which (with border-box) would include the padding and clip the last column and row. */
 .panel-body { height: 100%; display: flex; flex-direction: column; padding: 6px 0 0 10px; background: var(--bg); }
 .term-host { flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
+/* xterm's own scrollbar has nothing to scroll (scrollback: 0; tmux keeps the history and the mouse wheel
+   scrolls it), yet it shows on hover over the last columns. xterm 6 has no option to turn it off. */
+.term-host .xterm .scrollbar { display: none; }
 .empty-workspace {
   height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 12px; padding: 24px; text-align: center; position: relative;
