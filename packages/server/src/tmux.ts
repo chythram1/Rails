@@ -20,7 +20,7 @@ writeFileSync(
     "set -g mouse on", // wheel scrolls tmux history (the browser terminal only sees the screen)
     "set -g history-limit 50000",
     "set -s escape-time 0", // TUIs need Esc without delay
-    "set -g remain-on-exit on", // keep the last output visible after the process exits
+    "set -g remain-on-exit off", // a panel's session ends with its process, so the panel closes itself
     "set -g window-size latest", // several devices: the one typing last sets the size
     'set -g default-terminal "tmux-256color"',
     'set -as terminal-features ",xterm-256color:RGB"',
@@ -72,18 +72,16 @@ export async function startSession(panelId: string, cwd: string, argv: string[])
   await tmux("source-file", CONF); // apply config changes to an already-running tmux server
 }
 
-/** Re-run a panel's (exited) process with a new command, keeping the session and its scrollback. */
-export async function respawn(panelId: string, cwd: string, argv: string[]): Promise<void> {
-  await tmux("respawn-pane", "-k", "-t", sessionName(panelId), "-c", cwd, "--", ...argv);
-}
-
 export async function killSession(panelId: string): Promise<void> {
   await tmux("kill-session", "-t", sessionName(panelId)).catch(() => {}); // already gone is fine
 }
 
-/** State of every rails tmux session: panel id -> whether its process has exited. */
-export async function sessionStates(): Promise<Map<string, { dead: boolean }>> {
-  const out = new Map<string, { dead: boolean }>();
+/**
+ * Panel ids whose process is still running. Dead panes left over from older rails versions (which
+ * kept exited panes on screen) don't count.
+ */
+export async function runningPanels(): Promise<Set<string>> {
+  const out = new Set<string>();
   let stdout = "";
   try {
     ({ stdout } = await tmux("list-panes", "-a", "-F", "#{session_name} #{pane_dead}"));
@@ -93,7 +91,7 @@ export async function sessionStates(): Promise<Map<string, { dead: boolean }>> {
   }
   for (const line of stdout.split("\n")) {
     const [name, dead] = line.split(" ");
-    if (name?.startsWith("p-")) out.set(name.slice(2), { dead: dead === "1" });
+    if (name?.startsWith("p-") && dead !== "1") out.add(name.slice(2));
   }
   return out;
 }

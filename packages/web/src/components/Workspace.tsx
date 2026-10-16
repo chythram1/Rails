@@ -188,24 +188,9 @@ function TerminalPanel(props: IDockviewPanelProps) {
 }
 
 function PanelBody({ panel, focused }: { panel: Panel; focused: boolean }) {
-  const ws = useWs();
-  const exited = ws.exited.has(panel.id);
   return (
     <div className="panel-body">
-      <TerminalView panelId={panel.id} focused={focused} onExited={() => ws.markExited(panel.id)} />
-      {exited && (
-        <div className="exited-bar" role="status">
-          <span>The process exited.</span>
-          {panel.kind !== "shell" && panel.sessionId && (
-            <button className="btn small" onClick={() => void ws.open(panel.kind, panel.sessionId)}>
-              Resume
-            </button>
-          )}
-          <button className="btn small" onClick={() => void ws.close(panel)}>
-            Close panel
-          </button>
-        </div>
-      )}
+      <TerminalView panelId={panel.id} focused={focused} />
     </div>
   );
 }
@@ -216,7 +201,7 @@ function PanelTab(props: IDockviewPanelHeaderProps) {
   if (!panel) return null;
   const title = ws.title(panel);
   return (
-    <div className={"panel-tab" + (ws.exited.has(panel.id) ? " exited" : "")} title={title}>
+    <div className="panel-tab" title={title}>
       <PanelIcon kind={panel.kind} />
       <span className="truncate">{title}</span>
       <button

@@ -42,15 +42,27 @@ const listeners = new Set<(projectId: string) => void>();
 export const onPanelsChanged = (fn: (projectId: string) => void) => listeners.add(fn);
 const changed = (projectId: string) => listeners.forEach((fn) => fn(projectId));
 
-/** A project's panels and saved layout. Panels whose tmux session vanished (e.g. reboot) are dropped. */
+/** Drop a panel whose process ended (`exit`, a crash, a reboot) and tell every browser. */
+async function removeEnded(panel: Panel): Promise<void> {
+  await tmux.killSession(panel.id); // clears a dead pane left by older rails versions
+  panels.remove(panel.id);
+  changed(panel.projectId);
+}
+
+/** Called when a browser's tmux client exits on its own: if the panel's process ended, remove the panel. */
+export async function panelEnded(id: string): Promise<void> {
+  const panel = panels.get(id);
+  if (panel && !(await tmux.runningPanels()).has(id)) await removeEnded(panel);
+}
+
+/** A project's panels and saved layout. Panels whose process ended while nobody was watching are dropped. */
 export async function getWorkspace(projectId: string): Promise<Workspace> {
   getProject(projectId);
-  const states = await tmux.sessionStates();
+  const running = await tmux.runningPanels();
   const list: Panel[] = [];
   for (const p of panels.list(projectId)) {
-    const state = states.get(p.id);
-    if (!state) panels.remove(p.id);
-    else list.push({ ...p, exited: state.dead });
+    if (running.has(p.id)) list.push(p);
+    else await removeEnded(p);
   }
   return { panels: list, layout: layouts.get(projectId) };
 }
@@ -63,10 +75,7 @@ export interface OpenPanel {
   prompt?: string;
 }
 
-/**
- * Open a panel. Opening a session that already has a panel returns that panel, restarting its
- * process if it had exited.
- */
+/** Open a panel. Opening a session that already has a running panel returns that panel. */
 export async function openPanel(projectId: string, req: OpenPanel): Promise<Panel> {
   const project = getProject(projectId);
   if (!["claude", "codex", "pi", "shell"].includes(req.kind)) throw new ServiceError("Unknown panel kind", 400);
@@ -77,12 +86,8 @@ export async function openPanel(projectId: string, req: OpenPanel): Promise<Pane
     const found = await findSession(req.kind, req.sessionId);
     const existing = panels.bySession(req.sessionId);
     if (existing) {
-      const state = (await tmux.sessionStates()).get(existing.id);
-      const cwd = found?.cwd ?? project.path;
-      const argv = resumeCommand(req.kind, req.sessionId);
-      if (!state) await tmux.startSession(existing.id, cwd, argv);
-      else if (state.dead) await tmux.respawn(existing.id, cwd, argv);
-      return existing;
+      if ((await tmux.runningPanels()).has(existing.id)) return existing;
+      await removeEnded(existing); // its process ended but nobody noticed yet; start a fresh panel
     }
     if (!found) throw new ServiceError("Session transcript not found", 404);
     return start(project.id, req.kind, req.sessionId, found.title, found.cwd, resumeCommand(req.kind, req.sessionId));

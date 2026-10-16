@@ -2,10 +2,8 @@ import type { IPty } from "node-pty";
 import type WebSocket from "ws";
 import type { ClientMsg, ServerMsg } from "@rails/shared";
 import { panels } from "./db.ts";
-import { onPanelsChanged } from "./panels.ts";
+import { onPanelsChanged, panelEnded } from "./panels.ts";
 import * as tmux from "./tmux.ts";
-
-const EXIT_POLL_MS = 2000;
 
 /**
  * Connects browser terminals to panels. Every attached panel gets its own tmux client (a PTY) sized to
@@ -13,8 +11,6 @@ const EXIT_POLL_MS = 2000;
  */
 export class TerminalHub {
   private clients = new Map<WebSocket, Map<string, IPty>>();
-  private dead = new Set<string>();
-  private poll?: NodeJS.Timeout;
 
   constructor() {
     onPanelsChanged((projectId) => this.broadcast({ type: "panels.changed", projectId }));
@@ -38,7 +34,6 @@ export class TerminalHub {
     ws.on("close", () => {
       for (const pty of this.clients.get(ws)?.values() ?? []) pty.kill();
       this.clients.delete(ws);
-      this.updatePolling();
     });
   }
 
@@ -47,24 +42,23 @@ export class TerminalHub {
     switch (msg.type) {
       case "term.attach": {
         ptys.get(msg.panelId)?.kill();
-        if (!panels.get(msg.panelId)) return send(ws, { type: "term.exited", panelId: msg.panelId });
+        if (!panels.get(msg.panelId)) return; // closed meanwhile; panels.changed updates the browser
         const pty = tmux.attach(msg.panelId, msg.cols, msg.rows);
         ptys.set(msg.panelId, pty);
         pty.onData((data) => send(ws, { type: "term.data", panelId: msg.panelId, data }));
-        // The tmux client only exits on its own when the session is gone (panel closed elsewhere).
+        // A tmux client only exits on its own when its session ended: the process exited (`exit`, a
+        // crash) or the panel was closed elsewhere. panelEnded removes the panel in the first case.
         pty.onExit(() => {
           if (ptys.get(msg.panelId) !== pty) return; // replaced or detached on purpose
           ptys.delete(msg.panelId);
-          send(ws, { type: "term.exited", panelId: msg.panelId });
+          void panelEnded(msg.panelId).catch(() => {});
         });
-        this.updatePolling();
         return;
       }
       case "term.detach": {
         const pty = ptys.get(msg.panelId);
         ptys.delete(msg.panelId);
         pty?.kill();
-        this.updatePolling();
         return;
       }
       case "term.input":
@@ -74,27 +68,6 @@ export class TerminalHub {
         if (msg.cols > 0 && msg.rows > 0) ptys.get(msg.panelId)?.resize(msg.cols, msg.rows);
         return;
     }
-  }
-
-  /** Poll tmux for exited processes, but only while some terminal is attached. */
-  private updatePolling() {
-    const attached = [...this.clients.values()].some((m) => m.size > 0);
-    if (attached && !this.poll) this.poll = setInterval(() => void this.checkExits(), EXIT_POLL_MS);
-    if (!attached && this.poll) {
-      clearInterval(this.poll);
-      this.poll = undefined;
-    }
-  }
-
-  private async checkExits() {
-    const states = await tmux.sessionStates();
-    for (const [ws, ptys] of this.clients) {
-      for (const panelId of ptys.keys()) {
-        const dead = states.get(panelId)?.dead ?? false;
-        if (dead && !this.dead.has(panelId)) send(ws, { type: "term.exited", panelId });
-      }
-    }
-    this.dead = new Set([...states].filter(([, s]) => s.dead).map(([id]) => id));
   }
 
   private broadcast(m: ServerMsg) {

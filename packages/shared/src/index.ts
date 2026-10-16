@@ -50,8 +50,6 @@ export interface Panel {
   sessionId?: string;
   title: string;
   createdAt: string;
-  /** The process has exited; the panel still shows its last output. */
-  exited?: boolean;
 }
 
 /** A project's panels plus the saved dockview layout (opaque to the server). */
@@ -86,8 +84,6 @@ export type ClientMsg =
 
 export type ServerMsg =
   | { type: "term.data"; panelId: string; data: string }
-  /** The panel's process exited (its last output stays on screen). */
-  | { type: "term.exited"; panelId: string }
-  /** A project's panels changed (opened or closed, possibly from another device). */
+  /** A project's panels changed: opened, closed, or ended on their own (possibly on another device). */
   | { type: "panels.changed"; projectId: string }
   | { type: "error"; message: string };

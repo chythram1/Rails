@@ -12,14 +12,11 @@ import { socket } from "../ws.ts";
 export function useWorkspace(projectId: string) {
   const { sessions, refreshSessions } = useStore();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [exited, setExited] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const w = await api.workspace(projectId);
-      setWorkspace(w);
-      setExited(new Set(w.panels.filter((p) => p.exited).map((p) => p.id)));
+      setWorkspace(await api.workspace(projectId));
     } catch (e: any) {
       setError(e.message);
     }
@@ -33,7 +30,7 @@ export function useWorkspace(projectId: string) {
     });
   }, [projectId, load]);
 
-  /** Open a new panel, or the panel of an existing session (restarting it if it had exited). */
+  /** Open a new panel, or focus the panel an existing session is already open in. */
   const open = useCallback(
     async (kind: PanelKind, sessionId?: string): Promise<Panel | undefined> => {
       setError("");
@@ -54,13 +51,11 @@ export function useWorkspace(projectId: string) {
     [sessions, projectId],
   );
 
-  /** Close a panel, which stops its process. Asks first unless the process already exited. */
+  /** Close a panel, which stops its process. (A process that exits on its own closes its panel.) */
   const close = useCallback(
     async (p: Panel) => {
-      if (!exited.has(p.id)) {
-        const what = p.kind === "shell" ? "Anything running in this shell stops." : `This stops ${providerLabel[p.kind]}. You can resume the session from the sidebar.`;
-        if (!confirm(`Close "${title(p)}"?\n\n${what}`)) return;
-      }
+      const what = p.kind === "shell" ? "Anything running in this shell stops." : `This stops ${providerLabel[p.kind]}. You can resume the session from the sidebar.`;
+      if (!confirm(`Close "${title(p)}"?\n\n${what}`)) return;
       try {
         await api.closePanel(p.id);
       } catch (e: any) {
@@ -69,12 +64,10 @@ export function useWorkspace(projectId: string) {
       await load();
       void refreshSessions(projectId);
     },
-    [exited, title, load, refreshSessions, projectId],
+    [title, load, refreshSessions, projectId],
   );
 
-  const markExited = useCallback((id: string) => setExited((s) => new Set(s).add(id)), []);
-
-  return { panels: workspace?.panels ?? null, layout: workspace?.layout ?? null, exited, error, setError, open, close, title, markExited };
+  return { panels: workspace?.panels ?? null, layout: workspace?.layout ?? null, error, setError, open, close, title };
 }
 
 export type WorkspaceState = ReturnType<typeof useWorkspace>;

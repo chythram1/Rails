@@ -25,6 +25,9 @@ Decisions:
 7. **Starting agents:** a sidebar session opens (or focuses) its panel; each pane's `+` starts a new
    agent or shell; the home composer starts the chosen agent with the prompt as its first message.
 
+   *Amended:* a panel also closes itself when its process exits (`exit`, `/exit`, a crash); tmux runs with
+   `remain-on-exit off`. Originally exited panels stayed on screen until closed by hand, which felt broken.
+
 Consequences:
 - A web terminal is remote shell access. Token auth and the localhost-by-default bind (ADR 0001 #5)
   matter more now.

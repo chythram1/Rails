@@ -22,7 +22,7 @@ packages/
  browser(s) ──HTTP /api/*──▶ Hono (index.ts) ──▶ services: projects.ts, panels.ts, git.ts
      ▲                                             │          │
      │                                             │          ├─▶ db.ts: projects, panels, layouts (SQLite)
-     │                                             │          └─▶ tmux.ts: new-session / kill / respawn
+     │                                             │          └─▶ tmux.ts: new-session / kill / running panels
      │                                             └─▶ providers/*: scan transcripts (read-only)
      │
      └──── WS /ws ◀── TerminalHub (terminals.ts) ──▶ node-pty: `tmux attach -t p-<panelId>`
@@ -37,13 +37,15 @@ packages/
 - **Panels:** `POST /api/projects/:id/panels` creates a DB row and a detached tmux session running the
   agent's CLI in the project (or the session's recorded cwd). Claude and pi get their session id up
   front (`--session-id`), so the panel knows its session immediately. New Codex panels don't know their
-  session id. Opening a session that already has a panel returns that panel and restarts its process
-  if it exited (`tmux respawn-pane`). `DELETE /api/panels/:id` kills the tmux session.
+  session id. Opening a session that already has a running panel returns that panel.
+  `DELETE /api/panels/:id` kills the tmux session.
 - **Terminals:** each browser terminal sends `term.attach` with its size; the server spawns
   `tmux attach` in a PTY for it and streams bytes both ways. Killing that PTY only detaches. tmux
   `window-size latest` sizes a shared window to the device that typed last.
-- **Exits:** tmux keeps exited panes visible (`remain-on-exit`). While any terminal is attached, the
-  hub polls tmux every 2s and sends `term.exited` for newly dead panes.
+- **Exits:** a panel closes itself when its process exits (`exit`, `/exit`, a crash). tmux has
+  `remain-on-exit off`, so the session ends with the process; the attached browsers' tmux clients then
+  exit, and `panelEnded` deletes the panel and broadcasts `panels.changed` so every device drops the tab.
+  Panels that ended while no browser was attached are dropped on the next workspace read.
 - **Persistence:** panels survive browser disconnects and server restarts (`tsx watch` included).
   On a reboot the tmux server is gone; the next workspace read drops panels whose tmux session no
   longer exists. Their transcripts remain, so sessions can be resumed from the sidebar.

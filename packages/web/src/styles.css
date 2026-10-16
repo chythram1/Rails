@@ -228,7 +228,6 @@ button.chip:hover { background: var(--hover); }
   font-family: var(--font);
 }
 .panel-tab { display: flex; align-items: center; gap: 8px; height: 100%; max-width: 240px; padding: 0 6px 0 12px; font-size: 13px; }
-.panel-tab.exited > .truncate { opacity: 0.55; text-decoration: line-through; }
 .tab-close {
   display: grid; place-items: center; width: 20px; height: 20px; border-radius: 5px;
   color: var(--muted); flex-shrink: 0; opacity: 0;
@@ -239,11 +238,6 @@ button.chip:hover { background: var(--hover); }
 .shell-icon { color: var(--muted); flex-shrink: 0; }
 .panel-body { height: 100%; display: flex; flex-direction: column; background: var(--bg); }
 .term-host { flex: 1; min-height: 0; padding: 6px 0 0 10px; }
-.exited-bar {
-  display: flex; align-items: center; gap: 10px; padding: 6px 12px;
-  border-top: 1px solid var(--border); background: var(--sidebar); font-size: 13px; color: var(--muted);
-}
-.exited-bar span { flex: 1; }
 .empty-workspace {
   height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 12px; padding: 24px; text-align: center;

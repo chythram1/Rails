@@ -15,18 +15,15 @@ interface Props {
   panelId: string;
   /** Focus the terminal whenever this becomes true (the panel became active). */
   focused: boolean;
-  onExited(): void;
 }
 
 /**
  * A browser terminal attached to a panel's tmux session. The server gives every attached terminal its
  * own tmux client, so this only streams bytes and reports its size.
  */
-export function TerminalView({ panelId, focused, onExited }: Props) {
+export function TerminalView({ panelId, focused }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const term = useRef<Terminal>(null);
-  const exitedRef = useRef(onExited);
-  exitedRef.current = onExited;
 
   useEffect(() => {
     const t = new Terminal({
@@ -55,7 +52,6 @@ export function TerminalView({ panelId, focused, onExited }: Props) {
 
     const offData = socket.on((m) => {
       if (m.type === "term.data" && m.panelId === panelId) t.write(m.data);
-      else if (m.type === "term.exited" && m.panelId === panelId) exitedRef.current();
     });
     const offConn = socket.onConnection((up) => up && attach());
     if (socket.connected) attach();
