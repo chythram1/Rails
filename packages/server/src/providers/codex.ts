@@ -24,7 +24,6 @@ async function scanFile(file: string): Promise<DiscoveredSession | null> {
     provider: "codex",
     id: meta.id,
     cwd: meta.cwd,
-    file,
     title: firstUser ? firstLine(firstUser) : "Untitled session",
     createdAt: meta.timestamp ?? mtime.toISOString(),
     updatedAt: mtime.toISOString(),

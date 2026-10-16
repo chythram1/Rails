@@ -23,7 +23,7 @@ async function scanFile(file: string): Promise<DiscoveredSession | null> {
     const u = head.find((e) => e.type === "message" && e.message?.role === "user" && textOf(e.message.content));
     title = u ? firstLine(textOf(u.message.content)) : "Untitled session";
   }
-  return { provider: "pi", id: s.id, cwd: s.cwd, file, title, createdAt: s.timestamp, updatedAt: mtime.toISOString() };
+  return { provider: "pi", id: s.id, cwd: s.cwd, title, createdAt: s.timestamp, updatedAt: mtime.toISOString() };
 }
 
 const scanFiles = cachedScanner(scanFile);

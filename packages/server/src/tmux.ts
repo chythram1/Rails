@@ -76,23 +76,17 @@ export async function killSession(panelId: string): Promise<void> {
   await tmux("kill-session", "-t", sessionName(panelId)).catch(() => {}); // already gone is fine
 }
 
-/**
- * Panel ids whose process is still running. Dead panes left over from older rails versions (which
- * kept exited panes on screen) don't count.
- */
+/** Panel ids whose process is still running (a panel's tmux session ends with its process). */
 export async function runningPanels(): Promise<Set<string>> {
   const out = new Set<string>();
   let stdout = "";
   try {
-    ({ stdout } = await tmux("list-panes", "-a", "-F", "#{session_name} #{pane_dead}"));
+    ({ stdout } = await tmux("list-sessions", "-F", "#{session_name}"));
   } catch (e) {
     if (e instanceof ServiceError) throw e; // tmux missing: don't mistake that for "no panels"
     return out; // no tmux server running yet
   }
-  for (const line of stdout.split("\n")) {
-    const [name, dead] = line.split(" ");
-    if (name?.startsWith("p-") && dead !== "1") out.add(name.slice(2));
-  }
+  for (const name of stdout.split("\n")) if (name.startsWith("p-")) out.add(name.slice(2));
   return out;
 }
 

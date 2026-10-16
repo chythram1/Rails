@@ -5,7 +5,6 @@ export interface DiscoveredSession {
   provider: ProviderId;
   id: string;
   cwd: string;
-  file: string;
   title: string;
   createdAt: string;
   updatedAt: string;

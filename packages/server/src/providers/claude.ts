@@ -35,7 +35,6 @@ async function scanFile(file: string): Promise<DiscoveredSession | null> {
     provider: "claude",
     id: first.sessionId ?? basename(file, ".jsonl"),
     cwd: first.cwd,
-    file,
     title,
     createdAt: first.timestamp ?? mtime.toISOString(),
     updatedAt: mtime.toISOString(),

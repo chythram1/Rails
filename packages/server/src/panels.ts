@@ -57,7 +57,7 @@ const changed = (projectId: string) => listeners.forEach((fn) => fn(projectId));
 
 /** Stop a panel's tmux session (if still there), drop the panel and tell every browser. */
 async function removePanel(panel: Panel): Promise<void> {
-  await tmux.killSession(panel.id); // stops the process; already gone is fine (also clears dead panes of older rails versions)
+  await tmux.killSession(panel.id); // stops the process; already gone is fine
   panels.remove(panel.id);
   changed(panel.projectId);
 }
