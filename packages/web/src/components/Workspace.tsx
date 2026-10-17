@@ -10,7 +10,7 @@ import {
   type IWatermarkPanelProps,
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
-import { GitBranch, X } from "lucide-react";
+import { IconGitBranch as GitBranch, IconX as X } from "@tabler/icons-react";
 import { parseSessionKey, sessionKey, type Panel, type PanelKind } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate } from "../router.ts";

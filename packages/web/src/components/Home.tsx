@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FolderPlus } from "lucide-react";
+import { IconFolderPlus as FolderPlus } from "@tabler/icons-react";
 import type { ProviderId } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate } from "../router.ts";

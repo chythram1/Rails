@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowUp } from "lucide-react";
+import { IconArrowUp as ArrowUp } from "@tabler/icons-react";
 
 interface Props {
   placeholder: string;

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Ban, ChevronLeft } from "lucide-react";
+import { IconBan as Ban, IconChevronLeft as ChevronLeft } from "@tabler/icons-react";
 import {
   SPROCKET_ACCESSORIES,
   SPROCKET_CHARACTERS,

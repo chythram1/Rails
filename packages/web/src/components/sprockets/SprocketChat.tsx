@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ChevronLeft, EllipsisVertical } from "lucide-react";
+import { IconChevronLeft as ChevronLeft, IconDotsVertical as EllipsisVertical } from "@tabler/icons-react";
 import type { Sprocket as SprocketData, SprocketMessage } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";

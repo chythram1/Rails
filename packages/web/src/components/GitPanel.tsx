@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, X } from "lucide-react";
+import { IconRefresh as RefreshCw, IconX as X } from "@tabler/icons-react";
 import type { GitStatus } from "@rails/shared";
 import { api } from "../api.ts";
 

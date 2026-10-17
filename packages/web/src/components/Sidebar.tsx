@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Boxes, CircleGauge, Cog, EllipsisVertical, Folder, FolderOpen, FolderPlus, PanelLeft, Plus } from "lucide-react";
+import { IconPackages as Boxes, IconGauge as CircleGauge, IconSettings as Cog, IconDotsVertical as EllipsisVertical, IconFolder as Folder, IconFolderOpen as FolderOpen, IconFolderPlus as FolderPlus, IconLayoutSidebar as PanelLeft, IconPlus as Plus } from "@tabler/icons-react";
 import type { PanelKind, Project, SessionSummary } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate, type Route } from "../router.ts";

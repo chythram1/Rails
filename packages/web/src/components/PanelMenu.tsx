@@ -1,4 +1,4 @@
-import { Plus, SquareTerminal } from "lucide-react";
+import { IconPlus as Plus, IconTerminal2 as SquareTerminal } from "@tabler/icons-react";
 import type { PanelKind, ProviderId } from "@rails/shared";
 import { useStore } from "../store.tsx";
 import { providerLabel } from "../util.ts";

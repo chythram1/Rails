@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Search } from "lucide-react";
+import { IconPlus as Plus, IconSearch as Search } from "@tabler/icons-react";
 import type { Sprocket as SprocketData } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate, type Route } from "../../router.ts";
