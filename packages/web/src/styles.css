@@ -336,6 +336,89 @@ button.chip:hover { background: var(--hover); }
   .sidebar.rail .nav-item { justify-content: center; padding: 0; }
 }
 
+/* ---- Sprocket characters (components/sprockets) ----
+   Each nested SVG group owns one motion. Idle loops run on --period (set per character, so a group of
+   Sprockets never bobs in sync) from --phase (a negative delay: each starts at a different point).
+   Loops are sine-like (ease-in-out each way); hats and dangling bits use the same period, later. */
+.sprocket { display: block; overflow: visible; flex-shrink: 0; }
+.sprocket :is(.s-rig, .s-sway, .s-pop, .s-hat, .s-in, .s-wobble, .s-dangle, .s-lid, .s-shadow) { transform-box: fill-box; }
+.sprocket :is(.s-sway, .s-pop, .s-hat, .s-in, .s-wobble) { transform-origin: 50% 100%; }
+.sprocket .s-dangle { transform-origin: 50% 0; }
+.sprocket .s-lid, .sprocket .s-shadow { transform-origin: 50% 50%; }
+.sprocket .s-shadow { fill: #000; opacity: 0.5; }
+.sprocket .s-rig { animation: sp-bob var(--period, 3.4s) ease-in-out var(--phase, 0s) infinite alternate; }
+.sprocket .s-sway { animation: sp-sway calc(var(--period, 3.4s) * 1.7) ease-in-out var(--phase, 0s) infinite alternate; }
+.sprocket .s-shadow { animation: sp-shadow var(--period, 3.4s) ease-in-out var(--phase, 0s) infinite alternate; }
+.sprocket .s-hat { animation: sp-tilt var(--period, 3.4s) ease-in-out calc(var(--phase, 0s) + 110ms) infinite alternate; }
+.sprocket :is(.s-wobble, .s-dangle) { animation: sp-swing var(--period, 3.4s) ease-in-out calc(var(--phase, 0s) + 260ms) infinite alternate; }
+/* Eyes lead, the face follows (motion.ts writes --ex/--ey/--fx/--fy in viewBox units). */
+.sprocket .s-face { transform: translate(calc(var(--fx, 0) * 1px), calc(var(--fy, 0) * 1px)); }
+.sprocket .s-eyes { transform: translate(calc(var(--ex, 0) * 1px), calc(var(--ey, 0) * 1px)); }
+.sprocket.paused * { animation-play-state: paused; }
+.sprocket.still * { animation: none; }
+@keyframes sp-bob { from { transform: translateY(0); } to { transform: translateY(-5px); } }
+@keyframes sp-sway { from { transform: rotate(-2deg); } to { transform: rotate(2deg); } }
+@keyframes sp-shadow { from { transform: scaleX(1); opacity: 0.5; } to { transform: scaleX(0.88); opacity: 0.35; } }
+@keyframes sp-tilt { from { transform: rotate(-2.5deg); } to { transform: rotate(2.5deg); } }
+@keyframes sp-swing { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+
+/* ---- Sprockets page: list column + chat or creator (components/sprockets) ---- */
+.sprockets { display: flex; height: 100%; min-height: 0; }
+.sp-list { width: 272px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
+.sp-list-head, .sp-head { display: flex; align-items: center; gap: 6px; height: 52px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
+.sp-list-head { padding: 0 10px 0 16px; }
+.sp-list-title { flex: 1; font-size: 15px; font-weight: 600; }
+.sp-list-head .icon-btn { width: 32px; height: 32px; }
+.sp-rows { list-style: none; margin: 0; padding: 6px; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 2px; }
+.sp-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 6px; border-radius: 10px; }
+.sp-row[aria-current="page"] { background: var(--surface-2); }
+.sp-row-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 14px; }
+.sp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; container-type: inline-size; }
+.sp-head { padding: 0 12px 0 20px; gap: 10px; }
+.sp-head h2 { font-size: 15px; font-weight: 600; }
+.sp-back { display: none; }
+.sp-placeholder { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px; text-align: center; }
+
+.sp-chat { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.sp-thread { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 24px 20px; display: flex; flex-direction: column; }
+.sp-messages { list-style: none; margin: 0 auto; padding: 0; width: 100%; max-width: 760px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.sp-bubble {
+  max-width: min(560px, 85%); padding: 9px 14px; border-radius: 18px; background: var(--surface-2);
+  font-size: 14.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.sp-notice { margin: 20px auto 0; color: var(--muted); font-size: 13px; text-align: center; }
+.sp-notice:empty { margin: 0; } /* stays in the accessibility tree (a live region), takes no room */
+.sp-empty { margin: auto; max-width: 340px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; text-wrap: balance; }
+.sp-empty-title { margin-top: 10px; font-size: 18px; font-weight: 500; }
+.sp-compose { width: 100%; max-width: 800px; margin: 0 auto; padding: 0 20px 20px; display: flex; flex-direction: column; gap: 8px; }
+
+.sp-creator { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.sp-creator-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 24px 20px 40px; display: grid; gap: 24px; align-content: start; justify-items: center; }
+.sp-stage { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.sp-stage-name { font-size: 18px; font-weight: 500; max-width: 260px; overflow-wrap: anywhere; text-align: center; }
+.sp-controls { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 22px; }
+/* Wide panes: preview on the left, kept in view while the options scroll. */
+@container (min-width: 760px) {
+  .sp-creator-body { grid-template-columns: minmax(0, 1fr) minmax(0, 520px); align-items: start; justify-items: stretch; column-gap: 32px; padding-top: 32px; }
+  .sp-stage { position: sticky; top: 0; padding-top: 40px; }
+}
+.sp-group { border: 0; padding: 0; margin: 0; min-width: 0; }
+.sp-group legend { padding: 0; margin-bottom: 8px; font-size: 13px; color: var(--muted); }
+.sp-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
+.sp-option {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 4px 8px; border: 1px solid transparent; border-radius: 12px; background: var(--surface);
+  color: var(--muted); font-size: 12px; cursor: pointer;
+}
+.sp-option input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.sp-option:has(input:checked) { border-color: #8a8a8a; background: var(--surface-2); color: var(--text); }
+.sp-option:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
+.sp-actions { display: flex; gap: 8px; }
+@media (hover: hover) {
+  .sp-row:hover { background: var(--hover); }
+  .sp-option:hover { background: var(--hover); }
+}
+
 /* ---- small screens: sidebar becomes a drawer ---- */
 @media (max-width: 860px) {
   /* The drawer is always full width: !important overrides the desktop width set inline (and the rail). */
@@ -346,10 +429,16 @@ button.chip:hover { background: var(--hover); }
   .nav-open .scrim { display: block; position: fixed; inset: 0; background: rgb(0 0 0 / 0.5); z-index: 10; }
   .main > .nav-toggle { display: inline-grid; }
   .mobile-tabs { padding-left: 48px; } /* room for the sidebar toggle */
+  /* Sprockets: the list, or one Sprocket, never both. */
+  .sprockets.at-list .sp-main, .sprockets.at-detail .sp-list { display: none; }
+  .sp-list { width: 100%; border-right: 0; }
+  .sp-list-head, .sp-head { padding-left: 52px; } /* room for the sidebar toggle */
+  .sp-back { display: inline-grid; }
   .page { padding: 64px 16px 32px; }
   .hero { font-size: 28px; }
   .git-panel { position: fixed; inset: 0 0 0 auto; width: min(380px, 100vw); z-index: 15; }
 }
 @media (prefers-reduced-motion: reduce) {
-  * { animation: none !important; transition: none !important; }
+  /* Sprockets are excluded: their motion has its own setting, off by default here (sprockets/motion.ts). */
+  *:not(.sprocket, .sprocket *) { animation: none !important; transition: none !important; }
 }

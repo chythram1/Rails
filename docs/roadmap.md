@@ -5,6 +5,7 @@ None of this is fixed. Move items here as they firm up, and record real decision
 Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
 
 ## Next
+- **Sprockets stage 2:** make them run (harness, prompts, tools, schedules) and reply (ADR 0005)
 - Verify Codex panels on a machine with Codex installed; map new Codex panels to their session id
 - "Needs attention" signal for panels (e.g. Claude Code hooks or terminal bell), lost with the chat UI
 - Provider logos in the home agent picker (needs a custom dropdown)

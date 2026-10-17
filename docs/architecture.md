@@ -66,6 +66,11 @@ packages/
   server stores it opaquely. The server's panel list is the source of truth: on load the client
   restores the layout, then adds panels missing from it and removes ones that were closed.
   `panels.changed` broadcasts keep other devices' panel lists current.
+- **Sprockets** (ADR 0005, stage 1): `sprockets.ts` stores Sprockets and the messages sent to them in
+  SQLite (`/api/sprockets`, `/api/sprockets/:id/messages`) and broadcasts `sprockets.changed`. Nothing
+  runs or replies yet. The web renders each Sprocket as an SVG character from data
+  (`components/sprockets/`); idle motion is CSS, eyes follow the pointer only in the creator, and the
+  page's pause control (per device, paused by default under reduced motion) stops the loops.
 - **Auth:** one access token, generated on first run into `~/.rails/config.json` or set with `RAILS_TOKEN`.
   `POST /api/auth/login` exchanges it for an httpOnly cookie, and both `/api/*` and the WebSocket
   upgrade check that cookie. The web app also accepts `?token=` once, then removes it from the URL.

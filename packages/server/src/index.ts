@@ -10,11 +10,12 @@ import { WebSocketServer } from "ws";
 import { HOST, PORT, TOKEN } from "./config.ts";
 import { projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
-import type { OpenPanel } from "@rails/shared";
+import type { OpenPanel, SprocketInput } from "@rails/shared";
 import { closePanel, getWorkspace, openPanel, saveLayout } from "./panels.ts";
 import { ServiceError } from "./errors.ts";
 import { attachPickedFolder, attachProject, detachProject, getProject, listProjectSessions, recentFolders } from "./projects.ts";
 import { providerInfo } from "./providers/index.ts";
+import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSprocket } from "./sprockets.ts";
 import { TerminalHub } from "./terminals.ts";
 import { version as tmuxVersion } from "./tmux.ts";
 
@@ -117,6 +118,24 @@ app.get("/api/projects/:id/git", async (c) => c.json(await gitStatus(getProject(
 
 app.get("/api/projects/:id/git/diff", async (c) =>
   c.text(await gitDiff(getProject(c.req.param("id")).path, c.req.query("path") ?? "")),
+);
+
+// ---- Sprockets (ADR 0005) ----
+app.get("/api/sprockets", (c) => c.json(listSprockets()));
+
+app.post("/api/sprockets", async (c) => c.json(createSprocket(await c.req.json<Partial<SprocketInput>>()), 201));
+
+app.put("/api/sprockets/:id", async (c) => c.json(updateSprocket(c.req.param("id"), await c.req.json<Partial<SprocketInput>>())));
+
+app.delete("/api/sprockets/:id", (c) => {
+  deleteSprocket(c.req.param("id"));
+  return c.json({ ok: true });
+});
+
+app.get("/api/sprockets/:id/messages", (c) => c.json(listMessages(c.req.param("id"))));
+
+app.post("/api/sprockets/:id/messages", async (c) =>
+  c.json(sendMessage(c.req.param("id"), (await c.req.json<{ text?: unknown }>()).text), 201),
 );
 
 // ---- static web build (production) ----

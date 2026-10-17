@@ -4,6 +4,7 @@ import { Home } from "./components/Home.tsx";
 import { Login } from "./components/Login.tsx";
 import { Placeholder } from "./components/Placeholder.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
+import { SprocketsPage } from "./components/sprockets/SprocketsPage.tsx";
 import { Workspace } from "./components/Workspace.tsx";
 import { useRoute } from "./router.ts";
 import { StoreProvider } from "./store.tsx";
@@ -74,6 +75,7 @@ function Shell() {
         </button>
         {route.name === "home" && <Home />}
         {route.name === "workspace" && <Workspace key={route.projectId} projectId={route.projectId} openKey={route.openKey} />}
+        {route.name === "sprockets" && <SprocketsPage route={route} />}
         {route.name === "customize" && <Placeholder title="Customize" body="Agent profiles, models, prompts and tools will live here." />}
         {route.name === "automate" && <Placeholder title="Automate" body="Scheduled and triggered agent runs will live here." />}
       </main>

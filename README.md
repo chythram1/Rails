@@ -34,6 +34,8 @@ Status:
 - Per-project split/tab layouts, saved on the server
 - Read-only git status and diffs
 - Official agent logos in the sidebar
+- Sprockets (ADR 0005): make always-on agent characters and chat with them. Visual only so far: they
+  don't reply yet
 
 Docs: [architecture](docs/architecture.md) · [glossary](docs/CONTEXT.md) · [decisions](docs/adr) · [provider formats](docs/providers.md) · [roadmap](docs/roadmap.md)
 

@@ -90,6 +90,52 @@ export interface GitStatus {
   files: GitFile[];
 }
 
+// ---- Sprockets: always-on agents (ADR 0005). Stage 1 is their look and chat UI only. ----
+
+/** The cast. Each character has a fixed shape and colour. */
+export const SPROCKET_CHARACTERS = ["block", "bean", "lune", "bell", "starry", "cog", "roo", "momo"] as const;
+export type SprocketCharacter = (typeof SPROCKET_CHARACTERS)[number];
+
+/** Accessories by slot; a Sprocket wears at most one per slot. Headphones take the head slot. */
+export const SPROCKET_SLOTS = {
+  head: ["beanie", "cap", "bow", "crown", "headphones"],
+  eyes: ["sunglasses", "glasses"],
+  neck: ["scarf"],
+} as const;
+export type SprocketSlot = keyof typeof SPROCKET_SLOTS;
+export type SprocketAccessory = (typeof SPROCKET_SLOTS)[SprocketSlot][number];
+
+/** What a Sprocket looks like. `"none"` leaves a slot empty. */
+export interface SprocketLook {
+  character: SprocketCharacter;
+  head: (typeof SPROCKET_SLOTS.head)[number] | "none";
+  eyes: (typeof SPROCKET_SLOTS.eyes)[number] | "none";
+  neck: (typeof SPROCKET_SLOTS.neck)[number] | "none";
+}
+
+export interface Sprocket {
+  id: string;
+  name: string;
+  look: SprocketLook;
+  createdAt: string;
+  /** The newest message in its chat, for the list preview. */
+  lastMessage?: SprocketMessage;
+}
+
+/** Body of "create a Sprocket" and "edit a Sprocket". */
+export interface SprocketInput {
+  name: string;
+  look: SprocketLook;
+}
+
+/** A message the user sent to a Sprocket. Sprockets can't reply yet, so every message is the user's. */
+export interface SprocketMessage {
+  id: string;
+  sprocketId: string;
+  text: string;
+  createdAt: string;
+}
+
 // ---- WebSocket protocol ----------------------------------------------------
 // Each attached panel gets its own tmux client on the server, sized to that browser's terminal.
 
@@ -106,4 +152,6 @@ export type ServerMsg =
   | { type: "panels.changed"; projectId: string }
   /** Every busy panel (its agent is thinking or replying), across all projects. Sent on connect and on change. */
   | { type: "panels.busy"; panelIds: string[] }
+  /** Sprockets or their messages changed (possibly on another device). */
+  | { type: "sprockets.changed" }
   | { type: "error"; message: string };

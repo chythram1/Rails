@@ -100,6 +100,8 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 | `packages/server/src/providers/` | One discovery adapter per provider (`scan`: cwd, title, dates from the head/tail of each transcript). `index.ts` holds the registry and `installed()`. |
 | `packages/web/src/components/Workspace.tsx` | The workspace: dockview layout (`Dock`), tabs, `+` menu, and the one-panel-at-a-time mobile view. Data comes from `useWorkspace.ts`. |
 | `packages/web/src/components/FolderMenu.tsx` | The Add project menu: search + recent agent folders + "Open folder…" (native picker). Popover placement comes from `usePopover` in `Menu.tsx`. |
+| `packages/server/src/sprockets.ts` | Sprocket services (ADR 0005): create/edit/delete and their messages. Emits `onSprocketsChanged`. |
+| `packages/web/src/components/sprockets/` | The Sprockets page (`SprocketsPage`, `SprocketCreator`, `SprocketChat`) and the character renderer (`Sprocket.tsx`: `characters.ts` data, `parts.tsx` accessories, `motion.ts` blinks/look-at/one-shots; idle loops in `styles.css`). |
 | `packages/web/src/components/TerminalView.tsx` | One xterm.js terminal attached to a panel over the shared socket; re-attaches on reconnect, reports resizes. |
 | `packages/web/src/` | React SPA. `store.tsx` holds global state, `ws.ts` the shared socket with reconnect, `router.ts` hash routing, `api.ts` the REST client, `styles.css` all CSS (tokens at the top), `components/` the UI. |
 
@@ -147,6 +149,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - Agent TUIs hard-wrap their output, so lines printed before a pane was narrowed stay clipped. That's normal terminal behaviour.
 - Imports use explicit `.ts` / `.tsx` extensions (`allowImportingTsExtensions`). The server runs TypeScript directly through `tsx` and has no build step.
 - Native `<select>` can't show images, so the home agent picker shows text.
+- Sprocket SVGs: a CSS `transform` replaces the SVG `transform` attribute, so position with an outer `<g transform>` and animate an inner group (`transform-box: fill-box`). Headless browsers report reduced motion, so Sprockets start paused there: press the page's play button.
 - Codex panels and Codex parsing are untested on this machine (Codex isn't installed).
 
 ## Long-term direction

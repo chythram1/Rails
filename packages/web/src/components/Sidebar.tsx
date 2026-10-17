@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Boxes, CircleGauge, EllipsisVertical, Folder, FolderOpen, FolderPlus, PanelLeft, Plus } from "lucide-react";
+import { Boxes, CircleGauge, Cog, EllipsisVertical, Folder, FolderOpen, FolderPlus, PanelLeft, Plus } from "lucide-react";
 import type { PanelKind, Project, SessionSummary } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate, type Route } from "../router.ts";
@@ -123,6 +123,7 @@ export function Sidebar({ route }: { route: Route }) {
       </div>
       <nav className="nav">
         <NavItem href={href.home()} icon={<Plus size={18} />} label="New chat" rail={rail} className={route.name === "home" ? "primary" : ""} />
+        <NavItem href={href.sprockets()} icon={<Cog size={18} />} label="Sprockets" rail={rail} className={route.name === "sprockets" ? "active" : ""} />
         <NavItem href="#/customize" icon={<Boxes size={18} />} label="Customize" rail={rail} className={route.name === "customize" ? "active" : ""} />
         <NavItem href="#/automate" icon={<CircleGauge size={18} />} label="Automate" rail={rail} className={route.name === "automate" ? "active" : ""} />
       </nav>

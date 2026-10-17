@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { Panel, PanelKind, Project } from "@rails/shared";
+import type { Panel, PanelKind, Project, Sprocket, SprocketLook, SprocketMessage } from "@rails/shared";
 import { RAILS_HOME } from "./config.ts";
 
 const db = new DatabaseSync(join(RAILS_HOME, "rails.db"));
@@ -25,6 +25,19 @@ db.exec(`
     project_id TEXT PRIMARY KEY,
     json TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS sprockets (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    look TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS sprocket_messages (
+    id TEXT PRIMARY KEY,
+    sprocket_id TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS sprocket_messages_by_sprocket ON sprocket_messages (sprocket_id, created_at);
 `);
 
 type Row = { id: string; name: string; path: string; created_at: string };
@@ -100,5 +113,54 @@ export const layouts = {
   },
   remove(projectId: string): void {
     db.prepare("DELETE FROM layouts WHERE project_id = ?").run(projectId);
+  },
+};
+
+// Sprockets (ADR 0005). `look` is stored as JSON and validated by the service when read.
+type SprocketRow = { id: string; name: string; look: string; created_at: string };
+const toSprocket = (r: SprocketRow): Omit<Sprocket, "look"> & { look: unknown } => ({
+  id: r.id,
+  name: r.name,
+  look: JSON.parse(r.look),
+  createdAt: r.created_at,
+});
+
+export const sprockets = {
+  list() {
+    return (db.prepare("SELECT * FROM sprockets ORDER BY created_at").all() as SprocketRow[]).map(toSprocket);
+  },
+  get(id: string) {
+    const r = db.prepare("SELECT * FROM sprockets WHERE id = ?").get(id) as SprocketRow | undefined;
+    return r && toSprocket(r);
+  },
+  create(name: string, look: SprocketLook) {
+    const id = randomUUID();
+    db.prepare("INSERT INTO sprockets (id, name, look, created_at) VALUES (?, ?, ?, ?)").run(id, name, JSON.stringify(look), new Date().toISOString());
+    return this.get(id)!;
+  },
+  update(id: string, name: string, look: SprocketLook): void {
+    db.prepare("UPDATE sprockets SET name = ?, look = ? WHERE id = ?").run(name, JSON.stringify(look), id);
+  },
+  remove(id: string): void {
+    db.prepare("DELETE FROM sprocket_messages WHERE sprocket_id = ?").run(id);
+    db.prepare("DELETE FROM sprockets WHERE id = ?").run(id);
+  },
+};
+
+type MessageRow = { id: string; sprocket_id: string; text: string; created_at: string };
+const toMessage = (r: MessageRow): SprocketMessage => ({ id: r.id, sprocketId: r.sprocket_id, text: r.text, createdAt: r.created_at });
+
+export const sprocketMessages = {
+  list(sprocketId: string): SprocketMessage[] {
+    return (db.prepare("SELECT * FROM sprocket_messages WHERE sprocket_id = ? ORDER BY created_at").all(sprocketId) as MessageRow[]).map(toMessage);
+  },
+  last(sprocketId: string): SprocketMessage | undefined {
+    const r = db.prepare("SELECT * FROM sprocket_messages WHERE sprocket_id = ? ORDER BY created_at DESC LIMIT 1").get(sprocketId) as MessageRow | undefined;
+    return r && toMessage(r);
+  },
+  create(sprocketId: string, text: string): SprocketMessage {
+    const m: SprocketMessage = { id: randomUUID(), sprocketId, text, createdAt: new Date().toISOString() };
+    db.prepare("INSERT INTO sprocket_messages (id, sprocket_id, text, created_at) VALUES (?, ?, ?, ?)").run(m.id, m.sprocketId, m.text, m.createdAt);
+    return m;
   },
 };

@@ -1,4 +1,16 @@
-import type { GitStatus, OpenPanel, Panel, Project, ProviderInfo, RecentFolder, SessionSummary, Workspace } from "@rails/shared";
+import type {
+  GitStatus,
+  OpenPanel,
+  Panel,
+  Project,
+  ProviderInfo,
+  RecentFolder,
+  SessionSummary,
+  Sprocket,
+  SprocketInput,
+  SprocketMessage,
+  Workspace,
+} from "@rails/shared";
 
 export class Unauthorized extends Error {}
 
@@ -43,4 +55,11 @@ export const api = {
     req(`/api/projects/${enc(projectId)}/layout`, { method: "PUT", body: JSON.stringify({ layout }) }),
   git: (projectId: string) => req<GitStatus>(`/api/projects/${enc(projectId)}/git`),
   diff: (projectId: string, path: string) => req<string>(`/api/projects/${enc(projectId)}/git/diff?path=${enc(path)}`),
+  sprockets: () => req<Sprocket[]>("/api/sprockets"),
+  createSprocket: (body: SprocketInput) => req<Sprocket>("/api/sprockets", { method: "POST", body: JSON.stringify(body) }),
+  updateSprocket: (id: string, body: SprocketInput) => req<Sprocket>("/api/sprockets/" + enc(id), { method: "PUT", body: JSON.stringify(body) }),
+  deleteSprocket: (id: string) => req("/api/sprockets/" + enc(id), { method: "DELETE" }),
+  sprocketMessages: (id: string) => req<SprocketMessage[]>(`/api/sprockets/${enc(id)}/messages`),
+  sendSprocketMessage: (id: string, text: string) =>
+    req<SprocketMessage>(`/api/sprockets/${enc(id)}/messages`, { method: "POST", body: JSON.stringify({ text }) }),
 };
