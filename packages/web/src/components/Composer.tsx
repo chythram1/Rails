@@ -7,10 +7,12 @@ interface Props {
   disabled?: boolean;
   disabledReason?: string;
   autoFocus?: boolean;
+  /** One line with the send button beside the text (chat threads), instead of the tall home box. */
+  compact?: boolean;
   children?: ReactNode; // controls shown in the bottom row (selectors)
 }
 
-export function Composer({ placeholder, onSubmit, disabled, disabledReason, autoFocus, children }: Props) {
+export function Composer({ placeholder, onSubmit, disabled, disabledReason, autoFocus, compact, children }: Props) {
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -30,7 +32,7 @@ export function Composer({ placeholder, onSubmit, disabled, disabledReason, auto
 
   return (
     <form
-      className={"composer" + (disabled ? " is-disabled" : "")}
+      className={"composer" + (compact ? " compact" : "") + (disabled ? " is-disabled" : "")}
       onSubmit={(e) => {
         e.preventDefault();
         submit();
@@ -53,7 +55,7 @@ export function Composer({ placeholder, onSubmit, disabled, disabledReason, auto
         }}
       />
       <div className="composer-row">
-        <div className="composer-controls">{children}</div>
+        {children && <div className="composer-controls">{children}</div>}
         <button className="send-btn" aria-label="Send" title="Send (Enter)" disabled={disabled || !text.trim()}>
           <ArrowUp size={18} />
         </button>

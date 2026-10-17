@@ -7,7 +7,9 @@ the user makes: one of 8 shapes (Block, Bean, Lune, Bell, Starry, Cog, Roo, Momo
 one head accessory or none (party hat, beanie, cap, bow, flower clip, crown, bucket hat), and
 a name. They have their own page (the "Sprockets" nav item): a list of Sprockets beside the selected
 one's chat, or the creator. The creator follows `ref/sprockets/stage1/create-bot.jpg`: the preview on
-top, then a row each for colour, accessory and shape, then the name.
+top, then a row each for colour, accessory and shape, then the name. New Sprockets can start from a
+suggestion (a preset name and look). With no Sprocket open, the page shows them all as cards; a chat
+opens with the Sprocket itself, and time labels mark gaps between messages.
 
 Stage 1 is visual only. Sprockets can be created, restyled, renamed and deleted, and the user can send
 them messages, but nothing runs: no Sprocket replies, and the chat says so. How they run (a harness,

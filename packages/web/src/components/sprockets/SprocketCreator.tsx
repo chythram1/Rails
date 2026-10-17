@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Ban, ChevronLeft } from "lucide-react";
 import {
   SPROCKET_ACCESSORIES,
@@ -15,6 +15,14 @@ import { AccessoryIcon } from "./parts.tsx";
 import { Sprocket } from "./Sprocket.tsx";
 
 const NEW_LOOK: SprocketLook = { character: "block", color: "blue", accessory: "none" };
+
+/** Ready-made Sprockets (ref create-bot.jpg). Picking one fills in the name and look; nothing runs yet. */
+const SUGGESTIONS: { name: string; about: string; look: SprocketLook }[] = [
+  { name: "Night Shift", about: "Works overnight and preps your morning digest", look: { character: "cog", color: "orange", accessory: "beanie" } },
+  { name: "Inbox Triage", about: "Sorts your email and drafts replies in your voice", look: { character: "momo", color: "pink", accessory: "bow" } },
+  { name: "CI Watch", about: "Tells you the moment a build goes red", look: { character: "roo", color: "teal", accessory: "cap" } },
+  { name: "Standup", about: "Sums up yesterday's commits every morning", look: { character: "bean", color: "green", accessory: "flower" } },
+];
 const MAX_NAME = 40;
 
 interface Props {
@@ -35,6 +43,12 @@ export function SprocketCreator({ sprocket, onSaved, onCancel }: Props) {
   const [saving, setSaving] = useState(false);
   // An empty name falls back to the shape's own name.
   const shownName = name.trim() || CHARACTERS[look.character].name;
+  const body = useRef<HTMLDivElement>(null);
+  const suggest = (s: (typeof SUGGESTIONS)[number]) => {
+    setLook(s.look);
+    setName(s.name);
+    body.current?.scrollTo({ top: 0 }); // back up to the preview
+  };
   const set = <K extends keyof SprocketLook>(key: K) => (v: SprocketLook[K]) => setLook((l) => ({ ...l, [key]: v }));
 
   const submit = async (e: FormEvent) => {
@@ -58,7 +72,7 @@ export function SprocketCreator({ sprocket, onSaved, onCancel }: Props) {
         </a>
         <h2 id="sp-creator-title" className="truncate">{sprocket ? `Edit ${sprocket.name}` : "New Sprocket"}</h2>
       </header>
-      <div className="sp-creator-body">
+      <div className="sp-creator-body" ref={body}>
         <Sprocket look={look} size={150} follow label={`Preview of ${shownName}`} />
 
         <Row legend="Colour" name="sp-color" value={look.color} onChange={set("color")}
@@ -86,6 +100,24 @@ export function SprocketCreator({ sprocket, onSaved, onCancel }: Props) {
           )}
           <button className="btn primary" disabled={saving}>{sprocket ? "Save changes" : "Get started"}</button>
         </div>
+        {!sprocket && (
+          <section className="sp-suggestions" aria-labelledby="sp-suggestions-title">
+            <h3 id="sp-suggestions-title">Suggestions</h3>
+            <ul>
+              {SUGGESTIONS.map((s) => (
+                <li key={s.name}>
+                  <button type="button" className="sp-suggestion" onClick={() => suggest(s)}>
+                    <Sprocket look={s.look} size={48} still />
+                    <span className="sp-suggestion-text">
+                      <span className="sp-card-name">{s.name}</span>
+                      <span className="muted small">{s.about}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </form>
   );

@@ -8,6 +8,7 @@
   --hover: #2a2a2a;
   --border: #2c2c2c;
   --border-strong: #3a3a3a;
+  --selected: #8a8a8a; /* border of a chosen option */
   --text: #ececec;
   --muted: #8e8e8e;
   --accent: #ececec;
@@ -179,6 +180,12 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .composer textarea::placeholder { color: #7a7a7a; }
 .composer-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .composer-controls { flex: 1; display: flex; gap: 4px; flex-wrap: wrap; margin-left: -8px; }
+.composer-row:not(:has(.composer-controls)) { justify-content: flex-end; }
+/* Compact: one rounded line, text grows upwards, send button on the right (chat threads). */
+.composer.compact { display: flex; align-items: flex-end; gap: 8px; padding: 6px 6px 6px 18px; border-radius: 24px; }
+.composer.compact textarea { flex: 1; font-size: 15px; padding: 7px 0; min-height: 0; }
+.composer.compact .composer-row { margin-top: 0; }
+.composer.compact .send-btn { width: 34px; height: 34px; }
 .select select {
   appearance: none; background: transparent; border: 0; border-radius: 8px;
   padding: 6px 26px 6px 10px; color: #cfcfcf; font-size: 14px; cursor: pointer;
@@ -354,31 +361,41 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 /* ---- Sprockets page: list column + chat or creator (components/sprockets) ---- */
 .sprockets { display: flex; height: 100%; min-height: 0; }
 .sp-list { width: 272px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
+/* 52px like the sidebar's logo row; 7px of top padding centres the contents on the logo's line (y = 29). */
 .sp-list-head, .sp-head { display: flex; align-items: center; gap: 6px; height: 52px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
-.sp-list-head { padding: 0 10px 0 16px; }
+.sp-list-head { padding: 7px 10px 0 16px; }
 .sp-list-title { flex: 1; font-size: 15px; font-weight: 600; }
 .sp-list-head .icon-btn { width: 32px; height: 32px; }
 .sp-rows { list-style: none; margin: 0; padding: 6px; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 2px; }
 .sp-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 6px; border-radius: 10px; }
 .sp-row[aria-current="page"] { background: var(--surface-2); }
-.sp-row-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 14px; }
+.sp-row-text { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 14px; }
+.sp-row-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.sp-row-top .truncate { flex: 1; }
+.sp-row-top .session-time { width: auto; }
 .sp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; container-type: inline-size; }
-.sp-head { padding: 0 12px 0 20px; gap: 10px; }
+.sp-head { padding: 7px 12px 0 20px; gap: 10px; }
 .sp-head h2 { font-size: 15px; font-weight: 600; }
 .sp-back { display: none; }
 .sp-placeholder { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px; text-align: center; }
 
 .sp-chat { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .sp-thread { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 24px 20px; display: flex; flex-direction: column; }
-.sp-messages { list-style: none; margin: 0 auto; padding: 0; width: 100%; max-width: 760px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+/* The thread opens with the Sprocket; on an empty chat that intro sits in the middle instead. */
+.sp-intro { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 8px auto 28px; max-width: 340px; text-align: center; text-wrap: balance; }
+.sp-intro.alone { margin: auto; }
+.sp-intro p, .sp-gallery-head p, .sp-suggestion p { margin: 0; }
+.sp-intro-title { margin-top: 8px; font-size: 18px; font-weight: 500; }
+.sp-messages { list-style: none; margin: 0 auto; padding: 0; width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: 8px; }
+.sp-message { display: flex; flex-direction: column; align-items: flex-end; }
+.sp-stamp { align-self: center; margin: 12px 0 8px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sp-message:first-child .sp-stamp { margin-top: 0; }
 .sp-bubble {
-  max-width: min(560px, 85%); padding: 9px 14px; border-radius: 18px; background: var(--surface-2);
+  margin: 0; max-width: min(560px, 85%); padding: 9px 14px; border-radius: 18px; background: var(--surface-2);
   font-size: 14.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .sp-notice { margin: 20px auto 0; color: var(--muted); font-size: 13px; text-align: center; }
 .sp-notice:empty { margin: 0; } /* stays in the accessibility tree (a live region), takes no room */
-.sp-empty { margin: auto; max-width: 340px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; text-wrap: balance; }
-.sp-empty-title { margin-top: 10px; font-size: 18px; font-weight: 500; }
 .sp-compose { width: 100%; max-width: 800px; margin: 0 auto; padding: 0 20px 20px; display: flex; flex-direction: column; gap: 8px; }
 
 .sp-creator { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -398,13 +415,36 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .swatch .sp-pick:has(input:checked) { box-shadow: 0 0 0 2px var(--text); }
 /* Accessories and shapes: thumbnails in a box; the chosen one gets a border. */
 .thumb .sp-pick { width: 50px; height: 50px; border: 1px solid transparent; }
-.thumb .sp-pick:has(input:checked) { border-color: #8a8a8a; background: var(--surface-2); }
+.thumb .sp-pick:has(input:checked) { border-color: var(--selected); background: var(--surface-2); }
 .sp-none { color: var(--muted); }
 .sp-name { width: 100%; max-width: 360px; margin-top: 16px; }
 @container (max-width: 560px) {
   .sp-row-picker { display: grid; grid-template-columns: repeat(var(--cols), auto); }
 }
 .sp-actions { display: flex; gap: 8px; margin-top: 8px; }
+.sp-suggestions { width: 100%; max-width: 620px; margin-top: 40px; }
+.sp-suggestions h3 { margin: 0 0 10px; font-size: 13px; font-weight: 400; color: var(--muted); }
+.sp-suggestions ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.sp-suggestion {
+  width: 100%; height: 100%; display: flex; align-items: center; gap: 14px; padding: 14px 16px; text-align: left;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+}
+.sp-suggestion-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sp-card-name { font-size: 14px; font-weight: 500; color: var(--text); }
+
+/* Gallery: the page with no Sprocket open. Cards hold the character, its name and the last message. */
+.sp-gallery { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 40px 32px 48px; }
+.sp-gallery-head { max-width: 880px; margin: 0 auto 20px; }
+.sp-gallery-head h2 { font-size: 22px; font-weight: 500; margin-bottom: 4px; }
+.sp-cards { list-style: none; margin: 0 auto; padding: 0; max-width: 880px; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.sp-card {
+  height: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 24px 14px 18px;
+  border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); text-align: center; min-width: 0;
+}
+.sp-card > .sprocket { margin-bottom: 10px; }
+.sp-card > .truncate { max-width: 100%; }
+.sp-card-new { justify-content: center; border-style: dashed; background: transparent; color: var(--muted); }
+.sp-card-plus { display: grid; place-items: center; width: 56px; height: 56px; margin-bottom: 8px; border-radius: 50%; background: var(--surface-2); color: var(--text); }
 
 /* ---- hover: only on devices that can hover, so a tap on a touch screen doesn't leave rows lit ---- */
 @media (hover: hover) {
@@ -415,7 +455,8 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
   .btn:hover:not(:disabled), button.chip:hover, .menu button:hover:not(:disabled), .select select:hover { background: var(--hover); }
   .btn.primary:hover:not(:disabled) { background: #fff; }
   .send-btn:hover:not(:disabled) { background: var(--accent); color: #111; border-color: var(--accent); }
-  .sp-row:hover, .thumb .sp-pick:hover { background: var(--hover); }
+  .sp-row:hover, .thumb .sp-pick:hover, .sp-card-new:hover { background: var(--hover); }
+  .sp-card:not(.sp-card-new):hover, .sp-suggestion:hover { background: var(--surface-2); border-color: var(--border-strong); }
 }
 
 /* ---- small screens: sidebar becomes a drawer ---- */
@@ -433,6 +474,7 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
   .sp-list { width: 100%; border-right: 0; }
   .sp-list-head, .sp-head { padding-left: 52px; } /* room for the sidebar toggle */
   .sp-back { display: inline-grid; }
+  .main:has(> .sprockets) > .nav-toggle { top: 14px; } /* on the Sprockets header's centre line */
   .page { padding: 64px 16px 32px; }
   .hero { font-size: 28px; }
   .git-panel { position: fixed; inset: 0 0 0 auto; width: min(380px, 100vw); z-index: 15; }

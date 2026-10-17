@@ -3,6 +3,7 @@ import { Pause, Play, Plus } from "lucide-react";
 import type { Sprocket as SprocketData } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate, type Route } from "../../router.ts";
+import { timeAgo } from "../../util.ts";
 import { socket } from "../../ws.ts";
 import { setSprocketMotion, useSprocketMotion } from "./motion.ts";
 import { Sprocket } from "./Sprocket.tsx";
@@ -49,12 +50,7 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
   } else if (route.id) {
     main = <p className="sp-placeholder muted">This Sprocket doesn't exist anymore.</p>;
   } else {
-    main = (
-      <div className="sp-placeholder">
-        <p className="muted">Choose a Sprocket to chat with, or make a new one.</p>
-        <a className="btn" href={href.newSprocket()}>New Sprocket</a>
-      </div>
-    );
+    main = <Gallery list={list} />;
   }
 
   return (
@@ -85,10 +81,13 @@ function SprocketList({ list, activeId }: { list: SprocketData[]; activeId?: str
         <ul className="sp-rows">
           {list.map((s) => (
             <li key={s.id}>
-              <a className="sp-row" href={href.sprocket(s.id)} aria-current={s.id === activeId ? "page" : undefined}>
+              <a className="sp-row" href={href.sprocket(s.id)} title={s.name} aria-current={s.id === activeId ? "page" : undefined}>
                 <Sprocket look={s.look} size={36} seed={s.id} />
                 <span className="sp-row-text">
-                  <span className="truncate">{s.name}</span>
+                  <span className="sp-row-top">
+                    <span className="truncate">{s.name}</span>
+                    <span className="muted small session-time">{timeAgo(s.lastMessage?.createdAt ?? s.createdAt)}</span>
+                  </span>
                   <span className="muted small truncate">{s.lastMessage?.text ?? "No messages yet"}</span>
                 </span>
               </a>
@@ -97,5 +96,39 @@ function SprocketList({ list, activeId }: { list: SprocketData[]; activeId?: str
         </ul>
       )}
     </aside>
+  );
+}
+
+/**
+ * The page with no Sprocket open (desktop): every Sprocket as a card with its character idling, like a
+ * cast line-up (ref core-characters.png, Grok's companions), plus a card that makes a new one.
+ */
+function Gallery({ list }: { list: SprocketData[] }) {
+  return (
+    <div className="sp-gallery">
+      <header className="sp-gallery-head">
+        <h2>Your Sprockets</h2>
+        <p className="muted small">Pick one to chat with, or make a new one.</p>
+      </header>
+      <ul className="sp-cards">
+        {list.map((s) => (
+          <li key={s.id}>
+            <a className="sp-card" href={href.sprocket(s.id)} title={s.name}>
+              <Sprocket look={s.look} size={84} seed={s.id} />
+              <span className="sp-card-name truncate">{s.name}</span>
+              <span className="muted small truncate">{s.lastMessage?.text ?? "No messages yet"}</span>
+            </a>
+          </li>
+        ))}
+        <li>
+          <a className="sp-card sp-card-new" href={href.newSprocket()}>
+            <span className="sp-card-plus" aria-hidden>
+              <Plus size={28} />
+            </span>
+            <span className="sp-card-name">New Sprocket</span>
+          </a>
+        </li>
+      </ul>
+    </div>
   );
 }

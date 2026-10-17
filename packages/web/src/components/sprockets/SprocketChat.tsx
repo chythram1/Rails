@@ -8,9 +8,26 @@ import { Composer } from "../Composer.tsx";
 import { MenuButton } from "../Menu.tsx";
 import { Sprocket } from "./Sprocket.tsx";
 
+/** A new time label when a message comes over an hour after the previous one (or on a new day). */
+const GAP_MS = 60 * 60 * 1000;
+
+const newGroup = (prev: string, next: string) =>
+  new Date(next).getTime() - new Date(prev).getTime() > GAP_MS || new Date(prev).toDateString() !== new Date(next).toDateString();
+
+/** "Today 9:04 AM", "Yesterday 3:10 PM" or "Oct 3, 9:04 AM". */
+function stamp(iso: string): string {
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(iso).setHours(0, 0, 0, 0)) / 86_400_000);
+  if (days === 0) return `Today ${time}`;
+  if (days === 1) return `Yesterday ${time}`;
+  return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${time}`;
+}
+
 /**
  * A Sprocket's chat. Stage 1 (ADR 0005): messages are stored and shown, but nothing answers them yet, so
- * the thread says so after the last one.
+ * the thread says so after the last one. The thread opens with the Sprocket itself (as Dot, Pi and
+ * hilos do), and time labels break it up where there are gaps.
  */
 export function SprocketChat({ sprocket }: { sprocket: SprocketData }) {
   const { id, name } = sprocket;
@@ -70,7 +87,7 @@ export function SprocketChat({ sprocket }: { sprocket: SprocketData }) {
           <ChevronLeft size={18} />
         </a>
         <Sprocket look={sprocket.look} size={28} seed={id} />
-        <h2 id="sp-chat-title" className="truncate">{name}</h2>
+        <h2 id="sp-chat-title" className="truncate" title={name}>{name}</h2>
         <span className="grow" />
         <MenuButton
           label={`${name} actions`}
@@ -90,20 +107,29 @@ export function SprocketChat({ sprocket }: { sprocket: SprocketData }) {
             <button className="btn" onClick={() => void load()}>Try again</button>
           </div>
         )}
-        {messages?.length === 0 && (
-          <div className="sp-empty">
-            <Sprocket look={sprocket.look} size={120} seed={id} />
-            <p className="sp-empty-title">Say hello to {name}</p>
-            <p className="muted small">{name} can't reply yet. Chatting with Sprockets is coming in a later update.</p>
+        {messages && (
+          <div className={"sp-intro" + (messages.length ? "" : " alone")}>
+            <Sprocket look={sprocket.look} size={messages.length ? 88 : 120} seed={id} />
+            <p className="sp-intro-title">{messages.length ? name : `Say hello to ${name}`}</p>
+            <p className="muted small">
+              {messages.length ? `This is the beginning of your chat with ${name}.` : `${name} can't reply yet. Chatting with Sprockets is coming in a later update.`}
+            </p>
           </div>
         )}
         {!!messages?.length && (
           <ol className="sp-messages" aria-label={`Messages to ${name}`}>
-            {messages.map((m, i) => (
-              <li key={m.id + i} className="sp-bubble" title={new Date(m.createdAt).toLocaleString()}>
-                {m.text}
-              </li>
-            ))}
+            {messages.map((m, i) => {
+              const prev = messages[i - 1];
+              const label = !prev || newGroup(prev.createdAt, m.createdAt);
+              return (
+                <li key={m.id + i} className="sp-message">
+                  {label && <time className="sp-stamp" dateTime={m.createdAt}>{stamp(m.createdAt)}</time>}
+                  <p className="sp-bubble" title={new Date(m.createdAt).toLocaleString()}>
+                    {m.text}
+                  </p>
+                </li>
+              );
+            })}
           </ol>
         )}
         {/* Always rendered, so screen readers announce the notice when the first message appears. */}
@@ -113,7 +139,7 @@ export function SprocketChat({ sprocket }: { sprocket: SprocketData }) {
       </div>
       <div className="sp-compose">
         {error && <p className="error" role="alert">{error}</p>}
-        <Composer placeholder={`Message ${name}`} onSubmit={(text) => void send(text)} autoFocus />
+        <Composer placeholder={`Message ${name}`} onSubmit={(text) => void send(text)} autoFocus compact />
       </div>
     </section>
   );
