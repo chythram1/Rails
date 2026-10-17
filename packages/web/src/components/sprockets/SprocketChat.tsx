@@ -112,7 +112,7 @@ export function SprocketChat({ sprocket }: { sprocket: SprocketData }) {
             <Sprocket look={sprocket.look} size={messages.length ? 88 : 120} seed={id} />
             <p className="sp-intro-title">{messages.length ? name : `Say hello to ${name}`}</p>
             <p className="muted small">
-              {messages.length ? `This is the beginning of your chat with ${name}.` : `${name} can't reply yet. Chatting with Sprockets is coming in a later update.`}
+              {messages.length ? `This is the beginning of your chat with ${name}.` : `${name} can't reply yet. Replies are coming in a later update.`}
             </p>
           </div>
         )}

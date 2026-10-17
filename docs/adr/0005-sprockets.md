@@ -8,7 +8,9 @@ one head accessory or none (party hat, beanie, cap, bow, flower clip, crown, buc
 a name. They have their own page (the "Sprockets" nav item): a list of Sprockets beside the selected
 one's chat, or the creator. The creator follows `ref/sprockets/stage1/create-bot.jpg`: the preview on
 top, then a row each for colour, accessory and shape, then the name. New Sprockets can start from a
-suggestion (a preset name and look). With no Sprocket open, the page shows them all as cards; a chat
+suggestion (a preset name and look); the suggestions' names also serve as the name placeholder, which
+moves to the next unused one each time the creator opens. The list column's header is a search field,
+not a title, so the word "Sprockets" shows once (the nav item). With no Sprocket open, the page shows them all as cards; a chat
 opens with the Sprocket itself, and time labels mark gaps between messages.
 
 Stage 1 is visual only. Sprockets can be created, restyled, renamed and deleted, and the user can send

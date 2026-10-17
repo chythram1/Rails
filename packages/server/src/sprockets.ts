@@ -44,7 +44,7 @@ function repairLook(raw: unknown): SprocketLook {
 
 function parseInput(body: Partial<SprocketInput> | undefined): SprocketInput {
   const name = typeof body?.name === "string" ? body.name.trim() : "";
-  if (!name) throw new ServiceError("Give your Sprocket a name.", 400);
+  if (!name) throw new ServiceError("Give it a name.", 400);
   if (name.length > MAX_NAME) throw new ServiceError(`Names can be at most ${MAX_NAME} characters.`, 400);
   return { name, look: parseLook(body?.look) };
 }

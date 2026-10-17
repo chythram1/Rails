@@ -363,8 +363,15 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .sp-list { width: 272px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
 /* 52px like the sidebar's logo row; 7px of top padding centres the contents on the logo's line (y = 29). */
 .sp-list-head, .sp-head { display: flex; align-items: center; gap: 6px; height: 52px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
-.sp-list-head { padding: 7px 10px 0 16px; }
-.sp-list-title { flex: 1; font-size: 15px; font-weight: 600; }
+.sp-list-head { padding: 7px 10px 0 12px; }
+.sp-search {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px;
+  border-radius: 8px; background: var(--surface); color: var(--muted);
+}
+.sp-search:focus-within { box-shadow: 0 0 0 1px var(--border-strong); }
+.sp-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: 13.5px; color: var(--text); }
+.sp-search input::placeholder { color: var(--muted); }
+.sp-search input::-webkit-search-cancel-button { filter: invert(0.6); }
 .sp-list-head .icon-btn { width: 32px; height: 32px; }
 .sp-rows { list-style: none; margin: 0; padding: 6px; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 2px; }
 .sp-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 6px; border-radius: 10px; }
@@ -384,7 +391,7 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 /* The thread opens with the Sprocket; on an empty chat that intro sits in the middle instead. */
 .sp-intro { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 8px auto 28px; max-width: 340px; text-align: center; text-wrap: balance; }
 .sp-intro.alone { margin: auto; }
-.sp-intro p, .sp-gallery-head p, .sp-suggestion p { margin: 0; }
+.sp-intro p { margin: 0; }
 .sp-intro-title { margin-top: 8px; font-size: 18px; font-weight: 500; }
 .sp-messages { list-style: none; margin: 0 auto; padding: 0; width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: 8px; }
 .sp-message { display: flex; flex-direction: column; align-items: flex-end; }
@@ -434,8 +441,6 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 
 /* Gallery: the page with no Sprocket open. Cards hold the character, its name and the last message. */
 .sp-gallery { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 40px 32px 48px; }
-.sp-gallery-head { max-width: 880px; margin: 0 auto 20px; }
-.sp-gallery-head h2 { font-size: 22px; font-weight: 500; margin-bottom: 4px; }
 .sp-cards { list-style: none; margin: 0 auto; padding: 0; max-width: 880px; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
 .sp-card {
   height: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 24px 14px 18px;

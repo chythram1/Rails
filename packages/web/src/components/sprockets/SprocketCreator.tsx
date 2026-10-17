@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Ban, ChevronLeft } from "lucide-react";
 import {
   SPROCKET_ACCESSORIES,
@@ -16,18 +16,40 @@ import { Sprocket } from "./Sprocket.tsx";
 
 const NEW_LOOK: SprocketLook = { character: "block", color: "blue", accessory: "none" };
 
-/** Ready-made Sprockets (ref create-bot.jpg). Picking one fills in the name and look; nothing runs yet. */
+/**
+ * Ready-made ideas. Picking one fills in the name and look (nothing runs yet). Their names double as the
+ * name field's placeholder, which moves to the next idea each time the creator opens.
+ */
 const SUGGESTIONS: { name: string; about: string; look: SprocketLook }[] = [
-  { name: "Night Shift", about: "Works overnight and preps your morning digest", look: { character: "cog", color: "orange", accessory: "beanie" } },
-  { name: "Inbox Triage", about: "Sorts your email and drafts replies in your voice", look: { character: "momo", color: "pink", accessory: "bow" } },
-  { name: "CI Watch", about: "Tells you the moment a build goes red", look: { character: "roo", color: "teal", accessory: "cap" } },
-  { name: "Standup", about: "Sums up yesterday's commits every morning", look: { character: "bean", color: "green", accessory: "flower" } },
+  { name: "PR Pal", about: "Reads new pull requests and points out risky changes", look: { character: "roo", color: "blue", accessory: "cap" } },
+  { name: "Changelog", about: "Turns merged work into release notes", look: { character: "block", color: "yellow", accessory: "party" } },
+  { name: "Dep Doctor", about: "Keeps an eye on outdated and vulnerable packages", look: { character: "cog", color: "green", accessory: "beanie" } },
+  { name: "Flake Hunter", about: "Tracks down flaky tests and suggests fixes", look: { character: "starry", color: "purple", accessory: "crown" } },
+  { name: "Doc Keeper", about: "Keeps READMEs and docs in step with the code", look: { character: "lune", color: "teal", accessory: "bucket" } },
+  { name: "Todo Sweeper", about: "Turns stray TODOs into a tidy task list", look: { character: "momo", color: "pink", accessory: "flower" } },
 ];
+
+const NEXT_NAME_KEY = "rails.sprocketsNextName";
+
+/**
+ * Index of the next suggested name that isn't taken, going round SUGGESTIONS from where the last visit
+ * stopped. Only reads: the creator stores where to continue once it has mounted (see below).
+ */
+function nextName(taken: string[]): number {
+  const start = (Number(localStorage.getItem(NEXT_NAME_KEY)) || 0) % SUGGESTIONS.length;
+  for (let i = 0; i < SUGGESTIONS.length; i++) {
+    const k = (start + i) % SUGGESTIONS.length;
+    if (!taken.includes(SUGGESTIONS[k].name)) return k;
+  }
+  return start;
+}
 const MAX_NAME = 40;
 
 interface Props {
   /** The Sprocket to edit; omit to create one. */
   sprocket?: SprocketData;
+  /** Names already in use, which the suggested name skips. */
+  taken: string[];
   onSaved(s: SprocketData): void;
   onCancel?(): void;
 }
@@ -36,13 +58,18 @@ interface Props {
  * Make or restyle a Sprocket (ref/sprockets/stage1/create-bot.jpg): the preview on top, then rows for
  * colour, accessory (drawn on its own) and shape, then the name.
  */
-export function SprocketCreator({ sprocket, onSaved, onCancel }: Props) {
+export function SprocketCreator({ sprocket, taken, onSaved, onCancel }: Props) {
   const [look, setLook] = useState<SprocketLook>(sprocket?.look ?? NEW_LOOK);
   const [name, setName] = useState(sprocket?.name ?? "");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  // An empty name falls back to the shape's own name.
-  const shownName = name.trim() || CHARACTERS[look.character].name;
+  // An empty name falls back to the suggested one (the placeholder).
+  const [nameIdea] = useState(() => nextName(taken));
+  useEffect(() => {
+    if (!sprocket) localStorage.setItem(NEXT_NAME_KEY, String(nameIdea + 1)); // the next visit suggests the next name
+  }, [sprocket, nameIdea]);
+  const suggested = sprocket?.name ?? SUGGESTIONS[nameIdea].name;
+  const shownName = name.trim() || suggested;
   const body = useRef<HTMLDivElement>(null);
   const suggest = (s: (typeof SUGGESTIONS)[number]) => {
     setLook(s.look);
@@ -70,7 +97,7 @@ export function SprocketCreator({ sprocket, onSaved, onCancel }: Props) {
         <a className="icon-btn sp-back" href={sprocket ? href.sprocket(sprocket.id) : href.sprockets()} aria-label="Back">
           <ChevronLeft size={18} />
         </a>
-        <h2 id="sp-creator-title" className="truncate">{sprocket ? `Edit ${sprocket.name}` : "New Sprocket"}</h2>
+        <h2 id="sp-creator-title" className="truncate" title={shownName}>{sprocket ? `Edit ${shownName}` : shownName}</h2>
       </header>
       <div className="sp-creator-body" ref={body}>
         <Sprocket look={look} size={150} follow label={`Preview of ${shownName}`} />
@@ -89,7 +116,7 @@ export function SprocketCreator({ sprocket, onSaved, onCancel }: Props) {
 
         <label className="field sp-name">
           <span>Name</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={CHARACTERS[look.character].name} maxLength={MAX_NAME} autoComplete="off" spellCheck={false} />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={suggested} maxLength={MAX_NAME} autoComplete="off" spellCheck={false} />
         </label>
         {error && <p className="error" role="alert">{error}</p>}
         <div className="sp-actions">
@@ -104,7 +131,7 @@ export function SprocketCreator({ sprocket, onSaved, onCancel }: Props) {
           <section className="sp-suggestions" aria-labelledby="sp-suggestions-title">
             <h3 id="sp-suggestions-title">Suggestions</h3>
             <ul>
-              {SUGGESTIONS.map((s) => (
+              {SUGGESTIONS.filter((s) => !taken.includes(s.name)).map((s) => (
                 <li key={s.name}>
                   <button type="button" className="sp-suggestion" onClick={() => suggest(s)}>
                     <Sprocket look={s.look} size={48} still />

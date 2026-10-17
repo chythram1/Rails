@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Pause, Play, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Pause, Play, Plus, Search } from "lucide-react";
 import type { Sprocket as SprocketData } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate, type Route } from "../../router.ts";
@@ -42,13 +42,13 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
   const creating = route.view === "new" || (route.view === "list" && list.length === 0);
   let main;
   if (creating) {
-    main = <SprocketCreator key="new" onSaved={(s) => navigate(href.sprocket(s.id))} onCancel={list.length ? () => navigate(href.sprockets()) : undefined} />;
+    main = <SprocketCreator key="new" taken={list.map((s) => s.name)} onSaved={(s) => navigate(href.sprocket(s.id))} onCancel={list.length ? () => navigate(href.sprockets()) : undefined} />;
   } else if (route.view === "edit" && current) {
-    main = <SprocketCreator key={current.id} sprocket={current} onSaved={(s) => navigate(href.sprocket(s.id))} onCancel={() => navigate(href.sprocket(current.id))} />;
+    main = <SprocketCreator key={current.id} sprocket={current} taken={[]} onSaved={(s) => navigate(href.sprocket(s.id))} onCancel={() => navigate(href.sprocket(current.id))} />;
   } else if (route.view === "chat" && current) {
     main = <SprocketChat key={current.id} sprocket={current} />;
   } else if (route.id) {
-    main = <p className="sp-placeholder muted">This Sprocket doesn't exist anymore.</p>;
+    main = <p className="sp-placeholder muted">This one doesn't exist anymore. It may have been deleted on another device.</p>;
   } else {
     main = <Gallery list={list} />;
   }
@@ -61,12 +61,22 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
   );
 }
 
+/** The list column. Its header is a search field (as in Telegram, Lindy or ref chat.png) rather than a title. */
 function SprocketList({ list, activeId }: { list: SprocketData[]; activeId?: string }) {
   const motion = useSprocketMotion();
+  const [query, setQuery] = useState("");
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? list.filter((s) => s.name.toLowerCase().includes(q) || s.lastMessage?.text.toLowerCase().includes(q)) : list;
+  }, [list, query]);
   return (
     <aside className="sp-list" aria-labelledby="sp-list-title">
+      <h1 id="sp-list-title" className="sr-only">Sprockets</h1>
       <div className="sp-list-head">
-        <h1 id="sp-list-title" className="sp-list-title">Sprockets</h1>
+        <label className="sp-search">
+          <Search size={15} aria-hidden />
+          <input type="search" placeholder="Search" aria-label="Search Sprockets" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </label>
         {/* Idle animations loop forever, so they get a visible pause control (WCAG 2.2.2). */}
         <button className="icon-btn" aria-label={motion ? "Pause animations" : "Play animations"} title={motion ? "Pause animations" : "Play animations"} onClick={() => setSprocketMotion(!motion)}>
           {motion ? <Pause size={16} /> : <Play size={16} />}
@@ -76,10 +86,12 @@ function SprocketList({ list, activeId }: { list: SprocketData[]; activeId?: str
         </a>
       </div>
       {list.length === 0 ? (
-        <p className="muted small pad">No Sprockets yet.</p>
+        <p className="muted small pad">Your first one will show up here.</p>
+      ) : shown.length === 0 ? (
+        <p className="muted small pad">No matches</p>
       ) : (
         <ul className="sp-rows">
-          {list.map((s) => (
+          {shown.map((s) => (
             <li key={s.id}>
               <a className="sp-row" href={href.sprocket(s.id)} title={s.name} aria-current={s.id === activeId ? "page" : undefined}>
                 <Sprocket look={s.look} size={36} seed={s.id} />
@@ -106,10 +118,7 @@ function SprocketList({ list, activeId }: { list: SprocketData[]; activeId?: str
 function Gallery({ list }: { list: SprocketData[] }) {
   return (
     <div className="sp-gallery">
-      <header className="sp-gallery-head">
-        <h2>Your Sprockets</h2>
-        <p className="muted small">Pick one to chat with, or make a new one.</p>
-      </header>
+      <h2 className="sr-only">All Sprockets</h2>
       <ul className="sp-cards">
         {list.map((s) => (
           <li key={s.id}>
@@ -125,7 +134,7 @@ function Gallery({ list }: { list: SprocketData[] }) {
             <span className="sp-card-plus" aria-hidden>
               <Plus size={28} />
             </span>
-            <span className="sp-card-name">New Sprocket</span>
+            <span className="sp-card-name">New</span>
           </a>
         </li>
       </ul>
