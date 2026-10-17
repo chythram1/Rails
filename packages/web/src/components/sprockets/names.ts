@@ -1,14 +1,24 @@
-import type { SprocketAccessory } from "@rails/shared";
+import type { SprocketAccessory, SprocketColor } from "@rails/shared";
 
 export const ACCESSORY_NAMES: Record<SprocketAccessory, string> = {
+  party: "Party hat",
   beanie: "Beanie",
   cap: "Cap",
   bow: "Bow",
+  flower: "Flower clip",
   crown: "Crown",
-  headphones: "Headphones",
-  sunglasses: "Sunglasses",
-  glasses: "Glasses",
-  scarf: "Scarf",
+  bucket: "Bucket hat",
 };
 
-export const SLOT_NAMES = { head: "Head", eyes: "Eyes", neck: "Neck" } as const;
+export const COLOR_NAMES: Record<SprocketColor, string> = {
+  brown: "Brown",
+  red: "Red",
+  orange: "Orange",
+  yellow: "Yellow",
+  green: "Green",
+  teal: "Teal",
+  blue: "Blue",
+  purple: "Purple",
+  pink: "Pink",
+  grey: "Grey",
+};

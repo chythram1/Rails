@@ -1,13 +1,13 @@
 // Sprockets: always-on agents (ADR 0005). Stage 1 stores their look, name and the messages the user
 // sends them; nothing runs yet, so they never reply.
 import {
+  SPROCKET_ACCESSORIES,
   SPROCKET_CHARACTERS,
-  SPROCKET_SLOTS,
+  SPROCKET_COLORS,
   type Sprocket,
   type SprocketInput,
   type SprocketLook,
   type SprocketMessage,
-  type SprocketSlot,
 } from "@rails/shared";
 import { sprocketMessages, sprockets } from "./db.ts";
 import { ServiceError } from "./errors.ts";
@@ -20,15 +20,26 @@ const listeners = new Set<() => void>();
 export const onSprocketsChanged = (fn: () => void) => listeners.add(fn);
 const changed = () => listeners.forEach((fn) => fn());
 
-/** A look from a request or the DB. Unknown ids are refused, so a stale client can't store junk. */
+const isOneOf = <T extends string>(list: readonly T[], v: unknown): v is T => list.includes(v as T);
+
+/** A look from a request. Unknown ids are refused, so a stale client can't store junk. */
 function parseLook(raw: unknown): SprocketLook {
   const look = (raw ?? {}) as Record<string, unknown>;
-  if (!SPROCKET_CHARACTERS.includes(look.character as never)) throw new ServiceError("Unknown character", 400);
-  for (const slot of Object.keys(SPROCKET_SLOTS) as SprocketSlot[]) {
-    const v = look[slot] ?? "none";
-    if (v !== "none" && !(SPROCKET_SLOTS[slot] as readonly string[]).includes(v as string)) throw new ServiceError(`Unknown ${slot} accessory`, 400);
-  }
-  return { character: look.character, head: look.head ?? "none", eyes: look.eyes ?? "none", neck: look.neck ?? "none" } as SprocketLook;
+  const accessory = look.accessory ?? "none";
+  if (!isOneOf(SPROCKET_CHARACTERS, look.character)) throw new ServiceError("Unknown character", 400);
+  if (!isOneOf(SPROCKET_COLORS, look.color)) throw new ServiceError("Unknown colour", 400);
+  if (accessory !== "none" && !isOneOf(SPROCKET_ACCESSORIES, accessory)) throw new ServiceError("Unknown accessory", 400);
+  return { character: look.character, color: look.color, accessory: accessory as SprocketLook["accessory"] };
+}
+
+/** A stored look, with ids that no longer exist replaced by defaults instead of breaking the page. */
+function repairLook(raw: unknown): SprocketLook {
+  const look = (raw ?? {}) as Record<string, unknown>;
+  return {
+    character: isOneOf(SPROCKET_CHARACTERS, look.character) ? look.character : "block",
+    color: isOneOf(SPROCKET_COLORS, look.color) ? look.color : "yellow",
+    accessory: isOneOf(SPROCKET_ACCESSORIES, look.accessory) ? look.accessory : "none",
+  };
 }
 
 function parseInput(body: Partial<SprocketInput> | undefined): SprocketInput {
@@ -38,16 +49,8 @@ function parseInput(body: Partial<SprocketInput> | undefined): SprocketInput {
   return { name, look: parseLook(body?.look) };
 }
 
-/** A stored Sprocket with a valid look: ids that no longer exist fall back instead of breaking the page. */
 function withLook(row: ReturnType<typeof sprockets.list>[number]): Sprocket {
-  let look: SprocketLook;
-  try {
-    look = parseLook(row.look);
-  } catch {
-    const raw = row.look as Partial<SprocketLook>;
-    look = { character: SPROCKET_CHARACTERS.includes(raw?.character as never) ? raw.character! : "block", head: "none", eyes: "none", neck: "none" };
-  }
-  return { ...row, look, lastMessage: sprocketMessages.last(row.id) };
+  return { ...row, look: repairLook(row.look), lastMessage: sprocketMessages.last(row.id) };
 }
 
 function getSprocket(id: string): Sprocket {

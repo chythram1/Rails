@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
 import type { SprocketLook } from "@rails/shared";
-import { CHARACTERS, type Primitive } from "./characters.ts";
+import { CHARACTERS, COLORS, type Primitive } from "./characters.ts";
 import { popIn, squash, useBlink, useLook, useSprocketMotion } from "./motion.ts";
-import { Eyes, Eyewear, Hat, Headphones, Scarf } from "./parts.tsx";
+import { Eyes, Hat } from "./parts.tsx";
 
 /** Seconds per bob at tempo 1. Sway takes longer, so the two never line up. */
 const PERIOD = 3.4;
@@ -33,10 +33,11 @@ function phaseOf(seed: string) {
 /**
  * A Sprocket character (see ref characters.md §5.2 for the layers). Each nested group owns one kind of
  * motion: s-rig bobs, s-sway sways, s-pop squashes on change, s-face/s-eyes follow the pointer, s-lid
- * blinks, and hats and dangling bits trail the bob a little later.
+ * blinks, and the accessory (and its wobbly bits) trails the bob a little later.
  */
 export function Sprocket({ look, size, still, follow, label, seed = look.character }: Props) {
   const def = CHARACTERS[look.character];
+  const color = COLORS[look.color];
   const motion = useSprocketMotion();
   const live = !still && motion;
   const svg = useRef<SVGSVGElement>(null);
@@ -51,7 +52,7 @@ export function Sprocket({ look, size, still, follow, label, seed = look.charact
   useEffect(() => {
     if (mounted.current && live) squash(pop.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [look.character, look.head, look.eyes, look.neck]);
+  }, [look.character, look.color, look.accessory]);
   useEffect(() => {
     mounted.current = true;
   }, []);
@@ -84,14 +85,11 @@ export function Sprocket({ look, size, still, follow, label, seed = look.charact
       <g className="s-rig">
         <g className="s-sway">
           <g className="s-pop" ref={pop}>
-            <g fill={def.color} stroke={def.round ? def.color : undefined} strokeWidth={def.round} strokeLinejoin="round">
+            <g fill={color} stroke={def.round ? color : undefined} strokeWidth={def.round} strokeLinejoin="round">
               {def.body.map((p, i) => (
                 <Shape key={i} p={p} />
               ))}
             </g>
-            {look.neck === "scarf" && (
-              <g transform={`translate(${def.neck.x} ${def.neck.y})`}>{part("scarf", <Scarf half={def.neck.half} colors={def.scarf} />)}</g>
-            )}
             <g transform={`translate(${def.face.x} ${def.face.y})`}>
               <g className="s-face">
                 <g className="s-eyes">
@@ -99,17 +97,12 @@ export function Sprocket({ look, size, still, follow, label, seed = look.charact
                     <Eyes tilt={def.face.tilt} />
                   </g>
                 </g>
-                {look.eyes !== "none" && part(look.eyes, <Eyewear id={look.eyes} />)}
               </g>
             </g>
-            {look.head === "headphones" ? (
-              <g transform={`translate(${def.ears.x} ${def.ears.y})`}>{part("headphones", <Headphones ears={def.ears} />)}</g>
-            ) : (
-              look.head !== "none" && (
-                <g transform={`translate(${def.hat.x} ${def.hat.y}) rotate(${def.hat.rot})`}>
-                  <g className="s-hat">{part(look.head, <Hat id={look.head} />)}</g>
-                </g>
-              )
+            {look.accessory !== "none" && (
+              <g transform={`translate(${def.hat.x} ${def.hat.y}) rotate(${def.hat.rot})`}>
+                <g className="s-hat">{part(look.accessory, <Hat id={look.accessory} />)}</g>
+              </g>
             )}
           </g>
         </g>

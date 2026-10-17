@@ -339,18 +339,17 @@ button.chip:hover { background: var(--hover); }
 /* ---- Sprocket characters (components/sprockets) ----
    Each nested SVG group owns one motion. Idle loops run on --period (set per character, so a group of
    Sprockets never bobs in sync) from --phase (a negative delay: each starts at a different point).
-   Loops are sine-like (ease-in-out each way); hats and dangling bits use the same period, later. */
+   Loops are sine-like (ease-in-out each way); the accessory and its wobbly bits use the same period, later. */
 .sprocket { display: block; overflow: visible; flex-shrink: 0; }
-.sprocket :is(.s-rig, .s-sway, .s-pop, .s-hat, .s-in, .s-wobble, .s-dangle, .s-lid, .s-shadow) { transform-box: fill-box; }
+.sprocket :is(.s-rig, .s-sway, .s-pop, .s-hat, .s-in, .s-wobble, .s-lid, .s-shadow) { transform-box: fill-box; }
 .sprocket :is(.s-sway, .s-pop, .s-hat, .s-in, .s-wobble) { transform-origin: 50% 100%; }
-.sprocket .s-dangle { transform-origin: 50% 0; }
 .sprocket .s-lid, .sprocket .s-shadow { transform-origin: 50% 50%; }
 .sprocket .s-shadow { fill: #000; opacity: 0.5; }
 .sprocket .s-rig { animation: sp-bob var(--period, 3.4s) ease-in-out var(--phase, 0s) infinite alternate; }
 .sprocket .s-sway { animation: sp-sway calc(var(--period, 3.4s) * 1.7) ease-in-out var(--phase, 0s) infinite alternate; }
 .sprocket .s-shadow { animation: sp-shadow var(--period, 3.4s) ease-in-out var(--phase, 0s) infinite alternate; }
 .sprocket .s-hat { animation: sp-tilt var(--period, 3.4s) ease-in-out calc(var(--phase, 0s) + 110ms) infinite alternate; }
-.sprocket :is(.s-wobble, .s-dangle) { animation: sp-swing var(--period, 3.4s) ease-in-out calc(var(--phase, 0s) + 260ms) infinite alternate; }
+.sprocket .s-wobble { animation: sp-swing var(--period, 3.4s) ease-in-out calc(var(--phase, 0s) + 260ms) infinite alternate; }
 /* Eyes lead, the face follows (motion.ts writes --ex/--ey/--fx/--fy in viewBox units). */
 .sprocket .s-face { transform: translate(calc(var(--fx, 0) * 1px), calc(var(--fy, 0) * 1px)); }
 .sprocket .s-eyes { transform: translate(calc(var(--ex, 0) * 1px), calc(var(--ey, 0) * 1px)); }
@@ -393,30 +392,32 @@ button.chip:hover { background: var(--hover); }
 .sp-compose { width: 100%; max-width: 800px; margin: 0 auto; padding: 0 20px 20px; display: flex; flex-direction: column; gap: 8px; }
 
 .sp-creator { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.sp-creator-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 24px 20px 40px; display: grid; gap: 24px; align-content: start; justify-items: center; }
-.sp-stage { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.sp-stage-name { font-size: 18px; font-weight: 500; max-width: 260px; overflow-wrap: anywhere; text-align: center; }
-.sp-controls { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 22px; }
-/* Wide panes: preview on the left, kept in view while the options scroll. */
-@container (min-width: 760px) {
-  .sp-creator-body { grid-template-columns: minmax(0, 1fr) minmax(0, 520px); align-items: start; justify-items: stretch; column-gap: 32px; padding-top: 32px; }
-  .sp-stage { position: sticky; top: 0; padding-top: 40px; }
+/* One centred column: preview, colour / accessory / shape rows, name, button (ref create-bot.jpg). */
+.sp-creator-body {
+  flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 40px 20px 48px;
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
 }
-.sp-group { border: 0; padding: 0; margin: 0; min-width: 0; }
-.sp-group legend { padding: 0; margin-bottom: 8px; font-size: 13px; color: var(--muted); }
-.sp-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
-.sp-option {
-  position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 6px 4px 8px; border: 1px solid transparent; border-radius: 12px; background: var(--surface);
-  color: var(--muted); font-size: 12px; cursor: pointer;
+.sp-creator-body > .sprocket { margin-bottom: 12px; }
+.sp-row-picker { border: 0; padding: 0; margin: 0; min-width: 0; max-width: 520px; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.sp-pick { position: relative; display: grid; place-items: center; border-radius: 12px; cursor: pointer; }
+.sp-pick input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.sp-pick:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
+/* Colours: round swatches; the chosen one gets a ring. */
+.swatch .sp-pick { width: 36px; height: 36px; border-radius: 50%; }
+.sp-swatch { width: 26px; height: 26px; border-radius: 50%; }
+.swatch .sp-pick:has(input:checked) { box-shadow: 0 0 0 2px var(--text); }
+/* Accessories and shapes: thumbnails in a box; the chosen one gets a border. */
+.thumb .sp-pick { width: 50px; height: 50px; border: 1px solid transparent; }
+.thumb .sp-pick:has(input:checked) { border-color: #8a8a8a; background: var(--surface-2); }
+.sp-none { color: var(--muted); }
+.sp-name { width: 100%; max-width: 360px; margin-top: 16px; }
+@container (max-width: 560px) {
+  .sp-row-picker { display: grid; grid-template-columns: repeat(var(--cols), auto); }
 }
-.sp-option input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
-.sp-option:has(input:checked) { border-color: #8a8a8a; background: var(--surface-2); color: var(--text); }
-.sp-option:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
-.sp-actions { display: flex; gap: 8px; }
+.sp-actions { display: flex; gap: 8px; margin-top: 8px; }
 @media (hover: hover) {
   .sp-row:hover { background: var(--hover); }
-  .sp-option:hover { background: var(--hover); }
+  .thumb .sp-pick:hover { background: var(--hover); }
 }
 
 /* ---- small screens: sidebar becomes a drawer ---- */

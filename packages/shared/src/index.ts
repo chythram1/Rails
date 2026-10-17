@@ -92,25 +92,23 @@ export interface GitStatus {
 
 // ---- Sprockets: always-on agents (ADR 0005). Stage 1 is their look and chat UI only. ----
 
-/** The cast. Each character has a fixed shape and colour. */
+/** The cast: the shapes a Sprocket can have. */
 export const SPROCKET_CHARACTERS = ["block", "bean", "lune", "bell", "starry", "cog", "roo", "momo"] as const;
 export type SprocketCharacter = (typeof SPROCKET_CHARACTERS)[number];
 
-/** Accessories by slot; a Sprocket wears at most one per slot. Headphones take the head slot. */
-export const SPROCKET_SLOTS = {
-  head: ["beanie", "cap", "bow", "crown", "headphones"],
-  eyes: ["sunglasses", "glasses"],
-  neck: ["scarf"],
-} as const;
-export type SprocketSlot = keyof typeof SPROCKET_SLOTS;
-export type SprocketAccessory = (typeof SPROCKET_SLOTS)[SprocketSlot][number];
+/** Body colours (the web holds the hex values). */
+export const SPROCKET_COLORS = ["brown", "red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "grey"] as const;
+export type SprocketColor = (typeof SPROCKET_COLORS)[number];
 
-/** What a Sprocket looks like. `"none"` leaves a slot empty. */
+/** Head accessories; a Sprocket wears one or none. */
+export const SPROCKET_ACCESSORIES = ["party", "beanie", "cap", "bow", "flower", "crown", "bucket"] as const;
+export type SprocketAccessory = (typeof SPROCKET_ACCESSORIES)[number];
+
+/** What a Sprocket looks like. */
 export interface SprocketLook {
   character: SprocketCharacter;
-  head: (typeof SPROCKET_SLOTS.head)[number] | "none";
-  eyes: (typeof SPROCKET_SLOTS.eyes)[number] | "none";
-  neck: (typeof SPROCKET_SLOTS.neck)[number] | "none";
+  color: SprocketColor;
+  accessory: SprocketAccessory | "none";
 }
 
 export interface Sprocket {

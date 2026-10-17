@@ -1,19 +1,20 @@
-import { useState, type FormEvent } from "react";
-import { ChevronLeft } from "lucide-react";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { Ban, ChevronLeft } from "lucide-react";
 import {
+  SPROCKET_ACCESSORIES,
   SPROCKET_CHARACTERS,
-  SPROCKET_SLOTS,
+  SPROCKET_COLORS,
   type Sprocket as SprocketData,
   type SprocketLook,
-  type SprocketSlot,
 } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href } from "../../router.ts";
-import { CHARACTERS } from "./characters.ts";
-import { ACCESSORY_NAMES, SLOT_NAMES } from "./names.ts";
+import { CHARACTERS, COLORS } from "./characters.ts";
+import { ACCESSORY_NAMES, COLOR_NAMES } from "./names.ts";
+import { AccessoryIcon } from "./parts.tsx";
 import { Sprocket } from "./Sprocket.tsx";
 
-const NEW_LOOK: SprocketLook = { character: "block", head: "none", eyes: "none", neck: "none" };
+const NEW_LOOK: SprocketLook = { character: "block", color: "blue", accessory: "none" };
 const MAX_NAME = 40;
 
 interface Props {
@@ -23,15 +24,18 @@ interface Props {
   onCancel?(): void;
 }
 
-/** Make or restyle a Sprocket: pick a character, one accessory per slot, and a name. */
+/**
+ * Make or restyle a Sprocket (ref/sprockets/stage1/create-bot.jpg): the preview on top, then rows for
+ * colour, accessory (drawn on its own) and shape, then the name.
+ */
 export function SprocketCreator({ sprocket, onSaved, onCancel }: Props) {
   const [look, setLook] = useState<SprocketLook>(sprocket?.look ?? NEW_LOOK);
   const [name, setName] = useState(sprocket?.name ?? "");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const character = CHARACTERS[look.character];
-  // An empty name falls back to the character's own name.
-  const shownName = name.trim() || character.name;
+  // An empty name falls back to the shape's own name.
+  const shownName = name.trim() || CHARACTERS[look.character].name;
+  const set = <K extends keyof SprocketLook>(key: K) => (v: SprocketLook[K]) => setLook((l) => ({ ...l, [key]: v }));
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -55,64 +59,61 @@ export function SprocketCreator({ sprocket, onSaved, onCancel }: Props) {
         <h2 id="sp-creator-title" className="truncate">{sprocket ? `Edit ${sprocket.name}` : "New Sprocket"}</h2>
       </header>
       <div className="sp-creator-body">
-        <div className="sp-stage">
-          <Sprocket look={look} size={180} follow label={`Preview of ${shownName}`} />
-          <p className="sp-stage-name" aria-hidden>{shownName}</p>
-        </div>
-        <div className="sp-controls">
-          <label className="field">
-            <span>Name</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={character.name} maxLength={MAX_NAME} autoComplete="off" spellCheck={false} />
-          </label>
-          <Options
-            legend="Character"
-            value={look.character}
-            options={SPROCKET_CHARACTERS.map((c) => ({ value: c, label: CHARACTERS[c].name, look: { ...look, character: c } }))}
-            onChange={(character) => setLook((l) => ({ ...l, character }))}
-          />
-          {(Object.keys(SPROCKET_SLOTS) as SprocketSlot[]).map((slot) => (
-            <Options
-              key={slot}
-              legend={SLOT_NAMES[slot]}
-              value={look[slot]}
-              options={(["none", ...SPROCKET_SLOTS[slot]] as SprocketLook[typeof slot][]).map((v) => ({
-                value: v,
-                label: v === "none" ? "None" : ACCESSORY_NAMES[v],
-                look: { ...look, [slot]: v },
-              }))}
-              onChange={(v) => setLook((l) => ({ ...l, [slot]: v }))}
-            />
-          ))}
-          {error && <p className="error" role="alert">{error}</p>}
-          <div className="sp-actions">
-            <button className="btn primary" disabled={saving}>{sprocket ? "Save changes" : "Create Sprocket"}</button>
-            {onCancel && (
-              <button type="button" className="btn" onClick={onCancel}>
-                Cancel
-              </button>
-            )}
-          </div>
+        <Sprocket look={look} size={150} follow label={`Preview of ${shownName}`} />
+
+        <Row legend="Colour" name="sp-color" value={look.color} onChange={set("color")}
+          options={SPROCKET_COLORS.map((c) => ({ value: c, label: COLOR_NAMES[c], view: <span className="sp-swatch" style={{ background: COLORS[c] }} /> }))}
+          variant="swatch" narrowColumns={5} />
+        <Row legend="Accessory" name="sp-accessory" value={look.accessory} onChange={set("accessory")}
+          options={(["none", ...SPROCKET_ACCESSORIES] as const).map((a) => ({
+            value: a,
+            label: a === "none" ? "No accessory" : ACCESSORY_NAMES[a],
+            view: a === "none" ? <Ban size={20} className="sp-none" /> : <AccessoryIcon id={a} size={32} />,
+          }))} narrowColumns={4} />
+        <Row legend="Shape" name="sp-shape" value={look.character} onChange={set("character")}
+          options={SPROCKET_CHARACTERS.map((c) => ({ value: c, label: CHARACTERS[c].name, view: <Sprocket look={{ ...look, character: c, accessory: "none" }} size={38} still /> }))} narrowColumns={4} />
+
+        <label className="field sp-name">
+          <span>Name</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={CHARACTERS[look.character].name} maxLength={MAX_NAME} autoComplete="off" spellCheck={false} />
+        </label>
+        {error && <p className="error" role="alert">{error}</p>}
+        <div className="sp-actions">
+          {onCancel && (
+            <button type="button" className="btn" onClick={onCancel}>
+              Cancel
+            </button>
+          )}
+          <button className="btn primary" disabled={saving}>{sprocket ? "Save changes" : "Get started"}</button>
         </div>
       </div>
     </form>
   );
 }
 
-/** A radio group drawn as thumbnails: each option shows the Sprocket as it would look with it. */
-function Options<T extends string>({ legend, value, options, onChange }: { legend: string; value: T; options: { value: T; label: string; look: SprocketLook }[]; onChange(v: T): void }) {
-  const group = "sp-" + legend.toLowerCase();
+/**
+ * One picker row: a radio group whose options are drawn as swatches or thumbnails. Arrow keys move
+ * between options; each option's name is its tooltip and its accessible name.
+ */
+function Row<T extends string>({ legend, name, value, options, onChange, variant = "thumb", narrowColumns }: {
+  legend: string;
+  name: string;
+  value: T;
+  options: { value: T; label: string; view: ReactNode }[];
+  onChange(v: T): void;
+  variant?: "thumb" | "swatch";
+  /** Columns on narrow screens, where one line doesn't fit, so the row wraps evenly. */
+  narrowColumns: number;
+}) {
   return (
-    <fieldset className="sp-group">
-      <legend>{legend}</legend>
-      <div className="sp-options">
-        {options.map((o) => (
-          <label key={o.value} className="sp-option">
-            <input type="radio" name={group} value={o.value} checked={o.value === value} onChange={() => onChange(o.value)} />
-            <Sprocket look={o.look} size={56} still />
-            <span>{o.label}</span>
-          </label>
-        ))}
-      </div>
+    <fieldset className={"sp-row-picker " + variant} style={{ "--cols": narrowColumns } as React.CSSProperties}>
+      <legend className="sr-only">{legend}</legend>
+      {options.map((o) => (
+        <label key={o.value} className="sp-pick" title={o.label}>
+          <input type="radio" name={name} value={o.value} checked={o.value === value} onChange={() => onChange(o.value)} aria-label={o.label} />
+          {o.view}
+        </label>
+      ))}
     </fieldset>
   );
 }

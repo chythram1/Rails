@@ -1,12 +1,12 @@
 // Eyes and accessories. Each part draws in its own coordinates around its anchor's origin; the renderer
-// places it. Parts never animate themselves: they mark swinging bits with s-dangle (hangs from its top)
-// or s-wobble (stands on its bottom), and the CSS animates those.
-import type { SprocketLook } from "@rails/shared";
-import type { CharacterDef } from "./characters.ts";
+// places it. Parts never animate themselves: they mark bits that wobble with s-wobble (stands on its
+// bottom), and the CSS animates those.
+import { useLayoutEffect, useRef } from "react";
+import type { SprocketAccessory } from "@rails/shared";
 
 const INK = "#17171c";
 /** Distance from the face centre to each eye. */
-export const EYE_X = 13;
+const EYE_X = 13;
 
 export function Eyes({ tilt }: { tilt: number }) {
   return (
@@ -18,36 +18,27 @@ export function Eyes({ tilt }: { tilt: number }) {
   );
 }
 
-/** Drawn at the face centre. */
-export function Eyewear({ id }: { id: SprocketLook["eyes"] }) {
-  if (id === "sunglasses") {
-    const lens = "M 3 -9 H 27 Q 29.5 -9 29 -6 L 27.5 4 Q 26.5 11 19 11 H 11 Q 4 11 3 4 Z";
-    return (
-      <g fill="#141416" transform="scale(1.12)">
-        <path d={lens} />
-        <path d={lens} transform="scale(-1 1)" />
-        <rect x={-30} y={-10.5} width={60} height={4.5} rx={2.25} />
-        <rect x={-37} y={-10} width={10} height={3.5} rx={1.75} />
-        <rect x={27} y={-10} width={10} height={3.5} rx={1.75} />
-        <path d="M 21 -4 L 17.5 4 M -9 -4 L -12.5 4" stroke="#fff" strokeOpacity={0.45} strokeWidth={2.6} strokeLinecap="round" />
-      </g>
-    );
-  }
-  if (id === "glasses") {
-    return (
-      <g fill="none" stroke="#141416" strokeWidth={3.5} strokeLinecap="round">
-        <circle cx={-17} cy={0} r={15} fill="#fff" fillOpacity={0.14} />
-        <circle cx={17} cy={0} r={15} fill="#fff" fillOpacity={0.14} />
-        <path d="M -2 -3 Q 0 -5.5 2 -3 M -32 -3 L -40 -4 M 32 -3 L 40 -4" />
-      </g>
-    );
-  }
-  return null;
+/** A horizontal band of a cone, from `t0` to `t1` (0 = base, 1 = tip). */
+function coneBand(t0: number, t1: number, half: number, height: number): string {
+  const at = (t: number, side: number) => `${(side * half * (1 - t)).toFixed(1)} ${(-height * t).toFixed(1)}`;
+  return `M ${at(t0, -1)} L ${at(t1, -1)} L ${at(t1, 1)} L ${at(t0, 1)} Z`;
 }
 
-/** Drawn at the hat anchor (bottom centre of the hat). Headphones are drawn by `Headphones` instead. */
-export function Hat({ id }: { id: SprocketLook["head"] }) {
+/** Drawn at the hat anchor (bottom centre of the hat). */
+export function Hat({ id }: { id: SprocketAccessory }) {
   switch (id) {
+    case "party":
+      return (
+        <g transform="rotate(8)">
+          <g className="s-wobble">
+            <circle cx={0} cy={-58} r={8} fill="#FFD34D" />
+          </g>
+          <path d={coneBand(0, 0.34, 26, 56)} fill="#FF8FB4" />
+          <path d={coneBand(0.34, 0.66, 26, 56)} fill="#FFD34D" />
+          <path d={coneBand(0.66, 1, 26, 56)} fill="#6FC3FF" />
+          <rect x={-28} y={-4} width={56} height={7} rx={3.5} fill="#F2709F" />
+        </g>
+      );
     case "beanie":
       return (
         <g>
@@ -69,15 +60,27 @@ export function Hat({ id }: { id: SprocketLook["head"] }) {
         </g>
       );
     case "bow":
+      // Sits to the right of the top of the head.
       return (
-        <g>
-          <path d="M -40 8 C -38 -30 38 -30 40 8" fill="none" stroke="#F6A6C6" strokeWidth={9} strokeLinecap="round" />
-          <g transform="translate(24 -21) rotate(14)">
-            <g className="s-wobble">
-              <path d="M 0 0 C -8 -16 -26 -14 -24 0 C -26 14 -8 16 0 0 Z" fill="#FFB8D3" />
-              <path d="M 0 0 C 8 -16 26 -14 24 0 C 26 14 8 16 0 0 Z" fill="#FFB8D3" />
-              <circle cx={0} cy={0} r={6} fill="#F27FAE" />
-            </g>
+        <g transform="translate(24 -4) rotate(16)">
+          <g className="s-wobble">
+            <path d="M 0 -2 C -6 -20 -30 -22 -28 -4 C -30 14 -6 14 0 2 Z" fill="#FFB0CF" />
+            <path d="M 0 -2 C 6 -20 30 -22 28 -4 C 30 14 6 14 0 2 Z" fill="#FFB0CF" />
+            <rect x={-7} y={-9} width={14} height={16} rx={6} fill="#F585B3" />
+          </g>
+        </g>
+      );
+    case "flower":
+      // A hair clip: the pink clip points back, the flower sits on the front.
+      return (
+        <g transform="translate(26 4) rotate(-12)">
+          <rect x={-2} y={-5} width={34} height={10} rx={5} fill="#F79AC0" />
+          <rect x={6} y={-1.5} width={20} height={3} rx={1.5} fill="#FFD5E5" />
+          <g className="s-wobble">
+            {[0, 72, 144, 216, 288].map((a) => (
+              <circle key={a} cx={0} cy={-10} r={8.5} fill="#FFFBF2" transform={`rotate(${a})`} />
+            ))}
+            <circle cx={0} cy={0} r={7} fill="#FFC531" />
           </g>
         </g>
       );
@@ -91,42 +94,35 @@ export function Hat({ id }: { id: SprocketLook["head"] }) {
           <circle cx={34} cy={-31} r={5.5} fill="#FFD95E" />
         </g>
       );
-    default:
-      return null;
+    case "bucket":
+      // Lifted so the brim, not the crown, rests on the hat line (it sat too low on Block and Momo).
+      return (
+        <g transform="translate(0 -7)">
+          <path d="M -30 -2 L -25 -34 Q 0 -42 25 -34 L 30 -2 Z" fill="#A574EE" />
+          <path d="M -29 -9 Q 0 -13 29 -9" fill="none" stroke="#8E5DDB" strokeWidth={4} strokeLinecap="round" />
+          <path d="M -46 6 Q -38 -6 -30 -6 L 30 -6 Q 38 -6 46 6 Q 0 14 -46 6 Z" fill="#8E5DDB" />
+        </g>
+      );
   }
 }
 
-/** Drawn at the ear line (`def.ears`), centred. Light, so the band shows against the dark page. */
-export function Headphones({ ears }: { ears: CharacterDef["ears"] }) {
-  const h = ears.half;
-  const peak = ears.top - ears.y - 10;
-  const c = (peak - 0.25 * -8) / 0.75; // control points that put the band's highest point at `peak`
+/**
+ * An accessory on its own (the creator's accessory row), scaled to fill a `size` square. Its viewBox
+ * is fitted to the drawing after the first render, since each accessory has its own extent.
+ */
+export function AccessoryIcon({ id, size }: { id: SprocketAccessory; size: number }) {
+  const svg = useRef<SVGSVGElement>(null);
+  const g = useRef<SVGGElement>(null);
+  useLayoutEffect(() => {
+    const b = g.current!.getBBox();
+    const side = Math.max(b.width, b.height) + 6;
+    svg.current!.setAttribute("viewBox", `${b.x + b.width / 2 - side / 2} ${b.y + b.height / 2 - side / 2} ${side} ${side}`);
+  }, [id]);
   return (
-    <g>
-      <path d={`M ${-h + 1} -8 C ${-h + 1} ${c} ${h - 1} ${c} ${h - 1} -8`} fill="none" stroke="#ECE6D8" strokeWidth={8} strokeLinecap="round" />
-      {[-1, 1].map((side) => (
-        <g key={side} transform={`scale(${side} 1)`}>
-          <rect x={h - 6} y={-21} width={15} height={42} rx={7.5} fill="#2A2A30" />
-          <rect x={h + 5} y={-19} width={12} height={38} rx={6} fill="#ECE6D8" />
-        </g>
-      ))}
-    </g>
-  );
-}
-
-const SCARF = { main: "#9B6BEA", shade: "#8A5BDD" };
-
-/** Drawn at the neck line (`def.neck`), centred. */
-export function Scarf({ half, colors = SCARF }: { half: number; colors?: { main: string; shade: string } }) {
-  return (
-    <g>
-      <g transform={`translate(${half - 22} 4)`}>
-        <g className="s-dangle">
-          <rect x={0} y={0} width={15} height={26} rx={6} fill={colors.shade} />
-          <path d="M 4 22 V 29 M 7.5 22 V 30 M 11 22 V 29" stroke={colors.shade} strokeWidth={3} strokeLinecap="round" />
-        </g>
+    <svg ref={svg} className="sp-accessory" width={size} height={size} viewBox="-60 -70 130 90" aria-hidden>
+      <g ref={g}>
+        <Hat id={id} />
       </g>
-      <rect x={-half - 3} y={-9} width={2 * half + 6} height={18} rx={9} fill={colors.main} />
-    </g>
+    </svg>
   );
 }
