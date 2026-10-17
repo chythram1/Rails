@@ -91,7 +91,7 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
   padding: 0 var(--nav-pad); border-radius: 10px; color: #cfcfcf;
 }
 .nav-item svg { width: var(--icon); height: var(--icon); flex-shrink: 0; }
-.nav-item:hover, .nav-item.active { background: var(--hover); color: var(--text); }
+.nav-item.active { background: var(--hover); color: var(--text); }
 .nav-item.primary { background: var(--surface-2); color: var(--text); }
 .section-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -101,14 +101,13 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .tree { flex: 1; overflow-y: auto; padding-bottom: 12px; }
 .project { margin-top: 6px; }
 .project-row { display: flex; align-items: center; padding-right: 4px; border-radius: 8px; cursor: pointer; }
-.project-row:hover { background: var(--hover); }
 .project-name {
   flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0;
   padding: 7px 12px; color: #cfcfcf; text-align: left;
 }
-.project-row:hover .project-name, .project-name.active { color: var(--text); }
+.project-name.active { color: var(--text); }
 .row-actions { display: flex; align-items: center; }
-.project-row .icon-btn:hover, .project-row .icon-btn[aria-expanded="true"] { background: var(--border-strong); }
+.project-row .icon-btn[aria-expanded="true"] { background: var(--border-strong); }
 /* Secondary row actions appear on hover or keyboard focus; always visible on touch screens. */
 .project-row .reveal { opacity: 0; }
 .project-row:hover .reveal, .project-row:focus-within .reveal, .reveal[aria-expanded="true"] { opacity: 1; }
@@ -118,14 +117,11 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
   display: flex; align-items: center; gap: 10px;
   padding: 7px 12px 7px 16px; border-radius: 8px; font-size: 14px;
 }
-.session-row:hover { background: var(--hover); }
 .session-row.active { background: var(--surface-2); }
 /* Fixed width (fits "just now" and "13h ago") so the agent logos before it line up across rows. */
 .session-time { flex-shrink: 0; width: 56px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .more { color: var(--muted); font-size: 13px; padding: 4px 12px 4px 34px; }
-.more:hover { color: var(--text); }
 .empty-hint { color: var(--muted); font-size: 14px; text-align: left; padding: 8px 12px; border-radius: 8px; }
-.empty-hint:hover { background: var(--hover); }
 .sidebar-foot {
   border-top: 1px solid var(--border); margin: auto calc(-1 * var(--side-pad)) 0; height: 44px;
   padding: 0 20px 0 calc(var(--icon-x) - 3.5px); /* 7px dot centred on --icon-x */
@@ -142,16 +138,14 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
   display: inline-grid; place-items: center; width: 30px; height: 30px;
   border-radius: 8px; color: var(--muted); flex-shrink: 0;
 }
-.icon-btn:hover, .icon-btn.active { background: var(--hover); color: var(--text); }
+.icon-btn.active { background: var(--hover); color: var(--text); }
 
 /* ---- buttons / fields ---- */
 .btn {
   border: 1px solid var(--border-strong); border-radius: 10px; padding: 7px 14px;
   background: var(--surface); font-size: 14px;
 }
-.btn:hover:not(:disabled) { background: var(--hover); }
 .btn.primary { background: var(--accent); color: #111; border-color: var(--accent); }
-.btn.primary:hover:not(:disabled) { background: #fff; }
 .btn.small { padding: 4px 10px; font-size: 13px; }
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
 .field input {
@@ -170,7 +164,6 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
   display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px;
   border: 1px solid var(--border-strong); border-radius: 999px; font-size: 14px;
 }
-button.chip:hover { background: var(--hover); }
 
 /* ---- composer ---- */
 .composer {
@@ -193,13 +186,11 @@ button.chip:hover { background: var(--hover); }
   background-position: calc(100% - 13px) 55%, calc(100% - 9px) 55%;
   background-size: 4px 4px; background-repeat: no-repeat;
 }
-.select select:hover { background-color: var(--hover); }
 .select option { background: var(--surface); }
 .send-btn {
   width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
   border: 1.5px solid #6a6a6a; color: var(--text); flex-shrink: 0;
 }
-.send-btn:hover:not(:disabled) { background: var(--accent); color: #111; border-color: var(--accent); }
 
 /* ---- workspace: terminal panels (dockview + xterm) ---- */
 .workspace { display: flex; flex-direction: column; height: 100%; min-height: 0; }
@@ -225,7 +216,7 @@ button.chip:hover { background: var(--hover); }
   --dv-inactivegroup-hiddenpanel-tab-color: var(--muted);
   --dv-separator-border: var(--border);
   --dv-tab-divider-color: var(--border);
-  --dv-drag-over-background-color: rgb(106 167 255 / 0.15);
+  --dv-drag-over-background-color: rgb(255 255 255 / 0.06); /* neutral: no blue drop highlight */
   font-family: var(--font);
 }
 /* Pane separators. Dockview draws a 1px line over the next pane's edge; widen it into a gutter and pad
@@ -245,7 +236,6 @@ button.chip:hover { background: var(--hover); }
   color: var(--muted); flex-shrink: 0; opacity: 0;
 }
 .dv-tab:hover .tab-close, .dv-active-tab .tab-close, .tab-close:focus-visible { opacity: 1; }
-.tab-close:hover { background: var(--hover); color: var(--text); }
 .header-add { display: flex; align-items: center; height: 100%; padding: 0 4px; }
 .header-git { display: flex; align-items: center; height: 100%; padding: 0 6px; }
 .empty-git { position: absolute; top: 6px; right: 8px; }
@@ -270,7 +260,7 @@ button.chip:hover { background: var(--hover); }
   display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px;
   font-size: 14px; text-align: left; color: var(--text);
 }
-.menu button:hover:not(:disabled), .menu button:focus-visible { background: var(--hover); outline: none; }
+.menu button:focus-visible { background: var(--hover); outline: none; }
 .menu button.danger { color: var(--red); }
 .menu-key { margin-left: auto; padding-left: 16px; font: 13px var(--font); color: var(--muted); }
 .menu-sep { height: 1px; margin: 5px 10px; background: var(--border-strong); }
@@ -300,7 +290,7 @@ button.chip:hover { background: var(--hover); }
 .git-head { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 6px 0 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .git-files { list-style: none; margin: 0; padding: 6px; max-height: 40%; overflow-y: auto; border-bottom: 1px solid var(--border); }
 .git-file { width: 100%; display: flex; gap: 10px; align-items: center; padding: 5px 10px; border-radius: 6px; font-size: 13px; text-align: left; }
-.git-file:hover, .git-file.active { background: var(--hover); }
+.git-file.active { background: var(--hover); }
 .git-code { font: 600 11px var(--mono); width: 18px; text-align: center; flex-shrink: 0; }
 .git-code.c-new { color: var(--green); }
 .git-code.c-mod { color: var(--amber); }
@@ -415,9 +405,17 @@ button.chip:hover { background: var(--hover); }
   .sp-row-picker { display: grid; grid-template-columns: repeat(var(--cols), auto); }
 }
 .sp-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+/* ---- hover: only on devices that can hover, so a tap on a touch screen doesn't leave rows lit ---- */
 @media (hover: hover) {
-  .sp-row:hover { background: var(--hover); }
-  .thumb .sp-pick:hover { background: var(--hover); }
+  .nav-item:hover, .project-row:hover, .session-row:hover, .empty-hint:hover, .git-file:hover { background: var(--hover); }
+  .nav-item:hover, .project-row:hover .project-name, .more:hover { color: var(--text); }
+  .project-row .icon-btn:hover { background: var(--border-strong); }
+  .icon-btn:hover, .tab-close:hover { background: var(--hover); color: var(--text); }
+  .btn:hover:not(:disabled), button.chip:hover, .menu button:hover:not(:disabled), .select select:hover { background: var(--hover); }
+  .btn.primary:hover:not(:disabled) { background: #fff; }
+  .send-btn:hover:not(:disabled) { background: var(--accent); color: #111; border-color: var(--accent); }
+  .sp-row:hover, .thumb .sp-pick:hover { background: var(--hover); }
 }
 
 /* ---- small screens: sidebar becomes a drawer ---- */
