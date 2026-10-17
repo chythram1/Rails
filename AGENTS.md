@@ -149,7 +149,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - Agent TUIs hard-wrap their output, so lines printed before a pane was narrowed stay clipped. That's normal terminal behaviour.
 - Imports use explicit `.ts` / `.tsx` extensions (`allowImportingTsExtensions`). The server runs TypeScript directly through `tsx` and has no build step.
 - Native `<select>` can't show images, so the home agent picker shows text.
-- Sprocket SVGs: a CSS `transform` replaces the SVG `transform` attribute, so position with an outer `<g transform>` and animate an inner group (`transform-box: fill-box`). Headless browsers report reduced motion, so Sprockets start paused there: press the page's play button.
+- Sprocket SVGs: a CSS `transform` replaces the SVG `transform` attribute, so position with an outer `<g transform>` and animate an inner group (`transform-box: fill-box`). Headless browsers often report reduced motion, which stops Sprocket animations: emulate `prefers-reduced-motion: no-preference` to check them.
 - Codex panels and Codex parsing are untested on this machine (Codex isn't installed).
 
 ## Long-term direction

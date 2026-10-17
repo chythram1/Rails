@@ -4,8 +4,18 @@ import { CHARACTERS, COLORS, type Primitive } from "./characters.ts";
 import { popIn, squash, useBlink, useLook, useSprocketMotion } from "./motion.ts";
 import { Eyes, Hat } from "./parts.tsx";
 
-/** Seconds per bob at tempo 1. Sway takes longer, so the two never line up. */
-const PERIOD = 3.4;
+/** Seconds per half bob (up, or down) at tempo 1. Sway takes longer, so the two never line up. */
+const PERIOD = 1.7;
+
+/**
+ * Idle motion by drawn size: small avatars need bigger, quicker moves to read at all, big ones calmer.
+ * `bob` is in viewBox units, `sway` in degrees, `speed` scales the period.
+ */
+function idleFor(size: number) {
+  if (size <= 64) return { bob: 9, sway: 6, speed: 0.8 };
+  if (size <= 110) return { bob: 7, sway: 4.5, speed: 0.9 };
+  return { bob: 6, sway: 3.5, speed: 1 };
+}
 /** The drawn area of the shared 200×215 coordinate system (hats, ear cups and the shadow included). */
 const VIEW = { x: 14, y: 24, w: 172, h: 190 };
 
@@ -57,8 +67,11 @@ export function Sprocket({ look, size, still, follow, label, seed = look.charact
     mounted.current = true;
   }, []);
 
-  const period = PERIOD * def.tempo;
+  const idle = idleFor(size);
+  const period = PERIOD * def.tempo * idle.speed;
   const style = {
+    "--bob": `${idle.bob}px`,
+    "--sway": `${idle.sway}deg`,
     width: size,
     height: (size * VIEW.h) / VIEW.w,
     "--period": `${period.toFixed(2)}s`,

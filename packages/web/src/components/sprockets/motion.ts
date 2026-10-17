@@ -1,5 +1,5 @@
 // Sprocket motion (see ref characters.md §5). Idle loops are CSS (styles.css, "Sprockets"); this module
-// holds the shared timing tokens, the motion on/off setting, and the few things JS animates: blinks,
+// holds the shared timing tokens, whether motion is on, and the few things JS animates: blinks,
 // one-shot reactions, and eyes that follow the pointer.
 import { useEffect, useSyncExternalStore, type RefObject } from "react";
 
@@ -7,28 +7,17 @@ import { useEffect, useSyncExternalStore, type RefObject } from "react";
 export const EASE_BACK = "cubic-bezier(0.34, 1.56, 0.64, 1)";
 export const DURATION = { quick: 150, standard: 250, slow: 400 };
 
-// ---- motion on/off: one setting per device, off by default when the OS asks for reduced motion ----
-const MOTION_KEY = "rails.sprocketsMotion";
-const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
-let motionOn = (() => {
-  const saved = localStorage.getItem(MOTION_KEY);
-  return saved === null ? !reduced() : saved === "on";
-})();
-const motionListeners = new Set<() => void>();
-
-export function setSprocketMotion(on: boolean) {
-  motionOn = on;
-  localStorage.setItem(MOTION_KEY, on ? "on" : "off");
-  motionListeners.forEach((fn) => fn());
-}
+// ---- motion is on unless the OS asks for reduced motion (there's no in-app switch) ----
+const REDUCED = "(prefers-reduced-motion: reduce)";
 
 export function useSprocketMotion(): boolean {
   return useSyncExternalStore(
     (fn) => {
-      motionListeners.add(fn);
-      return () => void motionListeners.delete(fn);
+      const mq = matchMedia(REDUCED);
+      mq.addEventListener("change", fn);
+      return () => mq.removeEventListener("change", fn);
     },
-    () => motionOn,
+    () => !matchMedia(REDUCED).matches,
   );
 }
 

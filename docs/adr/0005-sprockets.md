@@ -7,10 +7,9 @@ the user makes: one of 8 shapes (Block, Bean, Lune, Bell, Starry, Cog, Roo, Momo
 one head accessory or none (party hat, beanie, cap, bow, flower clip, crown, bucket hat), and
 a name. They have their own page (the "Sprockets" nav item): a list of Sprockets beside the selected
 one's chat, or the creator. The creator follows `ref/sprockets/stage1/create-bot.jpg`: the preview on
-top, then a row each for colour, accessory and shape, then the name. New Sprockets can start from a
-suggestion (a preset name and look); the suggestions' names also serve as the name placeholder, which
-moves to the next unused one each time the creator opens. The list column's header is a search field,
-not a title, so the word "Sprockets" shows once (the nav item). With no Sprocket open, the page shows them all as cards; a chat
+top, then a row each for colour, accessory and shape, then the name. The empty name field cycles through
+name ideas (an empty name takes the one showing). The list column's header is a search field, not a
+title, so the word "Sprockets" shows once (the nav item). With no Sprocket open, the page shows them all as cards; a chat
 opens with the Sprocket itself, and time labels mark gaps between messages.
 
 Stage 1 is visual only. Sprockets can be created, restyled, renamed and deleted, and the user can send
@@ -30,8 +29,10 @@ Decisions:
   three rows. Headphones were dropped too, so "none" plus 7 accessories lines up with the 8 shapes.
 - **Motion:** idle loops (bob, sway; the accessory and its wobbly bits trail) are CSS; blinks, change squashes and
   accessory pop-ins use the Web Animations API; the creator's preview follows the pointer with one shared
-  spring loop that stops when idle. Thumbnails are still. A pause control on the page turns the loops off
-  (WCAG 2.2.2), stored per device; it starts paused when the OS asks for reduced motion.
+  spring loop that stops when idle. Thumbnails are still. Small avatars bob and sway more (and faster)
+  than big ones, so the motion reads at list size. There's no in-app pause control: the loops are cheap,
+  and they stop when the OS asks for reduced motion. (WCAG 2.2.2 asks for a pause control for motion
+  over 5s; revisit if that matters.)
 
 Consequences:
 - Sprockets aren't providers and don't widen ADR 0002's scope: they're rails' own agents (see the "Home

@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pause, Play, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import type { Sprocket as SprocketData } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate, type Route } from "../../router.ts";
 import { timeAgo } from "../../util.ts";
 import { socket } from "../../ws.ts";
-import { setSprocketMotion, useSprocketMotion } from "./motion.ts";
 import { Sprocket } from "./Sprocket.tsx";
 import { SprocketChat } from "./SprocketChat.tsx";
 import { SprocketCreator } from "./SprocketCreator.tsx";
@@ -63,7 +62,6 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
 
 /** The list column. Its header is a search field (as in Telegram, Lindy or ref chat.png) rather than a title. */
 function SprocketList({ list, activeId }: { list: SprocketData[]; activeId?: string }) {
-  const motion = useSprocketMotion();
   const [query, setQuery] = useState("");
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -77,10 +75,6 @@ function SprocketList({ list, activeId }: { list: SprocketData[]; activeId?: str
           <Search size={15} aria-hidden />
           <input type="search" placeholder="Search" aria-label="Search Sprockets" value={query} onChange={(e) => setQuery(e.target.value)} />
         </label>
-        {/* Idle animations loop forever, so they get a visible pause control (WCAG 2.2.2). */}
-        <button className="icon-btn" aria-label={motion ? "Pause animations" : "Play animations"} title={motion ? "Pause animations" : "Play animations"} onClick={() => setSprocketMotion(!motion)}>
-          {motion ? <Pause size={16} /> : <Play size={16} />}
-        </button>
         <a className="icon-btn" href={href.newSprocket()} aria-label="New Sprocket" title="New Sprocket">
           <Plus size={18} />
         </a>

@@ -342,21 +342,22 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .sprocket :is(.s-sway, .s-pop, .s-hat, .s-in, .s-wobble) { transform-origin: 50% 100%; }
 .sprocket .s-lid, .sprocket .s-shadow { transform-origin: 50% 50%; }
 .sprocket .s-shadow { fill: #000; opacity: 0.5; }
-.sprocket .s-rig { animation: sp-bob var(--period, 3.4s) ease-in-out var(--phase, 0s) infinite alternate; }
-.sprocket .s-sway { animation: sp-sway calc(var(--period, 3.4s) * 1.7) ease-in-out var(--phase, 0s) infinite alternate; }
-.sprocket .s-shadow { animation: sp-shadow var(--period, 3.4s) ease-in-out var(--phase, 0s) infinite alternate; }
-.sprocket .s-hat { animation: sp-tilt var(--period, 3.4s) ease-in-out calc(var(--phase, 0s) + 110ms) infinite alternate; }
-.sprocket .s-wobble { animation: sp-swing var(--period, 3.4s) ease-in-out calc(var(--phase, 0s) + 260ms) infinite alternate; }
+.sprocket .s-rig { animation: sp-bob var(--period, 1.7s) ease-in-out var(--phase, 0s) infinite alternate; }
+.sprocket .s-sway { animation: sp-sway calc(var(--period, 1.7s) * 1.4) ease-in-out var(--phase, 0s) infinite alternate; }
+.sprocket .s-shadow { animation: sp-shadow var(--period, 1.7s) ease-in-out var(--phase, 0s) infinite alternate; }
+.sprocket .s-hat { animation: sp-tilt var(--period, 1.7s) ease-in-out calc(var(--phase, 0s) + 110ms) infinite alternate; }
+.sprocket .s-wobble { animation: sp-swing var(--period, 1.7s) ease-in-out calc(var(--phase, 0s) + 260ms) infinite alternate; }
 /* Eyes lead, the face follows (motion.ts writes --ex/--ey/--fx/--fy in viewBox units). */
 .sprocket .s-face { transform: translate(calc(var(--fx, 0) * 1px), calc(var(--fy, 0) * 1px)); }
 .sprocket .s-eyes { transform: translate(calc(var(--ex, 0) * 1px), calc(var(--ey, 0) * 1px)); }
 .sprocket.paused * { animation-play-state: paused; }
 .sprocket.still * { animation: none; }
-@keyframes sp-bob { from { transform: translateY(0); } to { transform: translateY(-5px); } }
-@keyframes sp-sway { from { transform: rotate(-2deg); } to { transform: rotate(2deg); } }
-@keyframes sp-shadow { from { transform: scaleX(1); opacity: 0.5; } to { transform: scaleX(0.88); opacity: 0.35; } }
-@keyframes sp-tilt { from { transform: rotate(-2.5deg); } to { transform: rotate(2.5deg); } }
-@keyframes sp-swing { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+/* Amplitudes come from --bob / --sway, set per size (Sprocket.tsx): small avatars move more. */
+@keyframes sp-bob { from { transform: translateY(0); } to { transform: translateY(calc(-1 * var(--bob, 6px))); } }
+@keyframes sp-sway { from { transform: rotate(calc(-1 * var(--sway, 3.5deg))); } to { transform: rotate(var(--sway, 3.5deg)); } }
+@keyframes sp-shadow { from { transform: scaleX(1); opacity: 0.5; } to { transform: scaleX(0.84); opacity: 0.32; } }
+@keyframes sp-tilt { from { transform: rotate(calc(-1.2 * var(--sway, 3.5deg))); } to { transform: rotate(calc(1.2 * var(--sway, 3.5deg))); } }
+@keyframes sp-swing { from { transform: rotate(calc(-2.5 * var(--sway, 3.5deg))); } to { transform: rotate(calc(2.5 * var(--sway, 3.5deg))); } }
 
 /* ---- Sprockets page: list column + chat or creator (components/sprockets) ---- */
 .sprockets { display: flex; height: 100%; min-height: 0; }
@@ -408,10 +409,10 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .sp-creator { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 /* One centred column: preview, colour / accessory / shape rows, name, button (ref create-bot.jpg). */
 .sp-creator-body {
-  flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 40px 20px 48px;
+  flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 28px 20px 32px;
   display: flex; flex-direction: column; align-items: center; gap: 16px;
 }
-.sp-creator-body > .sprocket { margin-bottom: 12px; }
+.sp-creator-body > .sprocket { margin-bottom: 4px; }
 .sp-row-picker { border: 0; padding: 0; margin: 0; min-width: 0; max-width: 520px; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .sp-pick { position: relative; display: grid; place-items: center; border-radius: 12px; cursor: pointer; }
 .sp-pick input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
@@ -424,19 +425,24 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .thumb .sp-pick { width: 50px; height: 50px; border: 1px solid transparent; }
 .thumb .sp-pick:has(input:checked) { border-color: var(--selected); background: var(--surface-2); }
 .sp-none { color: var(--muted); }
-.sp-name { width: 100%; max-width: 360px; margin-top: 16px; }
+.sp-name { width: 100%; max-width: 360px; margin-top: 12px; }
+/* Name ideas slide up through the empty field, one every 2.6s (IDEA_MS in SprocketCreator.tsx). */
+.sp-name-input { position: relative; display: block; overflow: hidden; border-radius: 10px; }
+.sp-name-input input { width: 100%; }
+.sp-name-input:has(.sp-name-idea) input::placeholder { color: transparent; }
+.sp-name-idea {
+  position: absolute; inset: 0 auto 0 13px; display: flex; align-items: center; pointer-events: none;
+  color: var(--muted); animation: sp-name-idea 2600ms ease-in-out both;
+}
+@keyframes sp-name-idea {
+  0% { opacity: 0; transform: translateY(10px); }
+  12%, 88% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
 @container (max-width: 560px) {
   .sp-row-picker { display: grid; grid-template-columns: repeat(var(--cols), auto); }
 }
 .sp-actions { display: flex; gap: 8px; margin-top: 8px; }
-.sp-suggestions { width: 100%; max-width: 620px; margin-top: 40px; }
-.sp-suggestions h3 { margin: 0 0 10px; font-size: 13px; font-weight: 400; color: var(--muted); }
-.sp-suggestions ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
-.sp-suggestion {
-  width: 100%; height: 100%; display: flex; align-items: center; gap: 14px; padding: 14px 16px; text-align: left;
-  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
-}
-.sp-suggestion-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .sp-card-name { font-size: 14px; font-weight: 500; color: var(--text); }
 
 /* Gallery: the page with no Sprocket open. Cards hold the character, its name and the last message. */
@@ -451,6 +457,16 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .sp-card-new { justify-content: center; border-style: dashed; background: transparent; color: var(--muted); }
 .sp-card-plus { display: grid; place-items: center; width: 56px; height: 56px; margin-bottom: 8px; border-radius: 50%; background: var(--surface-2); color: var(--text); }
 
+/* ---- scrollbars: thin and dark everywhere (terminals hide theirs, see .term-host) ---- */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+@supports not (scrollbar-color: auto) {
+  /* Safari: no scrollbar-color yet */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border: 3px solid transparent; border-radius: 8px; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background-color: #4a4a4a; }
+}
+
 /* ---- hover: only on devices that can hover, so a tap on a touch screen doesn't leave rows lit ---- */
 @media (hover: hover) {
   .nav-item:hover, .project-row:hover, .session-row:hover, .empty-hint:hover, .git-file:hover { background: var(--hover); }
@@ -461,7 +477,7 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
   .btn.primary:hover:not(:disabled) { background: #fff; }
   .send-btn:hover:not(:disabled) { background: var(--accent); color: #111; border-color: var(--accent); }
   .sp-row:hover, .thumb .sp-pick:hover, .sp-card-new:hover { background: var(--hover); }
-  .sp-card:not(.sp-card-new):hover, .sp-suggestion:hover { background: var(--surface-2); border-color: var(--border-strong); }
+  .sp-card:not(.sp-card-new):hover { background: var(--surface-2); border-color: var(--border-strong); }
 }
 
 /* ---- small screens: sidebar becomes a drawer ---- */
