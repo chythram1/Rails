@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, Unauthorized } from "./api.ts";
 import { Home } from "./components/Home.tsx";
 import { Login } from "./components/Login.tsx";
+import { ModelsSettings } from "./components/ModelsSettings.tsx";
 import { Placeholder } from "./components/Placeholder.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { SprocketsPage } from "./components/sprockets/SprocketsPage.tsx";
@@ -76,7 +77,12 @@ function Shell() {
         {route.name === "home" && <Home />}
         {route.name === "workspace" && <Workspace key={route.projectId} projectId={route.projectId} openKey={route.openKey} />}
         {route.name === "sprockets" && <SprocketsPage route={route} />}
-        {route.name === "customize" && <Placeholder title="Customize" body="Agent profiles, models, prompts and tools will live here." />}
+        {route.name === "customize" && (
+          <div className="page settings">
+            <h1 className="page-title">Customize</h1>
+            <ModelsSettings />
+          </div>
+        )}
         {route.name === "automate" && <Placeholder title="Automate" body="Scheduled and triggered agent runs will live here." />}
       </main>
     </div>

@@ -5,8 +5,10 @@ None of this is fixed. Move items here as they firm up, and record real decision
 Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
 
 ## Next
-- **Sprockets stage 2:** make them run and reply (ADR 0005). Each Sprocket attaches to one project and acts as a
-  coordination layer between that project's sessions. Sprockets replace the earlier "home agent" idea.
+- **Sprockets stage 2, next parts.** ADR 0006 covers replies, model providers, projects and core memory.
+  Next, a Sprocket sees its project's sessions (hooks for Claude Code, an extension for pi, the app-server
+  daemon for Codex), then messages them and coordinates: conflict warnings, handoffs, attention, digests.
+  Sprockets replace the earlier "home agent" idea.
 - Verify Codex panels on a machine with Codex installed; map new Codex panels to their session id
 - "Needs attention" signal for panels (e.g. Claude Code hooks or terminal bell), lost with the chat UI
 - Provider logos in the agent picker on Home (needs a custom dropdown)
@@ -21,7 +23,7 @@ Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
   the Node server (node-pty, `node:sqlite`, tmux) as it is; the native folder picker (ADR 0004) fits a desktop
   app well. An earlier idea, a Rust port with Tauri, is dropped unless a real need appears. Write an ADR
   when this starts.
-- **Customize:** agent profiles (model, system prompt, tools, permission mode)
+- **Customize:** it holds Models (ADR 0006) so far; next, agent profiles (model, system prompt, tools, permission mode)
 - **Automate:** saved prompts on a schedule or trigger (PR opened, Slack mention), with run history
   (see the "Pinned automations" cards in `ref/style.png`)
 - **Custom harness:** rails' own agent loop as an additional provider

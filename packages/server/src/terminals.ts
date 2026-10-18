@@ -4,6 +4,8 @@ import type { ClientMsg, ServerMsg } from "@rails/shared";
 import { watchBusy } from "./activity.ts";
 import { panels } from "./db.ts";
 import { onPanelsChanged, panelEnded } from "./panels.ts";
+import { onModelsChanged, onSignIn } from "./models.ts";
+import { onTyping } from "./runs.ts";
 import { onSprocketsChanged } from "./sprockets.ts";
 import * as tmux from "./tmux.ts";
 
@@ -20,6 +22,9 @@ export class TerminalHub {
   constructor() {
     onPanelsChanged((projectId) => this.broadcast({ type: "panels.changed", projectId }));
     onSprocketsChanged(() => this.broadcast({ type: "sprockets.changed" }));
+    onTyping((sprocketId, text) => this.broadcast({ type: "sprockets.typing", sprocketId, text }));
+    onModelsChanged(() => this.broadcast({ type: "models.changed" }));
+    onSignIn((signIn) => this.broadcast({ type: "models.signIn", signIn }));
   }
 
   connect(ws: WebSocket) {

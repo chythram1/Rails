@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { idle } from "./runs.ts";
 import { sprockets } from "./db.ts";
 import { createSprocket, deleteSprocket, listMessages, listSprockets, onSprocketsChanged, sendMessage, updateSprocket } from "./sprockets.ts";
 
@@ -34,13 +35,14 @@ describe("sprockets", () => {
     expect(s.look).toEqual({ character: "block", color: "yellow", accessory: "none" });
   });
 
-  it("updates, stores messages in order and deletes them with the Sprocket", () => {
+  it("updates, stores messages in order and deletes them with the Sprocket", async () => {
     const s = createSprocket({ name: "Helper", look });
     expect(updateSprocket(s.id, { name: "Helper 2", look: { ...look, color: "green" } }).look.color).toBe("green");
     sendMessage(s.id, " first ");
     sendMessage(s.id, "second");
-    expect(listMessages(s.id).map((m) => m.text)).toEqual(["first", "second"]);
-    expect(listSprockets().find((x) => x.id === s.id)!.lastMessage?.text).toBe("second");
+    // With no model set up, each message also gets a notice saying so (see runs.test.ts).
+    expect(listMessages(s.id).filter((m) => m.author === "user").map((m) => m.text)).toEqual(["first", "second"]);
+    await idle();
     deleteSprocket(s.id);
     expect(() => listMessages(s.id)).toThrow("Not found");
   });

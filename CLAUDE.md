@@ -100,8 +100,11 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 | `packages/server/src/providers/` | One discovery adapter per provider (`scan`: cwd, title, dates from the head/tail of each transcript). `index.ts` holds the registry and `installed()`. |
 | `packages/web/src/components/Workspace.tsx` | The workspace: dockview layout (`Dock`), tabs, `+` menu, and the one-panel-at-a-time mobile view. Data comes from `useWorkspace.ts`. |
 | `packages/web/src/components/FolderMenu.tsx` | The Add project menu: search + recent agent folders + "Open folder…" (native picker). Popover placement comes from `usePopover` in `Menu.tsx`. |
-| `packages/server/src/sprockets.ts` | Sprocket services (ADR 0005): create/edit/delete and their messages. Emits `onSprocketsChanged`. |
-| `packages/web/src/components/sprockets/` | The Sprockets page (`SprocketsPage`, `SprocketCreator`, `SprocketChat`) and the character renderer (`Sprocket.tsx`: `characters.ts` data, `parts.tsx` accessories, `motion.ts` blinks/look-at/one-shots; idle loops in `styles.css`). |
+| `packages/server/src/sprockets.ts` | Sprocket services (ADR 0005, 0006): create/edit/delete, settings (project, model, core memory) and messages. Emits `onSprocketsChanged`. |
+| `packages/server/src/runs.ts` | Sprocket runs (ADR 0006): one bounded pi-agent-core loop per reply, the runaway guards, the `remember` tool. |
+| `packages/server/src/models.ts` | Model providers for Sprockets (pi-ai): API keys, sign-in, the default model. Credentials live in `credentials.ts` (`RAILS_HOME/credentials.json`). |
+| `packages/server/src/signin.ts` | rails' own "Continue with ChatGPT" and OpenRouter sign-in flows (so every page says rails); they store credentials in pi-ai's shape (ADR 0006). |
+| `packages/web/src/components/sprockets/` | The Sprockets page (`SprocketsPage`, `SprocketCreator`, `SprocketChat`, `SprocketSettings`) and the character renderer (`Sprocket.tsx`: `characters.ts` data, `parts.tsx` accessories, `motion.ts` blinks/look-at/one-shots; idle loops in `styles.css`). |
 | `packages/web/src/components/TerminalView.tsx` | One xterm.js terminal attached to a panel over the shared socket; re-attaches on reconnect, reports resizes. |
 | `packages/web/src/` | React SPA. `store.tsx` holds global state, `ws.ts` the shared socket with reconnect, `router.ts` hash routing, `api.ts` the REST client, `styles.css` all CSS (tokens at the top), `components/` the UI. |
 
@@ -116,7 +119,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - `make` lists the targets, which wrap the npm scripts. `make dev`/`start`/`install` first run `make system-deps`, which installs tmux (required) if it's missing. `make dev` runs the server on :4317 and Vite on :5173. Open the printed `?token=` URL.
 - Optional pinned toolchain: `nix develop` (flakes may need `--extra-experimental-features 'nix-command flakes'`), then `make` as usual. Keep `flake.nix` to system tools only: no npm packaging, no agent CLIs. Update pins with `nix flake update`.
 - `make typecheck` must pass. `make start` builds and runs prod, where the server serves `web/dist`. `make token` prints the access token.
-- `make test` runs the tests (Vitest, `packages/*/src/**/*.test.ts`) and must pass. Tests get throwaway homes (`vitest.config.ts`, `vitest.setup.ts`). Also verify with typecheck, `curl` against the API and a browser check.
+- `make test` runs the tests (Vitest, `packages/*/src/**/*.test.ts`) and must pass. Tests get throwaway homes (`vitest.config.ts`, `vitest.setup.ts`), and Sprocket runs use pi-ai's scripted faux provider, never a real model. Also verify with typecheck, `curl` against the API and a browser check.
 - Use throwaway state with `make dev-tmp` (LAN-reachable, `/tmp/rails-dev`, token `t`) or `RAILS_HOME=/tmp/x RAILS_TOKEN=t`. For `curl`, log in first with `POST /api/auth/login {"token":…}` and keep the cookie.
 - Browser checks: start dev with `make dev-tmp` (or `make dev-lan`) and open the printed `?token=` URL. A browser on another device reaches it through the host's LAN or Tailscale address.
 - Panel tests run real agents with your logins. Use a scratch directory, then delete the transcripts they leave (`~/.claude/projects/-private-tmp-…`, `~/.pi/agent/sessions/--private-tmp-…--`, Codex threads with `codex delete --force <id>`) and kill the throwaway tmux server (`tmux -S $RAILS_HOME/tmux.sock kill-server`).
@@ -150,6 +153,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - Imports use explicit `.ts` / `.tsx` extensions (`allowImportingTsExtensions`). The server runs TypeScript directly through `tsx` and has no build step.
 - Native `<select>` can't show images, so the agent picker on Home shows text.
 - Sprocket SVGs: a CSS `transform` replaces the SVG `transform` attribute, so position with an outer `<g transform>` and animate an inner group (`transform-box: fill-box`). Headless browsers often report reduced motion, which stops Sprocket animations: emulate `prefers-reduced-motion: no-preference` to check them.
+- Upgrading pi-ai (`@earendil-works/pi-ai`, pinned `~1.3`): `signin.ts` runs the sign-in flows itself but stores pi-ai's credential shape, and pi-ai refreshes those tokens. `make test` (`signin.test.ts`) fails if the shape no longer fits; also compare `signin.ts` with pi-ai's `dist/auth/oauth/openai-chatgpt.js` and `openrouter.js` for flow changes (ADR 0006).
 - Codex is the least tested provider: check Codex changes against a real Codex install. Codex 0.16x runs interactive sessions on a shared app-server daemon, and any `-c` override on the command line makes it run without the daemon (see `docs/providers.md`).
 
 ## Long-term direction

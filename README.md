@@ -34,8 +34,9 @@ Status:
 - Per-project split/tab layouts, saved on the server
 - Read-only git status and diffs
 - Official agent logos in the sidebar
-- Sprockets (ADR 0005): make always-on agent characters and chat with them. Visual only so far: they
-  don't reply yet
+- Sprockets (ADR 0005, 0006): always-on agent characters that reply on your own model provider (API key
+  or "Continue with ChatGPT"), attach to a project and keep a short core memory. They don't see the
+  project's sessions yet
 
 Docs: [architecture](docs/architecture.md) · [glossary](docs/CONTEXT.md) · [decisions](docs/adr) · [provider formats](docs/providers.md) · [roadmap](docs/roadmap.md)
 

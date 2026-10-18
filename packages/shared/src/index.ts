@@ -90,7 +90,7 @@ export interface GitStatus {
   files: GitFile[];
 }
 
-// ---- Sprockets: always-on agents (ADR 0005). Stage 1 is their look and chat UI only. ----
+// ---- Sprockets: always-on agents (ADR 0005, 0006). ----
 
 /** The cast: the shapes a Sprocket can have. */
 export const SPROCKET_CHARACTERS = ["block", "bean", "lune", "bell", "starry", "cog", "roo", "momo"] as const;
@@ -116,8 +116,26 @@ export interface Sprocket {
   name: string;
   look: SprocketLook;
   createdAt: string;
+  /** The project it's attached to; a Sprocket belongs to at most one project. */
+  projectId?: string;
+  /** The model it runs on (`provider/model`), or none to use the default model. */
+  model?: string;
+  /** Its core memory: a short sheet that stays with it, even when it moves to another project. */
+  coreMemory: string;
+  /** True while it's working on a reply. */
+  running: boolean;
   /** The newest message in its chat, for the list preview. */
   lastMessage?: SprocketMessage;
+}
+
+/** Core memory is kept short on purpose (a frozen snapshot loaded into every run). */
+export const CORE_MEMORY_MAX = 1500;
+
+/** Body of "change a Sprocket's settings". Only the fields present change; null clears. */
+export interface SprocketSettings {
+  projectId?: string | null;
+  model?: string | null;
+  coreMemory?: string;
 }
 
 /** Body of "create a Sprocket" and "edit a Sprocket". */
@@ -126,12 +144,55 @@ export interface SprocketInput {
   look: SprocketLook;
 }
 
-/** A message the user sent to a Sprocket. Sprockets can't reply yet, so every message is the user's. */
+/** Who wrote a chat message: the user, the Sprocket, or rails itself (setup hints and errors). */
+export type SprocketAuthor = "user" | "sprocket" | "notice";
+
+/** One message in a Sprocket's chat. */
 export interface SprocketMessage {
   id: string;
   sprocketId: string;
+  author: SprocketAuthor;
   text: string;
   createdAt: string;
+}
+
+// ---- Models: what Sprockets run on (ADR 0006). ----
+
+/** A model provider rails can bill Sprockets to, and how it's set up. */
+export interface ModelProvider {
+  id: string;
+  name: string;
+  /** How it's set up, or null if it isn't. */
+  auth: null | { type: "api_key" | "oauth" };
+  /** Label of its sign-in button, for providers that support signing in (e.g. "Continue with ChatGPT"). */
+  signIn?: string;
+}
+
+/** A model a Sprocket can run on. `ref` is `provider/model`. */
+export interface ModelChoice {
+  ref: string;
+  provider: string;
+  name: string;
+}
+
+export interface ModelSettings {
+  providers: ModelProvider[];
+  /** Models of the providers that are set up. */
+  models: ModelChoice[];
+  /** Used by Sprockets that don't pick their own model. */
+  defaultModel?: string;
+}
+
+/** A sign-in with a provider in progress. It runs on the server; the browser opens `authUrl`. */
+export interface SignIn {
+  id: string;
+  providerId: string;
+  state: "waiting" | "done" | "failed" | "cancelled";
+  authUrl?: string;
+  /** Signing in again to the account this install signed in to before (no naming or consent screens). */
+  sameAccount?: boolean;
+  /** Why it failed. */
+  error?: string;
 }
 
 // ---- WebSocket protocol ----------------------------------------------------
@@ -152,4 +213,9 @@ export type ServerMsg =
   | { type: "panels.busy"; panelIds: string[] }
   /** Sprockets or their messages changed (possibly on another device). */
   | { type: "sprockets.changed" }
+  /** A Sprocket's reply so far, while it's being written; null when it's done. */
+  | { type: "sprockets.typing"; sprocketId: string; text: string | null }
+  /** Providers, sign-ins or the default model changed. */
+  | { type: "models.changed" }
+  | { type: "models.signIn"; signIn: SignIn }
   | { type: "error"; message: string };

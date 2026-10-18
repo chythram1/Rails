@@ -4,8 +4,8 @@ export type Route =
   | { name: "home" }
   /** A project's workspace. `openKey` asks it to open (or focus) that session's panel. */
   | { name: "workspace"; projectId: string; openKey?: string }
-  /** Sprockets (ADR 0005): the list, the creator (`new`, `edit`) or one Sprocket's chat. */
-  | { name: "sprockets"; view: "list" | "new" | "chat" | "edit"; id?: string }
+  /** Sprockets (ADR 0005): the list, the creator (`new`, `edit`), one Sprocket's chat or its settings. */
+  | { name: "sprockets"; view: "list" | "new" | "chat" | "edit" | "settings"; id?: string }
   | { name: "customize" }
   | { name: "automate" };
 
@@ -16,6 +16,7 @@ function parse(hash: string): Route {
   if (parts[0] === "sprockets") {
     if (parts[1] === "new") return { name: "sprockets", view: "new" };
     if (parts[1] && parts[2] === "edit") return { name: "sprockets", view: "edit", id: parts[1] };
+    if (parts[1] && parts[2] === "settings") return { name: "sprockets", view: "settings", id: parts[1] };
     if (parts[1]) return { name: "sprockets", view: "chat", id: parts[1] };
     return { name: "sprockets", view: "list" };
   }
@@ -32,6 +33,8 @@ export const href = {
   newSprocket: () => "#/sprockets/new",
   sprocket: (id: string) => `#/sprockets/${encodeURIComponent(id)}`,
   editSprocket: (id: string) => `#/sprockets/${encodeURIComponent(id)}/edit`,
+  sprocketSettings: (id: string) => `#/sprockets/${encodeURIComponent(id)}/settings`,
+  customize: () => "#/customize",
 };
 
 export function navigate(to: string) {

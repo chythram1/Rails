@@ -1,6 +1,8 @@
-// Sprockets: always-on agents (ADR 0005). Stage 1 stores their look, name and the messages the user
-// sends them; nothing runs yet, so they never reply.
+// Sprockets: always-on agents (ADR 0005, 0006): their look, name, chat and settings. A Sprocket is
+// attached to at most one project; moving it (or detaching it) deletes the chat it had there, while its
+// name, look and core memory stay. Replies are written by runs.ts.
 import {
+  CORE_MEMORY_MAX,
   SPROCKET_ACCESSORIES,
   SPROCKET_CHARACTERS,
   SPROCKET_COLORS,
@@ -8,9 +10,12 @@ import {
   type SprocketInput,
   type SprocketLook,
   type SprocketMessage,
+  type SprocketSettings,
 } from "@rails/shared";
-import { sprocketMessages, sprockets } from "./db.ts";
+import { projects, sprocketMessages, sprockets } from "./db.ts";
 import { ServiceError } from "./errors.ts";
+import { findModel } from "./models.ts";
+import { isRunning, onRunsChanged, requestReply, userMessageTime } from "./runs.ts";
 
 const MAX_NAME = 40;
 const MAX_MESSAGE = 4000;
@@ -19,6 +24,7 @@ const MAX_MESSAGE = 4000;
 const listeners = new Set<() => void>();
 export const onSprocketsChanged = (fn: () => void) => listeners.add(fn);
 const changed = () => listeners.forEach((fn) => fn());
+onRunsChanged(changed);
 
 const isOneOf = <T extends string>(list: readonly T[], v: unknown): v is T => list.includes(v as T);
 
@@ -50,7 +56,7 @@ function parseInput(body: Partial<SprocketInput> | undefined): SprocketInput {
 }
 
 function withLook(row: ReturnType<typeof sprockets.list>[number]): Sprocket {
-  return { ...row, look: repairLook(row.look), lastMessage: sprocketMessages.last(row.id) };
+  return { ...row, look: repairLook(row.look), running: isRunning(row.id), lastMessage: sprocketMessages.last(row.id) };
 }
 
 function getSprocket(id: string): Sprocket {
@@ -90,13 +96,46 @@ export function listMessages(sprocketId: string): SprocketMessage[] {
   return sprocketMessages.list(sprocketId);
 }
 
-/** Store a message to a Sprocket. Nothing answers it yet (stage 1). */
+/** Store the user's message to a Sprocket and ask it to reply. */
 export function sendMessage(sprocketId: string, rawText: unknown): SprocketMessage {
   getSprocket(sprocketId);
   const text = typeof rawText === "string" ? rawText.trim() : "";
   if (!text) throw new ServiceError("Message is empty", 400);
   if (text.length > MAX_MESSAGE) throw new ServiceError(`Messages can be at most ${MAX_MESSAGE} characters.`, 400);
-  const message = sprocketMessages.create(sprocketId, text);
+  const message = sprocketMessages.create(sprocketId, "user", text, userMessageTime(sprocketId));
   changed();
+  requestReply(sprocketId);
   return message;
+}
+
+/**
+ * Change a Sprocket's project, model or core memory. Every field is checked before any is applied, so a
+ * rejected request changes nothing (moving a Sprocket deletes its chat). Changing the project deletes it.
+ */
+export function updateSettings(id: string, body: SprocketSettings | undefined): Sprocket {
+  const s = getSprocket(id);
+  const { projectId, model, coreMemory } = body ?? {};
+  const moving = projectId !== undefined && (projectId ?? undefined) !== s.projectId;
+  if (moving) {
+    if (projectId !== null && (typeof projectId !== "string" || !projects.get(projectId))) throw new ServiceError("Unknown project", 400);
+    if (isRunning(id)) throw new ServiceError(`${s.name} is replying. Try again when it's done.`, 409);
+  }
+  if (model !== undefined && model !== null && (typeof model !== "string" || !findModel(model))) throw new ServiceError("Unknown model", 400);
+  if (coreMemory !== undefined) {
+    if (typeof coreMemory !== "string") throw new ServiceError("Core memory must be text", 400);
+    if (coreMemory.trim().length > CORE_MEMORY_MAX) throw new ServiceError(`Core memory can be at most ${CORE_MEMORY_MAX} characters.`, 400);
+  }
+
+  if (moving) sprockets.setProject(id, projectId ?? null);
+  if (model !== undefined) sprockets.setModel(id, model);
+  if (coreMemory !== undefined) sprockets.setCoreMemory(id, coreMemory.trim());
+  changed();
+  return getSprocket(id);
+}
+
+/** A project is being removed from rails: its Sprockets are detached (and their chats there deleted). */
+export function detachFromProject(projectId: string): void {
+  const attached = sprockets.byProject(projectId);
+  for (const s of attached) sprockets.setProject(s.id, null);
+  if (attached.length) changed();
 }

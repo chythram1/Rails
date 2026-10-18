@@ -10,12 +10,13 @@ import { WebSocketServer } from "ws";
 import { HOST, PORT, TOKEN } from "./config.ts";
 import { projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
-import type { OpenPanel, SprocketInput } from "@rails/shared";
+import type { OpenPanel, SprocketInput, SprocketSettings } from "@rails/shared";
 import { closePanel, getWorkspace, openPanel, saveLayout } from "./panels.ts";
 import { ServiceError } from "./errors.ts";
 import { attachPickedFolder, attachProject, detachProject, getProject, listProjectSessions, recentFolders } from "./projects.ts";
 import { providerInfo } from "./providers/index.ts";
-import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSprocket } from "./sprockets.ts";
+import { cancelSignIn, modelSettings, removeCredential, setApiKey, setDefaultModel, startSignIn, submitSignInCode } from "./models.ts";
+import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets.ts";
 import { TerminalHub } from "./terminals.ts";
 import { version as tmuxVersion } from "./tmux.ts";
 
@@ -120,7 +121,34 @@ app.get("/api/projects/:id/git/diff", async (c) =>
   c.text(await gitDiff(getProject(c.req.param("id")).path, c.req.query("path") ?? "")),
 );
 
-// ---- Sprockets (ADR 0005) ----
+// ---- Models: what Sprockets run on (ADR 0006) ----
+app.get("/api/models", async (c) => c.json(await modelSettings()));
+app.put("/api/models/default", async (c) => {
+  setDefaultModel((await c.req.json<{ model: unknown }>()).model);
+  return c.json({ ok: true });
+});
+app.put("/api/models/providers/:id/key", async (c) => {
+  await setApiKey(c.req.param("id"), (await c.req.json<{ key: unknown }>()).key);
+  return c.json({ ok: true });
+});
+app.delete("/api/models/providers/:id", async (c) => {
+  await removeCredential(c.req.param("id"));
+  return c.json({ ok: true });
+});
+app.post("/api/models/providers/:id/sign-in", async (c) => {
+  const body = await c.req.json<{ fresh?: unknown }>().catch(() => ({ fresh: false }));
+  return c.json(await startSignIn(c.req.param("id"), body.fresh === true), 201);
+});
+app.post("/api/models/sign-ins/:id/code", async (c) => {
+  await submitSignInCode(c.req.param("id"), (await c.req.json<{ code: unknown }>()).code);
+  return c.json({ ok: true });
+});
+app.delete("/api/models/sign-ins/:id", async (c) => {
+  await cancelSignIn(c.req.param("id"));
+  return c.json({ ok: true });
+});
+
+// ---- Sprockets (ADR 0005, 0006) ----
 app.get("/api/sprockets", (c) => c.json(listSprockets()));
 
 app.post("/api/sprockets", async (c) => c.json(createSprocket(await c.req.json<Partial<SprocketInput>>()), 201));
@@ -131,6 +159,8 @@ app.delete("/api/sprockets/:id", (c) => {
   deleteSprocket(c.req.param("id"));
   return c.json({ ok: true });
 });
+
+app.put("/api/sprockets/:id/settings", async (c) => c.json(updateSettings(c.req.param("id"), await c.req.json<SprocketSettings>())));
 
 app.get("/api/sprockets/:id/messages", (c) => c.json(listMessages(c.req.param("id"))));
 

@@ -6,6 +6,7 @@ import { href, navigate } from "../../router.ts";
 import { socket } from "../../ws.ts";
 import { Composer } from "../Composer.tsx";
 import { MenuButton } from "../Menu.tsx";
+import { useStore } from "../../store.tsx";
 import { Sprocket } from "./Sprocket.tsx";
 
 /** A new time label when a message comes over an hour after the previous one (or on a new day). */
@@ -25,13 +26,16 @@ function stamp(iso: string): string {
 }
 
 /**
- * A Sprocket's chat. Stage 1 (ADR 0005): messages are stored and shown, but nothing answers them yet, so
- * the thread says so after the last one. The thread opens with the Sprocket itself (as Dot, Pi and
- * hilos do), and time labels break it up where there are gaps.
+ * A Sprocket's chat (ADR 0005, 0006). The thread opens with the Sprocket itself (as Dot, Pi and hilos
+ * do), and time labels break it up where there are gaps. The user's messages sit on the right, replies on
+ * the left, and rails' own notices (no model yet, errors) in the middle. A reply shows as it's written.
  */
 export function SprocketChat({ sprocket }: { sprocket: SprocketData }) {
   const { id, name } = sprocket;
+  const { projects } = useStore();
+  const project = projects.find((p) => p.id === sprocket.projectId);
   const [messages, setMessages] = useState<SprocketMessage[] | null>(null);
+  const [typing, setTyping] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loadError, setLoadError] = useState("");
   const thread = useRef<HTMLDivElement>(null);
@@ -49,18 +53,19 @@ export function SprocketChat({ sprocket }: { sprocket: SprocketData }) {
     void load();
     return socket.on((m) => {
       if (m.type === "sprockets.changed") void load();
+      if (m.type === "sprockets.typing" && m.sprocketId === id) setTyping(m.text);
     });
-  }, [load]);
+  }, [load, id]);
 
-  // Keep the newest message in view.
+  // Keep the newest message (or the reply being written) in view.
   useLayoutEffect(() => {
     const el = thread.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages?.length]);
+  }, [messages?.length, typing, sprocket.running]);
 
   const send = async (text: string) => {
     setError("");
-    const pending: SprocketMessage = { id: "pending", sprocketId: id, text, createdAt: new Date().toISOString() };
+    const pending: SprocketMessage = { id: "pending", sprocketId: id, author: "user", text, createdAt: new Date().toISOString() };
     setMessages((m) => [...(m ?? []), pending]);
     try {
       await api.sendSprocketMessage(id, text);
@@ -88,6 +93,7 @@ export function SprocketChat({ sprocket }: { sprocket: SprocketData }) {
         </a>
         <Sprocket look={sprocket.look} size={28} seed={id} />
         <h2 id="sp-chat-title" className="truncate" title={name}>{name}</h2>
+        {project && <span className="sp-project truncate" title={`Attached to ${project.name}`}>{project.name}</span>}
         <span className="grow" />
         <MenuButton
           label={`${name} actions`}
@@ -95,7 +101,8 @@ export function SprocketChat({ sprocket }: { sprocket: SprocketData }) {
           icon={<EllipsisVertical size={16} />}
           align="right"
           items={[
-            { label: "Edit", shortcut: "e", onSelect: () => navigate(href.editSprocket(id)) },
+            { label: "Settings", shortcut: "s", onSelect: () => navigate(href.sprocketSettings(id)) },
+            { label: "Edit look", shortcut: "e", onSelect: () => navigate(href.editSprocket(id)) },
             { label: "Delete", shortcut: "d", danger: true, onSelect: () => void remove() },
           ]}
         />
@@ -112,19 +119,25 @@ export function SprocketChat({ sprocket }: { sprocket: SprocketData }) {
             <Sprocket look={sprocket.look} size={messages.length ? 88 : 120} seed={id} />
             <p className="sp-intro-title">{messages.length ? name : `Say hello to ${name}`}</p>
             <p className="muted small">
-              {messages.length ? `This is the beginning of your chat with ${name}.` : `${name} can't reply yet. Replies are coming in a later update.`}
+              {messages.length
+                ? `This is the beginning of your chat with ${name}${project ? ` in ${project.name}` : ""}.`
+                : project
+                  ? `${name} is attached to ${project.name}.`
+                  : `${name} isn't attached to a project. You can attach it in Settings.`}
             </p>
           </div>
         )}
         {!!messages?.length && (
-          <ol className="sp-messages" aria-label={`Messages to ${name}`}>
+          // A log: screen readers announce new messages (not the reply while it's being written).
+          <ol className="sp-messages" aria-label={`Chat with ${name}`} role="log">
             {messages.map((m, i) => {
               const prev = messages[i - 1];
               const label = !prev || newGroup(prev.createdAt, m.createdAt);
               return (
-                <li key={m.id + i} className="sp-message">
+                <li key={m.id + i} className={"sp-message " + m.author}>
                   {label && <time className="sp-stamp" dateTime={m.createdAt}>{stamp(m.createdAt)}</time>}
                   <p className="sp-bubble" title={new Date(m.createdAt).toLocaleString()}>
+                    {m.author === "sprocket" && <span className="sr-only">{name}: </span>}
                     {m.text}
                   </p>
                 </li>
@@ -132,10 +145,18 @@ export function SprocketChat({ sprocket }: { sprocket: SprocketData }) {
             })}
           </ol>
         )}
-        {/* Always rendered, so screen readers announce the notice when the first message appears. */}
-        <p className="sp-notice" role="status">
-          {messages?.length ? `${name} can't reply yet.` : ""}
-        </p>
+        {sprocket.running && (
+          <div className="sp-message sprocket" aria-hidden>
+            {typing ? (
+              <p className="sp-bubble">{typing}</p>
+            ) : (
+              <p className="sp-thinking">
+                <Sprocket look={sprocket.look} size={22} seed={id} /> Thinking…
+              </p>
+            )}
+          </div>
+        )}
+        <p className="sr-only" role="status">{sprocket.running ? `${name} is replying` : ""}</p>
       </div>
       <div className="sp-compose">
         {error && <p className="error" role="alert">{error}</p>}

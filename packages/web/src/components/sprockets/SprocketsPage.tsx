@@ -8,6 +8,7 @@ import { socket } from "../../ws.ts";
 import { Sprocket } from "./Sprocket.tsx";
 import { SprocketChat } from "./SprocketChat.tsx";
 import { SprocketCreator } from "./SprocketCreator.tsx";
+import { SprocketSettings } from "./SprocketSettings.tsx";
 
 type SprocketsRoute = Extract<Route, { name: "sprockets" }>;
 
@@ -44,6 +45,8 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
     main = <SprocketCreator key="new" taken={list.map((s) => s.name)} onSaved={(s) => navigate(href.sprocket(s.id))} onCancel={list.length ? () => navigate(href.sprockets()) : undefined} />;
   } else if (route.view === "edit" && current) {
     main = <SprocketCreator key={current.id} sprocket={current} taken={[]} onSaved={(s) => navigate(href.sprocket(s.id))} onCancel={() => navigate(href.sprocket(current.id))} />;
+  } else if (route.view === "settings" && current) {
+    main = <SprocketSettings key={current.id} sprocket={current} />;
   } else if (route.view === "chat" && current) {
     main = <SprocketChat key={current.id} sprocket={current} />;
   } else if (route.id) {
@@ -94,7 +97,7 @@ function SprocketList({ list, activeId }: { list: SprocketData[]; activeId?: str
                     <span className="truncate">{s.name}</span>
                     <span className="muted small session-time">{timeAgo(s.lastMessage?.createdAt ?? s.createdAt)}</span>
                   </span>
-                  <span className="muted small truncate">{s.lastMessage?.text ?? "No messages yet"}</span>
+                  <span className="muted small truncate">{preview(s)}</span>
                 </span>
               </a>
             </li>
@@ -119,7 +122,7 @@ function Gallery({ list }: { list: SprocketData[] }) {
             <a className="sp-card" href={href.sprocket(s.id)} title={s.name}>
               <Sprocket look={s.look} size={84} seed={s.id} />
               <span className="sp-card-name truncate">{s.name}</span>
-              <span className="muted small truncate">{s.lastMessage?.text ?? "No messages yet"}</span>
+              <span className="muted small truncate">{preview(s)}</span>
             </a>
           </li>
         ))}
@@ -134,4 +137,12 @@ function Gallery({ list }: { list: SprocketData[] }) {
       </ul>
     </div>
   );
+}
+
+/** The list's one-line preview of a Sprocket's chat. */
+function preview(s: SprocketData): string {
+  if (s.running) return "Replying…";
+  const m = s.lastMessage;
+  if (!m) return "No messages yet";
+  return m.author === "user" ? `You: ${m.text}` : m.text;
 }

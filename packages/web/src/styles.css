@@ -41,6 +41,8 @@ h1, h2 { font-weight: 500; margin: 0; }
 
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
+/* A button that reads as an inline link. */
+button.link { padding: 0; border: 0; background: none; color: var(--text); font-size: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .grow { flex: 1; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .pre { white-space: pre-wrap; }
@@ -154,6 +156,38 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
   padding: 9px 12px; outline: none;
 }
 .field input:focus { border-color: #5a5a5a; }
+
+/* Generic text input / select / textarea for forms. */
+.input {
+  background: var(--bg); border: 1px solid var(--border-strong); border-radius: 10px;
+  padding: 8px 12px; font-size: 14px; outline: none; min-width: 0;
+}
+.input:focus-visible { border-color: #6a6a6a; }
+select.input { padding-right: 28px; }
+textarea.input { resize: vertical; line-height: 1.5; }
+
+/* ---- settings (Customize → Models, Sprocket settings) ---- */
+.page.settings { max-width: 760px; }
+.settings-section { margin-top: 28px; display: flex; flex-direction: column; gap: 16px; }
+.settings-section h2 { font-size: 17px; font-weight: 600; margin: 0; }
+.settings-section > p { margin: -10px 0 0; }
+.settings-field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.settings-field > label { font-weight: 500; }
+.settings-field p { margin: 0; }
+.settings-field a { text-decoration: underline; text-underline-offset: 2px; }
+.provider-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; }
+.provider-row { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.provider-row + .provider-row { border-top: 1px solid var(--border); }
+.provider-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 30px; }
+.provider-name { font-weight: 500; }
+.provider-status { color: var(--muted); font-size: 13px; }
+.provider-status.ok { color: var(--text); }
+.provider-status.ok::before { content: "✓ "; color: #3fb950; }
+.provider-form { display: flex; gap: 8px; align-items: center; }
+.provider-form .input { flex: 1; }
+.provider-form.column { flex-direction: column; align-items: stretch; gap: 8px; }
+.provider-form.column p { margin: 0; }
+.provider-paste { display: flex; flex-direction: column; gap: 6px; }
 
 /* ---- pages ---- */
 .page { width: 100%; max-width: 1080px; margin: 0 auto; padding: 72px 32px 48px; overflow-y: auto; }
@@ -402,8 +436,17 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
   margin: 0; max-width: min(560px, 85%); padding: 9px 14px; border-radius: 18px; background: var(--surface-2);
   font-size: 14.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere;
 }
-.sp-notice { margin: 20px auto 0; color: var(--muted); font-size: 13px; text-align: center; }
-.sp-notice:empty { margin: 0; } /* stays in the accessibility tree (a live region), takes no room */
+/* Replies read like a document (no bubble), as in ChatGPT and Claude; rails' own notices sit in the middle. */
+.sp-message.sprocket { align-items: flex-start; }
+.sp-message.sprocket .sp-bubble { background: none; padding: 4px 0; max-width: min(680px, 100%); }
+.sp-message.notice { align-items: center; }
+.sp-message.notice .sp-bubble { background: none; color: var(--muted); font-size: 13px; text-align: center; padding: 4px 0; }
+.sp-settings { width: 100%; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 26px; }
+.sp-thinking { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+.sp-project {
+  max-width: 40%; padding: 2px 9px; border: 1px solid var(--border-strong); border-radius: 999px;
+  color: var(--muted); font-size: 12.5px;
+}
 .sp-compose { width: 100%; max-width: 800px; margin: 0 auto; padding: 0 20px 20px; display: flex; flex-direction: column; gap: 8px; }
 
 .sp-creator { display: flex; flex-direction: column; flex: 1; min-height: 0; }

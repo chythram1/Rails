@@ -3,6 +3,7 @@ import { basename, resolve } from "node:path";
 import { sessionKey, type Project, type RecentFolder, type SessionSummary } from "@rails/shared";
 import { layouts, panels, projects } from "./db.ts";
 import { ServiceError } from "./errors.ts";
+import { detachFromProject } from "./sprockets.ts";
 import { pickFolder } from "./picker.ts";
 import { scanAll, sessionsFor } from "./providers/index.ts";
 
@@ -30,6 +31,7 @@ export function detachProject(id: string): void {
   getProject(id);
   const n = panels.list(id).length;
   if (n > 0) throw new ServiceError(`Close the ${n} open panel${n === 1 ? "" : "s"} in this project first.`, 409);
+  detachFromProject(id);
   layouts.remove(id);
   projects.remove(id);
 }

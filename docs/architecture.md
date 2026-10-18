@@ -66,9 +66,13 @@ packages/
   server stores it opaquely. The server's panel list is the source of truth: on load the client
   restores the layout, then adds panels missing from it and removes ones that were closed.
   `panels.changed` broadcasts keep other devices' panel lists current.
-- **Sprockets** (ADR 0005, stage 1): `sprockets.ts` stores Sprockets and the messages sent to them in
-  SQLite (`/api/sprockets`, `/api/sprockets/:id/messages`) and broadcasts `sprockets.changed`. Nothing
-  runs or replies yet. The web renders each Sprocket as an SVG character from data
+- **Sprockets** (ADR 0005, 0006): `sprockets.ts` stores Sprockets, their chats and settings (project, model,
+  core memory) in SQLite and broadcasts `sprockets.changed`. A user message starts a run (`runs.ts`): a
+  pi-agent-core loop on the Sprocket's model, streamed to browsers as `sprockets.typing`, capped at 12 model
+  calls, 30 runs per Sprocket per hour and 2 runs at once. `models.ts` holds the model providers (pi-ai),
+  the default model and sign-ins; credentials are in `RAILS_HOME/credentials.json`. `signin.ts` runs the
+  sign-ins (ChatGPT, OpenRouter) itself and stores pi-ai's credential shape; callbacks land on the server's
+  `127.0.0.1` (OpenAI: port 1455). The web renders each Sprocket as an SVG character from data
   (`components/sprockets/`); idle motion is CSS, eyes follow the pointer only in the creator, and the
   loops stop when the OS asks for reduced motion.
 - **Auth:** one access token, generated on first run into `~/.rails/config.json` or set with `RAILS_TOKEN`.

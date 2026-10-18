@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { Panel, PanelKind, Project, Sprocket, SprocketLook, SprocketMessage } from "@rails/shared";
+import type { Panel, PanelKind, Project, Sprocket, SprocketAuthor, SprocketLook, SprocketMessage } from "@rails/shared";
 import { RAILS_HOME } from "./config.ts";
 
 const db = new DatabaseSync(join(RAILS_HOME, "rails.db"));
@@ -38,7 +38,21 @@ db.exec(`
     created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS sprocket_messages_by_sprocket ON sprocket_messages (sprocket_id, created_at);
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
+
+/** Add a column to a table made by an older version. SQLite has no ADD COLUMN IF NOT EXISTS. */
+function addColumn(table: string, column: string, definition: string) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+addColumn("sprockets", "project_id", "TEXT");
+addColumn("sprockets", "model", "TEXT");
+addColumn("sprockets", "core_memory", "TEXT NOT NULL DEFAULT ''");
+addColumn("sprocket_messages", "author", "TEXT NOT NULL DEFAULT 'user'");
 
 type Row = { id: string; name: string; path: string; created_at: string };
 const toProject = (r: Row): Project => ({ id: r.id, name: r.name, path: r.path, createdAt: r.created_at });
@@ -116,13 +130,16 @@ export const layouts = {
   },
 };
 
-// Sprockets (ADR 0005). `look` is stored as JSON and validated by the service when read.
-type SprocketRow = { id: string; name: string; look: string; created_at: string };
-const toSprocket = (r: SprocketRow): Omit<Sprocket, "look"> & { look: unknown } => ({
+// Sprockets (ADR 0005, 0006). `look` is stored as JSON and validated by the service when read.
+type SprocketRow = { id: string; name: string; look: string; created_at: string; project_id: string | null; model: string | null; core_memory: string };
+const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running"> & { look: unknown } => ({
   id: r.id,
   name: r.name,
   look: JSON.parse(r.look),
   createdAt: r.created_at,
+  projectId: r.project_id ?? undefined,
+  model: r.model ?? undefined,
+  coreMemory: r.core_memory,
 });
 
 export const sprockets = {
@@ -141,26 +158,63 @@ export const sprockets = {
   update(id: string, name: string, look: SprocketLook): void {
     db.prepare("UPDATE sprockets SET name = ?, look = ? WHERE id = ?").run(name, JSON.stringify(look), id);
   },
+  byProject(projectId: string) {
+    return (db.prepare("SELECT * FROM sprockets WHERE project_id = ? ORDER BY created_at").all(projectId) as SprocketRow[]).map(toSprocket);
+  },
+  /** Move to another project (or none). Its chat belongs to the old attachment, so it goes too. */
+  setProject(id: string, projectId: string | null): void {
+    db.prepare("DELETE FROM sprocket_messages WHERE sprocket_id = ?").run(id);
+    db.prepare("UPDATE sprockets SET project_id = ? WHERE id = ?").run(projectId, id);
+  },
+  setModel(id: string, model: string | null): void {
+    db.prepare("UPDATE sprockets SET model = ? WHERE id = ?").run(model, id);
+  },
+  setCoreMemory(id: string, text: string): void {
+    db.prepare("UPDATE sprockets SET core_memory = ? WHERE id = ?").run(text, id);
+  },
   remove(id: string): void {
     db.prepare("DELETE FROM sprocket_messages WHERE sprocket_id = ?").run(id);
     db.prepare("DELETE FROM sprockets WHERE id = ?").run(id);
   },
 };
 
-type MessageRow = { id: string; sprocket_id: string; text: string; created_at: string };
-const toMessage = (r: MessageRow): SprocketMessage => ({ id: r.id, sprocketId: r.sprocket_id, text: r.text, createdAt: r.created_at });
+type MessageRow = { id: string; sprocket_id: string; author: SprocketAuthor; text: string; created_at: string };
+const toMessage = (r: MessageRow): SprocketMessage => ({
+  id: r.id,
+  sprocketId: r.sprocket_id,
+  author: r.author,
+  text: r.text,
+  createdAt: r.created_at,
+});
 
 export const sprocketMessages = {
   list(sprocketId: string): SprocketMessage[] {
-    return (db.prepare("SELECT * FROM sprocket_messages WHERE sprocket_id = ? ORDER BY created_at").all(sprocketId) as MessageRow[]).map(toMessage);
+    return (db.prepare("SELECT * FROM sprocket_messages WHERE sprocket_id = ? ORDER BY created_at, rowid").all(sprocketId) as MessageRow[]).map(toMessage);
   },
   last(sprocketId: string): SprocketMessage | undefined {
-    const r = db.prepare("SELECT * FROM sprocket_messages WHERE sprocket_id = ? ORDER BY created_at DESC LIMIT 1").get(sprocketId) as MessageRow | undefined;
+    const r = db.prepare("SELECT * FROM sprocket_messages WHERE sprocket_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(sprocketId) as MessageRow | undefined;
     return r && toMessage(r);
   },
-  create(sprocketId: string, text: string): SprocketMessage {
-    const m: SprocketMessage = { id: randomUUID(), sprocketId, text, createdAt: new Date().toISOString() };
-    db.prepare("INSERT INTO sprocket_messages (id, sprocket_id, text, created_at) VALUES (?, ?, ?, ?)").run(m.id, m.sprocketId, m.text, m.createdAt);
+  create(sprocketId: string, author: SprocketAuthor, text: string, createdAt = new Date().toISOString()): SprocketMessage {
+    const m: SprocketMessage = { id: randomUUID(), sprocketId, author, text, createdAt };
+    db.prepare("INSERT INTO sprocket_messages (id, sprocket_id, author, text, created_at) VALUES (?, ?, ?, ?, ?)").run(
+      m.id,
+      m.sprocketId,
+      m.author,
+      m.text,
+      m.createdAt,
+    );
     return m;
+  },
+};
+
+/** Small app settings (the default model, this install's id), as key/value text. */
+export const settings = {
+  get(key: string): string | undefined {
+    return (db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined)?.value;
+  },
+  set(key: string, value: string | null): void {
+    if (value === null) db.prepare("DELETE FROM settings WHERE key = ?").run(key);
+    else db.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
   },
 };

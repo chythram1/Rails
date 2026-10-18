@@ -1,14 +1,17 @@
 import type {
   GitStatus,
+  ModelSettings,
   OpenPanel,
   Panel,
   Project,
   ProviderInfo,
   RecentFolder,
   SessionSummary,
+  SignIn,
   Sprocket,
   SprocketInput,
   SprocketMessage,
+  SprocketSettings,
   Workspace,
 } from "@rails/shared";
 
@@ -62,4 +65,14 @@ export const api = {
   sprocketMessages: (id: string) => req<SprocketMessage[]>(`/api/sprockets/${enc(id)}/messages`),
   sendSprocketMessage: (id: string, text: string) =>
     req<SprocketMessage>(`/api/sprockets/${enc(id)}/messages`, { method: "POST", body: JSON.stringify({ text }) }),
+  sprocketSettings: (id: string, body: SprocketSettings) =>
+    req<Sprocket>(`/api/sprockets/${enc(id)}/settings`, { method: "PUT", body: JSON.stringify(body) }),
+  models: () => req<ModelSettings>("/api/models"),
+  setDefaultModel: (model: string | null) => req("/api/models/default", { method: "PUT", body: JSON.stringify({ model }) }),
+  setProviderKey: (id: string, key: string) => req(`/api/models/providers/${enc(id)}/key`, { method: "PUT", body: JSON.stringify({ key }) }),
+  removeProvider: (id: string) => req(`/api/models/providers/${enc(id)}`, { method: "DELETE" }),
+  startSignIn: (id: string, fresh = false) =>
+    req<SignIn>(`/api/models/providers/${enc(id)}/sign-in`, { method: "POST", body: JSON.stringify({ fresh }) }),
+  submitSignInCode: (id: string, code: string) => req(`/api/models/sign-ins/${enc(id)}/code`, { method: "POST", body: JSON.stringify({ code }) }),
+  cancelSignIn: (id: string) => req(`/api/models/sign-ins/${enc(id)}`, { method: "DELETE" }),
 };

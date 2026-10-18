@@ -87,7 +87,11 @@ export function Sidebar({ route }: { route: Route }) {
   const remove = async (p: Project) => {
     const open = (await api.workspace(p.id).catch(() => null))?.panels.length ?? 0;
     if (open > 0) return alert(`Close the ${open} open panel${open === 1 ? "" : "s"} in "${p.name}" before removing it.`);
-    if (!confirm(`Remove "${p.name}" from rails?\n\nIts agent sessions stay on disk. Add the folder again anytime to bring them back.`)) return;
+    const attached = ((await api.sprockets().catch(() => [])) ?? []).filter((s) => s.projectId === p.id).map((s) => s.name);
+    const sprocketNote = attached.length
+      ? `\n\n${attached.join(", ")} ${attached.length === 1 ? "is" : "are"} detached, and ${attached.length === 1 ? "its chat" : "their chats"} here deleted.`
+      : "";
+    if (!confirm(`Remove "${p.name}" from rails?\n\nIts agent sessions stay on disk. Add the folder again anytime to bring them back.${sprocketNote}`)) return;
     try {
       await api.removeProject(p.id);
     } catch (e: any) {
