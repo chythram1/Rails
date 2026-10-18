@@ -10,6 +10,7 @@ import type {
   RecentFolder,
   ServerInfo,
   SessionSummary,
+  Suggestion,
   SignIn,
   Sprocket,
   SprocketInput,
@@ -87,6 +88,8 @@ export const api = {
     req<SprocketMessage>(`/api/sprockets/${enc(id)}/messages`, { method: "POST", body: JSON.stringify({ text }) }),
   sprocketSettings: (id: string, body: SprocketSettings) =>
     req<Sprocket>(`/api/sprockets/${enc(id)}/settings`, { method: "PUT", body: JSON.stringify(body) }),
+  sendSuggestion: (id: string, text: string) => req<Suggestion>(`/api/suggestions/${enc(id)}/send`, { method: "POST", body: JSON.stringify({ text }) }),
+  dismissSuggestion: (id: string) => req<Suggestion>(`/api/suggestions/${enc(id)}/dismiss`, { method: "POST" }),
   models: () => req<ModelSettings>("/api/models"),
   setDefaultModel: (model: string | null) => req("/api/models/default", { method: "PUT", body: JSON.stringify({ model }) }),
   setProviderKey: (id: string, key: string) => req(`/api/models/providers/${enc(id)}/key`, { method: "PUT", body: JSON.stringify({ key }) }),

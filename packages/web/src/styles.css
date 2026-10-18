@@ -607,6 +607,30 @@ ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
 .sp-event-options { display: block; color: var(--muted); font-size: 13px; }
 .sp-event-note { margin: 0; color: var(--muted); font-size: 13px; }
 .sp-message.event .sp-msg-actions { margin-left: -7px; }
+/* A reply a Coordinator suggests, under its message (SuggestionCard.tsx). The card is the field: it takes
+   the field's focus border, and Dismiss and Send sit at its foot. Once sent, a muted line and the quote. */
+.sp-suggestion {
+  display: flex; flex-direction: column; gap: 8px; width: min(680px, 100%); margin-top: 8px; padding: 10px 12px;
+  border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface);
+}
+.sp-suggestion:focus-within { border-color: var(--border-focus); }
+.sp-suggestion-head { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 0; color: var(--muted); font-size: 13px; }
+.sp-suggestion-label { flex: none; white-space: nowrap; margin-right: -2px; }
+.sp-suggestion-head .sp-suggestion-label { margin-right: -4px; }
+.sp-suggestion-line > svg { flex: none; }
+.sp-suggestion-text {
+  display: block; width: 100%; max-height: 12lh; padding: 0; border: 0; background: none;
+  font-size: 15px; line-height: 1.5; resize: none; overflow-y: auto;
+}
+.sp-suggestion-text:focus-visible { outline: none; } /* the card's border shows focus */
+.sp-suggestion-text:disabled { color: var(--text-2); }
+.sp-suggestion-answer { margin: 0; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sp-suggestion-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.sp-suggestion-actions .muted { text-wrap: pretty; }
+.sp-suggestion .error { margin: 0; }
+.sp-suggestion-done { display: flex; flex-direction: column; gap: 6px; width: min(680px, 100%); margin-top: 8px; }
+.sp-suggestion-line { display: flex; align-items: center; gap: 6px; min-width: 0; margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+.sp-suggestion-done .sp-suggestion-line { margin: 0; }
 /* A Sprocket's chat with its settings panel beside it (ref/sprockets/stage2/chat2.png). */
 .sp-main { position: relative; }
 .sp-detail { flex: 1; min-height: 0; display: flex; }

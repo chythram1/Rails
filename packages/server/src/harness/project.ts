@@ -90,7 +90,7 @@ async function cardWithTranscript(panel: Awaited<ReturnType<typeof openSessions>
 }
 
 /** One open session, by the short id the board shows or its title. */
-async function findOpen(p: Project, session: string) {
+export async function findOpen(p: Project, session: string) {
   const q = session.trim().toLowerCase();
   const list = await openSessions(p);
   const found = list.find((x) => x.id.startsWith(q) || x.title.toLowerCase() === q) ?? list.find((x) => x.title.toLowerCase().includes(q));
@@ -99,7 +99,7 @@ async function findOpen(p: Project, session: string) {
 }
 
 const none = Type.Object({});
-const session = Type.String({ description: 'A session\'s id from list_sessions or project_board (e.g. "1a2b3c4d"), or its title.' });
+export const session = Type.String({ description: 'A session\'s id from list_sessions or project_board (e.g. "1a2b3c4d"), or its title.' });
 
 export const projectCapabilities: Capability[] = [
   {

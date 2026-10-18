@@ -194,6 +194,30 @@ export interface SprocketMessage {
   activity?: string;
   /** On an event: which session, and what it's waiting for. `text` is the end of its message. */
   event?: SprocketEvent;
+  /** On a Coordinator's reply: the replies it suggests sending to sessions. */
+  suggestions?: Suggestion[];
+}
+
+/**
+ * A reply a Coordinator drafted for a session (step 3, ADR 0010). Nothing reaches the session until the
+ * user sends it (they can edit it first) or, for a dialog, answers it in the panel.
+ */
+export interface Suggestion {
+  id: string;
+  panelId: string;
+  kind: PanelKind;
+  /** The session's title when it was suggested. */
+  title: string;
+  sessionId?: string;
+  /** "reply": text Rails sends into the session; "answer": the option to pick in a dialog, in the panel. */
+  mode: "reply" | "answer";
+  text: string;
+  status: "pending" | "sending" | "sent" | "failed" | "dismissed" | "expired";
+  /** Why it failed, or why it can't be sent anymore. */
+  error?: string;
+  createdAt: string;
+  /** When its status last changed (sent, dismissed, expired). */
+  updatedAt: string;
 }
 
 // ---- Settings ----

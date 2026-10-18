@@ -56,8 +56,10 @@ export function foldCard(panel: { id: string; kind: PanelKind; title: string; se
         if (e.command) c.lastCommand = e.command;
         break;
       case "waiting":
+        // A question's dialog is reported more than once (pi's question tool, then its dialog; Claude Code's
+        // question, then its permission check): it stays a question.
+        if (!(c.status === "waiting" && c.waitingFor === "question")) c.waitingFor = e.reason;
         c.status = "waiting";
-        c.waitingFor = e.reason;
         break;
       case "resumed":
         if (c.status === "waiting") c.status = "working";

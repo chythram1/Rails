@@ -18,6 +18,7 @@ import { projects, sprocketMessages, sprockets } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { findModel } from "./models.ts";
 import { isRunning, onRunsChanged, requestReply, userMessageTime } from "./runs.ts";
+import { onSuggestionsChanged } from "./suggestions.ts";
 import { listeners } from "./util.ts";
 
 const MAX_NAME = 40;
@@ -28,6 +29,7 @@ const sprocketChanges = listeners();
 export const onSprocketsChanged = sprocketChanges.on;
 const changed = sprocketChanges.emit;
 onRunsChanged(changed);
+onSuggestionsChanged(changed);
 
 const isOneOf = <T extends string>(list: readonly T[], v: unknown): v is T => list.includes(v as T);
 

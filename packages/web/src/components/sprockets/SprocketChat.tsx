@@ -9,6 +9,7 @@ import { MenuButton } from "../Menu.tsx";
 import { useStore } from "../../store.tsx";
 import { Sprocket } from "./Sprocket.tsx";
 import { EventRow } from "./EventRow.tsx";
+import { SuggestionCard } from "./SuggestionCard.tsx";
 import { MessageActions } from "./MessageActions.tsx";
 import { Revealed, useRevealedText } from "./revealText.tsx";
 import { useThreadScroll } from "./threadScroll.ts";
@@ -205,6 +206,10 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
                       )}
                     </p>
                   )}
+                  {/* A Coordinator's suggested replies, once its message has been revealed. */}
+                  {!!m.suggestions?.length &&
+                    !(m.id === reveal?.id && shown < m.text.length) &&
+                    m.suggestions.map((s) => <SuggestionCard key={s.id} suggestion={s} projectId={sprocket.projectId} />)}
                   {m.author !== "notice" && <MessageActions text={m.text} at={m.createdAt} now={now} reply={m.author !== "user"} />}
                 </li>
               );

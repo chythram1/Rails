@@ -6,6 +6,7 @@
 // - `thread/resume {excludeTurns}` subscribes Rails to a mapped thread's turns and items.
 // The protocol is JSON-RPC over a WebSocket on the daemon's Unix socket. It's marked experimental, so
 // unknown messages are ignored and a lost connection is retried.
+import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { join } from "node:path";
 import WebSocket from "ws";
@@ -113,6 +114,19 @@ export class CodexWatcher {
     this.send({ jsonrpc: "2.0", id, method, params });
   }
 
+  /** Send text to a thread as the user's next message (ADR 0010): on an idle thread it starts a turn. */
+  queue(threadId: string, text: string, timeoutMs = 5000): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Codex didn't take the message in time. Reply in its panel.")), timeoutMs);
+      const input = [{ type: "text", text }];
+      this.request("thread/queue/add", { threadId, clientUserMessageId: randomUUID(), input }, (_result, error) => {
+        clearTimeout(timer);
+        if (error) reject(new Error(`Codex refused the message: ${(error as { message?: string })?.message ?? "unknown error"}`));
+        else resolve();
+      });
+    });
+  }
+
   /** Whether a new panel still waits for its thread (closed panels and old entries don't count). */
   hasPending = () => this.pending.some((p) => Date.now() - p.since < MAP_WITHIN_MS && panels.get(p.panelId));
 }
@@ -146,6 +160,12 @@ export function watchCodex(open: Panel[], started?: { panelId: string; cwd: stri
   );
   if (started) watcher.expect(started.panelId, started.cwd);
   connect(() => codexPanels(open).flatMap((p) => (p.sessionId ? [p.sessionId] : [])));
+}
+
+/** Send text into a Codex panel's thread (bridge/deliver.ts). */
+export function sendToCodex(threadId: string, text: string): Promise<void> {
+  if (!watcher || ws?.readyState !== WebSocket.OPEN) return Promise.reject(new Error("Rails isn't connected to Codex right now. Reply in its panel."));
+  return watcher.queue(threadId, text);
 }
 
 /** A panel closed: drop the connection when no Codex panel (or new one waiting for its thread) is left. */

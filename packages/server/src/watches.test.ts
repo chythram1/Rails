@@ -47,12 +47,15 @@ describe("looksLikeQuestion", () => {
 });
 
 describe("admit", () => {
-  it("wakes for questions and forms, never for permissions", () => {
+  it("wakes for questions and forms, never for permissions or other extension dialogs", () => {
     const questions = [{ question: "Which colour?", options: ["Blue", "Green"] }];
     expect(admit({ kind: "waiting", reason: "question", questions })).toEqual({ what: "question", text: "Which colour?", questions });
     expect(admit({ kind: "waiting", reason: "a form" })).toEqual({ what: "question", text: "It's waiting for a form." });
+    expect(admit({ kind: "waiting", reason: "input" })).toEqual({ what: "question", text: "It's waiting for input." });
     expect(admit({ kind: "waiting", reason: "permission for Bash" })).toBeNull();
     expect(admit({ kind: "waiting", reason: "approval" })).toBeNull();
+    // A pi extension's own dialog (here an approval extension's): it may well be a permission.
+    expect(admit(fromPi("ui_prompt_start", { title: "Approve write to /work/app/notes.txt?" })[0])).toBeNull();
   });
 
   it("wakes for a turn that ends with a question, keeping the end of it", () => {

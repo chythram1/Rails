@@ -70,7 +70,10 @@ packages/
   `panels.attention` (red dots). Attached Sprockets read the board through their capabilities (`harness/project.ts`).
   Recorded events also go to the watches (`watches.ts`, ADR 0009): when a session asks the user something (a
   dialog, or a turn that ends with a question) and nobody answers within 20 s, Rails puts an event in the
-  project's Coordinator's chat and starts a run.
+  project's Coordinator's chat and starts a run. The Coordinator can suggest a reply (`suggest_reply`,
+  `suggestions.ts`, ADR 0010), shown under its message; when the user sends it, `bridge/deliver.ts` puts it into
+  the session: Claude Code's message socket, the pi extension's long poll (`GET /bridge/<panelId>/pi/inbox`, confirmed with `POST …/pi/delivered`) or
+  Codex's `thread/queue/add`. Suggestions expire as soon as their session moves on.
 - **Persistence:** panels survive browser disconnects and server restarts (`tsx watch` included).
   On a reboot the tmux server is gone; the next workspace read drops panels whose tmux session no
   longer exists. Their transcripts remain, so sessions can be resumed from the sidebar.

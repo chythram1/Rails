@@ -7,9 +7,10 @@
 //   a tool, the answer) means it's moving again, and nothing wakes;
 // - one wake per wait, and at most one per session per COOLDOWN_MS, as a guard against loops (a wait that
 //   comes sooner wakes it once the cooldown is over, if the session is still waiting then).
-// Permission prompts never wake it: Sprockets don't answer those, and the tab's attention mark covers them.
+// Permission prompts never wake it, nor other dialogs pi extensions show (they may be approvals): Sprockets
+// don't answer those, and the tab's attention mark covers them.
 import type { SessionQuestion, SprocketEvent } from "@rails/shared";
-import type { SessionEvent } from "./bridge/events.ts";
+import { ASKING, type SessionEvent } from "./bridge/events.ts";
 import { onEvents, onPanelForgotten } from "./bridge/index.ts";
 import { panels, projects, sprockets } from "./db.ts";
 import { sessionsFor } from "./providers/index.ts";
@@ -85,9 +86,11 @@ function tail(text: string): string {
 export function admit(e: SessionEvent): Wake | "over" | null {
   switch (e.kind) {
     case "waiting":
-      if (e.reason.startsWith("permission") || e.reason === "approval") return null;
       if (e.questions?.length) return { what: "question", text: e.questions.map((q) => q.question).join("\n"), questions: e.questions };
-      return { what: "question", text: `It's waiting for ${e.reason === "input" ? "input" : e.reason}.` };
+      if (ASKING.has(e.reason)) return { what: "question", text: `It's waiting for ${e.reason}.` };
+      // Permissions and approvals, and other dialogs from pi extensions (which may well be approvals too):
+      // only the user answers those.
+      return null;
     case "turn_end":
       return looksLikeQuestion(e.text) ? { what: "turn_end", text: tail(e.text) } : "over";
     case "start":

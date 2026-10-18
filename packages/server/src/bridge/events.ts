@@ -23,6 +23,9 @@ export type SessionEvent =
   /** The session ended (the agent quit). */
   | { kind: "ended" };
 
+/** Waits without questions that still ask the user something: a Claude Code MCP form, Codex's request for input. */
+export const ASKING = new Set(["a form", "input"]);
+
 /** Longest text kept from a prompt or a final message. Agents report what they like, so every field is bounded. */
 const MAX_TEXT = 2000;
 /** Most files kept from one tool use. */

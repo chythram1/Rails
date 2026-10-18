@@ -22,7 +22,8 @@ Decisions:
     means it's moving again, and nothing wakes;
   - one wake per wait (agents may report a wait twice), and at most one per session per minute (a sooner
     one waits for the minute to pass);
-  - permission prompts never wake it: Sprockets never answer those, and the tab's attention mark covers them.
+  - permission prompts never wake it, nor other dialogs pi extensions show (they may be approvals): Sprockets
+    never answer those, and the tab's attention mark covers them.
 - **Waits arrive as chat messages** from Rails (author `event`), with the session, what it waits for (the
   dialog's questions and options, or the end of its last message) and a link to its panel. The model reads
   them as `[Rails event, not from your user]`, with the session's text quoted as data. The Coordinator's run
@@ -30,9 +31,7 @@ Decisions:
   the user after all, it replies `(quiet)`: nothing is saved but a "nothing needed" mark on the event.
 - **The bridge keeps the end of final messages** (the first 500 and the last 1,500 characters), since a
   closing question is what says a session waits.
-- **Not yet:** suggested answers the user sends with one tap (turn-end questions go through the session's
-  message channel; dialogs get a card with the suggested option and "Open panel", and Rails never types into
-  a panel), automatic answers for rules the user trusts (through the hooks: Claude Code's PreToolUse
+- **Not yet:** suggested answers the user sends with one tap (done in ADR 0010), automatic answers for rules the user trusts (through the hooks: Claude Code's PreToolUse
   `updatedInput.answers`, pi's `tool_call` block), a fast classifier judging every turn end in a shadow log,
   the workspace Sprocket panel, and muting a session. See `scratch/planning/step3-unblock.md`.
 

@@ -11,6 +11,7 @@ import { WebSocketServer } from "ws";
 import { serverInfo, onSignedOutEverywhere, signOutEverywhere } from "./account.ts";
 import { accessToken, HOST, PORT } from "./config.ts";
 import { watchCodex } from "./bridge/codex.ts";
+import { piInbox } from "./bridge/deliver.ts";
 import { loadAttention, receive, tokenOk as bridgeTokenOk } from "./bridge/index.ts";
 import { panels, projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
@@ -24,6 +25,7 @@ import { cancelSignIn, modelSettings, removeCredential, setApiKey, setDefaultMod
 import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets.ts";
 import { TerminalHub } from "./terminals.ts";
 import { startWatches } from "./watches.ts";
+import { dismissSuggestion, sendSuggestion, startSuggestions } from "./suggestions.ts";
 import { version as tmuxVersion } from "./tmux.ts";
 import { sameSecret } from "./util.ts";
 
@@ -74,10 +76,25 @@ app.use("/api/*", async (c, next) => {
 const LOOPBACK = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 // Claude Code's PostToolUse report holds the whole content of a file it wrote, so allow a few MB.
 const BRIDGE_BODY_LIMIT = 4 * 1024 * 1024;
-app.post("/bridge/:panelId/:source/:event", bodyLimit({ maxSize: BRIDGE_BODY_LIMIT, onError: (c) => c.json({}, 413) }), async (c) => {
-  if (!LOOPBACK.has(getConnInfo(c).remote.address ?? "")) return c.json({ error: "Forbidden" }, 403);
+/** Whether a bridge request comes from the panel itself: over loopback, with its token. */
+const fromPanel = (c: Context, panelId: string) =>
+  LOOPBACK.has(getConnInfo(c).remote.address ?? "") && bridgeTokenOk(panelId, c.req.header("authorization")?.replace(/^Bearer\s+/i, ""));
+// The pi extension's long poll for replies the user sends (ADR 0010).
+app.get("/bridge/:panelId/pi/inbox", async (c) => {
   const panelId = c.req.param("panelId");
-  if (!bridgeTokenOk(panelId, c.req.header("authorization")?.replace(/^Bearer\s+/i, ""))) return c.json({ error: "Unauthorized" }, 401);
+  if (!fromPanel(c, panelId)) return c.json({ error: "Unauthorized" }, 401);
+  return c.json({ messages: await piInbox.poll(panelId, c.req.raw.signal) });
+});
+app.post("/bridge/:panelId/pi/delivered", async (c) => {
+  const panelId = c.req.param("panelId");
+  if (!fromPanel(c, panelId)) return c.json({ error: "Unauthorized" }, 401);
+  const body = await c.req.json<{ id?: unknown; ok?: unknown }>().catch(() => ({}) as { id?: unknown; ok?: unknown });
+  piInbox.ack(panelId, body.id, body.ok);
+  return c.json({});
+});
+app.post("/bridge/:panelId/:source/:event", bodyLimit({ maxSize: BRIDGE_BODY_LIMIT, onError: (c) => c.json({}, 413) }), async (c) => {
+  const panelId = c.req.param("panelId");
+  if (!fromPanel(c, panelId)) return c.json({ error: "Unauthorized" }, 401);
   const body = await c.req.json().catch(() => ({}));
   receive(panelId, c.req.param("source"), c.req.param("event"), body, { inbox: c.req.query("inbox")?.slice(0, 300) || undefined });
   return c.json({});
@@ -208,6 +225,13 @@ app.post("/api/sprockets/:id/messages", async (c) =>
   c.json(sendMessage(c.req.param("id"), (await c.req.json<{ text?: unknown }>()).text), 201),
 );
 
+// Replies a Coordinator suggests (ADR 0010): the user sends them (edited or not) or dismisses them.
+app.post("/api/suggestions/:id/send", async (c) => {
+  const body = await c.req.json<{ text?: unknown }>().catch(() => ({}) as { text?: unknown });
+  return c.json(await sendSuggestion(c.req.param("id"), body.text));
+});
+app.post("/api/suggestions/:id/dismiss", (c) => c.json(dismissSuggestion(c.req.param("id"))));
+
 // ---- static web build (production) ----
 const webDist = join(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
 if (existsSync(webDist)) {
@@ -218,6 +242,7 @@ if (existsSync(webDist)) {
 // ---- server + websocket ----
 loadAttention(panels.all());
 startWatches(); // Coordinators hear about sessions that wait for the user
+startSuggestions(); // suggested replies expire as their sessions move on
 watchCodex(panels.all()); // Codex panels that survived a restart
 
 void tmuxVersion().then((v) => {

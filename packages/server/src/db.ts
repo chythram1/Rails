@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { Panel, PanelKind, Project, Sprocket, SprocketAuthor, SprocketEvent, SprocketLook, SprocketMessage } from "@rails/shared";
+import type { Panel, PanelKind, Project, Sprocket, SprocketAuthor, SprocketEvent, SprocketLook, SprocketMessage, Suggestion } from "@rails/shared";
 import { RAILS_HOME } from "./config.ts";
 
 const db = new DatabaseSync(join(RAILS_HOME, "rails.db"));
@@ -72,6 +72,25 @@ db.exec(`
     event TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS session_events_by_panel ON session_events (panel_id, id);
+  -- Replies a Coordinator suggests sending to sessions (ADR 0010). message_id is the reply they came with;
+  -- it's null while that reply is being written.
+  CREATE TABLE IF NOT EXISTS suggestions (
+    id TEXT PRIMARY KEY,
+    sprocket_id TEXT NOT NULL,
+    message_id TEXT,
+    panel_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    title TEXT NOT NULL,
+    session_id TEXT,
+    mode TEXT NOT NULL,
+    text TEXT NOT NULL,
+    status TEXT NOT NULL,
+    error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS suggestions_by_panel ON suggestions (panel_id, status);
+  CREATE INDEX IF NOT EXISTS suggestions_by_sprocket ON suggestions (sprocket_id, message_id);
 `);
 
 type Row = { id: string; name: string; path: string; created_at: string };
@@ -231,6 +250,7 @@ export const sprockets = {
   /** Move to another project (or none). Its chat and its role belong to the old attachment, so they go too. */
   setProject(id: string, projectId: string | null): void {
     db.prepare("DELETE FROM sprocket_messages WHERE sprocket_id = ?").run(id);
+    db.prepare("DELETE FROM suggestions WHERE sprocket_id = ?").run(id);
     db.prepare("UPDATE sprockets SET project_id = ?, codemode_store = '{}', coordinator = 0 WHERE id = ?").run(projectId, id);
   },
   /** Make a Sprocket its project's Coordinator, taking over from any other, or stop. */
@@ -270,6 +290,7 @@ export const sprockets = {
   },
   remove(id: string): void {
     db.prepare("DELETE FROM sprocket_messages WHERE sprocket_id = ?").run(id);
+    db.prepare("DELETE FROM suggestions WHERE sprocket_id = ?").run(id);
     db.prepare("DELETE FROM sprockets WHERE id = ?").run(id);
   },
 };
@@ -286,8 +307,14 @@ const toMessage = (r: MessageRow): SprocketMessage => ({
 });
 
 export const sprocketMessages = {
+  /** A chat, with each reply's suggestions. */
   list(sprocketId: string): SprocketMessage[] {
-    return (db.prepare("SELECT * FROM sprocket_messages WHERE sprocket_id = ? ORDER BY created_at, rowid").all(sprocketId) as MessageRow[]).map(toMessage);
+    const byMessage = suggestions.byMessage(sprocketId);
+    return (db.prepare("SELECT * FROM sprocket_messages WHERE sprocket_id = ? ORDER BY created_at, rowid").all(sprocketId) as MessageRow[]).map((r) => {
+      const m = toMessage(r);
+      const list = byMessage.get(m.id);
+      return list ? { ...m, suggestions: list } : m;
+    });
   },
   last(sprocketId: string): SprocketMessage | undefined {
     const r = db.prepare("SELECT * FROM sprocket_messages WHERE sprocket_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(sprocketId) as MessageRow | undefined;
@@ -323,6 +350,82 @@ export const sprocketMessages = {
       .prepare("SELECT id, steps FROM sprocket_messages WHERE sprocket_id = ? AND steps IS NOT NULL ORDER BY created_at DESC, rowid DESC LIMIT ?")
       .all(sprocketId, limit) as { id: string; steps: string }[];
     return new Map(rows.map((r) => [r.id, JSON.parse(r.steps)]));
+  },
+};
+
+type SuggestionRow = {
+  id: string;
+  sprocket_id: string;
+  message_id: string | null;
+  panel_id: string;
+  kind: PanelKind;
+  title: string;
+  session_id: string | null;
+  mode: Suggestion["mode"];
+  text: string;
+  status: Suggestion["status"];
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+const toSuggestion = (r: SuggestionRow): Suggestion & { sprocketId: string; messageId?: string } => ({
+  id: r.id,
+  sprocketId: r.sprocket_id,
+  ...(r.message_id ? { messageId: r.message_id } : {}),
+  panelId: r.panel_id,
+  kind: r.kind,
+  title: r.title,
+  ...(r.session_id ? { sessionId: r.session_id } : {}),
+  mode: r.mode,
+  text: r.text,
+  status: r.status,
+  ...(r.error ? { error: r.error } : {}),
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+export const suggestions = {
+  create(s: { sprocketId: string; panelId: string; kind: PanelKind; title: string; sessionId?: string; mode: Suggestion["mode"]; text: string }) {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    db.prepare(
+      "INSERT INTO suggestions (id, sprocket_id, panel_id, kind, title, session_id, mode, text, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+    ).run(id, s.sprocketId, s.panelId, s.kind, s.title, s.sessionId ?? null, s.mode, s.text, now, now);
+    return this.get(id)!;
+  },
+  get(id: string) {
+    const r = db.prepare("SELECT * FROM suggestions WHERE id = ?").get(id) as SuggestionRow | undefined;
+    return r && toSuggestion(r);
+  },
+  /** A Sprocket's shown suggestions (those whose reply was saved), by reply. */
+  byMessage(sprocketId: string): Map<string, Suggestion[]> {
+    const rows = db.prepare("SELECT * FROM suggestions WHERE sprocket_id = ? AND message_id IS NOT NULL ORDER BY created_at, rowid").all(sprocketId) as SuggestionRow[];
+    const map = new Map<string, Suggestion[]>();
+    for (const r of rows) {
+      const { sprocketId: _s, messageId: _m, ...s } = toSuggestion(r);
+      map.set(r.message_id!, [...(map.get(r.message_id!) ?? []), s]);
+    }
+    return map;
+  },
+  /** Pending ones for a panel (from any Sprocket). */
+  pendingFor(panelId: string) {
+    return (db.prepare("SELECT * FROM suggestions WHERE panel_id = ? AND status = 'pending'").all(panelId) as SuggestionRow[]).map(toSuggestion);
+  },
+  /** Show a run's suggestions under the reply it saved. */
+  attach(ids: string[], messageId: string): void {
+    for (const id of ids) db.prepare("UPDATE suggestions SET message_id = ? WHERE id = ? AND message_id IS NULL").run(messageId, id);
+  },
+  /** Forget suggestions that never got a reply to show them under. */
+  drop(ids: string[]): void {
+    for (const id of ids) db.prepare("DELETE FROM suggestions WHERE id = ? AND message_id IS NULL").run(id);
+  },
+  /** Change the status if it's one of `from`. False when it wasn't (someone else changed it first). */
+  setStatus(id: string, from: Suggestion["status"][], to: Suggestion["status"], extra: { error?: string; text?: string } = {}): boolean {
+    const marks = from.map(() => "?").join(", ");
+    const r = db
+      .prepare(`UPDATE suggestions SET status = ?, error = ?, text = COALESCE(?, text), updated_at = ? WHERE id = ? AND status IN (${marks})`)
+      .run(to, extra.error ?? null, extra.text ?? null, new Date().toISOString(), id, ...from);
+    return r.changes > 0;
   },
 };
 
