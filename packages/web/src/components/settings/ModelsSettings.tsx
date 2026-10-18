@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { IconCheck as Check } from "@tabler/icons-react";
 import type { ModelProvider, SignIn } from "@rails/shared";
 import { api } from "../../api.ts";
 import { socket } from "../../ws.ts";
@@ -109,28 +110,33 @@ function ProviderRow({ provider: p }: { provider: ModelProvider }) {
     <li className="provider-row" id={`setting-provider-${p.id}`} data-settings-row tabIndex={-1}>
       <div className="provider-main">
         <span className="provider-name">{p.name}</span>
-        <span className={"provider-status" + (p.auth ? " ok" : "")}>{status(p)}</span>
+        <span className={"provider-status" + (p.auth ? " ok" : "")}>
+          {p.auth && <Check size={14} stroke={2.5} aria-hidden />}
+          {status(p)}
+        </span>
         {p.auth?.type === "oauth" && p.id === "openai" && (
           <a className="small" href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer">
             Manage usage
           </a>
         )}
-        <span className="grow" />
-        {p.auth ? (
-          <button className="btn small" onClick={() => void remove()}>Remove</button>
-        ) : (
-          !adding &&
-          !signIn && (
-            <>
-              {p.signIn && (
-                <button className="btn small" onClick={() => void startSignIn()}>
-                  {p.signIn}
-                </button>
-              )}
-              <button className="btn small" onClick={() => setAdding(true)}>Add API key</button>
-            </>
-          )
-        )}
+        {/* One group at the end of the row: on a narrow screen it wraps as a whole and stays on the right. */}
+        <span className="provider-actions">
+          {p.auth ? (
+            <button className="btn small" onClick={() => void remove()}>Remove</button>
+          ) : (
+            !adding &&
+            !signIn && (
+              <>
+                {p.signIn && (
+                  <button className="btn small" onClick={() => void startSignIn()}>
+                    {p.signIn}
+                  </button>
+                )}
+                <button className="btn small" onClick={() => setAdding(true)}>Add API key</button>
+              </>
+            )
+          )}
+        </span>
       </div>
       {adding && (
         <form className="provider-form" onSubmit={(e) => void saveKey(e)}>

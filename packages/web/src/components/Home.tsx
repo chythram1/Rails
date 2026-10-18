@@ -5,8 +5,10 @@ import { api } from "../api.ts";
 import { href, navigate } from "../router.ts";
 import { useStore } from "../store.tsx";
 import { providerLabel } from "../util.ts";
-import { Composer, Select } from "./Composer.tsx";
+import { Composer } from "./Composer.tsx";
+import { Dropdown } from "./Dropdown.tsx";
 import { FolderMenu } from "./FolderMenu.tsx";
+import { ProviderIcon } from "./ProviderIcon.tsx";
 
 export function Home() {
   const { projects, providers, picking } = useStore();
@@ -45,19 +47,22 @@ export function Home() {
         disabled={!project || starting}
         disabledReason={!project ? "Add a project to start a chat" : "Starting…"}
       >
-        <Select
+        <Dropdown
+          plain
           label="Project"
           value={selected}
           onChange={setSelected}
           options={projects.length ? projects.map((p) => ({ value: p.id, label: p.name })) : [{ value: "", label: "No project" }]}
         />
-        <Select<ProviderId>
+        <Dropdown
+          plain
           label="Agent"
           value={provider}
-          onChange={setProvider}
+          onChange={(v) => setProvider(v as ProviderId)}
           options={(providers.length ? providers : [{ id: "claude" as const, installed: true }]).map((p) => ({
             value: p.id,
             label: providerLabel[p.id] + (p.installed ? "" : " (not installed)"),
+            icon: <ProviderIcon provider={p.id} />,
             disabled: !p.installed,
           }))}
         />

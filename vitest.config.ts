@@ -11,6 +11,8 @@ export default defineConfig({
   test: {
     include: ["packages/*/src/**/*.test.ts"],
     environment: "node",
+    // design.test.ts reads styles.css as text (`?raw`); Vitest empties CSS it doesn't process.
+    css: { include: [/styles\.css/] },
     setupFiles: ["./vitest.setup.ts"],
     env: {
       RAILS_TOKEN: "test",

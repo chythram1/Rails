@@ -81,6 +81,7 @@ for these three, not into adding providers.
 1. `docs/CONTEXT.md` is the glossary. Use its terms (Project, Provider, Session, Transcript, Workspace, Panel…) in code and UI. Add a new concept there before using it.
 2. `docs/architecture.md` covers the runtime picture, panel lifecycle, provider support matrix, requirements and env vars.
 3. `docs/adr/` holds the decisions. Read the ADRs before changing anything foundational.
+4. `DESIGN.md` is the visual design system: colors, type, layout, shapes, components and the rules. Read it before any UI work.
 
 Read these when relevant: `docs/providers.md` before touching a parser or adapter, and `docs/roadmap.md`
 for future ideas, which aren't commitments. `ref/style.png` (overall look) and `ref/panels.png` (workspace panels) are the visual references (`ref/` is gitignored, so they may be missing in a fresh clone).
@@ -119,7 +120,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - **How an agent is launched:** `command()` in `panels.ts` (flags for new vs resumed sessions). tmux behaviour (mouse, keys, sizing) lives in the config written by `tmux.ts`.
 - **Transcript parsing:** edit `providers/<id>.ts`, and update `docs/providers.md` with anything you learn about the format.
 - **App settings** go in the Settings modal (`components/settings/`): sections of groups (a heading, then rows of label, description and control), as in `ref/settings.png`. Give each row `id="setting-<rowId>"`, `data-settings-row` and `tabIndex={-1}`, and add it to `SETTINGS` in `search.ts` (label plus synonyms) so search finds it. Customize is for agent profiles, prompts and tools, not app settings.
-- **UI:** reuse the tokens in `styles.css`, use `@tabler/icons-react` for icons (MIT), `var(--font)` / `var(--mono)` for text (Geist and Geist Mono, bundled via `@fontsource-variable`; no CDN fonts, and terminals keep the system monospace on purpose for glyph coverage), `ProviderIcon` for agent logos and `MenuButton` (`components/Menu.tsx`) for dropdown menus (style: `ref/project-menu.png`) and `Dropdown` (`components/Dropdown.tsx`) instead of a native `<select>`. The `better-*` skills in `.agents/skills/` cover UI review work.
+- **UI:** follow `DESIGN.md`. Reuse the tokens in `styles.css` (never a new hex), use `@tabler/icons-react` for icons (MIT), `var(--font)` / `var(--mono)` for text (Geist and Geist Mono, bundled via `@fontsource-variable`; no CDN fonts, and terminals keep the system monospace on purpose for glyph coverage), `ProviderIcon` for agent logos and `MenuButton` (`components/Menu.tsx`) for dropdown menus (style: `ref/project-menu.png`) and `Dropdown` (`components/Dropdown.tsx`) instead of a native `<select>`. The `better-*` skills in `.agents/skills/` cover UI review work.
 
 ## Commands and verification
 - `make` lists the targets, which wrap the npm scripts. `make dev`/`start`/`install` first run `make system-deps`, which installs tmux (required) if it's missing. `make dev` runs the server on :4317 and Vite on :5173. Open the printed `?token=` URL.
@@ -158,7 +159,6 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - Terminals render with WebGL (`@xterm/addon-webgl`). xterm's DOM renderer lets rows drift wider than the grid (fallback glyphs like `─` and `•`), which clips the right edge. Keep padding off `.term-host`: the fit addon sizes from that element's CSS width.
 - Agent TUIs hard-wrap their output, so lines printed before a pane was narrowed stay clipped. That's normal terminal behaviour.
 - Imports use explicit `.ts` / `.tsx` extensions (`allowImportingTsExtensions`). The server runs TypeScript directly through `tsx` and has no build step.
-- Native `<select>` can't show images, so the agent picker on Home shows text.
 - Sprocket SVGs: a CSS `transform` replaces the SVG `transform` attribute, so position with an outer `<g transform>` and animate an inner group (`transform-box: fill-box`). Headless browsers often report reduced motion, which stops Sprocket animations: emulate `prefers-reduced-motion: no-preference` to check them.
 - Upgrading pi-ai (`@earendil-works/pi-ai`, pinned `~1.3`): `signin.ts` runs the sign-in flows itself but stores pi-ai's credential shape, and pi-ai refreshes those tokens. `make test` (`signin.test.ts`) fails if the shape no longer fits; also compare `signin.ts` with pi-ai's `dist/auth/oauth/openai-chatgpt.js` and `openrouter.js` for flow changes (ADR 0006).
 - Codex is the least tested provider: check Codex changes against a real Codex install. Codex 0.16x runs interactive sessions on a shared app-server daemon (other clients see its threads), and any `-c` override makes it run without the daemon (see `docs/providers.md`). A brand-new thread can't be subscribed to (`thread/resume`) until Codex has saved its first turn.
@@ -175,4 +175,5 @@ Update the docs in the same change as the code:
 - New terms go in `CONTEXT.md`.
 - New or changed foundations get a new numbered ADR. Never quietly break an existing one.
 - Remove finished items from `roadmap.md`.
+- Visual changes (tokens, type, shapes, components, rules) go in `DESIGN.md`. Its color front matter mirrors `styles.css`, and `design.test.ts` fails if they differ.
 - Keep this file short: a map and rules. Detail belongs in `docs/`.

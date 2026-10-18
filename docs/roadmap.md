@@ -9,7 +9,6 @@ Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
   ADR 0007 lets Sprockets see their project's sessions. Next, they message sessions and coordinate:
   conflict warnings, handoffs, attention, digests.
   Sprockets replace the earlier "home agent" idea.
-- Provider logos in the agent picker on Home (needs a custom dropdown)
 - Adopt sessions running in the user's own terminal (today only panels started by Rails are shared)
 - Adding projects from another device: Recent works anywhere, but "Open folder…" opens on the server's screen (ADR 0004)
 - Git actions: stage/commit, branch, and a worktree per session

@@ -1,22 +1,28 @@
-/* Minimal dark UI modeled on style.png. Tokens first; components below. */
+/* Minimal dark UI. Tokens first; components below. DESIGN.md (repo root) says how to use them, and its
+   front matter mirrors the colors here (a test keeps them in sync). */
 :root {
   color-scheme: dark;
+  /* Surfaces, darkest to lightest. */
   --bg: #121212;
   --sidebar: #171717;
   --surface: #1f1f1f;
   --surface-2: #262626;
   --hover: #2a2a2a;
+  /* Lines. */
   --border: #2c2c2c;
   --border-strong: #3a3a3a;
-  --selected: #8a8a8a; /* border of a chosen option */
+  --border-focus: #6a6a6a; /* a field's border while it's focused or open */
+  --focus: #8a8a8a; /* focus rings, and the outline of a chosen option */
+  /* Text. */
   --text: #ececec;
-  --muted: #8e8e8e;
-  --accent: #ececec;
+  --text-2: #cfcfcf; /* navigation and other quiet-but-primary labels */
+  --muted: #929292; /* secondary text and placeholders */
+  --primary: #ececec; /* the one accent: primary buttons. Text on it uses --bg. */
+  /* State only: never decoration. */
   --green: #3fb950;
   --amber: #e3b341;
   --red: #f0605a;
-  --blue: #6aa7ff;
-  --radius: 12px;
+  --blue: #6aa7ff; /* diff hunk headers only */
   --radius-lg: 20px;
   --font: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -36,7 +42,8 @@ a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; background: none; border: 0; padding: 0; }
 button:disabled { cursor: default; opacity: 0.45; }
-:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+::selection { background: rgb(255 255 255 / 0.16); }
 h1, h2 { font-weight: 500; margin: 0; }
 
 .muted { color: var(--muted); }
@@ -90,7 +97,7 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .nav { display: flex; flex-direction: column; gap: 2px; }
 .nav-item {
   display: flex; align-items: center; gap: 12px; height: 40px;
-  padding: 0 var(--nav-pad); border-radius: 10px; color: #cfcfcf;
+  padding: 0 var(--nav-pad); border-radius: 10px; color: var(--text-2);
 }
 .nav-item svg { width: var(--icon); height: var(--icon); flex-shrink: 0; }
 .nav-item.active { background: var(--hover); color: var(--text); }
@@ -105,7 +112,7 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .project-row { display: flex; align-items: center; padding-right: 4px; border-radius: 8px; cursor: pointer; }
 .project-name {
   flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0;
-  padding: 7px 12px; color: #cfcfcf; text-align: left;
+  padding: 7px 12px; color: var(--text-2); text-align: left;
 }
 .project-name.active { color: var(--text); }
 .row-actions { display: flex; align-items: center; }
@@ -157,21 +164,21 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
   border: 1px solid var(--border-strong); border-radius: 10px; padding: 7px 14px;
   background: var(--surface); font-size: 14px;
 }
-.btn.primary { background: var(--accent); color: #111; border-color: var(--accent); }
+.btn.primary { background: var(--primary); color: var(--bg); border-color: var(--primary); }
 .btn.small { padding: 4px 10px; font-size: 13px; }
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
 .field input {
   background: var(--bg); border: 1px solid var(--border-strong); border-radius: 10px;
   padding: 9px 12px; outline: none;
 }
-.field input:focus { border-color: #5a5a5a; }
+.field input:focus { border-color: var(--border-focus); }
 
 /* Generic text input / select / textarea for forms. */
 .input {
   background: var(--bg); border: 1px solid var(--border-strong); border-radius: 10px;
   padding: 8px 12px; font-size: 14px; outline: none; min-width: 0;
 }
-.input:focus-visible { border-color: #6a6a6a; }
+.input:focus-visible { border-color: var(--border-focus); }
 /* Dropdown (components/Dropdown.tsx): a field-like button and a list in a menu popover. */
 .dropdown {
   display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 12px; text-align: left;
@@ -179,12 +186,17 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 }
 .dropdown > span { flex: 1; }
 .dropdown > svg { flex-shrink: 0; color: var(--muted); }
-.dropdown[aria-expanded="true"], .dropdown:focus-visible { border-color: #6a6a6a; outline: none; }
+.dropdown[aria-expanded="true"], .dropdown:focus-visible { border-color: var(--border-focus); outline: none; }
 .dropdown:disabled { opacity: 0.6; cursor: default; }
+/* Plain: a picker inside another control (the composer), with no field look until it's used. */
+.dropdown.plain { gap: 6px; padding: 6px 8px 6px 10px; border-color: transparent; border-radius: 8px; background: none; color: var(--text-2); }
+.dropdown.plain[aria-expanded="true"] { border-color: transparent; background: var(--hover); color: var(--text); }
+.dropdown.plain:focus-visible { border-color: transparent; outline: 2px solid var(--focus); outline-offset: 0; }
 .dropdown-menu { min-width: 200px; max-width: calc(100vw - 16px); }
 .dropdown-list { max-height: 300px; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
 .dropdown-list button { width: 100%; }
 .dropdown-check { margin-left: auto; flex-shrink: 0; }
+.dropdown-list button:disabled { color: var(--muted); cursor: default; }
 .dropdown-search {
   margin: 0 0 4px; padding: 7px 10px; border: 0; border-bottom: 1px solid var(--border-strong); border-radius: 0;
   background: none; outline: none; font-size: 14px; color: var(--text);
@@ -201,9 +213,10 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .provider-row + .provider-row { border-top: 1px solid var(--border); }
 .provider-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 30px; }
 .provider-name { font-weight: 500; }
-.provider-status { color: var(--muted); font-size: 13px; }
+.provider-actions { margin-left: auto; display: flex; gap: 8px; }
+.provider-status { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 13px; }
 .provider-status.ok { color: var(--text); }
-.provider-status.ok::before { content: "✓ "; color: #3fb950; }
+.provider-status.ok > svg { color: var(--green); }
 .provider-form { display: flex; gap: 8px; align-items: center; }
 .provider-form .input { flex: 1; }
 .provider-form.column { flex-direction: column; align-items: stretch; gap: 8px; }
@@ -221,17 +234,17 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .settings-nav { display: flex; flex-direction: column; gap: 14px; padding: 14px 12px; border-right: 1px solid var(--border); background: var(--sidebar); min-height: 0; overflow-y: auto; }
 .settings-search {
   display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; flex-shrink: 0;
-  border: 1px solid var(--border-strong); border-radius: 9px; background: var(--surface); color: var(--muted);
+  border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); color: var(--muted);
 }
-.settings-search:focus-within { border-color: #5a5a5a; }
+.settings-search:focus-within { border-color: var(--border-focus); }
 .settings-search input { flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--text); font-size: 14px; }
-.settings-search input::placeholder { color: #7a7a7a; }
+.settings-search input::placeholder { color: var(--muted); }
 .settings-search input::-webkit-search-cancel-button { display: none; } /* Escape clears it */
-.settings-nav-title { margin: 4px 10px 6px; color: var(--muted); font-size: 12.5px; }
+.settings-nav-title { margin: 4px 10px 6px; color: var(--muted); font-size: 12px; }
 .settings-sections [role="tablist"] { display: flex; flex-direction: column; gap: 2px; }
 .settings-tab {
   width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 0; border-radius: 8px;
-  background: none; color: #cfcfcf; font-size: 14px; text-align: left; white-space: nowrap;
+  background: none; color: var(--text-2); font-size: 14px; text-align: left; white-space: nowrap;
 }
 .settings-tab[aria-selected="true"] { background: var(--surface-2); color: var(--text); }
 .settings-results { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -263,11 +276,10 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .set-facts { margin: 0; }
 .set-facts dt { font-size: 14px; }
 .set-facts dd { margin: 0; font-size: 14px; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
-.set-sub { color: var(--muted); font-size: 12.5px; }
+.set-sub { color: var(--muted); font-size: 13px; }
 .set-callout { margin-top: 12px; padding: 14px; border: 1px solid var(--border-strong); border-radius: 12px; display: flex; flex-direction: column; gap: 10px; }
 .set-callout p { margin: 0; }
 .avatar-btn { flex-shrink: 0; padding: 0; border: 0; border-radius: 50%; background: none; }
-.avatar-btn:focus-visible { outline: 2px solid #8a8a8a; outline-offset: 3px; }
 .mono { font-family: var(--mono); font-size: 13px; }
 .btn.danger { color: var(--red); }
 .btn:disabled { opacity: 0.5; }
@@ -284,7 +296,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .avatar-grid { display: grid; grid-template-columns: repeat(8, 52px); gap: 14px; }
 .avatar-option { position: relative; width: 52px; height: 52px; border-radius: 50%; cursor: pointer; }
 .avatar-option:has(input:checked) .avatar { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--text); }
-.avatar-option:has(input:focus-visible) { outline: 2px solid var(--muted); outline-offset: 8px; }
+.avatar-option:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 8px; }
 .avatar-check {
   position: absolute; right: -4px; bottom: -4px; width: 20px; height: 20px; display: grid; place-items: center;
   border-radius: 50%; background: var(--text); color: var(--surface); box-shadow: 0 0 0 2px var(--surface);
@@ -313,7 +325,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
   width: 100%; resize: none; border: 0; outline: none; background: transparent;
   font-size: 17px; line-height: 1.5; min-height: 28px;
 }
-.composer textarea::placeholder { color: #7a7a7a; }
+.composer textarea::placeholder { color: var(--muted); }
 .composer-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .composer-controls { flex: 1; display: flex; gap: 4px; flex-wrap: wrap; margin-left: -8px; }
 .composer-row:not(:has(.composer-controls)) { justify-content: flex-end; }
@@ -322,17 +334,9 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .composer.compact textarea { flex: 1; font-size: 15px; padding: 7px 0; min-height: 0; }
 .composer.compact .composer-row { margin-top: 0; }
 .composer.compact .send-btn { width: 34px; height: 34px; }
-.select select {
-  appearance: none; background: transparent; border: 0; border-radius: 8px;
-  padding: 6px 26px 6px 10px; color: #cfcfcf; font-size: 14px; cursor: pointer;
-  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
-  background-position: calc(100% - 13px) 55%, calc(100% - 9px) 55%;
-  background-size: 4px 4px; background-repeat: no-repeat;
-}
-.select option { background: var(--surface); }
 .send-btn {
   width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
-  border: 1.5px solid #6a6a6a; color: var(--text); flex-shrink: 0;
+  border: 1.5px solid var(--border-focus); color: var(--text); flex-shrink: 0;
 }
 
 /* ---- workspace: terminal panels (dockview + xterm) ---- */
@@ -355,7 +359,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
   --dv-inactivegroup-hiddenpanel-tab-background-color: var(--sidebar);
   --dv-activegroup-visiblepanel-tab-color: var(--text);
   --dv-activegroup-hiddenpanel-tab-color: var(--muted);
-  --dv-inactivegroup-visiblepanel-tab-color: #bdbdbd;
+  --dv-inactivegroup-visiblepanel-tab-color: var(--text-2);
   --dv-inactivegroup-hiddenpanel-tab-color: var(--muted);
   --dv-separator-border: var(--border);
   --dv-tab-divider-color: var(--border);
@@ -375,7 +379,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .dock .dv-split-view-container.dv-vertical > .dv-sash-container > .dv-sash { height: var(--gutter-h); transform: translateY(2px); }
 .panel-tab { display: flex; align-items: center; gap: 8px; height: 100%; max-width: 240px; padding: 0 6px 0 12px; font-size: 13px; }
 .tab-close {
-  display: grid; place-items: center; width: 20px; height: 20px; border-radius: 5px;
+  display: grid; place-items: center; width: 20px; height: 20px; border-radius: 6px;
   color: var(--muted); flex-shrink: 0; opacity: 0;
 }
 .dv-tab:hover .tab-close, .dv-active-tab .tab-close, .tab-close:focus-visible { opacity: 1; }
@@ -400,7 +404,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
   box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
 }
 .menu button {
-  display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px;
+  display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px;
   font-size: 14px; text-align: left; color: var(--text);
 }
 .menu button:focus-visible { background: var(--hover); outline: none; }
@@ -447,7 +451,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 /* ---- login ---- */
 .login { height: 100%; display: grid; place-items: center; padding: 16px; }
 .login-card { width: min(380px, 100%); display: flex; flex-direction: column; gap: 14px; }
-.login-card h1 { font-size: 28px; font-weight: 600; }
+.login-card h1 { font-size: 28px; }
 
 /* ---- desktop: collapsed sidebar shows an icon rail ---- */
 @media (min-width: 861px) {
@@ -458,7 +462,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
      keep their height. The add-project button matches the nav items so the icons form one evenly
      spaced column (it moves up because the "Projects" heading is hidden). */
   .sidebar.rail .section-head { padding-top: 2px; padding-bottom: 0; }
-  .sidebar.rail :is(.brand, .section-head) .icon-btn { width: 100%; border-radius: 10px; color: #cfcfcf; }
+  .sidebar.rail :is(.brand, .section-head) .icon-btn { width: 100%; border-radius: 10px; color: var(--text-2); }
   .sidebar.rail .section-head .icon-btn { height: 40px; }
   .sidebar.rail :is(.brand, .section-head) .icon-btn:hover { color: var(--text); }
   .sidebar.rail :is(.brand, .section-head) .icon-btn svg { width: var(--icon); height: var(--icon); }
@@ -506,7 +510,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
   border-radius: 8px; background: var(--surface); color: var(--muted);
 }
 .sp-search:focus-within { box-shadow: 0 0 0 1px var(--border-strong); }
-.sp-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: 13.5px; color: var(--text); }
+.sp-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: 13px; color: var(--text); }
 .sp-search input::placeholder { color: var(--muted); }
 .sp-search input::-webkit-search-cancel-button { filter: invert(0.6); }
 .sp-list-head .icon-btn { width: 32px; height: 32px; }
@@ -536,7 +540,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-message:first-child .sp-stamp { margin-top: 0; }
 .sp-bubble {
   margin: 0; max-width: min(560px, 85%); padding: 9px 14px; border-radius: 18px; background: var(--surface-2);
-  font-size: 14.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere;
+  font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 /* Replies read like a document (no bubble), as in ChatGPT and Claude; rails' own notices sit in the middle. */
 .sp-message.sprocket { align-items: flex-start; }
@@ -563,7 +567,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-thinking { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; color: var(--muted); font-size: 14px; }
 .sp-project {
   max-width: 40%; padding: 2px 9px; border: 1px solid var(--border-strong); border-radius: 999px;
-  color: var(--muted); font-size: 12.5px;
+  color: var(--muted); font-size: 12px;
 }
 .sp-compose { width: 100%; max-width: 800px; margin: 0 auto; padding: 0 20px 20px; display: flex; flex-direction: column; gap: 8px; }
 
@@ -577,14 +581,14 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-row-picker { border: 0; padding: 0; margin: 0; min-width: 0; max-width: 520px; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .sp-pick { position: relative; display: grid; place-items: center; border-radius: 12px; cursor: pointer; }
 .sp-pick input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
-.sp-pick:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
+.sp-pick:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* Colours: round swatches; the chosen one gets a ring. */
 .swatch .sp-pick { width: 36px; height: 36px; border-radius: 50%; }
 .sp-swatch { width: 26px; height: 26px; border-radius: 50%; }
 .swatch .sp-pick:has(input:checked) { box-shadow: 0 0 0 2px var(--text); }
 /* Accessories and shapes: thumbnails in a box; the chosen one gets a border. */
 .thumb .sp-pick { width: 50px; height: 50px; border: 1px solid transparent; }
-.thumb .sp-pick:has(input:checked) { border-color: var(--selected); background: var(--surface-2); }
+.thumb .sp-pick:has(input:checked) { border-color: var(--focus); background: var(--surface-2); }
 .sp-none { color: var(--muted); }
 .sp-name { width: 100%; max-width: 360px; margin-top: 12px; }
 /* Name ideas slide up through the empty field, one every 2.6s (IDEA_MS in SprocketCreator.tsx). */
@@ -635,9 +639,9 @@ textarea.input { resize: vertical; line-height: 1.5; }
   .project-row .icon-btn:hover { background: var(--border-strong); }
   .icon-btn:hover, .tab-close:hover { background: var(--hover); color: var(--text); }
   .account-row:hover, .settings-tab:hover:not([aria-selected="true"]), .settings-result:hover { background: var(--hover); }
-  .btn:hover:not(:disabled), button.chip:hover, .menu button:hover:not(:disabled), .select select:hover { background: var(--hover); }
+  .btn:hover:not(:disabled), button.chip:hover, .menu button:hover:not(:disabled), .dropdown.plain:hover:not(:disabled) { background: var(--hover); }
   .btn.primary:hover:not(:disabled) { background: #fff; }
-  .send-btn:hover:not(:disabled) { background: var(--accent); color: #111; border-color: var(--accent); }
+  .send-btn:hover:not(:disabled) { background: var(--primary); color: var(--bg); border-color: var(--primary); }
   .sp-row:hover, .thumb .sp-pick:hover, .sp-card-new:hover { background: var(--hover); }
   .sp-card:not(.sp-card-new):hover { background: var(--surface-2); border-color: var(--border-strong); }
 }

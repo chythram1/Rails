@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { IconCheck as Check, IconChevronDown as ChevronDown } from "@tabler/icons-react";
 import { usePopover } from "./Menu.tsx";
 
@@ -7,6 +7,9 @@ export interface DropdownOption {
   label: string;
   /** Options with a group are listed under its name (e.g. a model's provider). */
   group?: string;
+  /** Shown before the label, in the list and on the button (e.g. an agent's logo). */
+  icon?: ReactNode;
+  disabled?: boolean;
 }
 
 /** Long lists get a search field. */
@@ -16,7 +19,8 @@ const SEARCH_FROM = 10;
  * A select in the app's own style (ref/sprockets/stage2/dropdown.png shows the browser's, which doesn't
  * fit): a field-like button that opens a list in the popover menus use (usePopover), with a check on the
  * chosen option. Arrow keys move, Enter picks, Escape closes; long lists can be searched. Label it with a
- * <label htmlFor={id}>, as a native select.
+ * <label htmlFor={id}>, as a native select, or with `label` when there's no visible one. `plain` drops the
+ * field look, for a picker inside another control (the composer's project and agent).
  */
 export function Dropdown({
   id,
@@ -25,6 +29,8 @@ export function Dropdown({
   onChange,
   disabled,
   placeholder = "Choose…",
+  label,
+  plain,
 }: {
   id?: string;
   value: string;
@@ -32,6 +38,8 @@ export function Dropdown({
   onChange(value: string): void;
   disabled?: boolean;
   placeholder?: string;
+  label?: string;
+  plain?: boolean;
 }) {
   const { at, trigger, panel, close, toggle } = usePopover("left");
   const [query, setQuery] = useState("");
@@ -44,7 +52,7 @@ export function Dropdown({
     return q ? options.filter((o) => o.label.toLowerCase().includes(q) || o.group?.toLowerCase().includes(q)) : options;
   }, [options, query]);
 
-  const optionButtons = () => [...(list.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? [])];
+  const optionButtons = () => [...(list.current?.querySelectorAll<HTMLButtonElement>('[role="option"]:not(:disabled)') ?? [])];
 
   // On open: start at the chosen option (scrolled into view), or in the search field of a long list.
   useEffect(() => {
@@ -85,7 +93,8 @@ export function Dropdown({
         ref={trigger}
         id={id}
         type="button"
-        className="dropdown"
+        className={"dropdown" + (plain ? " plain" : "")}
+        aria-label={label && `${label}: ${selected?.label ?? placeholder}`}
         aria-haspopup="listbox"
         aria-expanded={!!at}
         disabled={disabled}
@@ -97,8 +106,9 @@ export function Dropdown({
           }
         }}
       >
+        {selected?.icon}
         <span className={"truncate" + (selected ? "" : " muted")}>{selected?.label ?? placeholder}</span>
-        <ChevronDown size={16} aria-hidden />
+        <ChevronDown size={plain ? 14 : 16} aria-hidden />
       </button>
       {at && (
         <div className="menu dropdown-menu" ref={panel} style={{ ...at, width: trigger.current?.offsetWidth }} onKeyDown={onKey}>
@@ -112,14 +122,22 @@ export function Dropdown({
               onKeyDown={(e) => e.key === "Enter" && shown[0] && pick(shown[0])}
             />
           )}
-          <div className="dropdown-list" role="listbox" ref={list} aria-labelledby={id}>
+          <div className="dropdown-list" role="listbox" ref={list} aria-labelledby={label ? undefined : id} aria-label={label}>
             {shown.map((o) => {
               const heading = o.group && o.group !== lastGroup ? o.group : undefined;
               lastGroup = o.group;
               return (
                 <div key={o.value} role="presentation">
                   {heading && <div className="menu-heading">{heading}</div>}
-                  <button type="button" role="option" aria-selected={o.value === value} className={o.value === value ? "active" : undefined} onClick={() => pick(o)}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={o.value === value}
+                    disabled={o.disabled}
+                    className={o.value === value ? "active" : undefined}
+                    onClick={() => pick(o)}
+                  >
+                    {o.icon}
                     <span className="truncate">{o.label}</span>
                     {o.value === value && <Check size={15} className="dropdown-check" aria-hidden />}
                   </button>

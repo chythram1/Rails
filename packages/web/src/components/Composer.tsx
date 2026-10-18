@@ -63,18 +63,3 @@ export function Composer({ placeholder, onSubmit, disabled, disabledReason, auto
     </form>
   );
 }
-
-export function Select<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string; disabled?: boolean }[]; onChange(v: T): void }) {
-  return (
-    <label className="select">
-      <span className="sr-only">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value as T)}>
-        {options.map((o) => (
-          <option key={o.value} value={o.value} disabled={o.disabled}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
