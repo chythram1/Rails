@@ -19,8 +19,9 @@ Decisions:
   their only way out.
 - **Capabilities** (`harness/`) are plain server functions with a TypeBox schema, an optional output schema
   (structured results, else text) and an effect, `read` or `act`. Arguments are checked like pi checks a tool
-  call (pi-ai's `validateToolArguments`). Every limit lives in these functions, never in the script: the
-  Sprocket's project only, size caps, and at most 10 changes (`act` calls) per run, counted across its scripts.
+  call (pi-ai's `validateToolArguments`). Every limit lives on the server, never in the script: the capability
+  functions keep to the Sprocket's project and cap sizes, and the codemode runner allows at most 10 changes
+  (`act` calls) per run, counted across its scripts.
 - **What differs from pi**, because Sprockets run unattended inside the Rails server: a 60 s default deadline
   (120 s at most), a 128 MB heap, at most 2 scripts at once, no images or tool search, output trimmed instead of
   saved to a file, and the store kept per Sprocket and cleared when it moves to another project (like its chat).

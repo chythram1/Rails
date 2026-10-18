@@ -6,7 +6,7 @@ import { models, refOf } from "./models.ts";
 import { CORE_MEMORY_MAX, editMemory } from "./harness/memory.ts";
 import { idle, onActivity, onTyping, readableError } from "./runs.ts";
 import { sprocketMessages } from "./db.ts";
-import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings } from "./sprockets.ts";
+import { createSprocket, deleteSprocket, detachFromProject, listMessages, listSprockets, sendMessage, updateSettings } from "./sprockets.ts";
 
 // A scripted model stands in for a real provider.
 const faux = fauxProvider();
@@ -81,6 +81,22 @@ describe("runs", () => {
     await idle();
     // The faux model gets the system prompt as a message of its own.
     expect(seen).toEqual(["system", "user", "assistant", "toolResult: the board says: all idle", "assistant", "user"]);
+  });
+
+  it("doesn't let a run put back the store of a project the Sprocket left while it ran", async () => {
+    const s = sprocket();
+    const p = projects.create("app", "/work/store-" + s.id);
+    updateSettings(s.id, { projectId: p.id });
+    faux.setResponses([
+      () => {
+        detachFromProject(p.id); // the project is removed from Rails while the run goes on (moving it is refused then)
+        return fauxAssistantMessage([fauxToolCall("codemode", { code: 'store("seen", ["a.ts"])' })], { stopReason: "toolUse" });
+      },
+      fauxAssistantMessage("Done."),
+    ]);
+    sendMessage(s.id, "look around");
+    await idle();
+    expect(sprockets.codemodeStore(s.id)).toEqual({});
   });
 
   it("stops a run that keeps calling tools", async () => {

@@ -127,10 +127,9 @@ async function run(id: string) {
   const project = s.projectId ? projects.get(s.projectId) : undefined;
   // The chat, with the tool work behind the most recent replies put back in front of them.
   const recent = history.slice(-HISTORY);
-  const saved = sprocketMessages.steps(id);
-  const replayed = new Set(recent.filter((m) => saved.has(m.id)).slice(-REPLAYED).map((m) => m.id));
+  const replayed = sprocketMessages.recentSteps(id, REPLAYED);
   const context: Message[] = recent.flatMap((m) => [
-    ...((replayed.has(m.id) ? saved.get(m.id) : []) as Message[]),
+    ...((replayed.get(m.id) ?? []) as Message[]),
     toLlm(m.author, m.text, model, Date.parse(m.createdAt)),
   ]);
   // One tool (ADR 0008): the model writes scripts that call the Sprocket's capabilities.
@@ -144,7 +143,8 @@ async function run(id: string) {
   };
   const code = codemodeTool(capabilities, { sprocketId: id, project }, {
     store: () => sprockets.codemodeStore(id),
-    saveStore: (writes) => sprockets.saveCodemodeStore(id, writes),
+    // Moving to another project clears the store (it belonged there): a script that was running then mustn't put it back.
+    saveStore: (writes) => sprockets.get(id)?.projectId === s.projectId && sprockets.saveCodemodeStore(id, writes),
     onCallStart: (capability, args) => {
       going.push({ capability, args });
       report();

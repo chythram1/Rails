@@ -280,9 +280,11 @@ export const sprocketMessages = {
     );
     return m;
   },
-  /** The stored tool steps of a Sprocket's replies, by message id. */
-  steps(sprocketId: string): Map<string, unknown[]> {
-    const rows = db.prepare("SELECT id, steps FROM sprocket_messages WHERE sprocket_id = ? AND steps IS NOT NULL").all(sprocketId) as { id: string; steps: string }[];
+  /** The stored tool steps of the `limit` latest replies of a Sprocket that have them, by message id. */
+  recentSteps(sprocketId: string, limit: number): Map<string, unknown[]> {
+    const rows = db
+      .prepare("SELECT id, steps FROM sprocket_messages WHERE sprocket_id = ? AND steps IS NOT NULL ORDER BY created_at DESC, rowid DESC LIMIT ?")
+      .all(sprocketId, limit) as { id: string; steps: string }[];
     return new Map(rows.map((r) => [r.id, JSON.parse(r.steps)]));
   },
 };

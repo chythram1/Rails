@@ -57,9 +57,13 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
   const { shown, fresh } = useRevealedText(reveal?.text ?? "", reveal?.live === true);
   const scroll = useThreadScroll(thread, spacer, sprocket.running, [messages, reveal?.id, shown, sprocket.running, activity.summary]);
 
+  /** Loads overlap (the first one, every `sprockets.changed`, StrictMode's second run): only the latest applies. */
+  const loads = useRef(0);
   const load = useCallback(async () => {
+    const n = ++loads.current;
     try {
       const list = await api.sprocketMessages(id);
+      if (n !== loads.current) return; // a newer load is on its way, and an older answer would undo it
       // A reply that wasn't here before (it just finished, or arrived whole) is revealed, carrying on
       // from where the written-out text got to.
       const known = seen.current;
@@ -69,7 +73,7 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
       setMessages(list);
       setLoadError("");
     } catch (e: any) {
-      setLoadError(e.message);
+      if (n === loads.current) setLoadError(e.message);
     }
   }, [id]);
 
