@@ -23,7 +23,7 @@ export type SessionEvent =
   | { kind: "ended" };
 
 /** Longest text kept from a prompt or a final message. Agents report what they like, so every field is bounded. */
-export const MAX_TEXT = 2000;
+const MAX_TEXT = 2000;
 /** Most files kept from one tool use. */
 export const MAX_FILES = 20;
 const clip = (s: unknown, max = MAX_TEXT) => {

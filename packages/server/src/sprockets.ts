@@ -16,14 +16,15 @@ import { projects, sprocketMessages, sprockets } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { findModel } from "./models.ts";
 import { isRunning, onRunsChanged, requestReply, userMessageTime } from "./runs.ts";
+import { listeners } from "./util.ts";
 
 const MAX_NAME = 40;
 const MAX_MESSAGE = 4000;
 
 // ---- change notifications (the terminal hub forwards these to every browser) ----
-const listeners = new Set<() => void>();
-export const onSprocketsChanged = (fn: () => void) => listeners.add(fn);
-const changed = () => listeners.forEach((fn) => fn());
+const sprocketChanges = listeners();
+export const onSprocketsChanged = sprocketChanges.on;
+const changed = sprocketChanges.emit;
 onRunsChanged(changed);
 
 const isOneOf = <T extends string>(list: readonly T[], v: unknown): v is T => list.includes(v as T);

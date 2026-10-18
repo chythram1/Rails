@@ -9,6 +9,7 @@ import { ServiceError } from "./errors.ts";
 import { getProject } from "./projects.ts";
 import { discovery, findSession, installed } from "./providers/index.ts";
 import * as tmux from "./tmux.ts";
+import { listeners } from "./util.ts";
 
 /**
  * The user's login shell from their account. Not $SHELL: shells like `nix develop` set it to their own
@@ -54,9 +55,9 @@ function newCommand(kind: PanelKind, prompt: string | undefined): { argv: string
 }
 
 // ---- change notifications (the terminal hub forwards these to every browser) ----
-const listeners = new Set<(projectId: string) => void>();
-export const onPanelsChanged = (fn: (projectId: string) => void) => listeners.add(fn);
-const changed = (projectId: string) => listeners.forEach((fn) => fn(projectId));
+const panelChanges = listeners<[projectId: string]>();
+export const onPanelsChanged = panelChanges.on;
+const changed = panelChanges.emit;
 
 // Codex picks a new session's id itself; the bridge learns it from Codex's daemon (bridge/codex.ts).
 onCodexSession((panelId, threadId) => {

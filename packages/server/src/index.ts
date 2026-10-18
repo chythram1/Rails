@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,6 +23,7 @@ import { cancelSignIn, modelSettings, removeCredential, setApiKey, setDefaultMod
 import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets.ts";
 import { TerminalHub } from "./terminals.ts";
 import { version as tmuxVersion } from "./tmux.ts";
+import { sameSecret } from "./util.ts";
 
 const COOKIE = "rails_token";
 const hub = new TerminalHub();
@@ -43,12 +43,7 @@ app.onError((err, c) => {
 const setLoginCookie = (c: Context, token: string) =>
   setCookie(c, COOKIE, token, { httpOnly: true, sameSite: "Lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
 
-const tokenOk = (t: string | undefined) => {
-  if (!t) return false;
-  const a = Buffer.from(t);
-  const b = Buffer.from(accessToken());
-  return a.length === b.length && timingSafeEqual(a, b);
-};
+const tokenOk = (t: string | undefined) => sameSecret(t, accessToken());
 
 /**
  * Whether a browser request comes from the rails page itself. Cookies are shared by every port of a

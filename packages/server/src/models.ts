@@ -16,6 +16,7 @@ import { fileCredentialStore } from "./credentials.ts";
 import { settings } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { signInWithChatGPT, signInWithOpenRouter, type PendingSignIn } from "./signin.ts";
+import { listeners } from "./util.ts";
 
 /**
  * The providers offered, in display order, and the ones users may sign in to. Anthropic's own sign-in
@@ -45,12 +46,12 @@ for (const o of OFFERED) {
   if (o.signIn && p.auth.oauth) signInLabels.set(p.id, o.signIn);
 }
 
-const listeners = new Set<() => void>();
-export const onModelsChanged = (fn: () => void) => listeners.add(fn);
-const changed = () => listeners.forEach((fn) => fn());
+const modelChanges = listeners();
+export const onModelsChanged = modelChanges.on;
+const changed = modelChanges.emit;
 
-const signInListeners = new Set<(s: SignIn) => void>();
-export const onSignIn = (fn: (s: SignIn) => void) => signInListeners.add(fn);
+const signInChanges = listeners<[signIn: SignIn]>();
+export const onSignIn = signInChanges.on;
 
 function provider(id: string): Provider {
   const p = models.getProvider(id);
@@ -160,7 +161,7 @@ let active: Active | undefined;
 
 function update(a: Active, patch: Partial<SignIn>) {
   a.signIn = { ...a.signIn, ...patch };
-  signInListeners.forEach((fn) => fn(a.signIn));
+  signInChanges.emit(a.signIn);
 }
 
 /** `fresh`: sign in to a different account than last time (ChatGPT registers Rails again). */

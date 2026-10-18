@@ -11,11 +11,11 @@ import { fileURLToPath } from "node:url";
 import type { PanelKind } from "@rails/shared";
 import { PORT } from "../config.ts";
 
-export const PI_EXTENSION = join(dirname(fileURLToPath(import.meta.url)), "pi", "rails.ts");
+const PI_EXTENSION = join(dirname(fileURLToPath(import.meta.url)), "pi", "rails.ts");
 
 const CLAUDE_HOOKS = ["UserPromptSubmit", "PostToolUse", "PermissionRequest", "Notification", "Stop", "StopFailure", "SessionEnd"] as const;
 
-export function claudeSettings(panelId: string): string {
+function claudeSettings(panelId: string): string {
   const url = (hook: string) => `http://127.0.0.1:${PORT}/bridge/${panelId}/claude/${hook}`;
   const http = (hook: string) => ({
     type: "http",

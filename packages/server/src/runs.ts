@@ -7,6 +7,7 @@ import { CORE_MEMORY_MAX } from "@rails/shared";
 import { projectTools } from "./bridge/tools.ts";
 import { projects, settings, sprocketMessages, sprockets } from "./db.ts";
 import { findModel, models } from "./models.ts";
+import { listeners } from "./util.ts";
 
 /** Model calls in one run (each round of tool calls is one). */
 const MAX_STEPS = 12;
@@ -26,13 +27,13 @@ const recent = new Map<string, number[]>();
 /** When each running Sprocket's run started (ms). Its reply is dated then. */
 const runStart = new Map<string, number>();
 
-const changeListeners = new Set<() => void>();
-const typingListeners = new Set<(sprocketId: string, text: string | null) => void>();
+const runChanges = listeners();
+const typingChanges = listeners<[sprocketId: string, text: string | null]>();
 /** Something visible changed: a run started or ended, a message or the core memory was written. */
-export const onRunsChanged = (fn: () => void) => changeListeners.add(fn);
-export const onTyping = (fn: (sprocketId: string, text: string | null) => void) => typingListeners.add(fn);
-const changed = () => changeListeners.forEach((fn) => fn());
-const typing = (id: string, text: string | null) => typingListeners.forEach((fn) => fn(id, text));
+export const onRunsChanged = runChanges.on;
+export const onTyping = typingChanges.on;
+const changed = runChanges.emit;
+const typing = typingChanges.emit;
 
 export const isRunning = (sprocketId: string) => running.has(sprocketId);
 
@@ -175,7 +176,7 @@ function toLlm(author: "user" | "sprocket" | "notice", text: string, model: Mode
   } as AssistantMessage;
 }
 
-export function systemPrompt(name: string, projectName: string | undefined, coreMemory: string): string {
+function systemPrompt(name: string, projectName: string | undefined, coreMemory: string): string {
   return [
     `You are ${name}, a Sprocket: a small always-on helper inside Rails. Rails runs coding agents (Claude Code, Codex and pi) in terminal panels, grouped by project, and Sprockets help the user keep track of that work.`,
     projectName
@@ -198,7 +199,7 @@ const rememberParams = Type.Object({
 });
 
 /** Edits the Sprocket's core memory, within CORE_MEMORY_MAX. */
-export function rememberTool(sprocketId: string): AgentTool<typeof rememberParams> {
+function rememberTool(sprocketId: string): AgentTool<typeof rememberParams> {
   return {
     name: "remember",
     label: "Remember",

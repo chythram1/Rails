@@ -45,7 +45,6 @@ h1, h2 { font-weight: 500; margin: 0; }
 button.link { padding: 0; border: 0; background: none; color: var(--text); font-size: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .grow { flex: 1; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.pre { white-space: pre-wrap; }
 .pad { padding: 12px 16px; }
 .indent { padding: 2px 0 6px 34px; }
 .error { color: var(--red); font-size: 14px; }

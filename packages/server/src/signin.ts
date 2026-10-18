@@ -153,7 +153,7 @@ const OPENAI_AUTHORIZE = "https://auth.openai.com/api/accounts/authorize";
 const OPENAI_TOKEN = "https://auth.openai.com/api/accounts/oauth/token";
 const OPENAI_RESOURCE = "https://api.openai.com/v1";
 /** OpenAI only accepts this redirect, so the port is fixed (the Codex CLI and pi use it too). */
-export const CHATGPT_PORT = 1455;
+const CHATGPT_PORT = 1455;
 const PLAN_SCOPE = "chatgpt.tokens.use.direct";
 /** Treat tokens as expired this long before they are, so a request never starts with one about to lapse. */
 const EXPIRY_MARGIN_MS = 3 * 60_000;

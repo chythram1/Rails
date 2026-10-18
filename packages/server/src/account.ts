@@ -8,16 +8,17 @@ import type { ServerInfo } from "@rails/shared";
 import { HOST, PORT, rotateToken, TOKEN_FROM_ENV } from "./config.ts";
 import { ServiceError } from "./errors.ts";
 import * as tmux from "./tmux.ts";
+import { listeners } from "./util.ts";
 
-const listeners = new Set<() => void>();
+const signedOut = listeners();
 /** The token was replaced: open connections signed in with the old one should go. */
-export const onSignedOutEverywhere = (fn: () => void) => listeners.add(fn);
+export const onSignedOutEverywhere = signedOut.on;
 
 /** Replace the access token. Returns the new one, for the device that asked. */
 export function signOutEverywhere(): string {
   if (TOKEN_FROM_ENV) throw new ServiceError("The access token is set with RAILS_TOKEN, so Rails can't replace it.", 409);
   const token = rotateToken();
-  listeners.forEach((fn) => fn());
+  signedOut.emit();
   return token;
 }
 
