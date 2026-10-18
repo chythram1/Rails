@@ -23,6 +23,7 @@ import { getProfile, updateProfile } from "./profile.ts";
 import { cancelSignIn, modelSettings, removeCredential, setApiKey, setDefaultModel, startSignIn, submitSignInCode } from "./models.ts";
 import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets.ts";
 import { TerminalHub } from "./terminals.ts";
+import { startWatches } from "./watches.ts";
 import { version as tmuxVersion } from "./tmux.ts";
 import { sameSecret } from "./util.ts";
 
@@ -216,6 +217,7 @@ if (existsSync(webDist)) {
 
 // ---- server + websocket ----
 loadAttention(panels.all());
+startWatches(); // Coordinators hear about sessions that wait for the user
 watchCodex(panels.all()); // Codex panels that survived a restart
 
 void tmuxVersion().then((v) => {

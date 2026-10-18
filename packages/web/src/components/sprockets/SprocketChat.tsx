@@ -8,6 +8,7 @@ import { Composer } from "../Composer.tsx";
 import { MenuButton } from "../Menu.tsx";
 import { useStore } from "../../store.tsx";
 import { Sprocket } from "./Sprocket.tsx";
+import { EventRow } from "./EventRow.tsx";
 import { MessageActions } from "./MessageActions.tsx";
 import { Revealed, useRevealedText } from "./revealText.tsx";
 import { useThreadScroll } from "./threadScroll.ts";
@@ -31,7 +32,8 @@ function stamp(iso: string): string {
 /**
  * A Sprocket's chat (ADR 0005, 0006). The thread opens with the Sprocket itself (as Dot, Pi and hilos
  * do), and time labels break it up where there are gaps. The user's messages sit on the right, replies on
- * the left, and rails' own notices (no model yet, errors) in the middle. A reply shows as it's written.
+ * the left, and rails' own notices (no model yet, errors) in the middle. A Coordinator's chat also has the
+ * sessions that waited for the user (EventRow). A reply shows as it's written.
  */
 export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; panelOpen: boolean }) {
   const { id, name } = sprocket;
@@ -185,21 +187,25 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
                 <li key={m.id + i} className={"sp-message " + m.author}>
                   {label && <time className="sp-stamp" dateTime={m.createdAt}>{stamp(m.createdAt)}</time>}
                   {m.activity && <p className="sp-steps">{m.activity}</p>}
-                  <p className="sp-bubble">
-                    {m.author === "sprocket" && <span className="sr-only">{name}: </span>}
-                    {m.id === reveal?.id ? (
-                      <>
-                        {/* Screen readers get the whole reply once, not every revealed piece. */}
-                        <span className="sr-only">{m.text}</span>
-                        <span aria-hidden>
-                          <Revealed text={m.text} shown={shown} fresh={fresh} />
-                        </span>
-                      </>
-                    ) : (
-                      m.text
-                    )}
-                  </p>
-                  {m.author !== "notice" && <MessageActions text={m.text} at={m.createdAt} now={now} reply={m.author === "sprocket"} />}
+                  {m.event ? (
+                    <EventRow message={m} projectId={sprocket.projectId} name={name} />
+                  ) : (
+                    <p className="sp-bubble">
+                      {m.author === "sprocket" && <span className="sr-only">{name}: </span>}
+                      {m.id === reveal?.id ? (
+                        <>
+                          {/* Screen readers get the whole reply once, not every revealed piece. */}
+                          <span className="sr-only">{m.text}</span>
+                          <span aria-hidden>
+                            <Revealed text={m.text} shown={shown} fresh={fresh} />
+                          </span>
+                        </>
+                      ) : (
+                        m.text
+                      )}
+                    </p>
+                  )}
+                  {m.author !== "notice" && <MessageActions text={m.text} at={m.createdAt} now={now} reply={m.author !== "user"} />}
                 </li>
               );
             })}

@@ -128,6 +128,11 @@ export interface Sprocket {
    * Muse's and Hermes' identity files). Stays with it across projects. Its core memory is internal.
    */
   description: string;
+  /**
+   * Whether it's its project's Coordinator: the one Sprocket Rails wakes when a session there waits for the
+   * user (step 3). At most one per project.
+   */
+  coordinator: boolean;
   /** True while it's working on a reply. */
   running: boolean;
   /** The newest message in its chat, for the list preview. */
@@ -142,6 +147,8 @@ export interface SprocketSettings {
   projectId?: string | null;
   model?: string | null;
   description?: string;
+  /** Make it its project's Coordinator (taking over from any other), or stop. Needs a project. */
+  coordinator?: boolean;
 }
 
 /** Body of "create a Sprocket" and "edit a Sprocket". */
@@ -150,8 +157,31 @@ export interface SprocketInput {
   look: SprocketLook;
 }
 
-/** Who wrote a chat message: the user, the Sprocket, or rails itself (setup hints and errors). */
-export type SprocketAuthor = "user" | "sprocket" | "notice";
+/**
+ * Who wrote a chat message: the user, the Sprocket, Rails itself (setup hints and errors), or a session
+ * event Rails woke a Coordinator with.
+ */
+export type SprocketAuthor = "user" | "sprocket" | "notice" | "event";
+
+/** A question a session asked the user in a dialog (Claude Code's AskUserQuestion, a pi question tool). */
+export interface SessionQuestion {
+  question: string;
+  options: string[];
+}
+
+/** What woke a Coordinator: a session in its project is waiting for the user. */
+export interface SprocketEvent {
+  panelId: string;
+  kind: PanelKind;
+  /** The panel's title then. */
+  title: string;
+  sessionId?: string;
+  /** It asked in a dialog (or a form), or it ended its turn with what looks like a question. */
+  what: "question" | "turn_end";
+  questions?: SessionQuestion[];
+  /** The Coordinator looked and decided the user needn't hear about it. */
+  quiet?: boolean;
+}
 
 /** One message in a Sprocket's chat. */
 export interface SprocketMessage {
@@ -162,6 +192,8 @@ export interface SprocketMessage {
   createdAt: string;
   /** On a reply: what the Sprocket looked at or did for it ("Looked at the board and read src/api.ts"). */
   activity?: string;
+  /** On an event: which session, and what it's waiting for. `text` is the end of its message. */
+  event?: SprocketEvent;
 }
 
 // ---- Settings ----

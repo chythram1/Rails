@@ -40,18 +40,28 @@ export function cardOf(panel: Panel): SessionCard {
   return foldCard(panel, sessionEvents.list(panel.id));
 }
 
+const recorded = listeners<[panel: Panel, events: SessionEvent[]]>();
+/** A panel reported events (after they're stored). Sprocket watches follow sessions through this. */
+export const onEvents = recorded.on;
+
 /** Record events from a panel and update what depends on them. */
 export function record(panelId: string, events: SessionEvent[], sessionId?: string): void {
   const panel = panels.get(panelId);
   if (!panel || !events.length) return;
   for (const e of events) sessionEvents.add(panelId, sessionId ?? (e.kind === "start" ? e.sessionId : undefined), e);
   setAttention(panelId, attentionOf(cardOf(panel)));
+  recorded.emit(panel, events);
 }
+
+const forgotten = listeners<[panelId: string]>();
+/** A panel closed. */
+export const onPanelForgotten = forgotten.on;
 
 /** A panel closed: forget what it reported. */
 export function forgetPanel(panelId: string): void {
   sessionEvents.removePanel(panelId);
   setAttention(panelId, undefined);
+  forgotten.emit(panelId);
 }
 
 /** Rebuild attention after a restart, from what's stored. */

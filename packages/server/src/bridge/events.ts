@@ -3,6 +3,7 @@
 // notifications); these pure functions turn those reports into SessionEvents. Unknown reports become
 // nothing: agents add events over time, and the board only needs these.
 import { isAbsolute, join } from "node:path";
+import type { SessionQuestion } from "@rails/shared";
 
 export type SessionEvent =
   /** The agent started (or resumed) a session. `inbox` is Claude Code's message socket, for step 3. */
@@ -11,8 +12,8 @@ export type SessionEvent =
   | { kind: "prompt"; text: string }
   /** The agent used a tool. `files` are absolute paths it read or changed; `command` a shell command. */
   | { kind: "tool"; tool: string; files: string[]; edit: boolean; command?: string }
-  /** The agent is waiting for the user: a permission, a question, a form. */
-  | { kind: "waiting"; reason: string }
+  /** The agent is waiting for the user: a permission, a question, a form. `questions` when it asked in a dialog. */
+  | { kind: "waiting"; reason: string; questions?: SessionQuestion[] }
   /** The wait is over (answered or dismissed). */
   | { kind: "resumed" }
   /** The agent finished its turn. `text` is its last message. */
@@ -30,6 +31,25 @@ const clip = (s: unknown, max = MAX_TEXT) => {
   const t = typeof s === "string" ? s.trim() : "";
   return t.length > max ? t.slice(0, max) + "…" : t;
 };
+/** A final message keeps its start and its end: a closing question is what says the session waits for the user. */
+const HEAD = 500;
+const clipEnds = (s: unknown) => {
+  const t = typeof s === "string" ? s.trim() : "";
+  return t.length > MAX_TEXT ? `${t.slice(0, HEAD)}\n…\n${t.slice(t.length - (MAX_TEXT - HEAD))}` : t;
+};
+
+/** Questions from a question tool's input (Claude Code's AskUserQuestion, pi's ask_user_question), bounded. */
+function questionsOf(input: any): SessionQuestion[] | undefined {
+  if (!Array.isArray(input?.questions)) return undefined;
+  const list = input.questions
+    .slice(0, 4)
+    .map((q: any) => ({
+      question: clip(q?.question, 300),
+      options: (Array.isArray(q?.options) ? q.options : []).slice(0, 6).map((o: any) => clip(typeof o === "string" ? o : o?.label, 100)).filter(Boolean),
+    }))
+    .filter((q: SessionQuestion) => q.question);
+  return list.length ? list : undefined;
+}
 const abs = (cwd: string | undefined, p: unknown) => (typeof p !== "string" || !p ? [] : [clip(isAbsolute(p) || !cwd ? p : join(cwd, p), 500)]);
 const id = (v: unknown) => (typeof v === "string" ? v.slice(0, 200) : undefined);
 
@@ -46,7 +66,9 @@ export function fromClaude(hook: string, input: any, extra: { inbox?: string } =
       return [{ kind: "prompt", text: clip(input?.prompt) }];
     case "PreToolUse":
       // Only questions to the user reach here (the hook matcher), and they wait for an answer.
-      return input?.tool_name === "AskUserQuestion" ? [{ kind: "waiting", reason: "question" }] : [];
+      if (input?.tool_name !== "AskUserQuestion") return [];
+      const questions = questionsOf(input?.tool_input);
+      return [{ kind: "waiting", reason: "question", ...(questions ? { questions } : {}) }];
     case "PostToolUse": {
       const tool = clip(input?.tool_name, 100) || "tool";
       const ti = input?.tool_input ?? {};
@@ -66,7 +88,7 @@ export function fromClaude(hook: string, input: any, extra: { inbox?: string } =
       // Forms from MCP servers wait for the user; other notifications (idle reminders, auth) don't.
       return /^elicitation(_url)?_dialog$/.test(input?.notification_type ?? "") ? [{ kind: "waiting", reason: "a form" }] : [];
     case "Stop":
-      return [{ kind: "turn_end", text: clip(input?.last_assistant_message) }];
+      return [{ kind: "turn_end", text: clipEnds(input?.last_assistant_message) }];
     case "StopFailure":
       return [{ kind: "failed", error: clip(input?.error ?? input?.message ?? input?.error_type ?? "the turn failed", 300) }];
     case "SessionEnd":
@@ -90,6 +112,9 @@ export function fromPi(event: string, data: any): SessionEvent[] {
     case "tool": {
       const tool = clip(data?.tool, 100) || "tool";
       const input = data?.input ?? {};
+      // pi has no question tool of its own; extensions add them (ask_user_question and the like), with Claude's shape.
+      const questions = /question/i.test(tool) ? questionsOf(input) : undefined;
+      if (questions) return [{ kind: "waiting", reason: "question", questions }];
       return [
         {
           kind: "tool",
@@ -105,7 +130,7 @@ export function fromPi(event: string, data: any): SessionEvent[] {
     case "ui_prompt_end":
       return [{ kind: "resumed" }];
     case "agent_end":
-      return data?.error ? [{ kind: "failed", error: clip(data.error, 300) }] : [{ kind: "turn_end", text: clip(data?.text) }];
+      return data?.error ? [{ kind: "failed", error: clip(data.error, 300) }] : [{ kind: "turn_end", text: clipEnds(data?.text) }];
     case "session_shutdown":
       return [{ kind: "ended" }];
     default:
@@ -140,7 +165,7 @@ export function fromCodex(method: string, params: any): SessionEvent[] {
       const turn = params?.turn ?? {};
       if (turn.status === "failed") return [{ kind: "failed", error: clip(turn.error?.message ?? "the turn failed", 300) }];
       const final = [...(turn.items ?? [])].reverse().find((i: any) => i?.type === "agentMessage");
-      return [{ kind: "turn_end", text: clip(final?.text) }];
+      return [{ kind: "turn_end", text: clipEnds(final?.text) }];
     }
     case "thread/closed":
       return [{ kind: "ended" }];

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { Panel, PanelKind, Project, Sprocket, SprocketAuthor, SprocketLook, SprocketMessage } from "@rails/shared";
+import type { Panel, PanelKind, Project, Sprocket, SprocketAuthor, SprocketEvent, SprocketLook, SprocketMessage } from "@rails/shared";
 import { RAILS_HOME } from "./config.ts";
 
 const db = new DatabaseSync(join(RAILS_HOME, "rails.db"));
@@ -54,10 +54,14 @@ addColumn("sprockets", "model", "TEXT");
 addColumn("sprockets", "core_memory", "TEXT NOT NULL DEFAULT ''");
 addColumn("sprockets", "description", "TEXT NOT NULL DEFAULT ''");
 addColumn("sprockets", "codemode_store", "TEXT NOT NULL DEFAULT '{}'");
+/** 1 for its project's Coordinator (at most one per project). */
+addColumn("sprockets", "coordinator", "INTEGER NOT NULL DEFAULT 0");
 addColumn("sprocket_messages", "author", "TEXT NOT NULL DEFAULT 'user'");
 addColumn("sprocket_messages", "activity", "TEXT");
 /** On a reply: the run's tool calls and results (pi-ai messages, JSON), replayed to later runs. Never sent to browsers. */
 addColumn("sprocket_messages", "steps", "TEXT");
+/** On an event: the SprocketEvent, as JSON. */
+addColumn("sprocket_messages", "event", "TEXT");
 addColumn("panels", "bridge_token", "TEXT");
 db.exec(`
   CREATE TABLE IF NOT EXISTS session_events (
@@ -181,7 +185,17 @@ export const layouts = {
 };
 
 // Sprockets (ADR 0005, 0006). `look` is stored as JSON and validated by the service when read.
-type SprocketRow = { id: string; name: string; look: string; created_at: string; project_id: string | null; model: string | null; description: string; core_memory: string };
+type SprocketRow = {
+  id: string;
+  name: string;
+  look: string;
+  created_at: string;
+  project_id: string | null;
+  model: string | null;
+  description: string;
+  core_memory: string;
+  coordinator: number;
+};
 /** A stored Sprocket, with its internal core memory (never sent to browsers). */
 const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running"> & { look: unknown; coreMemory: string } => ({
   id: r.id,
@@ -191,6 +205,7 @@ const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running"> & { look
   projectId: r.project_id ?? undefined,
   model: r.model ?? undefined,
   description: r.description,
+  coordinator: r.coordinator === 1,
   coreMemory: r.core_memory,
 });
 
@@ -213,10 +228,26 @@ export const sprockets = {
   byProject(projectId: string) {
     return (db.prepare("SELECT * FROM sprockets WHERE project_id = ? ORDER BY created_at").all(projectId) as SprocketRow[]).map(toSprocket);
   },
-  /** Move to another project (or none). Its chat belongs to the old attachment, so it goes too. */
+  /** Move to another project (or none). Its chat and its role belong to the old attachment, so they go too. */
   setProject(id: string, projectId: string | null): void {
     db.prepare("DELETE FROM sprocket_messages WHERE sprocket_id = ?").run(id);
-    db.prepare("UPDATE sprockets SET project_id = ?, codemode_store = '{}' WHERE id = ?").run(projectId, id);
+    db.prepare("UPDATE sprockets SET project_id = ?, codemode_store = '{}', coordinator = 0 WHERE id = ?").run(projectId, id);
+  },
+  /** Make a Sprocket its project's Coordinator, taking over from any other, or stop. */
+  setCoordinator(id: string, on: boolean): void {
+    db.exec("BEGIN");
+    try {
+      if (on) db.prepare("UPDATE sprockets SET coordinator = 0 WHERE project_id = (SELECT project_id FROM sprockets WHERE id = ?)").run(id);
+      db.prepare("UPDATE sprockets SET coordinator = ? WHERE id = ? AND project_id IS NOT NULL").run(on ? 1 : 0, id);
+      db.exec("COMMIT");
+    } catch (e) {
+      db.exec("ROLLBACK");
+      throw e;
+    }
+  },
+  coordinatorOf(projectId: string) {
+    const r = db.prepare("SELECT * FROM sprockets WHERE project_id = ? AND coordinator = 1").get(projectId) as SprocketRow | undefined;
+    return r && toSprocket(r);
   },
   /** Values a Sprocket's scripts keep with store()/load() (harness/codemode.ts). They belong to its project, like its chat. */
   codemodeStore(id: string): Record<string, unknown> {
@@ -243,7 +274,7 @@ export const sprockets = {
   },
 };
 
-type MessageRow = { id: string; sprocket_id: string; author: SprocketAuthor; text: string; created_at: string; activity: string | null };
+type MessageRow = { id: string; sprocket_id: string; author: SprocketAuthor; text: string; created_at: string; activity: string | null; event: string | null };
 const toMessage = (r: MessageRow): SprocketMessage => ({
   id: r.id,
   sprocketId: r.sprocket_id,
@@ -251,6 +282,7 @@ const toMessage = (r: MessageRow): SprocketMessage => ({
   text: r.text,
   createdAt: r.created_at,
   ...(r.activity ? { activity: r.activity } : {}),
+  ...(r.event ? { event: JSON.parse(r.event) } : {}),
 });
 
 export const sprocketMessages = {
@@ -266,10 +298,10 @@ export const sprocketMessages = {
     author: SprocketAuthor,
     text: string,
     createdAt = new Date().toISOString(),
-    { activity, steps }: { activity?: string; steps?: unknown[] } = {},
+    { activity, steps, event }: { activity?: string; steps?: unknown[]; event?: SprocketEvent } = {},
   ): SprocketMessage {
-    const m: SprocketMessage = { id: randomUUID(), sprocketId, author, text, createdAt, ...(activity ? { activity } : {}) };
-    db.prepare("INSERT INTO sprocket_messages (id, sprocket_id, author, text, created_at, activity, steps) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
+    const m: SprocketMessage = { id: randomUUID(), sprocketId, author, text, createdAt, ...(activity ? { activity } : {}), ...(event ? { event } : {}) };
+    db.prepare("INSERT INTO sprocket_messages (id, sprocket_id, author, text, created_at, activity, steps, event) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(
       m.id,
       m.sprocketId,
       m.author,
@@ -277,8 +309,13 @@ export const sprocketMessages = {
       m.createdAt,
       activity ?? null,
       steps?.length ? JSON.stringify(steps) : null,
+      event ? JSON.stringify(event) : null,
     );
     return m;
+  },
+  /** Mark an event the Coordinator decided the user needn't hear about. */
+  setQuiet(id: string): void {
+    db.prepare("UPDATE sprocket_messages SET event = json_set(event, '$.quiet', json('true')) WHERE id = ? AND event IS NOT NULL").run(id);
   },
   /** The stored tool steps of the `limit` latest replies of a Sprocket that have them, by message id. */
   recentSteps(sprocketId: string, limit: number): Map<string, unknown[]> {

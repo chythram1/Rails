@@ -7,18 +7,21 @@ import { useStore } from "../../store.tsx";
 import { Dropdown } from "../Dropdown.tsx";
 import { ModelSelect, useModelSettings } from "../ModelSelect.tsx";
 import { useOpenSettings } from "../settings/context.ts";
+import { Switch } from "../Switch.tsx";
 import { Sprocket } from "./Sprocket.tsx";
 
 /**
  * A Sprocket's settings, in a panel beside its chat (ref/sprockets/stage2/chat2.png): its look and name,
- * its description, the project it's attached to and its model. Its core memory is its own business and
- * isn't shown. Moving it to another project deletes its
+ * its description, the project it's attached to, whether it's that project's Coordinator, and its model.
+ * Its core memory is its own business and isn't shown. Moving it to another project deletes its
  * chat there, so that asks first; its name, look and core memory stay. The panel has its own URL
  * (`#/sprockets/<id>/settings`), so the browser's back button closes it.
  */
-export function SprocketSettings({ sprocket }: { sprocket: SprocketData }) {
+export function SprocketSettings({ sprocket, all }: { sprocket: SprocketData; all: SprocketData[] }) {
   const { id, name } = sprocket;
   const { projects } = useStore();
+  const project = projects.find((p) => p.id === sprocket.projectId);
+  const coordinator = all.find((s) => s.projectId && s.projectId === sprocket.projectId && s.coordinator && s.id !== id);
   const { settings: models } = useModelSettings();
   const openSettings = useOpenSettings();
   const [error, setError] = useState("");
@@ -40,6 +43,11 @@ export function SprocketSettings({ sprocket }: { sprocket: SprocketData }) {
     const question = to ? `Attach ${name} to ${to.name}?` : `Detach ${name} from its project?`;
     if (sprocket.lastMessage && !confirm(`${question}\n\nIts chat is deleted. Its name, look and core memory stay.`)) return;
     await save({ projectId: projectId || null });
+  };
+
+  const setCoordinator = async (on: boolean) => {
+    if (on && coordinator && project && !confirm(`Make ${name} the Coordinator of ${project.name}?\n\n${coordinator.name} stops being it.`)) return;
+    await save({ coordinator: on });
   };
 
   const defaultName = models?.models.find((m) => m.ref === models.defaultModel)?.name;
@@ -76,6 +84,24 @@ export function SprocketSettings({ sprocket }: { sprocket: SprocketData }) {
           <p className="muted small">
             {sprocket.running ? `${name} is replying. You can move it when it's done.` : "A Sprocket helps with one project at a time. Moving it starts a new chat."}
           </p>
+        </div>
+
+        <div className="settings-field sp-switch-field">
+          <div className="sp-switch-text">
+            <label htmlFor="sp-coordinator">Coordinator</label>
+            <p id="sp-coordinator-help" className="muted small">
+              {!project
+                ? `Attach ${name} to a project first.`
+                : `When a session in ${project.name} waits for you, ${name} tells you what it needs. One Sprocket per project${coordinator ? `; now it's ${coordinator.name}` : ""}.`}
+            </p>
+          </div>
+          <Switch
+            id="sp-coordinator"
+            checked={sprocket.coordinator}
+            disabled={!project}
+            aria-describedby="sp-coordinator-help"
+            onChange={(on) => void setCoordinator(on)}
+          />
         </div>
 
         <div className="settings-field">

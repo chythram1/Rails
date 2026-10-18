@@ -589,6 +589,24 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-message.sprocket .sp-bubble { background: none; padding: 4px 0; max-width: min(680px, 100%); }
 .sp-message.notice { align-items: center; }
 .sp-message.notice .sp-bubble { background: none; color: var(--muted); font-size: 13px; text-align: center; padding: 4px 0; max-width: 100%; text-wrap: balance; }
+/* A session waiting for the user, in its Coordinator's chat (EventRow.tsx): a muted line with the agent's
+   logo, the session and a link to its panel, then what it asked, quoted. The Coordinator's reply follows. */
+.sp-message.event { align-items: flex-start; }
+.sp-event { display: flex; flex-direction: column; gap: 6px; width: min(680px, 100%); padding-top: 4px; }
+/* One line: a long session title (often its first prompt) gives way; what it waits for and the link stay. */
+.sp-event-head { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--muted); font-size: 13px; }
+.sp-event-title { flex: 0 1 auto; min-width: 0; color: var(--text-2); font-weight: 500; }
+.sp-event-what { flex: 1 0 auto; margin-left: -4px; white-space: nowrap; }
+.sp-event-open { flex: none; color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; }
+.sp-event-quote {
+  margin: 0; padding: 0 0 0 12px; border-left: 2px solid var(--border-strong); list-style: none;
+  color: var(--text-2); font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+blockquote.sp-event-quote { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; overflow: hidden; }
+ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
+.sp-event-options { display: block; color: var(--muted); font-size: 13px; }
+.sp-event-note { margin: 0; color: var(--muted); font-size: 13px; }
+.sp-message.event .sp-msg-actions { margin-left: -7px; }
 /* A Sprocket's chat with its settings panel beside it (ref/sprockets/stage2/chat2.png). */
 .sp-main { position: relative; }
 .sp-detail { flex: 1; min-height: 0; display: flex; }
@@ -602,6 +620,19 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-panel-look { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .sp-panel .settings-field > :is(.input, .dropdown) { width: 100%; }
 .sp-field-foot { display: flex; align-items: center; gap: 8px; }
+.sp-switch-field { flex-direction: row; align-items: flex-start; gap: 16px; }
+.sp-switch-text { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.sp-switch-text > label { font-weight: 500; }
+/* On/off switch (Switch.tsx): Paper White when on, like the one primary button; no slide (no chrome motion). */
+.switch {
+  flex: none; display: inline-flex; align-items: center; width: 36px; height: 20px; padding: 2px;
+  border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface-2); cursor: pointer;
+}
+.switch-knob { width: 14px; height: 14px; border-radius: 50%; background: var(--muted); }
+.switch[aria-checked="false"]:not(:disabled):hover .switch-knob { background: var(--text-2); }
+.switch[aria-checked="true"] { justify-content: flex-end; background: var(--primary); border-color: var(--primary); }
+.switch[aria-checked="true"] .switch-knob { background: var(--bg); }
+.switch:disabled { opacity: 0.5; cursor: default; }
 /* Not enough room beside the chat: the panel lies over it instead of squeezing it. */
 @container (max-width: 720px) {
   .sp-panel { position: absolute; inset: 0 0 0 auto; width: min(340px, 100%); z-index: 2; box-shadow: -12px 0 32px rgb(0 0 0 / 0.4); }

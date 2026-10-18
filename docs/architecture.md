@@ -68,6 +68,9 @@ packages/
   panels are open), which also gives new Codex panels their session id. Events fold into board cards
   (`bridge/board.ts`); panels waiting for the user or with a failed turn are broadcast as
   `panels.attention` (red dots). Attached Sprockets read the board through their capabilities (`harness/project.ts`).
+  Recorded events also go to the watches (`watches.ts`, ADR 0009): when a session asks the user something (a
+  dialog, or a turn that ends with a question) and nobody answers within 20 s, Rails puts an event in the
+  project's Coordinator's chat and starts a run.
 - **Persistence:** panels survive browser disconnects and server restarts (`tsx watch` included).
   On a reboot the tmux server is gone; the next workspace read drops panels whose tmux session no
   longer exists. Their transcripts remain, so sessions can be resumed from the sidebar.
@@ -76,7 +79,7 @@ packages/
   restores the layout, then adds panels missing from it and removes ones that were closed.
   `panels.changed` broadcasts keep other devices' panel lists current.
 - **Sprockets** (ADR 0005, 0006): `sprockets.ts` stores Sprockets, their chats and settings (project, model,
-  description; core memory stays internal) in SQLite and broadcasts `sprockets.changed`. A user message starts a run (`runs.ts`): a
+  description, whether it's its project's Coordinator; core memory stays internal) in SQLite and broadcasts `sprockets.changed`. A user message (or, for a Coordinator, an event) starts a run (`runs.ts`): a
   pi-agent-core loop on the Sprocket's model, streamed to browsers as `sprockets.typing`, capped at 12 model
   calls, 30 runs per Sprocket per hour and 2 runs at once. Its one tool is codemode (ADR 0008,
   `harness/codemode.ts`): scripts run in pi's QuickJS sandbox and call the Sprocket's capabilities (`harness/`:

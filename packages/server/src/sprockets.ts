@@ -8,6 +8,7 @@ import {
   SPROCKET_COLORS,
   SPROCKET_DESCRIPTION_MAX,
   type Sprocket,
+  type SprocketEvent,
   type SprocketInput,
   type SprocketLook,
   type SprocketMessage,
@@ -110,13 +111,21 @@ export function sendMessage(sprocketId: string, rawText: unknown): SprocketMessa
   return message;
 }
 
+/** A session in a Coordinator's project waits for the user (watches.ts): put it in the chat and wake the Coordinator. */
+export function postEvent(sprocketId: string, event: SprocketEvent, text: string): void {
+  sprocketMessages.create(sprocketId, "event", text, userMessageTime(sprocketId), { event });
+  changed();
+  requestReply(sprocketId);
+}
+
 /**
- * Change a Sprocket's project, model or core memory. Every field is checked before any is applied, so a
- * rejected request changes nothing (moving a Sprocket deletes its chat). Changing the project deletes it.
+ * Change a Sprocket's project, model, description or role. Every field is checked before any is applied,
+ * so a rejected request changes nothing (moving a Sprocket deletes its chat). Moving it also ends its role
+ * as Coordinator, unless the same request asks for it in the new project.
  */
 export function updateSettings(id: string, body: SprocketSettings | undefined): Sprocket {
   const s = getSprocket(id);
-  const { projectId, model, description } = body ?? {};
+  const { projectId, model, description, coordinator } = body ?? {};
   const moving = projectId !== undefined && (projectId ?? undefined) !== s.projectId;
   if (moving) {
     if (projectId !== null && (typeof projectId !== "string" || !projects.get(projectId))) throw new ServiceError("Unknown project", 400);
@@ -128,10 +137,15 @@ export function updateSettings(id: string, body: SprocketSettings | undefined): 
     if (description.trim().length > SPROCKET_DESCRIPTION_MAX)
       throw new ServiceError(`Descriptions can be at most ${SPROCKET_DESCRIPTION_MAX} characters.`, 400);
   }
+  if (coordinator !== undefined) {
+    if (typeof coordinator !== "boolean") throw new ServiceError("coordinator must be true or false", 400);
+    if (coordinator && !(moving ? projectId : s.projectId)) throw new ServiceError("Attach it to a project first.", 400);
+  }
 
   if (moving) sprockets.setProject(id, projectId ?? null);
   if (model !== undefined) sprockets.setModel(id, model);
   if (description !== undefined) sprockets.setDescription(id, description.trim());
+  if (coordinator !== undefined) sprockets.setCoordinator(id, coordinator);
   changed();
   return getSprocket(id);
 }

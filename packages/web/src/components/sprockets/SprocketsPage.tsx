@@ -52,7 +52,7 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
     main = (
       <div key={current.id} className="sp-detail">
         <SprocketChat sprocket={current} panelOpen={panel} />
-        {panel && <SprocketSettings sprocket={current} />}
+        {panel && <SprocketSettings sprocket={current} all={list} />}
       </div>
     );
   } else if (route.id) {
@@ -150,5 +150,6 @@ function preview(s: SprocketData): string {
   if (s.running) return "Replying…";
   const m = s.lastMessage;
   if (!m) return "No messages yet";
+  if (m.event) return `${m.event.title}: ${m.event.questions?.[0]?.question ?? m.text}`;
   return m.author === "user" ? `You: ${m.text}` : m.text;
 }
