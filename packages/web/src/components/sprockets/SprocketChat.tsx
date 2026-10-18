@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { IconChevronLeft as ChevronLeft, IconDotsVertical as EllipsisVertical, IconLayoutSidebarRight as PanelRight } from "@tabler/icons-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { IconArrowDown as ArrowDown, IconChevronLeft as ChevronLeft, IconDotsVertical as EllipsisVertical, IconLayoutSidebarRight as PanelRight } from "@tabler/icons-react";
 import type { Sprocket as SprocketData, SprocketMessage } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
@@ -8,9 +8,9 @@ import { Composer } from "../Composer.tsx";
 import { MenuButton } from "../Menu.tsx";
 import { useStore } from "../../store.tsx";
 import { Sprocket } from "./Sprocket.tsx";
-
-/** Room left above a sent message when the thread slides it to the top. */
-const PIN_GAP = 16;
+import { MessageActions } from "./MessageActions.tsx";
+import { Revealed, useRevealedText } from "./revealText.tsx";
+import { useThreadScroll } from "./threadScroll.ts";
 
 /** A new time label when a message comes over an hour after the previous one (or on a new day). */
 const GAP_MS = 60 * 60 * 1000;
@@ -38,17 +38,33 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
   const { projects } = useStore();
   const project = projects.find((p) => p.id === sprocket.projectId);
   const [messages, setMessages] = useState<SprocketMessage[] | null>(null);
-  const [typing, setTyping] = useState<string | null>(null);
+  /** The reply being revealed (revealText.tsx): while it's written, then as the saved message `id`. */
+  const [reveal, setReveal] = useState<{ text: string; live: boolean; id?: string } | null>(null);
+  /** Messages already shown; null until the first load, whose messages show at once. */
+  const seen = useRef<Set<string> | null>(null);
+  /** Re-renders once a minute, so "5 minutes ago" under each message stays true. */
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
   const [error, setError] = useState("");
   const [loadError, setLoadError] = useState("");
   const thread = useRef<HTMLDivElement>(null);
   const spacer = useRef<HTMLDivElement>(null);
-  /** Set when the user sends: the thread slides their message to the top, once, and keeps room for it there. */
-  const pin = useRef<"slide" | "hold" | null>(null);
+  const { shown, fresh } = useRevealedText(reveal?.text ?? "", reveal?.live === true);
+  const scroll = useThreadScroll(thread, spacer, sprocket.running, [messages, reveal?.id, shown, sprocket.running]);
 
   const load = useCallback(async () => {
     try {
-      setMessages(await api.sprocketMessages(id));
+      const list = await api.sprocketMessages(id);
+      // A reply that wasn't here before (it just finished, or arrived whole) is revealed, carrying on
+      // from where the written-out text got to.
+      const known = seen.current;
+      seen.current = new Set(list.map((m) => m.id));
+      const reply = known ? list.filter((m) => m.author === "sprocket" && !known.has(m.id)).at(-1) : undefined;
+      if (reply) setReveal({ text: reply.text, live: false, id: reply.id });
+      setMessages(list);
       setLoadError("");
     } catch (e: any) {
       setLoadError(e.message);
@@ -59,35 +75,22 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
     void load();
     return socket.on((m) => {
       if (m.type === "sprockets.changed") void load();
-      if (m.type === "sprockets.typing" && m.sprocketId === id) setTyping(m.text);
+      if (m.type === "sprockets.typing" && m.sprocketId === id) {
+        const text = m.text;
+        setReveal((r) => (text === null ? r && { ...r, live: false } : { text, live: true }));
+      }
     });
   }, [load, id]);
 
-  // Opening a chat shows its end. Sending slides the new message to the top of the thread (as ChatGPT and
-  // Claude do) with the reply growing below it; the spacer after the messages keeps enough room for that
-  // while the reply is short. After the slide nothing moves the view, so reading back isn't interrupted.
-  useLayoutEffect(() => {
-    const el = thread.current;
-    if (!el || !spacer.current) return;
-    if (!pin.current) {
-      el.scrollTop = el.scrollHeight;
-      return;
-    }
-    const sent = [...el.querySelectorAll<HTMLElement>(".sp-message.user")].at(-1);
-    if (!sent) return;
-    const top = sent.offsetTop - PIN_GAP;
-    spacer.current.style.height = "0px";
-    const room = top + el.clientHeight - spacer.current.offsetTop - parseFloat(getComputedStyle(el).paddingBottom);
-    spacer.current.style.height = `${Math.max(0, room)}px`;
-    if (pin.current === "slide") {
-      el.scrollTo({ top, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-      pin.current = "hold";
-    }
-  }, [messages, typing, sprocket.running]);
+  // A new run (possibly started on another device) starts with "Thinking…", not the last reply.
+  useEffect(() => {
+    if (sprocket.running) setReveal((r) => (r?.id ? null : r));
+  }, [sprocket.running]);
 
   const send = async (text: string) => {
     setError("");
-    pin.current = "slide";
+    setReveal(null);
+    scroll.onSend();
     const pending: SprocketMessage = { id: "pending", sprocketId: id, author: "user", text, createdAt: new Date().toISOString() };
     setMessages((m) => [...(m ?? []), pending]);
     try {
@@ -169,17 +172,31 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
               return (
                 <li key={m.id + i} className={"sp-message " + m.author}>
                   {label && <time className="sp-stamp" dateTime={m.createdAt}>{stamp(m.createdAt)}</time>}
-                  <p className="sp-bubble" title={new Date(m.createdAt).toLocaleString()}>
+                  <p className="sp-bubble">
                     {m.author === "sprocket" && <span className="sr-only">{name}: </span>}
-                    {m.text}
+                    {m.id === reveal?.id ? (
+                      <>
+                        {/* Screen readers get the whole reply once, not every revealed piece. */}
+                        <span className="sr-only">{m.text}</span>
+                        <span aria-hidden>
+                          <Revealed text={m.text} shown={shown} fresh={fresh} />
+                        </span>
+                      </>
+                    ) : (
+                      m.text
+                    )}
                   </p>
+                  {m.author !== "notice" && <MessageActions text={m.text} at={m.createdAt} now={now} reply={m.author === "sprocket"} />}
                 </li>
               );
             })}
-            {sprocket.running && (
+            {sprocket.running && !reveal?.id && (
               <li className="sp-message sprocket" aria-hidden>
-                {typing ? (
-                  <p className="sp-bubble">{typing}</p>
+                {/* "Thinking…" holds its place until the first words show, so the row never empties. */}
+                {reveal && shown > 0 ? (
+                  <p className="sp-bubble">
+                    <Revealed text={reveal.text} shown={shown} fresh={fresh} />
+                  </p>
                 ) : (
                   <p className="sp-thinking">
                     <Sprocket look={sprocket.look} size={22} seed={id} /> Thinking…
@@ -190,9 +207,15 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
           </ol>
         )}
         <div className="sp-spacer" ref={spacer} aria-hidden />
+        <div className="sp-fade" aria-hidden />
         <p className="sr-only" role="status">{sprocket.running ? `${name} is replying` : ""}</p>
       </div>
       <div className="sp-compose">
+        {scroll.hidden && (
+          <button className="sp-jump" aria-label="Jump to the latest message" title="Jump to latest" onClick={scroll.jumpToLatest}>
+            <ArrowDown size={16} />
+          </button>
+        )}
         {error && <p className="error" role="alert">{error}</p>}
         <Composer placeholder={`Message ${name}`} onSubmit={(text) => void send(text)} autoFocus compact />
       </div>

@@ -534,6 +534,43 @@ textarea.input { resize: vertical; line-height: 1.5; }
 /* position: relative makes the thread the offsetParent its messages are measured against (SprocketChat). */
 .sp-thread { position: relative; flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 24px 20px; display: flex; flex-direction: column; }
 .sp-spacer { flex-shrink: 0; }
+/* The thread's bottom edge: the messages nearest the composer fade and blur into the page (after claude.ai's
+   scroll-fade strip, taller and with a light blur). Both ramp evenly over the whole 48px, so it reads as one
+   soft edge rather than a band. It shows only while there's more below: a scroll-driven animation fades it
+   out over the last 48px of scrolling. Browsers without scroll-driven animations skip it. */
+@property --sp-fade-raw { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --sp-fade-on { syntax: "<number>"; inherits: true; initial-value: 0; }
+/* Two layers: the fade (this element's background) and the blur (::before), the blur only in the lower part
+   where the fade is dark enough to cover the halo blurred light text casts on a dark page (blur alone there
+   reads as a glow). Their strength comes from --k, not opacity: opacity would cut the blur off from the text. */
+.sp-fade {
+  --k: 0;
+  /* Sticky offsets count from inside the thread's padding: -24px puts it on the thread's visible bottom edge. */
+  position: sticky; bottom: -24px; flex-shrink: 0; height: 48px; margin-top: -48px; z-index: 1; pointer-events: none;
+  background: linear-gradient(
+    to top, rgb(from var(--bg) r g b / var(--k)), rgb(from var(--bg) r g b / calc(0.9 * var(--k))) 12%,
+    rgb(from var(--bg) r g b / calc(0.72 * var(--k))) 28%, rgb(from var(--bg) r g b / calc(0.5 * var(--k))) 46%,
+    rgb(from var(--bg) r g b / calc(0.28 * var(--k))) 64%, rgb(from var(--bg) r g b / calc(0.1 * var(--k))) 82%, transparent
+  );
+}
+.sp-fade::before {
+  content: ""; position: absolute; inset: 0;
+  backdrop-filter: blur(calc(1.5px * var(--k))); -webkit-backdrop-filter: blur(calc(1.5px * var(--k)));
+  mask-image: linear-gradient(to top, #000 20%, transparent 55%);
+}
+@supports (animation-timeline: scroll()) {
+  .sp-fade {
+    --k: calc(var(--sp-fade-raw) * var(--sp-fade-on));
+    animation-name: sp-fade-out, sp-fade-on; animation-timing-function: linear; animation-fill-mode: both, none;
+    animation-duration: auto; animation-timeline: scroll(), scroll(); animation-range: calc(100% - 48px) 100%, 0px 101%;
+  }
+}
+@keyframes sp-fade-out { from { --sp-fade-raw: 1; } to { --sp-fade-raw: 0; } }
+/* Only runs while the thread can scroll at all, so a short chat has no strip. */
+@keyframes sp-fade-on { from, to { --sp-fade-on: 1; } }
+/* A reply's newly revealed text fades in (revealText.tsx; claude.ai's 0.4s ease-out). */
+.sp-fresh { animation: sp-fresh 400ms ease-out both; }
+@keyframes sp-fresh { from { opacity: 0; } }
 /* The thread opens with the Sprocket; on an empty chat that intro sits in the middle instead. */
 .sp-intro { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 8px auto 28px; max-width: 340px; text-align: center; text-wrap: balance; }
 .sp-intro.alone { margin: auto; }
@@ -569,12 +606,32 @@ textarea.input { resize: vertical; line-height: 1.5; }
 @container (max-width: 720px) {
   .sp-panel { position: absolute; inset: 0 0 0 auto; width: min(340px, 100%); z-index: 2; box-shadow: -12px 0 32px rgb(0 0 0 / 0.4); }
 }
+/* The details row under a message (MessageActions.tsx): always takes its space, so messages sit apart and
+   nothing shifts; shows for the one message under the pointer, or the one whose button has focus unless the
+   pointer is on another. Touch screens can't hover, so there it always shows. */
+.sp-msg-actions { display: flex; align-items: center; gap: 2px; height: 28px; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.sp-message.sprocket .sp-msg-actions { margin-left: -7px; } /* the copy icon's glyph lines up with the reply's text */
+.sp-time { padding: 0 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sp-msg-actions .icon-btn { width: 28px; height: 28px; }
+@media (hover: hover) {
+  .sp-msg-actions { opacity: 0; }
+  .sp-message:is(:hover, :focus-within) .sp-msg-actions { opacity: 1; }
+  .sp-messages:hover .sp-message:not(:hover) .sp-msg-actions { opacity: 0; }
+}
 .sp-thinking { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; color: var(--muted); font-size: 15px; }
 .sp-project {
   max-width: 40%; padding: 2px 9px; border: 1px solid var(--border-strong); border-radius: 999px;
   color: var(--muted); font-size: 12px;
 }
-.sp-compose { width: 100%; max-width: 800px; margin: 0 auto; padding: 0 20px 20px; display: flex; flex-direction: column; gap: 8px; }
+/* The composer is 12px wider than the message column on each side, so its round ends sit outside the text
+   rather than right on the edge where replies start and the user's bubbles end. */
+.sp-compose { position: relative; width: 100%; max-width: 800px; margin: 0 auto; padding: 0 8px 20px; display: flex; flex-direction: column; gap: 8px; }
+/* Floats over the end of the thread while messages are hidden below the view (threadScroll.ts). */
+.sp-jump {
+  position: absolute; z-index: 2; bottom: calc(100% + 10px); left: 50%; translate: -50% 0; width: 32px; height: 32px;
+  display: grid; place-items: center; border-radius: 50%; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border-strong); box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+}
 
 .sp-creator { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 /* One centred column: preview, colour / accessory / shape rows, name, button (ref create-bot.jpg). */
@@ -645,6 +702,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
   .icon-btn:hover, .tab-close:hover { background: var(--hover); color: var(--text); }
   .account-row:hover, .settings-tab:hover:not([aria-selected="true"]), .settings-result:hover { background: var(--hover); }
   .avatar-btn:hover .avatar-edit { opacity: 1; }
+  .sp-jump:hover { background: var(--hover); }
   .btn:hover:not(:disabled), button.chip:hover, .menu button:hover:not(:disabled), .dropdown.plain:hover:not(:disabled) { background: var(--hover); }
   .btn.primary:hover:not(:disabled) { background: #fff; }
   .send-btn:hover:not(:disabled) { background: var(--primary); color: var(--bg); border-color: var(--primary); }
@@ -690,6 +748,8 @@ textarea.input { resize: vertical; line-height: 1.5; }
   .avatar-grid { grid-template-columns: repeat(4, 52px); }
 }
 @media (prefers-reduced-motion: reduce) {
-  /* Sprockets are excluded: their motion has its own setting, off by default here (sprockets/motion.ts). */
-  *:not(.sprocket, .sprocket *) { animation: none !important; transition: none !important; }
+  /* Sprocket characters (svg.sprocket; a reply's <li> is also .sprocket) are excluded: their motion has its
+     own setting, off by default here (sprockets/motion.ts). The thread's edge fade (.sp-fade) follows
+     scrolling, not time, so it stays. */
+  *:not(svg.sprocket, svg.sprocket *, .sp-fade) { animation: none !important; transition: none !important; }
 }

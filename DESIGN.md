@@ -299,9 +299,14 @@ Soft rectangles throughout, with radius growing with the size of the thing.
 - **Settings rows:** what it is (and why) on the left, the control on the right, a hairline between rows; rows wrap under each other on phones.
 
 ### Chat (Sprockets)
+- The composer is 12px wider than the message column on each side, so its round ends sit outside the text instead of on the edge where replies start and the user's bubbles end.
 - The user's messages are `--surface-2` bubbles (18px radius) on the right; replies read as plain text with no bubble; Rails' own notices are centered 13px `--muted` text. Day stamps are 12px, centered.
 - The pending reply ("Thinking…" with the Sprocket's 22px icon, then the text as it's written) sits in the message column exactly where the reply will land, so nothing jumps when it's done.
-- Sending slides the new message to the top of the thread (a smooth scroll, as in ChatGPT and Claude), with the reply growing below it. After that slide nothing moves the view. Opening a chat starts at its end.
+- Movement follows claude.ai (`sprockets/threadScroll.ts`). Opening a chat starts at its end and follows new messages while the view is at the very bottom. Sending glides (450 ms, cubic ease-out, our own animation: the browser's smooth scroll is over in ~0.2 s and reads as a jump) the new message to the top with room reserved below for the reply, unless more than half the view is already empty below the messages: then nothing moves and the reply fills that space. The reserved room shrinks as the reply grows, a long reply streams on below the fold, and the room is dropped once the user scrolls it out of view.
+- **Replies appear like claude.ai's** (`sprockets/revealText.tsx`): text is revealed at an even pace about 0.3 s behind what has arrived (the server sends it in bursts every 120 ms), and each newly revealed stretch fades in over 400 ms ease-out. A reply that arrives whole is revealed the same way, faster; the saved message carries on from the written-out text without restarting. Screen readers get each reply once, whole.
+- **The Soft Edge Rule.** The thread's bottom 48px fades evenly into `--bg` (after claude.ai's 28px scroll-fade strip, taller and softer), with a 1.5px blur only in its lower half, under the darker part of the fade: blurred light text on a dark page casts a halo that reads as a glow wherever the fade can't cover it. It shows only while more messages are hidden below (a scroll-driven animation; browsers without one show no strip). It's the one blur in Rails: no other glass or blur.
+- **Message details** (`sprockets/MessageActions.tsx`, ref `message.png`): a 28px row under each of the user's messages (the time, "23 minutes ago" at 12px, then a 14px copy icon in a 28px button, on the right) and each reply (copy, then the time, from the left); none under notices. The row always takes its space, which is what separates messages, and shows only for the message under the pointer (or whose button has keyboard focus); on touch screens it always shows. The time's tooltip is the full date.
+- **Jump to latest:** a 32px round button (`--surface`, 1px `--border-strong`, Popover shadow) floats centered above the composer while more than 80px of the messages are hidden below the view.
 
 ### Terminal panels
 - Dockview themed from the tokens (`.dockview-theme-dark` overrides in `styles.css`); the xterm theme in `TerminalView.tsx` mirrors `--bg`, `--text` and `--border-strong`. Tab close buttons show on hover or on the active tab.
@@ -323,7 +328,7 @@ Soft rectangles throughout, with radius growing with the size of the thing.
 ### Don't:
 - **Don't** use a native `<select>` or unstyled scrollbars: the app has its own Dropdown and thin dark scrollbars.
 - **Don't** introduce a hue for hover, selection, focus, links or branding (The Color Means State Rule).
-- **Don't** add transitions or entrance animations to the chrome. The only motion is the mobile drawer slide (0.2s), the chat's slide to a sent message, the Sprockets and the creator's name ideas, and all of it stops under `prefers-reduced-motion` except the Sprockets' own setting.
+- **Don't** add transitions or entrance animations to the chrome. The only motion is the mobile drawer slide (0.2s), the chat's glide to a sent message, a reply's text fading in, the Sprockets and the creator's name ideas, and all of it stops under `prefers-reduced-motion` except the Sprockets' own setting (and the scroll-linked edge fade, which isn't motion over time).
 - **Don't** put a shadow on something that sits in the page flow, or drop the 1px edge from a floating layer.
 - **Don't** use emoji or Unicode glyphs (✓, ×, →) as icons.
 - **Don't** show full filesystem paths; show the project's name.
