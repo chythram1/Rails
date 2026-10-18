@@ -48,7 +48,7 @@ export function App() {
     return (
       <div className="login">
         <div className="login-card">
-          <h1>rails</h1>
+          <h1>Rails</h1>
           <p className="error" role="alert">{downError}</p>
           <button className="btn primary" onClick={() => void check()}>Try again</button>
         </div>

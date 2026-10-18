@@ -66,12 +66,13 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ---
 
-# Project: rails
+# Project: Rails
 
-rails is a self-hosted web app that acts as a multiplexer for coding agents. You attach project
+Rails is a self-hosted web app that acts as a multiplexer for coding agents. You attach project
 directories, it finds the Claude Code, Codex and pi sessions that already exist for them, and each
 project gets a workspace of terminal panels running the agents' own TUIs (split, resize, drag), shared
-across devices (ADR 0003). "rails" is only a name. This is **not** Ruby on Rails.
+across devices (ADR 0003). "Rails" is only a name. This is **not** Ruby on Rails. Write the name as "Rails" in UI
+copy and docs; identifiers stay lowercase (`~/.rails`, `RAILS_HOME`, `@rails/*`, `rails.db`).
 
 Scope is exactly three agents: Claude Code, Codex and pi (ADR 0002). Put effort into deeper support
 for these three, not into adding providers.
@@ -103,7 +104,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 | `packages/server/src/sprockets.ts` | Sprocket services (ADR 0005, 0006): create/edit/delete, settings (project, model, core memory) and messages. Emits `onSprocketsChanged`. |
 | `packages/server/src/runs.ts` | Sprocket runs (ADR 0006): one bounded pi-agent-core loop per reply, the runaway guards, the `remember` tool. |
 | `packages/server/src/models.ts` | Model providers for Sprockets (pi-ai): API keys, sign-in, the default model. Credentials live in `credentials.ts` (`RAILS_HOME/credentials.json`). |
-| `packages/server/src/signin.ts` | rails' own "Continue with ChatGPT" and OpenRouter sign-in flows (so every page says rails); they store credentials in pi-ai's shape (ADR 0006). |
+| `packages/server/src/signin.ts` | Rails' own "Continue with ChatGPT" and OpenRouter sign-in flows (so every page says Rails); they store credentials in pi-ai's shape (ADR 0006). |
 | `packages/web/src/components/sprockets/` | The Sprockets page (`SprocketsPage`, `SprocketCreator`, `SprocketChat`, `SprocketSettings`) and the character renderer (`Sprocket.tsx`: `characters.ts` data, `parts.tsx` accessories, `motion.ts` blinks/look-at/one-shots; idle loops in `styles.css`). |
 | `packages/web/src/components/TerminalView.tsx` | One xterm.js terminal attached to a panel over the shared socket; re-attaches on reconnect, reports resizes. |
 | `packages/web/src/` | React SPA. `store.tsx` holds global state, `ws.ts` the shared socket with reconnect, `router.ts` hash routing, `api.ts` the REST client, `styles.css` all CSS (tokens at the top), `components/` the UI. |
@@ -124,7 +125,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - Browser checks: start dev with `make dev-tmp` (or `make dev-lan`) and open the printed `?token=` URL. A browser on another device reaches it through the host's LAN or Tailscale address.
 - Panel tests run real agents with your logins. Use a scratch directory, then delete the transcripts they leave (`~/.claude/projects/-private-tmp-…`, `~/.pi/agent/sessions/--private-tmp-…--`, Codex threads with `codex delete --force <id>`) and kill the throwaway tmux server (`tmux -S $RAILS_HOME/tmux.sock kill-server`).
 - Never resume or open the user's real sessions in tests: `claude --resume` appends lines to the transcript even if you type nothing. Create scratch sessions instead.
-- Never kill tmux servers or rails processes you didn't start: the user's own `make dev` may be running on :4317/:5173, so test on other ports (`RAILS_PORT=4319`, `npx vite --port 5180`).
+- Never kill tmux servers or Rails processes you didn't start: the user's own `make dev` may be running on :4317/:5173, so test on other ports (`RAILS_PORT=4319`, `npx vite --port 5180`).
 
 ## Branching
 - Work that's experimental, likely to be rolled back, or large (a new subsystem, a change across server and web, anything the user calls "try" or "experimental") goes on its own branch: `git switch -c <short-name>`. Use a worktree (`git worktree add ../rails-<name> -b <name>`) if `make dev` is running on main.
@@ -133,7 +134,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - If it's unclear whether something counts as experimental, ask before starting.
 
 ## Invariants
-- Provider transcripts are the source of truth for sessions. rails reads them and **never writes** them (the agents do, inside panels). The DB only stores projects, panels and layouts.
+- Provider transcripts are the source of truth for sessions. Rails reads them and **never writes** them (the agents do, inside panels). The DB only stores projects, panels and layouts.
 - Panel processes live in tmux, not in the server. A browser disconnecting or the server restarting must never kill an agent; only closing the panel does.
 - The server's panel list is the source of truth; the saved layout is only an arrangement. Reconcile layout against the list, never the other way round.
 - The access token must never reach panel processes: keep the env cleaning in `tmux.ts`.
@@ -144,7 +145,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 
 ## Gotchas
 - Don't use `$SHELL` for the user's shell: `nix develop` sets it to its own bash. Shell panels use `os.userInfo().shell`.
-- The server needs tmux >= 3.2 (`make system-deps` or `nix develop`). Every rails home has its own tmux server (`$RAILS_HOME/tmux.sock`); panels survive server restarts but not a reboot.
+- The server needs tmux >= 3.2 (`make system-deps` or `nix develop`). Every Rails home has its own tmux server (`$RAILS_HOME/tmux.sock`); panels survive server restarts but not a reboot.
 - node-pty's `spawn-helper` must be executable; the root `postinstall` fixes it. "posix_spawnp failed" means it didn't run.
 - xterm.js puts the class `terminal` on its own root, so don't use that class name for wrappers.
 - Pane gutters (`styles.css`) restyle dockview internals: its `.dv-view` / `.dv-sash` classes and its hard-coded 4px sash, which is widened and shifted 2px. `dockview-react` is pinned to `~8.5.1`; after upgrading it, re-check gutter alignment and dragging.
@@ -157,7 +158,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - Codex is the least tested provider: check Codex changes against a real Codex install. Codex 0.16x runs interactive sessions on a shared app-server daemon, and any `-c` override on the command line makes it run without the daemon (see `docs/providers.md`).
 
 ## Long-term direction
-rails may ship as a desktop app later. A Node-based shell such as Electron is fine, so the Node server can
+Rails may ship as a desktop app later. A Node-based shell such as Electron is fine, so the Node server can
 stay; the earlier Rust port idea is dropped (see `docs/roadmap.md`). Keep logic in plain service functions
 and the client/server contract fully described by the types in `packages/shared`.
 

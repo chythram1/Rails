@@ -1,11 +1,11 @@
-# rails
+# Rails
 
 A self-hosted, multi-device agent multiplexer. Attach a project folder, see every Claude Code, Codex and
 pi session that already exists for it, and run the agents' own terminal UIs side by side in panels you
 can split, resize and rearrange, from your laptop or phone.
 
 Projects are added with your operating system's own folder picker (Finder on macOS, zenity/kdialog on
-Linux), which opens on the machine running rails.
+Linux), which opens on the machine running Rails.
 
 Requires Node 24+, **tmux 3.2+** (every panel runs in it) and the agents' CLIs on the server's `PATH`.
 `make dev`, `make start` and `make install` check for tmux and install it with Homebrew, apt or dnf when
@@ -40,4 +40,4 @@ Status:
 
 Docs: [architecture](docs/architecture.md) · [glossary](docs/CONTEXT.md) · [decisions](docs/adr) · [provider formats](docs/providers.md) · [roadmap](docs/roadmap.md)
 
-Working on rails with a coding agent? Start with [AGENTS.md](AGENTS.md).
+Working on Rails with a coding agent? Start with [AGENTS.md](AGENTS.md).

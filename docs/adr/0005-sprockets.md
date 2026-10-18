@@ -2,7 +2,7 @@
 
 Status: accepted (stage 1: look and chat UI only).
 
-Sprockets are a lightweight collection of always-on agents native to rails. Each one is a small character
+Sprockets are a lightweight collection of always-on agents native to Rails. Each one is a small character
 the user makes: one of 8 shapes (Block, Bean, Lune, Bell, Starry, Cog, Roo, Momo), one of 10 colours,
 one head accessory or none (party hat, beanie, cap, bow, flower clip, crown, bucket hat), and
 a name. They have their own page (the "Sprockets" nav item): a list of Sprockets beside the selected
@@ -35,6 +35,6 @@ Decisions:
   over 5s; revisit if that matters.)
 
 Consequences:
-- Sprockets aren't providers and don't widen ADR 0002's scope: they're rails' own agents (see the "Home
+- Sprockets aren't providers and don't widen ADR 0002's scope: they're Rails' own agents (see the "Home
   agent" idea in the roadmap), and they don't run in panels.
 - The app's no-animation rule has one exception: Sprocket characters.

@@ -182,7 +182,7 @@ void tmuxVersion().then((v) => {
 
 const server = serve({ fetch: app.fetch, hostname: HOST, port: PORT }, () => {
   const url = `http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}`;
-  console.log(`rails server on ${url}`);
+  console.log(`Rails server on ${url}`);
   console.log(`open: ${process.env.NODE_ENV === "production" ? url : "http://localhost:5173"}/?token=${TOKEN}`);
 });
 

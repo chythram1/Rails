@@ -1,7 +1,7 @@
 # Architecture
 
-rails is a self-hosted web app that works as an **agent multiplexer**. You attach local project
-directories, and rails discovers the sessions that existing coding agents (Claude Code, Codex, pi)
+Rails is a self-hosted web app that works as an **agent multiplexer**. You attach local project
+directories, and Rails discovers the sessions that existing coding agents (Claude Code, Codex, pi)
 already have on disk for them. Each project has a workspace of terminal panels running the agents'
 own TUIs, which you can split, resize and rearrange, and use from any device (ADR 0003).
 
@@ -32,7 +32,7 @@ packages/
    session p-<panelId> ──▶ `claude --resume <id>` | `pi --session <id>` | `codex resume <id>` | $SHELL -l
 ```
 
-- **History** lives in provider transcripts. rails reads them only for discovery (titles, dates, the
+- **History** lives in provider transcripts. Rails reads them only for discovery (titles, dates, the
   sidebar). The agents write their own transcripts while they run in panels.
 - **Panels:** `POST /api/projects/:id/panels` creates a DB row and a detached tmux session running the
   agent's CLI in the project (or the session's recorded cwd). Claude and pi get their session id up
@@ -90,7 +90,7 @@ packages/
   name on the client, showing at most 8. "Open folder…" calls `POST /api/projects/pick`, which runs the OS folder picker on the server
   (`picker.ts`: osascript on macOS, zenity then kdialog on Linux, PowerShell on Windows) and waits for
   the user. Cancel returns `{project: null}`; a folder that's already a project returns that project.
-  The dialog shows on the server's screen, so it's meant for using rails on the host machine.
+  The dialog shows on the server's screen, so it's meant for using Rails on the host machine.
 - **Discovery** runs on request (sidebar refresh, about every 20s while the app is open, and after
   panel changes). It scans every provider store and keeps sessions whose cwd is the project directory
   or inside it. Per-file results are cached by mtime and size.
@@ -101,7 +101,7 @@ packages/
 | --- | --- | --- |
 | claude | ✅ `~/.claude/projects/*/*.jsonl` | ✅ `claude --session-id <uuid> [-- prompt]` / `claude --resume <id>` |
 | pi | ✅ `~/.pi/agent/sessions/*/*.jsonl` | ✅ `pi --session-id <uuid> [-- prompt]` / `pi --session <id>` |
-| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl` (path verified with Codex 0.163; line format from docs) | ⚠️ `codex [-- prompt]` / `codex resume <id>` (run fine in tmux with Codex 0.163; not yet tested through rails) |
+| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl` (path verified with Codex 0.163; line format from docs) | ⚠️ `codex [-- prompt]` / `codex resume <id>` (run fine in tmux with Codex 0.163; not yet tested through Rails) |
 
 A provider is only offered when its CLI is on the server's `PATH` (`ProviderInfo.installed`).
 Transcript format notes are in [providers.md](./providers.md).

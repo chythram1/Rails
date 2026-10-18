@@ -91,7 +91,7 @@ export function Sidebar({ route }: { route: Route }) {
     const sprocketNote = attached.length
       ? `\n\n${attached.join(", ")} ${attached.length === 1 ? "is" : "are"} detached, and ${attached.length === 1 ? "its chat" : "their chats"} here deleted.`
       : "";
-    if (!confirm(`Remove "${p.name}" from rails?\n\nIts agent sessions stay on disk. Add the folder again anytime to bring them back.${sprocketNote}`)) return;
+    if (!confirm(`Remove "${p.name}" from Rails?\n\nIts agent sessions stay on disk. Add the folder again anytime to bring them back.${sprocketNote}`)) return;
     try {
       await api.removeProject(p.id);
     } catch (e: any) {
@@ -113,7 +113,7 @@ export function Sidebar({ route }: { route: Route }) {
   return (
     <aside ref={aside} className={"sidebar" + (rail ? " rail" : "") + (dragging ? " dragging" : "")} style={rail ? undefined : { width }}>
       <div className="brand">
-        <img className="brand-logo" src={logo} alt="rails" width={24} height={24} />
+        <img className="brand-logo" src={logo} alt="Rails" width={24} height={24} />
         <button
           className="icon-btn"
           aria-label={rail ? "Expand sidebar" : "Collapse sidebar"}

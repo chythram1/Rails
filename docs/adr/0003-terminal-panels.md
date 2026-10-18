@@ -2,7 +2,7 @@
 
 Status: accepted. Supersedes ADR 0001 items 2, 6 and 10, and the "live Claude chat" part of item 4.
 
-rails is now an agent multiplexer in the literal sense. Each agent runs its own native terminal UI
+Rails is now an agent multiplexer in the literal sense. Each agent runs its own native terminal UI
 (Claude Code, Codex, pi), and the web app shows those terminals as panels you can split, resize and
 rearrange. The custom chat interface is gone. Reference: `ref/panels.png`.
 
@@ -12,7 +12,7 @@ Decisions:
    and message rendering happen inside each TUI. The Claude Agent SDK path, permission cards and
    transcript rendering are removed. Transcripts are still read for discovery (titles, sidebar).
 2. **tmux backs every panel.** Each panel's process runs in its own tmux session on a socket private to
-   the rails home (`$RAILS_HOME/tmux.sock`). The server attaches to it through node-pty, one tmux client
+   the Rails home (`$RAILS_HOME/tmux.sock`). The server attaches to it through node-pty, one tmux client
    per connected browser panel. So agents survive server restarts, every device sees the same terminal
    (tmux `window-size latest`), and you can attach from a normal terminal with
    `tmux -S ~/.rails/tmux.sock attach`. tmux is now a host requirement.
@@ -31,6 +31,6 @@ Decisions:
 Consequences:
 - A web terminal is remote shell access. Token auth and the localhost-by-default bind (ADR 0001 #5)
   matter more now.
-- rails can no longer see message-level detail live (no "waiting for approval" dot). The sidebar only
+- Rails can no longer see message-level detail live (no "waiting for approval" dot). The sidebar only
   knows whether a session has an open panel.
 - Codex is still untested on the dev machine.

@@ -16,7 +16,7 @@ export function Login({ onDone }: { onDone: () => void }) {
   return (
     <div className="login">
       <form className="login-card" onSubmit={submit}>
-        <h1>rails</h1>
+        <h1>Rails</h1>
         <p className="muted">Enter the access token printed when the server started.</p>
         <label className="field">
           <span>Access token</span>

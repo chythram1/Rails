@@ -17,7 +17,7 @@ import type {
 
 export class Unauthorized extends Error {}
 
-const UNREACHABLE = "Can't reach the rails server. Check that it's running (make dev).";
+const UNREACHABLE = "Can't reach the Rails server. Check that it's running (make dev).";
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;

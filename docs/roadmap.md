@@ -12,7 +12,7 @@ Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
 - Verify Codex panels on a machine with Codex installed; map new Codex panels to their session id
 - "Needs attention" signal for panels (e.g. Claude Code hooks or terminal bell), lost with the chat UI
 - Provider logos in the agent picker on Home (needs a custom dropdown)
-- Adopt sessions running in the user's own terminal (today only panels started by rails are shared)
+- Adopt sessions running in the user's own terminal (today only panels started by Rails are shared)
 - Adding projects from another device: Recent works anywhere, but "Open folder…" opens on the server's screen (ADR 0004)
 - Git actions: stage/commit, branch, and a worktree per session
 - Session search across projects
@@ -26,6 +26,6 @@ Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
 - **Customize:** it holds Models (ADR 0006) so far; next, agent profiles (model, system prompt, tools, permission mode)
 - **Automate:** saved prompts on a schedule or trigger (PR opened, Slack mention), with run history
   (see the "Pinned automations" cards in `ref/style.png`)
-- **Custom harness:** rails' own agent loop as an additional provider
+- **Custom harness:** Rails' own agent loop as an additional provider
 - Plugins and MCP server management
 - Multi-user accounts, remote runners

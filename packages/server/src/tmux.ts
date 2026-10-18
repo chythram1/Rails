@@ -43,7 +43,7 @@ function cleanEnv(): Record<string, string> {
   return env;
 }
 
-const MISSING = "tmux isn't installed on the server. Run `make system-deps` (or install tmux >= 3.2), then restart rails.";
+const MISSING = "tmux isn't installed on the server. Run `make system-deps` (or install tmux >= 3.2), then restart Rails.";
 
 async function tmux(...args: string[]) {
   try {

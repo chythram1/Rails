@@ -2,7 +2,7 @@
 
 Status: accepted
 
-rails supports exactly three providers: **Claude Code** (`claude`), **Codex** (`codex`) and **pi** (`pi`).
+Rails supports exactly three providers: **Claude Code** (`claude`), **Codex** (`codex`) and **pi** (`pi`).
 
 The goal is to give these three the deepest chat support possible: live sessions, resume, tool approvals,
 and rich message rendering. Adding a fourth provider, or building a generic plugin system for providers,
