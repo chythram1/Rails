@@ -2,7 +2,7 @@
 # Env vars (RAILS_HOME, RAILS_HOST, RAILS_PORT, RAILS_TOKEN) pass through, e.g. `RAILS_PORT=5000 make dev`.
 
 .DEFAULT_GOAL := help
-.PHONY: help install system-deps dev dev-lan dev-tmp typecheck build start token clean distclean
+.PHONY: help install system-deps dev dev-lan dev-tmp typecheck test build start token clean distclean
 
 TMP_HOME ?= /tmp/rails-dev
 TMUX_MIN := 3.2
@@ -41,6 +41,9 @@ dev-tmp: node_modules system-deps ## Dev on LAN with throwaway state (/tmp/rails
 
 typecheck: node_modules ## Typecheck all packages (must pass)
 	npm run typecheck
+
+test: node_modules ## Run the tests (Vitest; must pass)
+	npm test
 
 build: node_modules ## Build the web app into packages/web/dist
 	npm run build

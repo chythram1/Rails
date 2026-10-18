@@ -10,10 +10,13 @@
     "build": "npm run build -w @rails/web",
     "start": "NODE_ENV=production npm run start -w @rails/server",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "postinstall": "chmod +x node_modules/node-pty/prebuilds/*/spawn-helper 2>/dev/null || true"
+    "postinstall": "chmod +x node_modules/node-pty/prebuilds/*/spawn-helper 2>/dev/null || true",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "concurrently": "^9.2.0",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "vitest": "^5.0.5"
   }
 }
