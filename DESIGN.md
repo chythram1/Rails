@@ -300,13 +300,15 @@ Soft rectangles throughout, with radius growing with the size of the thing.
 
 ### Chat (Sprockets)
 - The user's messages are `--surface-2` bubbles (18px radius) on the right; replies read as plain text with no bubble; Rails' own notices are centered 13px `--muted` text. Day stamps are 12px, centered.
+- The pending reply ("Thinking…" with the Sprocket's 22px icon, then the text as it's written) sits in the message column exactly where the reply will land, so nothing jumps when it's done.
+- Sending slides the new message to the top of the thread (a smooth scroll, as in ChatGPT and Claude), with the reply growing below it. After that slide nothing moves the view. Opening a chat starts at its end.
 
 ### Terminal panels
 - Dockview themed from the tokens (`.dockview-theme-dark` overrides in `styles.css`); the xterm theme in `TerminalView.tsx` mirrors `--bg`, `--text` and `--border-strong`. Tab close buttons show on hover or on the active tab.
 
 ### Sprockets and avatars (signature)
 - **Sprockets** are the product's personality: SVG characters with idle loops (bob, sway, blink, look-at) on a per-character period and phase, so a group never moves in sync. They're the only looping motion in Rails, and they respect their own motion setting. See ADR 0005 and the gotcha about SVG transforms in `AGENTS.md`.
-- **Avatars:** eight pixel-pattern circles; the chosen one in the picker gets a white ring and a check badge.
+- **Avatars:** eight pixel-pattern circles; the chosen one in the picker gets a white ring and a check badge. The avatar button in Settings dims (`rgb(0 0 0 / 0.5)`) and shows a 16px pencil on hover or keyboard focus.
 
 ## Do's and Don'ts
 
@@ -321,7 +323,7 @@ Soft rectangles throughout, with radius growing with the size of the thing.
 ### Don't:
 - **Don't** use a native `<select>` or unstyled scrollbars: the app has its own Dropdown and thin dark scrollbars.
 - **Don't** introduce a hue for hover, selection, focus, links or branding (The Color Means State Rule).
-- **Don't** add transitions or entrance animations to the chrome. The only motion is the mobile drawer slide (0.2s), the Sprockets and the creator's name ideas, and all of it stops under `prefers-reduced-motion` except the Sprockets' own setting.
+- **Don't** add transitions or entrance animations to the chrome. The only motion is the mobile drawer slide (0.2s), the chat's slide to a sent message, the Sprockets and the creator's name ideas, and all of it stops under `prefers-reduced-motion` except the Sprockets' own setting.
 - **Don't** put a shadow on something that sits in the page flow, or drop the 1px edge from a floating layer.
 - **Don't** use emoji or Unicode glyphs (✓, ×, →) as icons.
 - **Don't** show full filesystem paths; show the project's name.

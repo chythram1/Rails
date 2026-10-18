@@ -279,7 +279,10 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .set-sub { color: var(--muted); font-size: 13px; }
 .set-callout { margin-top: 12px; padding: 14px; border: 1px solid var(--border-strong); border-radius: 12px; display: flex; flex-direction: column; gap: 10px; }
 .set-callout p { margin: 0; }
-.avatar-btn { flex-shrink: 0; padding: 0; border: 0; border-radius: 50%; background: none; }
+.avatar-btn { position: relative; flex-shrink: 0; padding: 0; border: 0; border-radius: 50%; background: none; }
+/* Hover or keyboard focus: the avatar dims and shows a pencil, so it reads as editable. */
+.avatar-edit { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%; background: rgb(0 0 0 / 0.5); color: var(--text); opacity: 0; }
+.avatar-btn:focus-visible .avatar-edit { opacity: 1; }
 .mono { font-family: var(--mono); font-size: 13px; }
 .btn.danger { color: var(--red); }
 .btn:disabled { opacity: 0.5; }
@@ -528,7 +531,9 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-placeholder { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px; text-align: center; }
 
 .sp-chat { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.sp-thread { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 24px 20px; display: flex; flex-direction: column; }
+/* position: relative makes the thread the offsetParent its messages are measured against (SprocketChat). */
+.sp-thread { position: relative; flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 24px 20px; display: flex; flex-direction: column; }
+.sp-spacer { flex-shrink: 0; }
 /* The thread opens with the Sprocket; on an empty chat that intro sits in the middle instead. */
 .sp-intro { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 8px auto 28px; max-width: 340px; text-align: center; text-wrap: balance; }
 .sp-intro.alone { margin: auto; }
@@ -564,7 +569,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 @container (max-width: 720px) {
   .sp-panel { position: absolute; inset: 0 0 0 auto; width: min(340px, 100%); z-index: 2; box-shadow: -12px 0 32px rgb(0 0 0 / 0.4); }
 }
-.sp-thinking { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+.sp-thinking { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; color: var(--muted); font-size: 15px; }
 .sp-project {
   max-width: 40%; padding: 2px 9px; border: 1px solid var(--border-strong); border-radius: 999px;
   color: var(--muted); font-size: 12px;
@@ -639,6 +644,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
   .project-row .icon-btn:hover { background: var(--border-strong); }
   .icon-btn:hover, .tab-close:hover { background: var(--hover); color: var(--text); }
   .account-row:hover, .settings-tab:hover:not([aria-selected="true"]), .settings-result:hover { background: var(--hover); }
+  .avatar-btn:hover .avatar-edit { opacity: 1; }
   .btn:hover:not(:disabled), button.chip:hover, .menu button:hover:not(:disabled), .dropdown.plain:hover:not(:disabled) { background: var(--hover); }
   .btn.primary:hover:not(:disabled) { background: #fff; }
   .send-btn:hover:not(:disabled) { background: var(--primary); color: var(--bg); border-color: var(--primary); }

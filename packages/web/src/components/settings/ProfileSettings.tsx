@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import { IconCheck as Check } from "@tabler/icons-react";
+import { IconCheck as Check, IconPencil as Pencil } from "@tabler/icons-react";
 import { PROFILE_AVATARS, PROFILE_NAME_MAX, type ProfileAvatar } from "@rails/shared";
 import { useStore } from "../../store.tsx";
 import { Avatar, AVATAR_LABELS } from "../Avatar.tsx";
@@ -48,6 +48,9 @@ export function ProfileSettings() {
         </div>
         <button className="avatar-btn" aria-label="Change avatar" aria-haspopup="dialog" title="Change avatar" onClick={() => setPicking(true)}>
           <Avatar avatar={profile.avatar} size={40} />
+          <span className="avatar-edit" aria-hidden>
+            <Pencil size={16} />
+          </span>
         </button>
       </div>
       <div className="set-row" id="setting-name" data-settings-row tabIndex={-1}>

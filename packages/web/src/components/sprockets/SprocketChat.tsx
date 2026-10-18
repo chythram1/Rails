@@ -9,6 +9,9 @@ import { MenuButton } from "../Menu.tsx";
 import { useStore } from "../../store.tsx";
 import { Sprocket } from "./Sprocket.tsx";
 
+/** Room left above a sent message when the thread slides it to the top. */
+const PIN_GAP = 16;
+
 /** A new time label when a message comes over an hour after the previous one (or on a new day). */
 const GAP_MS = 60 * 60 * 1000;
 
@@ -39,6 +42,9 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
   const [error, setError] = useState("");
   const [loadError, setLoadError] = useState("");
   const thread = useRef<HTMLDivElement>(null);
+  const spacer = useRef<HTMLDivElement>(null);
+  /** Set when the user sends: the thread slides their message to the top, once, and keeps room for it there. */
+  const pin = useRef<"slide" | "hold" | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -57,14 +63,31 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
     });
   }, [load, id]);
 
-  // Keep the newest message (or the reply being written) in view.
+  // Opening a chat shows its end. Sending slides the new message to the top of the thread (as ChatGPT and
+  // Claude do) with the reply growing below it; the spacer after the messages keeps enough room for that
+  // while the reply is short. After the slide nothing moves the view, so reading back isn't interrupted.
   useLayoutEffect(() => {
     const el = thread.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages?.length, typing, sprocket.running]);
+    if (!el || !spacer.current) return;
+    if (!pin.current) {
+      el.scrollTop = el.scrollHeight;
+      return;
+    }
+    const sent = [...el.querySelectorAll<HTMLElement>(".sp-message.user")].at(-1);
+    if (!sent) return;
+    const top = sent.offsetTop - PIN_GAP;
+    spacer.current.style.height = "0px";
+    const room = top + el.clientHeight - spacer.current.offsetTop - parseFloat(getComputedStyle(el).paddingBottom);
+    spacer.current.style.height = `${Math.max(0, room)}px`;
+    if (pin.current === "slide") {
+      el.scrollTo({ top, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      pin.current = "hold";
+    }
+  }, [messages, typing, sprocket.running]);
 
   const send = async (text: string) => {
     setError("");
+    pin.current = "slide";
     const pending: SprocketMessage = { id: "pending", sprocketId: id, author: "user", text, createdAt: new Date().toISOString() };
     setMessages((m) => [...(m ?? []), pending]);
     try {
@@ -137,7 +160,8 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
           </div>
         )}
         {!!messages?.length && (
-          // A log: screen readers announce new messages (not the reply while it's being written).
+          // A log: screen readers announce new messages (not the reply while it's being written, which sits
+          // in the list, where the reply will be, but hidden from them).
           <ol className="sp-messages" aria-label={`Chat with ${name}`} role="log">
             {messages.map((m, i) => {
               const prev = messages[i - 1];
@@ -152,19 +176,20 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
                 </li>
               );
             })}
+            {sprocket.running && (
+              <li className="sp-message sprocket" aria-hidden>
+                {typing ? (
+                  <p className="sp-bubble">{typing}</p>
+                ) : (
+                  <p className="sp-thinking">
+                    <Sprocket look={sprocket.look} size={22} seed={id} /> Thinking…
+                  </p>
+                )}
+              </li>
+            )}
           </ol>
         )}
-        {sprocket.running && (
-          <div className="sp-message sprocket" aria-hidden>
-            {typing ? (
-              <p className="sp-bubble">{typing}</p>
-            ) : (
-              <p className="sp-thinking">
-                <Sprocket look={sprocket.look} size={22} seed={id} /> Thinking…
-              </p>
-            )}
-          </div>
-        )}
+        <div className="sp-spacer" ref={spacer} aria-hidden />
         <p className="sr-only" role="status">{sprocket.running ? `${name} is replying` : ""}</p>
       </div>
       <div className="sp-compose">
