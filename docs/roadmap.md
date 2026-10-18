@@ -6,8 +6,9 @@ Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
 
 ## Next
 - **Sprockets stage 2, next parts.** ADR 0006 covers replies, model providers, projects and core memory.
-  ADR 0007 lets Sprockets see their project's sessions. Next, they message sessions and coordinate:
-  conflict warnings, handoffs, attention, digests.
+  ADR 0007 lets Sprockets see their project's sessions, and ADR 0008 gives them a harness (codemode over
+  capabilities: sessions, git, files). Next, they message sessions and coordinate: conflict warnings,
+  handoffs, attention, digests, woken by watches on sessions.
   Sprockets replace the earlier "home agent" idea.
 - Adopt sessions running in the user's own terminal (today only panels started by Rails are shared)
 - Adding projects from another device: Recent works anywhere, but "Open folder…" opens on the server's screen (ADR 0004)
