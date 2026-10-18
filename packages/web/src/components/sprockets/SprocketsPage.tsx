@@ -46,12 +46,13 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
   } else if (route.view === "edit" && current) {
     main = <SprocketCreator key={current.id} sprocket={current} taken={[]} onSaved={(s) => navigate(href.sprocket(s.id))} onCancel={() => navigate(href.sprocket(current.id))} />;
   } else if ((route.view === "chat" || route.view === "settings") && current) {
-    // The chat stays put while its settings panel opens and closes beside it.
+    // The chat stays put while its settings panel opens and closes beside it. The key is on the wrapper:
+    // another Sprocket gets a fresh chat and panel (siblings sharing one key would pile up old chats).
     const panel = route.view === "settings";
     main = (
-      <div className={"sp-detail" + (panel ? " with-panel" : "")}>
-        <SprocketChat key={current.id} sprocket={current} panelOpen={panel} />
-        {panel && <SprocketSettings key={current.id} sprocket={current} />}
+      <div key={current.id} className="sp-detail">
+        <SprocketChat sprocket={current} panelOpen={panel} />
+        {panel && <SprocketSettings sprocket={current} />}
       </div>
     );
   } else if (route.id) {
