@@ -36,9 +36,16 @@ only reads transcripts for discovery (cwd, title, dates); the agents' TUIs rende
 
 ## Codex CLI — `~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl`
 
-Codex isn't installed on the dev machine, so these notes come from the public format and are **untested**.
+Checked with Codex 0.163.0 (October 2026): the rollout path below is right, and the folder only appears once
+the first thread exists. The line format still comes from the public docs and is **untested**.
 
 - The first line is `{type:'session_meta', payload:{id, cwd, timestamp, ...}}`.
 - `{type:'response_item', payload:{type:'message', role, content:[{type:'input_text'|'output_text', text}]}}`
 - `{type:'response_item', payload:{type:'function_call', name, arguments, call_id}}` and `function_call_output`.
-- CLI (untested): `codex [-- prompt]` starts a session (id unknown until its rollout file appears); `codex resume <id>` reopens one.
+- CLI: `codex [-- prompt]` starts a session (id unknown until its rollout file appears); `codex resume <id>` reopens one,
+  but fails ("no rollout found") for a thread that has no turns yet. `codex delete --force <id>` deletes a thread.
+- Codex 0.16x also keeps thread metadata in `~/.codex/state_<n>.sqlite` (`threads`: id, cwd, title, rollout_path, …)
+  and runs interactive sessions on a shared local **app-server daemon** (`codex app-server daemon version` prints
+  its socket). Clients speak JSON-RPC over a WebSocket on that Unix socket: `thread/list` filters by `cwd`, and
+  thread events are broadcast to clients. Any `-c`, `--enable`, `--disable` or `--search` flag makes the TUI run
+  embedded instead, so its thread is invisible to the daemon.

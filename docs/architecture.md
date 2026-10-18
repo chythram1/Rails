@@ -97,7 +97,7 @@ packages/
 | --- | --- | --- |
 | claude | ✅ `~/.claude/projects/*/*.jsonl` | ✅ `claude --session-id <uuid> [-- prompt]` / `claude --resume <id>` |
 | pi | ✅ `~/.pi/agent/sessions/*/*.jsonl` | ✅ `pi --session-id <uuid> [-- prompt]` / `pi --session <id>` |
-| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl` (format from docs; untested locally) | ⚠️ `codex [-- prompt]` / `codex resume <id>` (untested: Codex isn't installed here) |
+| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl` (path verified with Codex 0.163; line format from docs) | ⚠️ `codex [-- prompt]` / `codex resume <id>` (run fine in tmux with Codex 0.163; not yet tested through rails) |
 
 A provider is only offered when its CLI is on the server's `PATH` (`ProviderInfo.installed`).
 Transcript format notes are in [providers.md](./providers.md).

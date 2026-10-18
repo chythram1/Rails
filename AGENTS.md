@@ -118,8 +118,8 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - `make typecheck` must pass. `make start` builds and runs prod, where the server serves `web/dist`. `make token` prints the access token.
 - There's no automated test suite yet. Verify with typecheck, `curl` against the API and a browser check. Don't add a test framework without asking.
 - Use throwaway state with `make dev-tmp` (LAN-reachable, `/tmp/rails-dev`, token `t`) or `RAILS_HOME=/tmp/x RAILS_TOKEN=t`. For `curl`, log in first with `POST /api/auth/login {"token":…}` and keep the cookie.
-- Browser testing on this machine: use `agent-browser-remote` (see the global AGENTS.md). Start dev with `make dev-tmp` (or `make dev-lan`) and open `http://100.101.76.38:5173/?token=…`. The mac-mini reaches it over Tailscale.
-- Panel tests run real agents with your logins. Use a scratch directory, then delete the transcripts they leave (`~/.claude/projects/-private-tmp-…`, `~/.pi/agent/sessions/--private-tmp-…--`) and kill the throwaway tmux server (`tmux -S $RAILS_HOME/tmux.sock kill-server`).
+- Browser checks: start dev with `make dev-tmp` (or `make dev-lan`) and open the printed `?token=` URL. A browser on another device reaches it through the host's LAN or Tailscale address.
+- Panel tests run real agents with your logins. Use a scratch directory, then delete the transcripts they leave (`~/.claude/projects/-private-tmp-…`, `~/.pi/agent/sessions/--private-tmp-…--`, Codex threads with `codex delete --force <id>`) and kill the throwaway tmux server (`tmux -S $RAILS_HOME/tmux.sock kill-server`).
 - Never resume or open the user's real sessions in tests: `claude --resume` appends lines to the transcript even if you type nothing. Create scratch sessions instead.
 - Never kill tmux servers or rails processes you didn't start: the user's own `make dev` may be running on :4317/:5173, so test on other ports (`RAILS_PORT=4319`, `npx vite --port 5180`).
 
@@ -134,9 +134,9 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - Panel processes live in tmux, not in the server. A browser disconnecting or the server restarting must never kill an agent; only closing the panel does.
 - The server's panel list is the source of truth; the saved layout is only an arrangement. Reconcile layout against the list, never the other way round.
 - The access token must never reach panel processes: keep the env cleaning in `tmux.ts`.
-- Discovery must stay cheap. Provider stores can be huge (pi is about 600MB here), so scans read only the head and tail of each file and cache by mtime and size. Never read whole files during a scan.
+- Discovery must stay cheap. Provider stores can be huge (a pi store can reach hundreds of MB), so scans read only the head and tail of each file and cache by mtime and size. Never read whole files during a scan.
 - The web client must work over plain HTTP on the LAN or Tailscale, so don't use secure-context-only browser APIs (for example `crypto.randomUUID` or the async clipboard API).
-- Keep server logic in plain service functions, not inside Hono route handlers. Routes should only parse input and call services, so the future home agent can reuse those services as tools.
+- Keep server logic in plain service functions, not inside Hono route handlers. Routes should only parse input and call services, so Sprockets can reuse those services as tools.
 - Project paths are stored as realpaths, because agents record the real cwd (on macOS, `/tmp` is really `/private/tmp`).
 
 ## Gotchas
@@ -148,14 +148,14 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - Terminals render with WebGL (`@xterm/addon-webgl`). xterm's DOM renderer lets rows drift wider than the grid (fallback glyphs like `─` and `•`), which clips the right edge. Keep padding off `.term-host`: the fit addon sizes from that element's CSS width.
 - Agent TUIs hard-wrap their output, so lines printed before a pane was narrowed stay clipped. That's normal terminal behaviour.
 - Imports use explicit `.ts` / `.tsx` extensions (`allowImportingTsExtensions`). The server runs TypeScript directly through `tsx` and has no build step.
-- Native `<select>` can't show images, so the home agent picker shows text.
+- Native `<select>` can't show images, so the agent picker on Home shows text.
 - Sprocket SVGs: a CSS `transform` replaces the SVG `transform` attribute, so position with an outer `<g transform>` and animate an inner group (`transform-box: fill-box`). Headless browsers often report reduced motion, which stops Sprocket animations: emulate `prefers-reduced-motion: no-preference` to check them.
-- Codex panels and Codex parsing are untested on this machine (Codex isn't installed).
+- Codex is the least tested provider: check Codex changes against a real Codex install. Codex 0.16x runs interactive sessions on a shared app-server daemon, and any `-c` override on the command line makes it run without the daemon (see `docs/providers.md`).
 
 ## Long-term direction
-The end goal is to port rails to a single Rust binary that runs as a desktop app (see `docs/roadmap.md`).
-Until then, keep the server easy to port: logic in plain service functions, the client/server contract
-fully described by the types in `packages/shared`, and no new Node-only dependencies without a good reason.
+rails may ship as a desktop app later. A Node-based shell such as Electron is fine, so the Node server can
+stay; the earlier Rust port idea is dropped (see `docs/roadmap.md`). Keep logic in plain service functions
+and the client/server contract fully described by the types in `packages/shared`.
 
 ## Keeping docs current
 Update the docs in the same change as the code:
