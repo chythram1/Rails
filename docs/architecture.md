@@ -80,7 +80,8 @@ packages/
   pi-agent-core loop on the Sprocket's model, streamed to browsers as `sprockets.typing`, capped at 12 model
   calls, 30 runs per Sprocket per hour and 2 runs at once. Its one tool is codemode (ADR 0008,
   `harness/codemode.ts`): scripts run in pi's QuickJS sandbox and call the Sprocket's capabilities (`harness/`:
-  memory; and for attached Sprockets the board, sessions, git and read-only files, `files.ts`). `models.ts` holds the model providers (pi-ai),
+  memory; and for attached Sprockets the board, sessions, git and read-only files, `files.ts`). Each call's step goes
+  to browsers as `sprockets.activity`, and the run's summary is saved on the reply (the run log). `models.ts` holds the model providers (pi-ai),
   the default model and sign-ins; credentials are in `RAILS_HOME/credentials.json`. `signin.ts` runs the
   sign-ins (ChatGPT, OpenRouter) itself and stores pi-ai's credential shape; callbacks land on the server's
   `127.0.0.1` (OpenAI: port 1455). The web renders each Sprocket as an SVG character from data

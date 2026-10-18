@@ -10,7 +10,7 @@ import { panels, sessionEvents } from "../db.ts";
 import { isSecretPath, readProjectFile, READ_MAX_LINES, SEARCH_MAX_MATCHES, searchProject, withoutSecrets } from "../files.ts";
 import { gitDiff, gitDiffAll, gitLog, gitShow, gitStatus } from "../git.ts";
 import { conversation, findSession, sessionsFor } from "../providers/index.ts";
-import type { Capability, RunContext } from "./capabilities.ts";
+import { listOf, type Capability, type RunContext } from "./capabilities.ts";
 
 const ACTIVITY = 25;
 /** session_conversation: messages by default and at most, each message's length, and the whole result's. */
@@ -22,6 +22,8 @@ const CONVERSATION_CHARS = 12_000;
 const DIFF_CHARS = 60_000;
 const GIT_MAX_BYTES = 512 * 1024;
 
+/** How many different values of `key` the calls had (sessions, commits). */
+const count = (calls: any[], key: string) => new Set(calls.map((c) => c[key])).size;
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "…" : s);
 /** A patch as a Sprocket sees it: secrets left out, then cut to DIFF_CHARS. */
 function patch({ text, cut }: { text: string; cut: boolean }, what: string): string {
@@ -85,6 +87,7 @@ export const projectCapabilities: Capability[] = [
       "What every agent session in your project is doing, as text to read: status, what it was asked, files it changed, its last reply, and files more than one session changed.",
     params: none,
     effect: "read",
+    log: { doing: () => "Looking at the board", done: () => "looked at the board" },
     run: async (_args, ctx) => {
       const p = project(ctx);
       return boardText(p, (await openSessions(p)).map(cardOf));
@@ -111,6 +114,7 @@ export const projectCapabilities: Capability[] = [
       },
     },
     effect: "read",
+    log: { doing: () => "Listing the sessions", done: () => "listed the sessions" },
     run: async (_args, ctx) =>
       (await openSessions(project(ctx))).map((panel) => {
         const card = cardOf(panel);
@@ -130,6 +134,10 @@ export const projectCapabilities: Capability[] = [
     description: `The last ${ACTIVITY} things one session did since it was opened in Rails (prompts, tools, files, replies), oldest first. For what was said before that, use session_conversation.`,
     params: Type.Object({ session }),
     effect: "read",
+    log: {
+      doing: () => "Checking a session's activity",
+      done: (calls) => (count(calls, "session") > 1 ? `checked ${count(calls, "session")} sessions' activity` : "checked a session's activity"),
+    },
     run: async ({ session }, ctx) => {
       const p = await findOpen(project(ctx), session);
       const events = sessionEvents.list(p.id).slice(-ACTIVITY);
@@ -147,6 +155,10 @@ export const projectCapabilities: Capability[] = [
       messages: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_MESSAGES, description: `How many of the latest messages (default ${MESSAGES}).` })),
     }),
     effect: "read",
+    log: {
+      doing: () => "Reading a conversation",
+      done: (calls) => (count(calls, "session") > 1 ? `read ${count(calls, "session")} conversations` : "read a conversation"),
+    },
     run: async ({ session, messages }, ctx) => {
       const p = await findOpen(project(ctx), session);
       const sessionId = p.sessionId ?? cardOf(p).sessionId;
@@ -183,6 +195,7 @@ export const projectCapabilities: Capability[] = [
       required: ["isRepo", "ahead", "behind", "files"],
     },
     effect: "read",
+    log: { doing: () => "Checking git status", done: () => "checked git status" },
     run: async (_args, ctx) => gitStatus(project(ctx).path),
   },
   {
@@ -190,6 +203,13 @@ export const projectCapabilities: Capability[] = [
     description: "Uncommitted changes against the last commit, as a patch: one file's, or all of them (files that may hold secrets are left out).",
     params: Type.Object({ path: Type.Optional(Type.String({ description: "A file, relative to the project. Omit for every change." })) }),
     effect: "read",
+    log: {
+      doing: ({ path }) => (path ? `Looking at the changes to ${path}` : "Looking at the uncommitted changes"),
+      done: (calls) => {
+        const paths = calls.map((c) => c.path).filter(Boolean);
+        return paths.length === calls.length ? `looked at the changes to ${listOf(paths, "files")}` : "looked at the uncommitted changes";
+      },
+    },
     run: async ({ path }, ctx) => {
       const root = project(ctx).path;
       if (path && isSecretPath(path.replace(/^\.\//, ""))) throw new Error(`${path} may hold secrets, so Sprockets can't see its changes.`);
@@ -212,6 +232,7 @@ export const projectCapabilities: Capability[] = [
       items: { type: "object", properties: { commit: { type: "string" }, date: { type: "string" }, author: { type: "string" }, subject: { type: "string" } }, required: ["commit", "date", "author", "subject"] },
     },
     effect: "read",
+    log: { doing: () => "Looking at the git history", done: () => "looked at the git history" },
     run: async ({ limit, path }, ctx) => gitLog(project(ctx).path, limit ?? 20, path),
   },
   {
@@ -219,6 +240,10 @@ export const projectCapabilities: Capability[] = [
     description: "One commit: its message, the files it changed and its patch (files that may hold secrets are left out).",
     params: Type.Object({ commit: Type.String({ description: 'A commit hash, or a name like "HEAD~1".' }) }),
     effect: "read",
+    log: {
+      doing: ({ commit }) => `Looking at commit ${commit}`,
+      done: (calls) => (count(calls, "commit") > 1 ? `looked at ${count(calls, "commit")} commits` : `looked at commit ${calls[0].commit}`),
+    },
     run: async ({ commit }, ctx) => patch(await gitShow(project(ctx).path, commit, GIT_MAX_BYTES), "The commit"),
   },
   {
@@ -230,6 +255,7 @@ export const projectCapabilities: Capability[] = [
       lines: Type.Optional(Type.Integer({ minimum: 1, maximum: READ_MAX_LINES, description: "How many lines (default 400)." })),
     }),
     effect: "read",
+    log: { doing: ({ path }) => `Reading ${path}`, done: (calls) => `read ${listOf(calls.map((c) => c.path), "files")}` },
     run: async ({ path, from, lines }, ctx) => readProjectFile(project(ctx).path, path, { from, lines }),
   },
   {
@@ -250,6 +276,10 @@ export const projectCapabilities: Capability[] = [
       required: ["matches", "truncated"],
     },
     effect: "read",
+    log: {
+      doing: ({ query }) => `Searching for “${query}”`,
+      done: (calls) => `searched for ${listOf(calls.map((c) => `“${c.query}”`), "terms")}`,
+    },
     run: async ({ query, regex, glob, limit }, ctx) => searchProject(project(ctx).path, query, { regex, glob, limit }),
   },
 ];

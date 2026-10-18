@@ -4,7 +4,8 @@
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { Api, AssistantMessage, Message, Model } from "@earendil-works/pi-ai";
 import { projects, settings, sprocketMessages, sprockets } from "./db.ts";
-import { codemodeTool } from "./harness/codemode.ts";
+import { stepText, summarize, type Capability } from "./harness/capabilities.ts";
+import { codemodeTool, type CallRecord } from "./harness/codemode.ts";
 import { CORE_MEMORY_MAX, memoryCapability } from "./harness/memory.ts";
 import { projectCapabilities } from "./harness/project.ts";
 import { findModel, models } from "./models.ts";
@@ -30,9 +31,12 @@ const runStart = new Map<string, number>();
 
 const runChanges = listeners();
 const typingChanges = listeners<[sprocketId: string, text: string | null]>();
+const activityChanges = listeners<[sprocketId: string, step: string | null, summary: string | null]>();
 /** Something visible changed: a run started or ended, a message or the core memory was written. */
 export const onRunsChanged = runChanges.on;
 export const onTyping = typingChanges.on;
+/** The step a reply is on and what it has done so far (the run log); nulls when the run ends. */
+export const onActivity = activityChanges.on;
 const changed = runChanges.emit;
 const typing = typingChanges.emit;
 
@@ -70,6 +74,7 @@ async function start(id: string) {
     running.delete(id);
     runStart.delete(id);
     typing(id, null);
+    activityChanges.emit(id, null, null);
     changed();
     if (again.delete(id)) requestReply(id);
     const next = waiting.shift();
@@ -115,9 +120,26 @@ async function run(id: string) {
   const project = s.projectId ? projects.get(s.projectId) : undefined;
   // One tool (ADR 0008): the model writes scripts that call the Sprocket's capabilities.
   const capabilities = [memoryCapability(changed), ...(project ? projectCapabilities : [])];
+  // The run log: every call's outcome, and the ones going now (scripts can run several at once).
+  const done: { name: string; args: unknown; status: CallRecord["status"] }[] = [];
+  const going: { capability: Capability; args: unknown }[] = [];
+  const report = () => {
+    const now = going.at(-1);
+    activityChanges.emit(id, now ? stepText(now.capability, now.args) : null, summarize(capabilities, done) ?? null);
+  };
   const code = codemodeTool(capabilities, { sprocketId: id, project }, {
     store: () => sprockets.codemodeStore(id),
     saveStore: (writes) => sprockets.saveCodemodeStore(id, writes),
+    onCallStart: (capability, args) => {
+      going.push({ capability, args });
+      report();
+    },
+    onCallEnd: (capability, args, status) => {
+      const i = going.findIndex((g) => g.capability === capability && g.args === args);
+      if (i >= 0) going.splice(i, 1);
+      done.push({ name: capability.name, args, status });
+      report();
+    },
   });
   const agent = new Agent({
     initialState: {
@@ -146,7 +168,7 @@ async function run(id: string) {
   if (!now || now.projectId !== s.projectId) return;
   const reply = agent.state.messages.filter((m): m is AssistantMessage => m.role === "assistant").at(-1);
   const text = reply ? textOf(reply) : "";
-  if (text) sprocketMessages.create(id, "sprocket", text, startedAt);
+  if (text) sprocketMessages.create(id, "sprocket", text, startedAt, summarize(capabilities, done));
   if (steps > MAX_STEPS) notice(id, `Stopped after ${MAX_STEPS} steps.`);
   else if (reply?.stopReason === "error") notice(id, `The model returned an error: ${readableError(reply.errorMessage)}`);
   else if (!text) notice(id, "The model sent an empty reply.");

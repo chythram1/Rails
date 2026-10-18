@@ -618,6 +618,8 @@ textarea.input { resize: vertical; line-height: 1.5; }
   .sp-message:is(:hover, :focus-within) .sp-msg-actions { opacity: 1; }
   .sp-messages:hover .sp-message:not(:hover) .sp-msg-actions { opacity: 0; }
 }
+/* The run log above a reply: what the Sprocket looked at or did for it. */
+.sp-steps { margin: 0 0 4px; color: var(--muted); font-size: 13px; text-wrap: pretty; }
 .sp-thinking { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; color: var(--muted); font-size: 15px; }
 .sp-project {
   max-width: 40%; padding: 2px 9px; border: 1px solid var(--border-strong); border-radius: 999px;

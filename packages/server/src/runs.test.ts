@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { projects, settings, sprockets } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { CORE_MEMORY_MAX, editMemory } from "./harness/memory.ts";
-import { idle, onTyping, readableError } from "./runs.ts";
+import { idle, onActivity, onTyping, readableError } from "./runs.ts";
 import { sprocketMessages } from "./db.ts";
 import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings } from "./sprockets.ts";
 
@@ -53,10 +53,15 @@ describe("runs", () => {
       fauxAssistantMessage([fauxToolCall("codemode", { code: 'return await tools.remember({ op: "add", text: "Prefers short answers." })' })], { stopReason: "toolUse" }),
       fauxAssistantMessage("Got it."),
     ]);
+    const steps: (string | null)[] = [];
+    onActivity((sprocketId, step) => sprocketId === s.id && steps.push(step));
     sendMessage(s.id, "keep it short from now on");
     await idle();
     expect(sprockets.get(s.id)!.coreMemory).toBe("Prefers short answers.");
     expect(authors(s.id).at(-1)).toBe("sprocket: Got it.");
+    // The run log: the step while it ran, then what the reply did, saved with it.
+    expect(steps).toEqual(["Updating its memory", null, null]);
+    expect(listMessages(s.id).at(-1)!.activity).toBe("Updated its memory");
   });
 
   it("stops a run that keeps calling tools", async () => {

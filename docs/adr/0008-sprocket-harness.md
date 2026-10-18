@@ -33,6 +33,10 @@ Decisions:
   stopped after 512 KB, a listing looks at 1,000 entries at most. Search uses ripgrep when it's installed,
   else `git grep`.
 
+- **A run log.** Each capability says, in a few words, what a call is doing ("Reading src/api.ts") and what
+  a run's calls of it did ("read 2 conversations"). Browsers get the step and the summary so far as
+  `sprockets.activity`; the summary is saved with the reply, and the chat shows it above the reply.
+
 Consequences:
 - A new ability is one capability: no tool or prompt plumbing, and the model sees it in the codemode
   description. The same functions can later serve agents in panels (MCP, the pi extension).

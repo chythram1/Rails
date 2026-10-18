@@ -55,6 +55,7 @@ addColumn("sprockets", "core_memory", "TEXT NOT NULL DEFAULT ''");
 addColumn("sprockets", "description", "TEXT NOT NULL DEFAULT ''");
 addColumn("sprockets", "codemode_store", "TEXT NOT NULL DEFAULT '{}'");
 addColumn("sprocket_messages", "author", "TEXT NOT NULL DEFAULT 'user'");
+addColumn("sprocket_messages", "activity", "TEXT");
 addColumn("panels", "bridge_token", "TEXT");
 db.exec(`
   CREATE TABLE IF NOT EXISTS session_events (
@@ -240,13 +241,14 @@ export const sprockets = {
   },
 };
 
-type MessageRow = { id: string; sprocket_id: string; author: SprocketAuthor; text: string; created_at: string };
+type MessageRow = { id: string; sprocket_id: string; author: SprocketAuthor; text: string; created_at: string; activity: string | null };
 const toMessage = (r: MessageRow): SprocketMessage => ({
   id: r.id,
   sprocketId: r.sprocket_id,
   author: r.author,
   text: r.text,
   createdAt: r.created_at,
+  ...(r.activity ? { activity: r.activity } : {}),
 });
 
 export const sprocketMessages = {
@@ -257,14 +259,15 @@ export const sprocketMessages = {
     const r = db.prepare("SELECT * FROM sprocket_messages WHERE sprocket_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(sprocketId) as MessageRow | undefined;
     return r && toMessage(r);
   },
-  create(sprocketId: string, author: SprocketAuthor, text: string, createdAt = new Date().toISOString()): SprocketMessage {
-    const m: SprocketMessage = { id: randomUUID(), sprocketId, author, text, createdAt };
-    db.prepare("INSERT INTO sprocket_messages (id, sprocket_id, author, text, created_at) VALUES (?, ?, ?, ?, ?)").run(
+  create(sprocketId: string, author: SprocketAuthor, text: string, createdAt = new Date().toISOString(), activity?: string): SprocketMessage {
+    const m: SprocketMessage = { id: randomUUID(), sprocketId, author, text, createdAt, ...(activity ? { activity } : {}) };
+    db.prepare("INSERT INTO sprocket_messages (id, sprocket_id, author, text, created_at, activity) VALUES (?, ?, ?, ?, ?, ?)").run(
       m.id,
       m.sprocketId,
       m.author,
       m.text,
       m.createdAt,
+      activity ?? null,
     );
     return m;
   },

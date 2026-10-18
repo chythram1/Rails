@@ -40,6 +40,8 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
   const [messages, setMessages] = useState<SprocketMessage[] | null>(null);
   /** The reply being revealed (revealText.tsx): while it's written, then as the saved message `id`. */
   const [reveal, setReveal] = useState<{ text: string; live: boolean; id?: string } | null>(null);
+  /** The reply's run log while it's written: the step it's on, and what it has done so far. */
+  const [activity, setActivity] = useState<{ step: string | null; summary: string | null }>({ step: null, summary: null });
   /** Messages already shown; null until the first load, whose messages show at once. */
   const seen = useRef<Set<string> | null>(null);
   /** Re-renders once a minute, so "5 minutes ago" under each message stays true. */
@@ -53,7 +55,7 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
   const thread = useRef<HTMLDivElement>(null);
   const spacer = useRef<HTMLDivElement>(null);
   const { shown, fresh } = useRevealedText(reveal?.text ?? "", reveal?.live === true);
-  const scroll = useThreadScroll(thread, spacer, sprocket.running, [messages, reveal?.id, shown, sprocket.running]);
+  const scroll = useThreadScroll(thread, spacer, sprocket.running, [messages, reveal?.id, shown, sprocket.running, activity.summary]);
 
   const load = useCallback(async () => {
     try {
@@ -79,17 +81,23 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
         const text = m.text;
         setReveal((r) => (text === null ? r && { ...r, live: false } : { text, live: true }));
       }
+      // The summary outlives the run's end by a moment (until the saved reply, which carries it, loads), so
+      // it doesn't blink out; a new send or run clears it.
+      if (m.type === "sprockets.activity" && m.sprocketId === id) setActivity((a) => ({ step: m.step, summary: m.summary ?? a.summary }));
     });
   }, [load, id]);
 
   // A new run (possibly started on another device) starts with "Thinking…", not the last reply.
   useEffect(() => {
     if (sprocket.running) setReveal((r) => (r?.id ? null : r));
+    if (sprocket.running) setActivity((a) => (reveal?.id ? { step: null, summary: null } : a));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sprocket.running]);
 
   const send = async (text: string) => {
     setError("");
     setReveal(null);
+    setActivity({ step: null, summary: null });
     scroll.onSend();
     const pending: SprocketMessage = { id: "pending", sprocketId: id, author: "user", text, createdAt: new Date().toISOString() };
     setMessages((m) => [...(m ?? []), pending]);
@@ -172,6 +180,7 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
               return (
                 <li key={m.id + i} className={"sp-message " + m.author}>
                   {label && <time className="sp-stamp" dateTime={m.createdAt}>{stamp(m.createdAt)}</time>}
+                  {m.activity && <p className="sp-steps">{m.activity}</p>}
                   <p className="sp-bubble">
                     {m.author === "sprocket" && <span className="sr-only">{name}: </span>}
                     {m.id === reveal?.id ? (
@@ -192,14 +201,16 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
             })}
             {sprocket.running && !reveal?.id && (
               <li className="sp-message sprocket" aria-hidden>
-                {/* "Thinking…" holds its place until the first words show, so the row never empties. */}
+                {/* The same line the saved reply will carry, so nothing moves when it replaces this. */}
+                {activity.summary && <p className="sp-steps">{activity.summary}</p>}
+                {/* "Thinking…" (or the step it's on) holds its place until the first words show, so the row never empties. */}
                 {reveal && shown > 0 ? (
                   <p className="sp-bubble">
                     <Revealed text={reveal.text} shown={shown} fresh={fresh} />
                   </p>
                 ) : (
                   <p className="sp-thinking">
-                    <Sprocket look={sprocket.look} size={22} seed={id} /> Thinking…
+                    <Sprocket look={sprocket.look} size={22} seed={id} /> {activity.step ? `${activity.step}…` : "Thinking…"}
                   </p>
                 )}
               </li>

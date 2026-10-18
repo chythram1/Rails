@@ -31,6 +31,7 @@ export function memoryCapability(changed: () => void): Capability {
       old: Type.Optional(Type.String()),
     }),
     effect: "act",
+    log: { doing: () => "Updating its memory", done: () => "updated its memory" },
     run: async (args, ctx) => {
       const next = editMemory(sprockets.get(ctx.sprocketId)?.coreMemory ?? "", args);
       sprockets.setCoreMemory(ctx.sprocketId, next);

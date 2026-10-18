@@ -23,6 +23,34 @@ export interface Capability {
   /** "act" capabilities change something (a message, the Sprocket's memory); a run may do only so many. */
   effect: "read" | "act";
   run(args: any, ctx: RunContext): Promise<unknown>;
+  /** For the run log: the step while a call runs ("Reading src/api.ts"), and what this run's calls did ("read src/api.ts"). */
+  log?: { doing(args: any): string; done(calls: any[]): string };
+}
+
+/** The step a call is on, for the "Thinking…" line. */
+export const stepText = (capability: Capability, args: unknown) => capability.log?.doing(args) ?? `Using ${capability.name}`;
+
+/** "a.ts", "a.ts and b.ts", "a.ts, b.ts and c.ts", or "a.ts, b.ts and 3 more files": distinct items. */
+export function listOf(items: string[], noun: string): string {
+  const distinct = [...new Set(items)];
+  if (distinct.length > 3) return `${distinct.slice(0, 2).join(", ")} and ${distinct.length - 2} more ${noun}`;
+  return distinct.length > 1 ? `${distinct.slice(0, -1).join(", ")} and ${distinct.at(-1)}` : (distinct[0] ?? "");
+}
+
+/**
+ * A run's calls in one line, in the order of first use: "Looked at the board, read 2 conversations and
+ * searched for “fetchUser”". Failed calls are counted at the end; calls cut off when a script ended are left out.
+ */
+export function summarize(capabilities: Capability[], calls: { name: string; args: unknown; status: string }[]): string | undefined {
+  const byName = new Map<string, unknown[]>();
+  for (const call of calls) if (call.status === "ok") byName.set(call.name, [...(byName.get(call.name) ?? []), call.args]);
+  const phrases = [...byName].map(([name, all]) => capabilities.find((c) => c.name === name)?.log?.done(all) ?? `used ${name}`);
+  const failed = calls.filter((c) => c.status === "error").length;
+  if (!phrases.length && !failed) return undefined;
+  const text = phrases.length > 1 ? `${phrases.slice(0, -1).join(", ")} and ${phrases.at(-1)}` : (phrases[0] ?? "");
+  const tail = failed ? `${failed} step${failed > 1 ? "s" : ""} failed` : "";
+  const line = [text, tail].filter(Boolean).join("; ");
+  return line.charAt(0).toUpperCase() + line.slice(1);
 }
 
 /** A script's arguments checked (and coerced) against the capability's schema, as pi checks a tool call. */

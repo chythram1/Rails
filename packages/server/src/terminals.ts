@@ -7,7 +7,7 @@ import { onPanelsChanged, panelEnded } from "./panels.ts";
 import { attentionList, onAttention } from "./bridge/index.ts";
 import { onModelsChanged, onSignIn } from "./models.ts";
 import { getProfile, onProfileChanged } from "./profile.ts";
-import { onTyping } from "./runs.ts";
+import { onActivity, onTyping } from "./runs.ts";
 import { onSprocketsChanged } from "./sprockets.ts";
 import * as tmux from "./tmux.ts";
 
@@ -25,6 +25,7 @@ export class TerminalHub {
     onPanelsChanged((projectId) => this.broadcast({ type: "panels.changed", projectId }));
     onSprocketsChanged(() => this.broadcast({ type: "sprockets.changed" }));
     onTyping((sprocketId, text) => this.broadcast({ type: "sprockets.typing", sprocketId, text }));
+    onActivity((sprocketId, step, summary) => this.broadcast({ type: "sprockets.activity", sprocketId, step, summary }));
     onModelsChanged(() => this.broadcast({ type: "models.changed" }));
     onSignIn((signIn) => this.broadcast({ type: "models.signIn", signIn }));
     onProfileChanged((profile) => this.broadcast({ type: "profile.changed", profile }));

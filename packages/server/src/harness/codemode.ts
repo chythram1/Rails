@@ -39,8 +39,9 @@ export interface CodemodeHooks {
   store(): Record<string, unknown>;
   /** A successful script's `store()` writes. */
   saveStore(writes: { set: Record<string, unknown>; delete: string[] }): void;
-  /** The calls so far, after each change (for the live "Thinking…" line). */
-  onCalls?(calls: CallRecord[]): void;
+  /** A call started, and ended (for the run log and the live "Thinking…" line). */
+  onCallStart?(capability: Capability, args: unknown): void;
+  onCallEnd?(capability: Capability, args: unknown, status: CallRecord["status"]): void;
 }
 
 const params = Type.Object({ code: Type.String({ description: "Raw JavaScript source." }) });
@@ -86,20 +87,21 @@ export function codemodeTool(capabilities: Capability[], ctx: Omit<RunContext, "
       const startedAt = performance.now();
       const { code, options } = parseCodemodeSource(input.code);
       const calls: CallRecord[] = [];
-      const publish = () => hooks.onCalls?.(calls.map((c) => ({ ...c })));
       const tools = capabilities.map((capability) => ({
         ...declaration(capability),
         description: renderToolSample(declaration(capability)),
         execute: async (args: unknown, { signal: callSignal }: { signal: AbortSignal }) => {
           const record: CallRecord = { name: capability.name, args: preview(args), status: "running" };
           calls.push(record);
-          publish();
           const callStartedAt = performance.now();
+          let checked: unknown = args;
           try {
             if (capability.effect === "act" && ++acts > MAX_ACTS_PER_RUN) {
               throw new Error(`This run has already made ${MAX_ACTS_PER_RUN} changes, the most one run may make.`);
             }
-            const value = await capability.run(checkArgs(capability, args), { ...ctx, signal: callSignal });
+            checked = checkArgs(capability, args);
+            hooks.onCallStart?.(capability, checked);
+            const value = await capability.run(checked, { ...ctx, signal: callSignal });
             record.status = "ok";
             return capability.output ? value : String(value ?? "");
           } catch (e) {
@@ -108,7 +110,7 @@ export function codemodeTool(capabilities: Capability[], ctx: Omit<RunContext, "
             throw e;
           } finally {
             record.durationMs = performance.now() - callStartedAt;
-            publish();
+            hooks.onCallEnd?.(capability, checked, record.status);
           }
         },
       }));
@@ -130,7 +132,6 @@ export function codemodeTool(capabilities: Capability[], ctx: Omit<RunContext, "
       }
       // Calls still marked running were cut off by the script ending, a timeout, or an abort.
       for (const call of calls) if (call.status === "running") call.status = "cancelled";
-      publish();
 
       const output = [...result.output];
       if (result.ok) {

@@ -160,6 +160,8 @@ export interface SprocketMessage {
   author: SprocketAuthor;
   text: string;
   createdAt: string;
+  /** On a reply: what the Sprocket looked at or did for it ("Looked at the board and read src/api.ts"). */
+  activity?: string;
 }
 
 // ---- Settings ----
@@ -265,6 +267,8 @@ export type ServerMsg =
   | { type: "sprockets.changed" }
   /** A Sprocket's reply so far, while it's being written; null when it's done. */
   | { type: "sprockets.typing"; sprocketId: string; text: string | null }
+  /** While a Sprocket replies: the step it's on ("Reading src/api.ts"), and what it has done so far; null when done. */
+  | { type: "sprockets.activity"; sprocketId: string; step: string | null; summary: string | null }
   /** Providers, sign-ins or the default model changed. */
   | { type: "models.changed" }
   | { type: "models.signIn"; signIn: SignIn }
