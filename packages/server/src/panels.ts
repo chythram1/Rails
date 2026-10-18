@@ -80,6 +80,13 @@ export async function getWorkspace(projectId: string): Promise<Workspace> {
   return { panels: list, layout: layouts.get(projectId) };
 }
 
+/**
+ * Sessions being opened right now. A second request for the same session (React's StrictMode runs effects
+ * twice in development; two devices can click at once) waits for the first instead of racing it to the
+ * database, where one panel per session is enforced.
+ */
+const opening = new Map<string, Promise<Panel>>();
+
 /** Open a panel. Opening a session that already has a running panel returns that panel. */
 export async function openPanel(projectId: string, req: OpenPanel): Promise<Panel> {
   const project = getProject(projectId);
@@ -88,19 +95,29 @@ export async function openPanel(projectId: string, req: OpenPanel): Promise<Pane
 
   if (req.sessionId) {
     if (req.kind === "shell") throw new ServiceError("Shells have no sessions", 400);
-    const existing = panels.bySession(req.sessionId);
-    if (existing) {
-      if ((await tmux.runningPanels()).has(existing.id)) return existing;
-      await removePanel(existing); // its process ended but nobody noticed yet; start a fresh panel
-    }
-    const found = await findSession(req.kind, req.sessionId);
-    if (!found) throw new ServiceError("Session transcript not found", 404);
-    return start(project.id, req.kind, req.sessionId, found.title, found.cwd, resumeCommand(req.kind, req.sessionId));
+    const { sessionId } = req;
+    const inFlight = opening.get(sessionId);
+    if (inFlight) return inFlight;
+    const open = openSession(project.id, req.kind, sessionId).finally(() => opening.delete(sessionId));
+    opening.set(sessionId, open);
+    return open;
   }
 
   const { argv, sessionId } = newCommand(req.kind, req.prompt?.trim() || undefined);
   const title = req.kind === "shell" ? "Shell" : discovery[req.kind].name;
   return start(project.id, req.kind, sessionId, title, project.path, argv);
+}
+
+/** Resume a discovered session in a panel, or return the panel it's already running in. */
+async function openSession(projectId: string, kind: ProviderId, sessionId: string): Promise<Panel> {
+  const existing = panels.bySession(sessionId);
+  if (existing) {
+    if ((await tmux.runningPanels()).has(existing.id)) return existing;
+    await removePanel(existing); // its process ended but nobody noticed yet; start a fresh panel
+  }
+  const found = await findSession(kind, sessionId);
+  if (!found) throw new ServiceError("Session transcript not found", 404);
+  return start(projectId, kind, sessionId, found.title, found.cwd, resumeCommand(kind, sessionId));
 }
 
 async function start(projectId: string, kind: PanelKind, sessionId: string | undefined, title: string, cwd: string, argv: string[]) {
