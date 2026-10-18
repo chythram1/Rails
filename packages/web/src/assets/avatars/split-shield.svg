@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Split pixel shield">
+  <title>Split pixel shield</title>
+  <circle cx="128" cy="128" r="128" fill="#C0D4CE"/>
+  <g fill="#6AA0D7">
+    <path d="M96 48H122V110H111V122H101V134H111V146H122V208H96V188H82V174H70V154H58V78H82V64H96Z"/>
+    <path d="M160 48H134V110H145V122H155V134H145V146H134V208H160V188H174V174H186V154H198V78H174V64H160Z"/>
+  </g>
+</svg>

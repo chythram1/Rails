@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import type { AttentionReason, Project, ProviderInfo, SessionSummary } from "@rails/shared";
+import type { AttentionReason, Profile, ProfileChange, Project, ProviderInfo, SessionSummary } from "@rails/shared";
 import { api } from "./api.ts";
 import { href, navigate } from "./router.ts";
 import { socket } from "./ws.ts";
@@ -8,6 +8,10 @@ interface Store {
   projects: Project[];
   providers: ProviderInfo[];
   connected: boolean;
+  /** The name and avatar at the foot of the sidebar; null until the socket first connects. */
+  profile: Profile | null;
+  /** Change the profile. Throws with the server's message. */
+  saveProfile(change: ProfileChange): Promise<void>;
   /** Panels whose agent is working right now (thinking or replying). */
   busy: Set<string>;
   /** Panels whose agent needs the user, and why (ADR 0007). */
@@ -33,6 +37,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [connected, setConnected] = useState(socket.connected);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [attention, setAttention] = useState<Map<string, AttentionReason>>(new Map());
   const [sessions, setSessions] = useState<Record<string, SessionSummary[]>>({});
@@ -65,6 +70,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (m.type === "panels.changed") void refreshSessions(m.projectId);
       if (m.type === "panels.busy") setBusy(new Set(m.panelIds));
       if (m.type === "panels.attention") setAttention(new Map(m.panels.map((a) => [a.panelId, a.reason])));
+      if (m.type === "profile.changed") setProfile(m.profile); // on connect too
     });
     // Pick up sessions started outside rails and new transcripts of freshly started panels.
     const poll = setInterval(() => projectsRef.current.forEach((p) => void refreshSessions(p.id)), 20_000);
@@ -102,10 +108,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [refreshProjects],
   );
 
+  const saveProfile = useCallback(async (change: ProfileChange) => {
+    setProfile(await api.updateProfile(change));
+  }, []);
+
   const value: Store = {
     projects,
     providers,
     connected,
+    profile,
+    saveProfile,
     busy,
     attention,
     sessions,

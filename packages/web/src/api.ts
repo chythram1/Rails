@@ -3,6 +3,8 @@ import type {
   ModelSettings,
   OpenPanel,
   Panel,
+  Profile,
+  ProfileChange,
   Project,
   ProviderInfo,
   RecentFolder,
@@ -56,6 +58,8 @@ export const api = {
     signedOut();
   },
   server: () => req<ServerInfo>("/api/server"),
+  /** The profile itself arrives over the socket (profile.changed), on connect and on every change. */
+  updateProfile: (change: ProfileChange) => req<Profile>("/api/profile", { method: "PUT", body: JSON.stringify(change) }),
   /** Replaces the access token (every other device is signed out) and returns the new one. */
   signOutEverywhere: () => req<{ token: string }>("/api/account/sign-out-everywhere", { method: "POST" }),
   providers: () => req<ProviderInfo[]>("/api/providers"),

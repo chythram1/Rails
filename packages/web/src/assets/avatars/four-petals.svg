@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Four pixel petals">
+  <title>Four pixel petals</title>
+  <circle cx="128" cy="128" r="128" fill="#E2DACA"/>
+  <g fill="#778A5A">
+    <path d="M111 48H145V61H158V93H145V108H111V93H98V61H111Z"/>
+    <path d="M111 48H145V61H158V93H145V108H111V93H98V61H111Z" transform="rotate(90 128 128)"/>
+    <path d="M111 48H145V61H158V93H145V108H111V93H98V61H111Z" transform="rotate(180 128 128)"/>
+    <path d="M111 48H145V61H158V93H145V108H111V93H98V61H111Z" transform="rotate(270 128 128)"/>
+  </g>
+</svg>

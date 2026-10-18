@@ -19,6 +19,7 @@ import { closePanel, getWorkspace, openPanel, saveLayout } from "./panels.ts";
 import { ServiceError } from "./errors.ts";
 import { attachPickedFolder, attachProject, detachProject, getProject, listProjectSessions, recentFolders } from "./projects.ts";
 import { providerInfo } from "./providers/index.ts";
+import { getProfile, updateProfile } from "./profile.ts";
 import { cancelSignIn, modelSettings, removeCredential, setApiKey, setDefaultModel, startSignIn, submitSignInCode } from "./models.ts";
 import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets.ts";
 import { TerminalHub } from "./terminals.ts";
@@ -108,6 +109,10 @@ app.post("/api/account/sign-out-everywhere", (c) => {
   setLoginCookie(c, token); // this device stays signed in
   return c.json({ token });
 });
+
+// ---- the profile: the name and avatar in the sidebar ----
+app.get("/api/profile", (c) => c.json(getProfile()));
+app.put("/api/profile", async (c) => c.json(updateProfile(await c.req.json<{ name?: unknown; avatar?: unknown }>())));
 
 // ---- providers / projects ----
 app.get("/api/providers", (c) => c.json(providerInfo()));

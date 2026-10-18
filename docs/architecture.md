@@ -94,6 +94,10 @@ packages/
   asking browser gets a new cookie and a sign-in link to share, and every WebSocket is closed so the rest
   reconnect, fail and show the sign-in screen (any 401 does that in the web app). A token set with
   `RAILS_TOKEN` can't be replaced this way.
+  The profile above it (`profile.ts`) is the name and avatar at the foot of the sidebar, stored with the
+  app settings in SQLite. `PUT /api/profile` changes it; each browser gets it as `profile.changed` on
+  connect and on every change. Until it's set, the name is the computer's (`scutil --get ComputerName` on
+  macOS, else the hostname).
   The server binds `127.0.0.1` by default. Panels are full shell access, so set `RAILS_HOST=0.0.0.0`
   only on networks you trust (LAN, Tailscale).
 - **Environment:** tmux and everything in it get the server's environment minus `RAILS_*` (the token),

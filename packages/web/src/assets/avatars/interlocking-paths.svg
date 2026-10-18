@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Interlocking angular paths">
+  <title>Interlocking angular paths</title>
+  <circle cx="128" cy="128" r="128" fill="#CFCEE7"/>
+  <g fill="#C66588">
+    <path d="M52 60H160V152H136V84H76V152H52Z"/>
+    <path d="M96 104H120V172H180V104H204V196H96Z"/>
+    <path d="M180 60H204V84H180ZM52 172H76V196H52Z"/>
+  </g>
+</svg>

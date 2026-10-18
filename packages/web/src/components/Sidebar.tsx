@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { IconPackages as Boxes, IconGauge as CircleGauge, IconSettings as Cog, IconDotsVertical as EllipsisVertical, IconFolder as Folder, IconFolderOpen as FolderOpen, IconFolderPlus as FolderPlus, IconLayoutSidebar as PanelLeft, IconLogout as LogOut, IconPlus as Plus, IconRobotFace as RobotFace, IconSelector as Selector } from "@tabler/icons-react";
+import { IconPackages as Boxes, IconGauge as CircleGauge, IconSettings as Cog, IconDotsVertical as EllipsisVertical, IconFolder as Folder, IconFolderOpen as FolderOpen, IconFolderPlus as FolderPlus, IconLayoutSidebar as PanelLeft, IconLogout as LogOut, IconPlus as Plus, IconRobotFace as RobotFace, IconChevronDown as ChevronDown } from "@tabler/icons-react";
 import type { AttentionReason, PanelKind, Project, SessionSummary } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate, type Route } from "../router.ts";
 import logo from "../assets/logo.svg";
 import { useStore } from "../store.tsx";
 import { timeAgo } from "../util.ts";
+import { Avatar } from "./Avatar.tsx";
 import { FolderMenu } from "./FolderMenu.tsx";
 import { MenuButton } from "./Menu.tsx";
 import { PanelMenu } from "./PanelMenu.tsx";
@@ -198,19 +199,22 @@ export function Sidebar({ route }: { route: Route }) {
 }
 
 /**
- * The account row at the foot of the sidebar (Claude's pattern): Rails and the connection state, opening
- * a menu with Settings and Sign out. In the icon rail only the logo shows, with the state as a dot.
+ * The account row at the foot of the sidebar (ref/sprockets/stage2/footer.png): the profile's avatar and
+ * name (this computer's until it's changed in Settings → Account), opening a menu with Settings and Sign
+ * out. While the connection is down it says so, with a dot on the avatar; in the icon rail only the avatar
+ * shows.
  */
 function AccountMenu({ connected }: { connected: boolean }) {
+  const { profile } = useStore();
   const openSettings = useOpenSettings();
-  const state = connected ? "Connected" : "Reconnecting…";
+  const name = profile?.name ?? "Rails";
   const signOut = () => void api.logout().catch((e: Error) => alert(e.message)); // the app switches to sign-in
   return (
     <MenuButton
       plain
       className="account-row"
-      label={`Rails, ${state}. Settings and sign out`}
-      title={`${state} · ${location.host}`}
+      label={`${name}${connected ? "" : ", reconnecting"}. Settings and sign out`}
+      title={`${connected ? "Connected" : "Reconnecting…"} · ${location.host}`}
       items={[
         { label: "Settings", icon: <Cog size={16} />, shortcut: "s", onSelect: () => openSettings() },
         { label: "Sign out", icon: <LogOut size={16} />, onSelect: signOut },
@@ -218,14 +222,14 @@ function AccountMenu({ connected }: { connected: boolean }) {
       icon={
         <>
           <span className="account-avatar" aria-hidden>
-            <img src={logo} alt="" width={18} height={18} />
-            <span className={"dot " + (connected ? "on" : "off")} />
+            {profile && <Avatar avatar={profile.avatar} size={28} />}
+            {!connected && <span className="dot off" />}
           </span>
           <span className="label account-text">
-            <span className="account-name">Rails</span>
-            <span className="muted small truncate">{state}</span>
+            <span className="truncate">{name}</span>
+            {!connected && <span className="muted"> · Reconnecting…</span>}
           </span>
-          <Selector size={16} className="label account-chevron" aria-hidden />
+          <ChevronDown size={16} className="label account-chevron" aria-hidden />
         </>
       }
     />

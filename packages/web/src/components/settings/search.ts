@@ -23,6 +23,8 @@ export const SETTINGS: SettingEntry[] = [
   { section: "general", rowId: "tmux", label: "tmux", phrases: ["terminal", "panels"] },
   { section: "general", rowId: "node", label: "Node.js", phrases: ["runtime"] },
   { section: "models", rowId: "default-model", label: "Default model", phrases: ["model", "LLM", "Sprocket model"] },
+  { section: "account", rowId: "avatar", label: "Avatar", phrases: ["profile", "picture", "photo", "icon"] },
+  { section: "account", rowId: "name", label: "Name", phrases: ["profile", "display name", "computer name", "machine", "rename"] },
   { section: "account", rowId: "sign-out", label: "Sign out on this device", phrases: ["log out", "logout", "sign off"] },
   { section: "account", rowId: "sign-out-everywhere", label: "Sign out everywhere", phrases: ["log out all devices", "access token", "new token", "reset token", "security", "lost device"] },
 ];

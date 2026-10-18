@@ -106,6 +106,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 | `packages/server/src/models.ts` | Model providers for Sprockets (pi-ai): API keys, sign-in, the default model. Credentials live in `credentials.ts` (`RAILS_HOME/credentials.json`). |
 | `packages/server/src/bridge/` | The bridge (ADR 0007): how agents report (`wiring.ts` flags, `pi/rails.ts` extension, `codex.ts` daemon client), the event shape (`events.ts`), the board and attention (`board.ts`, `index.ts`), and Sprockets' read tools (`tools.ts`). |
 | `packages/server/src/account.ts` | Settings → Account and General: sign out everywhere (replaces the access token), facts about this server. |
+| `packages/server/src/profile.ts` | The profile: the name and avatar at the foot of the sidebar (avatars in `web/src/assets/avatars/`, ids in `PROFILE_AVATARS`). |
 | `packages/web/src/components/settings/` | The Settings modal (`SettingsDialog`, opened with `useOpenSettings()` from `context.ts`, e.g. by the sidebar's account row), its sections (General, Models, Account) and its search (`search.ts`). |
 | `packages/server/src/signin.ts` | Rails' own "Continue with ChatGPT" and OpenRouter sign-in flows (so every page says Rails); they store credentials in pi-ai's shape (ADR 0006). |
 | `packages/web/src/components/sprockets/` | The Sprockets page (`SprocketsPage`, `SprocketCreator`, `SprocketChat`, `SprocketSettings`) and the character renderer (`Sprocket.tsx`: `characters.ts` data, `parts.tsx` accessories, `motion.ts` blinks/look-at/one-shots; idle loops in `styles.css`). |

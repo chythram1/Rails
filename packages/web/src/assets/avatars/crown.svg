@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Pixel crown">
+  <title>Pixel crown</title>
+  <circle cx="128" cy="128" r="128" fill="#C66588"/>
+  <g fill="#E2DACA">
+    <path d="M52 106H71V126H90V146H114V126H100V108H96V88H114V68H142V88H160V108H156V126H142V146H166V126H185V106H204V166H52Z"/>
+    <path d="M52 178H204V198H52Z"/>
+  </g>
+</svg>

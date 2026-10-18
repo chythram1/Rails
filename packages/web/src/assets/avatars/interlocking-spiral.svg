@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Interlocking spiral">
+  <title>Interlocking spiral</title>
+  <circle cx="128" cy="128" r="128" fill="#C0D4CE"/>
+  <g fill="#778A5A">
+    <path d="M102 52H154V82H110V120H128V134H88V68H102Z"/>
+    <path d="M102 52H154V82H110V120H128V134H88V68H102Z" transform="rotate(90 128 128)"/>
+    <path d="M102 52H154V82H110V120H128V134H88V68H102Z" transform="rotate(180 128 128)"/>
+    <path d="M102 52H154V82H110V120H128V134H88V68H102Z" transform="rotate(270 128 128)"/>
+  </g>
+</svg>

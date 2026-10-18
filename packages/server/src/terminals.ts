@@ -6,6 +6,7 @@ import { panels } from "./db.ts";
 import { onPanelsChanged, panelEnded } from "./panels.ts";
 import { attentionList, onAttention } from "./bridge/index.ts";
 import { onModelsChanged, onSignIn } from "./models.ts";
+import { getProfile, onProfileChanged } from "./profile.ts";
 import { onTyping } from "./runs.ts";
 import { onSprocketsChanged } from "./sprockets.ts";
 import * as tmux from "./tmux.ts";
@@ -26,6 +27,7 @@ export class TerminalHub {
     onTyping((sprocketId, text) => this.broadcast({ type: "sprockets.typing", sprocketId, text }));
     onModelsChanged(() => this.broadcast({ type: "models.changed" }));
     onSignIn((signIn) => this.broadcast({ type: "models.signIn", signIn }));
+    onProfileChanged((profile) => this.broadcast({ type: "profile.changed", profile }));
     onAttention((list) => this.broadcast({ type: "panels.attention", panels: list }));
   }
 
@@ -33,6 +35,7 @@ export class TerminalHub {
     this.clients.set(ws, new Map());
     send(ws, { type: "panels.busy", panelIds: this.busy });
     send(ws, { type: "panels.attention", panels: attentionList() });
+    send(ws, { type: "profile.changed", profile: getProfile() });
     this.stopWatching ??= watchBusy((ids) => {
       this.busy = ids;
       this.broadcast({ type: "panels.busy", panelIds: ids });

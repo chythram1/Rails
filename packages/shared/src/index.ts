@@ -164,6 +164,31 @@ export interface SprocketMessage {
 
 // ---- Settings ----
 
+/** The avatars a Profile can use, in picker order (their images are in the web app). */
+export const PROFILE_AVATARS = [
+  "interlocking-spiral",
+  "crown",
+  "linked-squares",
+  "four-petals",
+  "sparkle",
+  "interlocking-paths",
+  "split-shield",
+  "six-ray-burst",
+] as const;
+export type ProfileAvatar = (typeof PROFILE_AVATARS)[number];
+export const PROFILE_NAME_MAX = 40;
+
+/** The name and avatar at the foot of the sidebar, shared by every device. */
+export interface Profile {
+  name: string;
+  avatar: ProfileAvatar;
+  /** The name of the computer Rails runs on: the name when none is set. */
+  machineName: string;
+}
+
+/** A change to the profile (PUT /api/profile). An empty name goes back to the computer's name. */
+export type ProfileChange = Partial<Pick<Profile, "name" | "avatar">>;
+
 /** Facts about the Rails server, for Settings → General. */
 export interface ServerInfo {
   /** The address the server listens on (RAILS_HOST) and its port. */
@@ -243,4 +268,6 @@ export type ServerMsg =
   /** Providers, sign-ins or the default model changed. */
   | { type: "models.changed" }
   | { type: "models.signIn"; signIn: SignIn }
+  /** The profile. Sent on connect and when it changes (possibly on another device). */
+  | { type: "profile.changed"; profile: Profile }
   | { type: "error"; message: string };

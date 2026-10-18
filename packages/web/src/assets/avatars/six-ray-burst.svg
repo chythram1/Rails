@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Six-ray pixel burst">
+  <title>Six-ray pixel burst</title>
+  <circle cx="128" cy="128" r="128" fill="#6AA0D7"/>
+  <g fill="#CFCEE7">
+    <path d="M111 44H145V76H133V88H122V106H111Z"/>
+    <path d="M56 76H83V88H93V106H103V116H111V127H91V116H79V106H56Z"/>
+    <path d="M199 76H172V88H159V98H148V108H145V118H167V108H177V106H199Z"/>
+    <path d="M111 44H145V76H133V88H122V106H111Z" transform="rotate(180 128 128)"/>
+    <path d="M56 76H83V88H93V106H103V116H111V127H91V116H79V106H56Z" transform="rotate(180 128 128)"/>
+    <path d="M199 76H172V88H159V98H148V108H145V118H167V108H177V106H199Z" transform="rotate(180 128 128)"/>
+  </g>
+</svg>

@@ -19,6 +19,7 @@ describe("settings search", () => {
     expect(find("chatgpt")).toEqual(["provider-openai"]);
     expect(find("claude")).toEqual(["provider-anthropic"]);
     expect(find("token")).toContain("sign-out-everywhere");
+    expect(find("profile picture")).toEqual(["avatar"]);
   });
 
   it("puts label matches before synonym matches", () => {

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Linked pixel squares">
+  <title>Linked pixel squares</title>
+  <circle cx="128" cy="128" r="128" fill="#CFCEE7"/>
+  <path fill="#6AA0D7" fill-rule="evenodd" d="M56 82H112V110H144V82H200V98H216V158H200V174H144V146H112V174H56V158H40V98H56ZM76 110V146H112V110ZM144 110V146H180V110Z"/>
+</svg>

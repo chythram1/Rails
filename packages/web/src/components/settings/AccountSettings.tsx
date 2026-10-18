@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { ServerInfo } from "@rails/shared";
 import { api } from "../../api.ts";
+import { ProfileSettings } from "./ProfileSettings.tsx";
 
 /**
- * Settings → Account. Rails has one user and one access token (ADR 0001), so the account is that token:
- * sign this browser out, or replace the token to sign out every device (Claude's "Log out of all
+ * Settings → Account: the profile (ProfileSettings.tsx), then access. Rails has one user and one access
+ * token (ADR 0001), so access is that token: sign this browser out, or replace the token to sign out every device (Claude's "Log out of all
  * devices"). This device stays signed in and gets a link for signing the others back in.
  */
 export function AccountSettings() {
@@ -40,31 +41,34 @@ export function AccountSettings() {
   };
 
   return (
-    <section className="set-group" aria-labelledby="access-title">
-      <h3 id="access-title">Access</h3>
-      <div className="set-row" id="setting-sign-out" data-settings-row tabIndex={-1}>
-        <div className="set-text">
-          <span className="set-label">Sign out on this device</span>
-          <p>This browser needs the access token to get back in.</p>
+    <>
+      <ProfileSettings />
+      <section className="set-group" aria-labelledby="access-title">
+        <h3 id="access-title">Access</h3>
+        <div className="set-row" id="setting-sign-out" data-settings-row tabIndex={-1}>
+          <div className="set-text">
+            <span className="set-label">Sign out on this device</span>
+            <p>This browser needs the access token to get back in.</p>
+          </div>
+          <button className="btn small" onClick={() => void signOut()}>Sign out</button>
         </div>
-        <button className="btn small" onClick={() => void signOut()}>Sign out</button>
-      </div>
-      <div className="set-row" id="setting-sign-out-everywhere" data-settings-row tabIndex={-1}>
-        <div className="set-text">
-          <span className="set-label">Sign out everywhere</span>
-          <p>
-            {info?.tokenFromEnv
-              ? "The access token is set with RAILS_TOKEN, so Rails can't replace it. Change it there and restart Rails."
-              : "Makes a new access token, so every other device has to sign in again. This one stays signed in."}
-          </p>
+        <div className="set-row" id="setting-sign-out-everywhere" data-settings-row tabIndex={-1}>
+          <div className="set-text">
+            <span className="set-label">Sign out everywhere</span>
+            <p>
+              {info?.tokenFromEnv
+                ? "The access token is set with RAILS_TOKEN, so Rails can't replace it. Change it there and restart Rails."
+                : "Makes a new access token, so every other device has to sign in again. This one stays signed in."}
+            </p>
+          </div>
+          <button className="btn small danger" disabled={!info || info.tokenFromEnv || busy} onClick={() => void signOutEverywhere()}>
+            Sign out everywhere
+          </button>
         </div>
-        <button className="btn small danger" disabled={!info || info.tokenFromEnv || busy} onClick={() => void signOutEverywhere()}>
-          Sign out everywhere
-        </button>
-      </div>
-      {link && <NewLink link={link} />}
-      {error && <p className="error" role="alert">{error}</p>}
-    </section>
+        {link && <NewLink link={link} />}
+        {error && <p className="error" role="alert">{error}</p>}
+      </section>
+    </>
   );
 }
 
