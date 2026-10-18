@@ -7,14 +7,22 @@ export function GitPanel({ projectId, refreshKey, onClose }: { projectId: string
   const [status, setStatus] = useState<GitStatus | null>(null);
   const [file, setFile] = useState<string | null>(null);
   const [diff, setDiff] = useState("");
+  const [error, setError] = useState("");
 
   const load = () => {
-    void api.git(projectId).then(setStatus);
+    setError("");
+    api.git(projectId).then(setStatus, (e: Error) => setError(e.message));
   };
   useEffect(load, [projectId, refreshKey]);
 
   useEffect(() => {
-    if (file) void api.diff(projectId, file).then(setDiff);
+    if (!file) return;
+    let current = true; // a slower answer for a file selected earlier mustn't replace this one
+    api.diff(projectId, file).then(
+      (d) => current && setDiff(d),
+      (e: Error) => current && setDiff(e.message),
+    );
+    return () => void (current = false);
   }, [projectId, file, refreshKey]);
 
   return (
@@ -36,7 +44,12 @@ export function GitPanel({ projectId, refreshKey, onClose }: { projectId: string
           <X size={16} />
         </button>
       </header>
-      {!status ? (
+      {error && !status ? (
+        <div className="pad">
+          <p className="error small" role="alert">{error}</p>
+          <button className="btn small" onClick={load}>Try again</button>
+        </div>
+      ) : !status ? (
         <p className="muted small pad">Loading…</p>
       ) : !status.isRepo ? (
         <p className="muted small pad">This project isn't a git repository.</p>

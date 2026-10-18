@@ -16,6 +16,7 @@ export function useWorkspace(projectId: string) {
   const load = useCallback(async () => {
     try {
       setWorkspace(await api.workspace(projectId));
+      setError("");
     } catch (e: any) {
       setError(e.message);
     }
