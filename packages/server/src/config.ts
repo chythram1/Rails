@@ -5,6 +5,13 @@ import { join } from "node:path";
 
 const home = homedir();
 
+// Tests get a throwaway home from vitest.setup.ts. Vitest started anywhere else (e.g. from a parent folder)
+// skips that file, and a test would then write to the user's real ~/.rails (projects, Sprockets, even a new
+// access token). Refuse instead.
+if (process.env.VITEST && !process.env.RAILS_HOME) {
+  throw new Error("Tests need a throwaway RAILS_HOME. Run them from the repo root (make test).");
+}
+
 export const RAILS_HOME = process.env.RAILS_HOME ?? join(home, ".rails");
 export const HOST = process.env.RAILS_HOST ?? "127.0.0.1";
 export const PORT = Number(process.env.RAILS_PORT ?? 4317);
