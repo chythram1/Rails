@@ -91,7 +91,7 @@ export function sharedFiles(cards: SessionCard[]): { file: string; panelIds: str
   return [...by].filter(([, ids]) => ids.length > 1).map(([file, panelIds]) => ({ file, panelIds }));
 }
 
-const AGENT: Record<PanelKind, string> = { claude: "Claude Code", codex: "Codex", pi: "pi", shell: "shell" };
+export const AGENT: Record<PanelKind, string> = { claude: "Claude Code", codex: "Codex", pi: "pi", shell: "shell" };
 const rel = (root: string, f: string) => (f.startsWith(root + "/") ? f.slice(root.length + 1) : f);
 const short = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "…" : s);
 const ago = (iso: string | undefined, now: number) => {

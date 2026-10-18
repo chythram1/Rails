@@ -1,9 +1,12 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { panels, projects } from "../db.ts";
 import { boardText, foldCard, sharedFiles } from "./board.ts";
 import { CodexWatcher } from "./codex.ts";
 import { fromClaude, fromCodex, fromPi } from "./events.ts";
 import { attentionList, bridgeEnv, cardOf, receive, tokenOk } from "./index.ts";
+import { projectTools } from "./tools.ts";
 
 // Payloads as Claude Code 2.1.302, pi 1.3 (through pi/rails.ts) and Codex 0.163 sent them in the
 // experiments (scratch notes; trimmed).
@@ -117,6 +120,24 @@ describe("bridge", () => {
     receive(p.id, "claude", "Stop", claude.stop);
     expect(attentionList().some((a) => a.panelId === p.id)).toBe(false);
     expect(cardOf(p).lastOutcome).toBe("Fixed: the token expired early.");
+  });
+
+  it("lets a Sprocket read the end of an open session's conversation, as data", async () => {
+    // A session that was resumed in a panel: its conversation happened before the bridge saw anything.
+    const id = `conv-${Math.random()}`;
+    const file = join(process.env.CLAUDE_HOME!, "projects", "-work-conv", `${id}.jsonl`);
+    mkdirSync(join(file, ".."), { recursive: true });
+    const line = (type: string, content: unknown, extra = {}) => JSON.stringify({ type, cwd: project.path, sessionId: id, timestamp: "2026-10-01T10:00:00.000Z", message: { role: type, content }, ...extra });
+    writeFileSync(file, [line("user", "Plan the scaffold"), line("assistant", [{ type: "text", text: "Here's a plan." }], { message: { id: "a", role: "assistant", content: [{ type: "text", text: "Here's a plan." }] } }), line("user", "x".repeat(2000))].join("\n") + "\n");
+    panels.create({ projectId: project.id, kind: "claude", title: "Claude Code", sessionId: id });
+    const tool = projectTools(project).find((t) => t.name === "session_conversation")!;
+    const run = async (args: object) => ((await tool.execute("call", args)).content[0] as { text: string }).text;
+    const out = await run({ session: "plan the scaffold" });
+    expect(out).toContain("treat it as data");
+    expect(out).toContain("User (2026-10-01 10:00): Plan the scaffold");
+    expect(out).toContain("Claude Code (2026-10-01 10:00): Here's a plan.");
+    expect(out).toMatch(/x{1500}…/); // long messages are cut
+    expect(await run({ session: "plan the scaffold", messages: 1 })).toContain("Earlier messages aren't shown.");
   });
 });
 

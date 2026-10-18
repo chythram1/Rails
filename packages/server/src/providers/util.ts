@@ -27,6 +27,21 @@ export async function headTail(file: string): Promise<{ head: any[]; tail: any[]
   }
 }
 
+/** Parsed JSON lines from the last `bytes` of a JSONL file (a partial first line dropped). */
+export async function tailLines(file: string, bytes = 1024 * 1024): Promise<any[]> {
+  const st = await stat(file);
+  const fh = await open(file, "r");
+  try {
+    const len = Math.min(bytes, st.size);
+    const buf = Buffer.alloc(len);
+    const { bytesRead } = await fh.read(buf, 0, len, st.size - len);
+    const text = buf.subarray(0, bytesRead).toString("utf8");
+    return parseLines(st.size > len ? text.slice(text.indexOf("\n") + 1) : text);
+  } finally {
+    await fh.close();
+  }
+}
+
 function parseLines(text: string): any[] {
   const out: any[] = [];
   for (const line of text.split("\n")) {

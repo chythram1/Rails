@@ -2,7 +2,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { CODEX_HOME } from "../config.ts";
-import type { DiscoveredSession, DiscoveryAdapter } from "./types.ts";
+import type { DiscoveredSession, DiscoveryAdapter, TranscriptMessage } from "./types.ts";
 import { cachedScanner, firstLine, headTail, walk } from "./util.ts";
 
 const root = join(CODEX_HOME, "sessions");
@@ -27,8 +27,18 @@ async function scanFile(file: string): Promise<DiscoveredSession | null> {
     title: firstUser ? firstLine(firstUser) : "Untitled session",
     createdAt: meta.timestamp ?? mtime.toISOString(),
     updatedAt: mtime.toISOString(),
+    file,
   };
 }
+
+/** User and assistant messages, without the context Codex adds as user messages or developer notes. */
+const messages = (lines: any[]): TranscriptMessage[] =>
+  lines.flatMap((e) => {
+    const p = e.type === "response_item" && e.payload?.type === "message" ? e.payload : null;
+    const role = p?.role === "user" ? "user" : p?.role === "assistant" ? "agent" : null;
+    const text = role ? textOf(p.content).trim() : "";
+    return role && text && !isContextText(text) ? [{ role, text, at: e.timestamp }] : [];
+  });
 
 const scanFiles = cachedScanner(scanFile);
 
@@ -36,6 +46,7 @@ export const codexDiscovery: DiscoveryAdapter = {
   id: "codex",
   name: "Codex",
   available: () => existsSync(root),
+  messages,
   async scan() {
     return scanFiles(await walk(root, (n) => n.startsWith("rollout-") && n.endsWith(".jsonl"), 4));
   },

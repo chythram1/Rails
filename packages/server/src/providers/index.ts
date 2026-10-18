@@ -4,7 +4,8 @@ import type { ProviderId, ProviderInfo } from "@rails/shared";
 import { claudeDiscovery } from "./claude.ts";
 import { codexDiscovery } from "./codex.ts";
 import { piDiscovery } from "./pi.ts";
-import type { DiscoveredSession, DiscoveryAdapter } from "./types.ts";
+import type { DiscoveredSession, DiscoveryAdapter, TranscriptMessage } from "./types.ts";
+import { tailLines } from "./util.ts";
 
 export const discovery: Record<ProviderId, DiscoveryAdapter> = {
   claude: claudeDiscovery,
@@ -35,6 +36,11 @@ const isWithin = (cwd: string, dir: string) => cwd === dir || cwd.startsWith(dir
 
 export async function sessionsFor(dir: string): Promise<DiscoveredSession[]> {
   return (await scanAll()).filter((s) => isWithin(s.cwd, dir)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+/** The latest messages of a session, oldest first, from a bounded read of the end of its transcript. */
+export async function conversation(s: DiscoveredSession): Promise<TranscriptMessage[]> {
+  return discovery[s.provider].messages(await tailLines(s.file));
 }
 
 export async function findSession(provider: ProviderId, id: string): Promise<DiscoveredSession | undefined> {

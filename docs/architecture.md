@@ -32,8 +32,9 @@ packages/
    session p-<panelId> ──▶ `claude --resume <id>` | `pi --session <id>` | `codex resume <id>` | $SHELL -l
 ```
 
-- **History** lives in provider transcripts. Rails reads them only for discovery (titles, dates, the
-  sidebar). The agents write their own transcripts while they run in panels.
+- **History** lives in provider transcripts. Rails reads them for discovery (titles, dates, the sidebar)
+  and, when a Sprocket asks, the end of one transcript (`session_conversation`, at most its last 1 MB). The
+  agents write their own transcripts while they run in panels.
 - **Panels:** `POST /api/projects/:id/panels` creates a DB row and a detached tmux session running the
   agent's CLI in the project (or the session's recorded cwd). Claude and pi get their session id up
   front (`--session-id`), so the panel knows its session immediately. New Codex panels don't know their
