@@ -6,6 +6,7 @@ import type {
   Project,
   ProviderInfo,
   RecentFolder,
+  ServerInfo,
   SessionSummary,
   SignIn,
   Sprocket,
@@ -16,6 +17,10 @@ import type {
 } from "@rails/shared";
 
 export class Unauthorized extends Error {}
+
+let signedOut = () => {};
+/** Called whenever the server says this browser isn't signed in, e.g. after "Sign out everywhere". */
+export const onSignedOut = (fn: () => void) => void (signedOut = fn);
 
 const UNREACHABLE = "Can't reach the Rails server. Check that it's running (make dev).";
 
@@ -30,7 +35,10 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(UNREACHABLE); // fetch only rejects on network failure
   }
   if (res.status === 502) throw new Error(UNREACHABLE); // Vite dev proxy: API server is down
-  if (res.status === 401) throw new Unauthorized();
+  if (res.status === 401) {
+    signedOut();
+    throw new Unauthorized();
+  }
   const type = res.headers.get("content-type") ?? "";
   const body = type.includes("json") ? await res.json() : await res.text();
   if (!res.ok) throw new Error((body as any)?.error ?? res.statusText);
@@ -42,6 +50,14 @@ const enc = encodeURIComponent;
 export const api = {
   login: (token: string) => req<{ ok: true }>("/api/auth/login", { method: "POST", body: JSON.stringify({ token }) }),
   me: () => req<{ ok: true }>("/api/auth/me"),
+  /** Signs this browser out and tells the app (which shows the sign-in screen). */
+  logout: async () => {
+    await req<{ ok: true }>("/api/auth/logout", { method: "POST" });
+    signedOut();
+  },
+  server: () => req<ServerInfo>("/api/server"),
+  /** Replaces the access token (every other device is signed out) and returns the new one. */
+  signOutEverywhere: () => req<{ token: string }>("/api/account/sign-out-everywhere", { method: "POST" }),
   providers: () => req<ProviderInfo[]>("/api/providers"),
   projects: () => req<Project[]>("/api/projects"),
   addProject: (path: string) => req<Project>("/api/projects", { method: "POST", body: JSON.stringify({ path }) }),

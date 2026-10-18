@@ -21,6 +21,8 @@ interface Props {
   icon: ReactNode;
   /** Extra class on the trigger (e.g. `reveal` to show it only on row hover). */
   className?: string;
+  /** A trigger styled entirely by `className` (e.g. a whole row) instead of an icon button. */
+  plain?: boolean;
   /** Which edge of the trigger the menu lines up with. */
   align?: "left" | "right";
   items: MenuItem[];
@@ -83,7 +85,7 @@ export function usePopover(align: "left" | "right") {
  * An icon button that opens a menu (see ref/project-menu.png). Arrow keys move, a shortcut key picks,
  * Escape closes.
  */
-export function MenuButton({ label, title, icon, className, align = "left", items }: Props) {
+export function MenuButton({ label, title, icon, className, plain, align = "left", items }: Props) {
   const { at, trigger, panel: menu, close, toggle } = usePopover(align);
 
   const pick = (item: MenuAction) => {
@@ -122,7 +124,7 @@ export function MenuButton({ label, title, icon, className, align = "left", item
     <>
       <button
         ref={trigger}
-        className={"icon-btn" + (className ? " " + className : "")}
+        className={[plain ? "" : "icon-btn", className].filter(Boolean).join(" ")}
         aria-label={label}
         title={title ?? label}
         aria-haspopup="menu"

@@ -125,11 +125,21 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .session-time { flex-shrink: 0; width: 56px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .more { color: var(--muted); font-size: 13px; padding: 4px 12px 4px 34px; }
 .empty-hint { color: var(--muted); font-size: 14px; text-align: left; padding: 8px 12px; border-radius: 8px; }
-.sidebar-foot {
-  border-top: 1px solid var(--border); margin: auto calc(-1 * var(--side-pad)) 0; height: 44px;
-  padding: 0 20px 0 calc(var(--icon-x) - 3.5px); /* 7px dot centred on --icon-x */
-  font-size: 13px; display: flex; align-items: center; gap: 8px;
+.sidebar-foot { border-top: 1px solid var(--border); margin: auto calc(-1 * var(--side-pad)) 0; padding: 6px var(--side-pad); }
+/* The account row: its 28px avatar is centred on --icon-x, in the sidebar and in the rail. */
+.account-row {
+  width: 100%; height: 48px; display: flex; align-items: center; gap: 10px; text-align: left;
+  padding: 0 8px 0 calc(var(--nav-pad) + var(--icon) / 2 - 14px); border: 0; border-radius: 10px; background: none;
 }
+.account-row[aria-expanded="true"] { background: var(--hover); }
+.account-avatar {
+  position: relative; width: 28px; height: 28px; flex-shrink: 0; display: grid; place-items: center;
+  border-radius: 8px; background: var(--surface-2);
+}
+.account-avatar .dot { position: absolute; right: -2px; bottom: -2px; box-shadow: 0 0 0 2px var(--sidebar); }
+.account-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.account-name { font-size: 14px; font-weight: 500; }
+.account-chevron { color: var(--muted); flex-shrink: 0; }
 
 .dot { width: 7px; height: 7px; border-radius: 50%; background: #555; flex-shrink: 0; }
 .dot.on, .dot.live { background: var(--green); }
@@ -163,14 +173,16 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
   padding: 8px 12px; font-size: 14px; outline: none; min-width: 0;
 }
 .input:focus-visible { border-color: #6a6a6a; }
-select.input { padding-right: 28px; }
+/* Our own chevron (as in .select), so it sits 14px in from the edge rather than where the browser puts it. */
+select.input {
+  appearance: none; padding-right: 36px; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 18px) 55%, calc(100% - 14px) 55%; background-size: 4px 4px; background-repeat: no-repeat;
+}
+select.input:disabled { cursor: default; opacity: 0.6; }
 textarea.input { resize: vertical; line-height: 1.5; }
 
-/* ---- settings (Customize → Models, Sprocket settings) ---- */
-.page.settings { max-width: 760px; }
-.settings-section { margin-top: 28px; display: flex; flex-direction: column; gap: 16px; }
-.settings-section h2 { font-size: 17px; font-weight: 600; margin: 0; }
-.settings-section > p { margin: -10px 0 0; }
+/* ---- settings forms (Settings → Models, Sprocket settings) ---- */
 .settings-field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
 .settings-field > label { font-weight: 500; }
 .settings-field p { margin: 0; }
@@ -188,6 +200,66 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .provider-form.column { flex-direction: column; align-items: stretch; gap: 8px; }
 .provider-form.column p { margin: 0; }
 .provider-paste { display: flex; flex-direction: column; gap: 6px; }
+
+/* ---- Settings: a modal with sections on the left (Claude's Directory dialog, ChatGPT's settings) ---- */
+.settings-dialog {
+  width: min(880px, calc(100vw - 48px)); height: min(640px, calc(100vh - 48px)); max-width: none; max-height: none;
+  padding: 0; border: 1px solid var(--border-strong); border-radius: 16px; background: var(--surface); color: var(--text);
+  display: grid; grid-template-columns: 220px minmax(0, 1fr); overflow: hidden; box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
+}
+.settings-dialog:not([open]) { display: none; } /* display: grid would override the browser's hidden state */
+.settings-dialog::backdrop { background: rgb(0 0 0 / 0.55); }
+.settings-nav { display: flex; flex-direction: column; gap: 14px; padding: 14px 12px; border-right: 1px solid var(--border); background: var(--sidebar); min-height: 0; overflow-y: auto; }
+.settings-search {
+  display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; flex-shrink: 0;
+  border: 1px solid var(--border-strong); border-radius: 9px; background: var(--surface); color: var(--muted);
+}
+.settings-search:focus-within { border-color: #5a5a5a; }
+.settings-search input { flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--text); font-size: 14px; }
+.settings-search input::placeholder { color: #7a7a7a; }
+.settings-search input::-webkit-search-cancel-button { display: none; } /* Escape clears it */
+.settings-nav-title { margin: 4px 10px 6px; color: var(--muted); font-size: 12.5px; }
+.settings-sections [role="tablist"] { display: flex; flex-direction: column; gap: 2px; }
+.settings-tab {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 0; border-radius: 8px;
+  background: none; color: #cfcfcf; font-size: 14px; text-align: left; white-space: nowrap;
+}
+.settings-tab[aria-selected="true"] { background: var(--surface-2); color: var(--text); }
+.settings-results { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.settings-result {
+  width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 7px 10px;
+  border: 0; border-radius: 8px; background: none; text-align: left; font-size: 14px;
+}
+.settings-result:focus-visible { background: var(--surface-2); outline: none; }
+.settings-empty { margin: 4px 10px; }
+.settings-panel { display: flex; flex-direction: column; min-height: 0; }
+/* Placed against the dialog (fixed-positioned), so it's top right in both layouts. */
+.settings-close { position: absolute; top: 12px; right: 12px; z-index: 1; }
+.settings-panel-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 30px 32px 32px; display: flex; flex-direction: column; gap: 40px; }
+/* Rows: what it is (and why) on the left, the control or value on the right, a line between rows. */
+.set-group { display: flex; flex-direction: column; }
+.set-group > h3 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+.set-intro { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.set-row:last-child { border-bottom: 0; }
+/* A row reached from search: marked for a moment, without animation. */
+.set-row.found { background: var(--surface-2); box-shadow: 0 0 0 8px var(--surface-2); border-radius: 2px; }
+.provider-row.found { background: var(--surface-2); }
+:is(.set-row, .provider-row):focus { outline: none; }
+.set-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.set-text label, .set-label { font-size: 14px; font-weight: 500; }
+.set-text p { margin: 0; color: var(--muted); font-size: 13px; text-wrap: pretty; }
+.set-row > select.input { width: min(300px, 50%); flex-shrink: 0; }
+.set-row > .btn { flex-shrink: 0; }
+.set-facts { margin: 0; }
+.set-facts dt { font-size: 14px; }
+.set-facts dd { margin: 0; font-size: 14px; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.set-sub { color: var(--muted); font-size: 12.5px; }
+.set-callout { margin-top: 12px; padding: 14px; border: 1px solid var(--border-strong); border-radius: 12px; display: flex; flex-direction: column; gap: 10px; }
+.set-callout p { margin: 0; }
+.mono { font-family: var(--mono); font-size: 13px; }
+.btn.danger { color: var(--red); }
+.btn:disabled { opacity: 0.5; }
 
 /* ---- pages ---- */
 .page { width: 100%; max-width: 1080px; margin: 0 auto; padding: 72px 32px 48px; overflow-y: auto; }
@@ -516,6 +588,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
   .nav-item:hover, .project-row:hover .project-name, .more:hover { color: var(--text); }
   .project-row .icon-btn:hover { background: var(--border-strong); }
   .icon-btn:hover, .tab-close:hover { background: var(--hover); color: var(--text); }
+  .account-row:hover, .settings-tab:hover:not([aria-selected="true"]), .settings-result:hover { background: var(--hover); }
   .btn:hover:not(:disabled), button.chip:hover, .menu button:hover:not(:disabled), .select select:hover { background: var(--hover); }
   .btn.primary:hover:not(:disabled) { background: #fff; }
   .send-btn:hover:not(:disabled) { background: var(--accent); color: #111; border-color: var(--accent); }
@@ -542,6 +615,16 @@ textarea.input { resize: vertical; line-height: 1.5; }
   .page { padding: 64px 16px 32px; }
   .hero { font-size: 28px; }
   .git-panel { position: fixed; inset: 0 0 0 auto; width: min(380px, 100vw); z-index: 15; }
+  /* Settings fills the screen: search on top, then the sections as a row of tabs. */
+  .settings-dialog { width: 100vw; height: 100dvh; border: 0; border-radius: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .settings-nav { gap: 10px; padding: 10px 56px 10px 12px; border-right: 0; border-bottom: 1px solid var(--border); max-height: 45dvh; }
+  .settings-nav-title { display: none; }
+  .settings-sections [role="tablist"] { flex-direction: row; overflow-x: auto; }
+  .settings-tab { width: auto; }
+  .settings-close { top: 12px; right: 10px; } /* beside the search field */
+  .settings-panel-body { padding: 20px 16px 24px; gap: 32px; }
+  .set-row { flex-wrap: wrap; gap: 10px 24px; }
+  .set-row > select.input { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
   /* Sprockets are excluded: their motion has its own setting, off by default here (sprockets/motion.ts). */

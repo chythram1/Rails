@@ -34,7 +34,6 @@ export const href = {
   sprocket: (id: string) => `#/sprockets/${encodeURIComponent(id)}`,
   editSprocket: (id: string) => `#/sprockets/${encodeURIComponent(id)}/edit`,
   sprocketSettings: (id: string) => `#/sprockets/${encodeURIComponent(id)}/settings`,
-  customize: () => "#/customize",
 };
 
 export function navigate(to: string) {

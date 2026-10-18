@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -27,4 +27,17 @@ function loadConfig(): ConfigFile {
   return cfg;
 }
 
-export const TOKEN = process.env.RAILS_TOKEN ?? loadConfig().token;
+/** RAILS_TOKEN pins the access token; otherwise it lives in config.json and can be replaced. */
+export const TOKEN_FROM_ENV = process.env.RAILS_TOKEN !== undefined;
+let token = process.env.RAILS_TOKEN ?? loadConfig().token;
+
+export const accessToken = () => token;
+
+/** Replace the token in config.json with a new one, so every device has to sign in again. */
+export function rotateToken(): string {
+  token = randomBytes(24).toString("base64url");
+  const file = join(RAILS_HOME, "config.json");
+  writeFileSync(file + ".tmp", JSON.stringify({ token } satisfies ConfigFile, null, 2), { mode: 0o600 });
+  renameSync(file + ".tmp", file);
+  return token;
+}

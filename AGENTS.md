@@ -104,6 +104,8 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 | `packages/server/src/sprockets.ts` | Sprocket services (ADR 0005, 0006): create/edit/delete, settings (project, model, core memory) and messages. Emits `onSprocketsChanged`. |
 | `packages/server/src/runs.ts` | Sprocket runs (ADR 0006): one bounded pi-agent-core loop per reply, the runaway guards, the `remember` tool. |
 | `packages/server/src/models.ts` | Model providers for Sprockets (pi-ai): API keys, sign-in, the default model. Credentials live in `credentials.ts` (`RAILS_HOME/credentials.json`). |
+| `packages/server/src/account.ts` | Settings → Account and General: sign out everywhere (replaces the access token), facts about this server. |
+| `packages/web/src/components/settings/` | The Settings modal (`SettingsDialog`, opened with `useOpenSettings()` from `context.ts`, e.g. by the sidebar's account row), its sections (General, Models, Account) and its search (`search.ts`). |
 | `packages/server/src/signin.ts` | Rails' own "Continue with ChatGPT" and OpenRouter sign-in flows (so every page says Rails); they store credentials in pi-ai's shape (ADR 0006). |
 | `packages/web/src/components/sprockets/` | The Sprockets page (`SprocketsPage`, `SprocketCreator`, `SprocketChat`, `SprocketSettings`) and the character renderer (`Sprocket.tsx`: `characters.ts` data, `parts.tsx` accessories, `motion.ts` blinks/look-at/one-shots; idle loops in `styles.css`). |
 | `packages/web/src/components/TerminalView.tsx` | One xterm.js terminal attached to a panel over the shared socket; re-attaches on reconnect, reports resizes. |
@@ -114,6 +116,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - **New REST endpoint:** put the logic in a service module, add a thin route in `server/src/index.ts`, then add the client method in `web/src/api.ts`.
 - **How an agent is launched:** `command()` in `panels.ts` (flags for new vs resumed sessions). tmux behaviour (mouse, keys, sizing) lives in the config written by `tmux.ts`.
 - **Transcript parsing:** edit `providers/<id>.ts`, and update `docs/providers.md` with anything you learn about the format.
+- **App settings** go in the Settings modal (`components/settings/`): sections of groups (a heading, then rows of label, description and control), as in `ref/settings.png`. Give each row `id="setting-<rowId>"`, `data-settings-row` and `tabIndex={-1}`, and add it to `SETTINGS` in `search.ts` (label plus synonyms) so search finds it. Customize is for agent profiles, prompts and tools, not app settings.
 - **UI:** reuse the tokens in `styles.css`, use `@tabler/icons-react` for icons (MIT), `var(--font)` / `var(--mono)` for text (Geist and Geist Mono, bundled via `@fontsource-variable`; no CDN fonts, and terminals keep the system monospace on purpose for glyph coverage), `ProviderIcon` for agent logos and `MenuButton` (`components/Menu.tsx`) for dropdown menus (style: `ref/project-menu.png`). The `better-*` skills in `.agents/skills/` cover UI review work.
 
 ## Commands and verification

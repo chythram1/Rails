@@ -81,6 +81,11 @@ packages/
   Cookies are shared across every port of a host, so the WebSocket upgrade and non-GET `/api` requests
   also require `Origin` to match `Host` (when an Origin is sent). That's why the Vite dev proxy keeps the
   browser's `Host` (`changeOrigin: false`).
+  Settings → Account signs a browser out (`POST /api/auth/logout` clears its cookie) or signs out every
+  device (`POST /api/account/sign-out-everywhere`, `account.ts`): a new token goes into `config.json`, the
+  asking browser gets a new cookie and a sign-in link to share, and every WebSocket is closed so the rest
+  reconnect, fail and show the sign-in screen (any 401 does that in the web app). A token set with
+  `RAILS_TOKEN` can't be replaced this way.
   The server binds `127.0.0.1` by default. Panels are full shell access, so set `RAILS_HOST=0.0.0.0`
   only on networks you trust (LAN, Tailscale).
 - **Environment:** tmux and everything in it get the server's environment minus `RAILS_*` (the token),

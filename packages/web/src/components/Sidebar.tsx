@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { IconPackages as Boxes, IconGauge as CircleGauge, IconSettings as Cog, IconDotsVertical as EllipsisVertical, IconFolder as Folder, IconFolderOpen as FolderOpen, IconFolderPlus as FolderPlus, IconLayoutSidebar as PanelLeft, IconPlus as Plus } from "@tabler/icons-react";
+import { IconPackages as Boxes, IconGauge as CircleGauge, IconSettings as Cog, IconDotsVertical as EllipsisVertical, IconFolder as Folder, IconFolderOpen as FolderOpen, IconFolderPlus as FolderPlus, IconLayoutSidebar as PanelLeft, IconLogout as LogOut, IconPlus as Plus, IconRobotFace as RobotFace, IconSelector as Selector } from "@tabler/icons-react";
 import type { PanelKind, Project, SessionSummary } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate, type Route } from "../router.ts";
@@ -10,6 +10,7 @@ import { FolderMenu } from "./FolderMenu.tsx";
 import { MenuButton } from "./Menu.tsx";
 import { PanelMenu } from "./PanelMenu.tsx";
 import { ProviderIcon } from "./ProviderIcon.tsx";
+import { useOpenSettings } from "./settings/context.ts";
 
 const PAGE = 5;
 const COLLAPSED_KEY = "rails.collapsedProjects";
@@ -127,7 +128,7 @@ export function Sidebar({ route }: { route: Route }) {
       </div>
       <nav className="nav">
         <NavItem href={href.home()} icon={<Plus size={18} />} label="New chat" rail={rail} className={route.name === "home" ? "primary" : ""} />
-        <NavItem href={href.sprockets()} icon={<Cog size={18} />} label="Sprockets" rail={rail} className={route.name === "sprockets" ? "active" : ""} />
+        <NavItem href={href.sprockets()} icon={<RobotFace size={18} />} label="Sprockets" rail={rail} className={route.name === "sprockets" ? "active" : ""} />
         <NavItem href="#/customize" icon={<Boxes size={18} />} label="Customize" rail={rail} className={route.name === "customize" ? "active" : ""} />
         <NavItem href="#/automate" icon={<CircleGauge size={18} />} label="Automate" rail={rail} className={route.name === "automate" ? "active" : ""} />
       </nav>
@@ -188,15 +189,46 @@ export function Sidebar({ route }: { route: Route }) {
         })}
       </div>
 
-      <div className="sidebar-foot" title={rail ? (connected ? "Connected" : "Reconnecting…") : undefined}>
-        <span className={"dot " + (connected ? "on" : "off")} aria-hidden />
-        <span className="label">
-          {connected ? "Connected" : "Reconnecting…"}
-          <span className="muted"> · {location.hostname}</span>
-        </span>
+      <div className="sidebar-foot">
+        <AccountMenu connected={connected} />
       </div>
       <div className="sidebar-resize" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" onPointerDown={startResize} />
     </aside>
+  );
+}
+
+/**
+ * The account row at the foot of the sidebar (Claude's pattern): Rails and the connection state, opening
+ * a menu with Settings and Sign out. In the icon rail only the logo shows, with the state as a dot.
+ */
+function AccountMenu({ connected }: { connected: boolean }) {
+  const openSettings = useOpenSettings();
+  const state = connected ? "Connected" : "Reconnecting…";
+  const signOut = () => void api.logout().catch((e: Error) => alert(e.message)); // the app switches to sign-in
+  return (
+    <MenuButton
+      plain
+      className="account-row"
+      label={`Rails, ${state}. Settings and sign out`}
+      title={`${state} · ${location.host}`}
+      items={[
+        { label: "Settings", icon: <Cog size={16} />, shortcut: "s", onSelect: () => openSettings() },
+        { label: "Sign out", icon: <LogOut size={16} />, onSelect: signOut },
+      ]}
+      icon={
+        <>
+          <span className="account-avatar" aria-hidden>
+            <img src={logo} alt="" width={18} height={18} />
+            <span className={"dot " + (connected ? "on" : "off")} />
+          </span>
+          <span className="label account-text">
+            <span className="account-name">Rails</span>
+            <span className="muted small truncate">{state}</span>
+          </span>
+          <Selector size={16} className="label account-chevron" aria-hidden />
+        </>
+      }
+    />
   );
 }
 

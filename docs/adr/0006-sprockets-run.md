@@ -12,7 +12,7 @@ Decisions:
   providers, auth, streaming) and `@earendil-works/pi-agent-core` (the tool loop). These are MIT npm
   libraries; users don't need pi installed. Sprockets aren't a fourth provider (ADR 0002) and don't run in
   panels or tmux.
-- **The user brings the model.** Customize → Models sets up providers with an API key (OpenAI, Anthropic,
+- **The user brings the model.** Settings → Models sets up providers with an API key (OpenAI, Anthropic,
   OpenRouter, Google, xAI, Mistral, Groq, DeepSeek) or a sign-in: "Continue with ChatGPT" (OpenAI allows
   open-source and locally run apps to use a ChatGPT plan) and OpenRouter's sign-in. **No Anthropic
   subscription sign-in**: Anthropic doesn't allow its subscriptions in other apps, so Anthropic takes an API

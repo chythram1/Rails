@@ -156,6 +156,23 @@ export interface SprocketMessage {
   createdAt: string;
 }
 
+// ---- Settings ----
+
+/** Facts about the Rails server, for Settings → General. */
+export interface ServerInfo {
+  /** The address the server listens on (RAILS_HOST) and its port. */
+  host: string;
+  port: number;
+  /** True when other devices can reach it (it listens beyond localhost). */
+  network: boolean;
+  /** The commit it runs, when it runs from a git checkout. */
+  build?: string;
+  tmux?: string;
+  node: string;
+  /** The access token is set with RAILS_TOKEN, so Rails can't replace it. */
+  tokenFromEnv: boolean;
+}
+
 // ---- Models: what Sprockets run on (ADR 0006). ----
 
 /** A model provider rails can bill Sprockets to, and how it's set up. */

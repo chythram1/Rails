@@ -9,9 +9,12 @@ class Socket {
   private connListeners = new Set<(up: boolean) => void>();
   private queue: ClientMsg[] = [];
   private retry = 0;
+  /** Signed out: don't reconnect until connect() is called again (after signing in). */
+  private stopped = false;
   connected = false;
 
   connect() {
+    this.stopped = false;
     if (this.ws) return;
     const proto = location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(`${proto}://${location.host}/ws`);
@@ -28,8 +31,15 @@ class Socket {
     ws.onclose = () => {
       this.ws = undefined;
       this.setConnected(false);
-      setTimeout(() => this.connect(), Math.min(10_000, 500 * 2 ** this.retry++));
+      if (!this.stopped) setTimeout(() => !this.stopped && this.connect(), Math.min(10_000, 500 * 2 ** this.retry++));
     };
+  }
+
+  /** Close the connection for good (signing out): the server keeps an open socket authorized otherwise. */
+  disconnect() {
+    this.stopped = true;
+    this.queue = [];
+    this.ws?.close();
   }
 
   private setConnected(up: boolean) {

@@ -96,6 +96,12 @@ export class TerminalHub {
     for (const ws of this.clients.keys()) send(ws, m);
   }
 
+  /** Close every browser connection (after signing out everywhere): they reconnect, and only a browser
+   * with the new token gets back in. Panel processes keep running in tmux. */
+  disconnectAll() {
+    for (const ws of this.clients.keys()) ws.close(4001, "Signed out");
+  }
+
   /** Detach every browser client. Panel processes keep running in tmux. */
   detachAll() {
     for (const ptys of this.clients.values()) for (const pty of ptys.values()) pty.kill();

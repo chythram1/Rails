@@ -4,10 +4,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { Hono } from "hono";
-import { getCookie, setCookie } from "hono/cookie";
+import { Hono, type Context } from "hono";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { WebSocketServer } from "ws";
-import { HOST, PORT, TOKEN } from "./config.ts";
+import { serverInfo, onSignedOutEverywhere, signOutEverywhere } from "./account.ts";
+import { accessToken, HOST, PORT } from "./config.ts";
 import { projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
 import type { OpenPanel, SprocketInput, SprocketSettings } from "@rails/shared";
@@ -24,6 +25,10 @@ const COOKIE = "rails_token";
 const hub = new TerminalHub();
 const app = new Hono();
 
+// After "sign out everywhere", close every connection; browsers with the new token reconnect. The delay
+// lets the device that asked receive its new cookie before its own socket drops.
+onSignedOutEverywhere(() => setTimeout(() => hub.disconnectAll(), 1000));
+
 // Services throw ServiceError for expected failures; anything else is a 500 (Hono's default behavior).
 app.onError((err, c) => {
   if (err instanceof ServiceError) return c.json({ error: err.message }, err.status);
@@ -31,10 +36,13 @@ app.onError((err, c) => {
   return c.text("Internal Server Error", 500);
 });
 
+const setLoginCookie = (c: Context, token: string) =>
+  setCookie(c, COOKIE, token, { httpOnly: true, sameSite: "Lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
+
 const tokenOk = (t: string | undefined) => {
   if (!t) return false;
   const a = Buffer.from(t);
-  const b = Buffer.from(TOKEN);
+  const b = Buffer.from(accessToken());
   return a.length === b.length && timingSafeEqual(a, b);
 };
 
@@ -64,7 +72,12 @@ app.use("/api/*", async (c, next) => {
 app.post("/api/auth/login", async (c) => {
   const { token } = await c.req.json<{ token?: string }>();
   if (!tokenOk(token)) return c.json({ error: "Invalid token" }, 401);
-  setCookie(c, COOKIE, token!, { httpOnly: true, sameSite: "Lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
+  setLoginCookie(c, token!);
+  return c.json({ ok: true });
+});
+
+app.post("/api/auth/logout", (c) => {
+  deleteCookie(c, COOKIE, { path: "/" });
   return c.json({ ok: true });
 });
 
@@ -74,6 +87,14 @@ app.use("/api/*", async (c, next) => {
 });
 
 app.get("/api/auth/me", (c) => c.json({ ok: true }));
+
+// ---- settings: this server and the account (one access token) ----
+app.get("/api/server", async (c) => c.json(await serverInfo()));
+app.post("/api/account/sign-out-everywhere", (c) => {
+  const token = signOutEverywhere();
+  setLoginCookie(c, token); // this device stays signed in
+  return c.json({ token });
+});
 
 // ---- providers / projects ----
 app.get("/api/providers", (c) => c.json(providerInfo()));
@@ -183,7 +204,7 @@ void tmuxVersion().then((v) => {
 const server = serve({ fetch: app.fetch, hostname: HOST, port: PORT }, () => {
   const url = `http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}`;
   console.log(`Rails server on ${url}`);
-  console.log(`open: ${process.env.NODE_ENV === "production" ? url : "http://localhost:5173"}/?token=${TOKEN}`);
+  console.log(`open: ${process.env.NODE_ENV === "production" ? url : "http://localhost:5173"}/?token=${accessToken()}`);
 });
 
 const wss = new WebSocketServer({ noServer: true });

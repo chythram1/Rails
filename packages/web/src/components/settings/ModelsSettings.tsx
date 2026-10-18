@@ -1,13 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { ModelProvider, SignIn } from "@rails/shared";
-import { api } from "../api.ts";
-import { socket } from "../ws.ts";
-import { ModelSelect, useModelSettings } from "./ModelSelect.tsx";
+import { api } from "../../api.ts";
+import { socket } from "../../ws.ts";
+import { ModelSelect, useModelSettings } from "../ModelSelect.tsx";
 
 /**
- * Customize → Models (ADR 0006): the providers Sprockets can run on, set up with an API key or a sign-in,
- * and the default model. Laid out like the provider lists in Braintrust and Retool: one row per provider
- * with its status and an action. Keys and tokens stay on the server; the page only learns which are set.
+ * Settings → Models (ADR 0006): the default model and the providers Sprockets can run on, set up with an
+ * API key or a sign-in. One row per provider with its status and an action, like Claude's Connectors and
+ * the provider lists in Braintrust and Retool. Keys and tokens stay on the server; the page only learns
+ * which are set.
  */
 export function ModelsSettings() {
   const { settings, error } = useModelSettings();
@@ -25,30 +26,36 @@ export function ModelsSettings() {
   };
 
   return (
-    <section className="settings-section" aria-labelledby="models-title">
-      <h2 id="models-title">Models</h2>
-      <p className="muted">What your Sprockets run on. Keys and sign-ins are stored on the computer running Rails.</p>
-
-      <div className="settings-field">
-        <label htmlFor="default-model">Default model</label>
-        <ModelSelect
-          id="default-model"
-          settings={settings}
-          value={settings.defaultModel}
-          empty={settings.models.length ? "None" : "Set up a provider first"}
-          disabled={!settings.models.length}
-          onChange={(ref) => void setDefault(ref)}
-        />
-        <p className="muted small">Used by Sprockets that don't pick their own.</p>
+    <>
+      <section className="set-group" aria-labelledby="sprockets-title">
+        <h3 id="sprockets-title">Sprockets</h3>
+        <div className="set-row" id="setting-default-model" data-settings-row tabIndex={-1}>
+          <div className="set-text">
+            <label htmlFor="default-model">Default model</label>
+            <p>Used by Sprockets that don't pick their own.</p>
+          </div>
+          <ModelSelect
+            id="default-model"
+            settings={settings}
+            value={settings.defaultModel}
+            empty={settings.models.length ? "None" : "Set up a provider first"}
+            disabled={!settings.models.length}
+            onChange={(ref) => void setDefault(ref)}
+          />
+        </div>
         {saveError && <p className="error" role="alert">{saveError}</p>}
-      </div>
+      </section>
 
-      <ul className="provider-list" aria-label="Providers">
-        {settings.providers.map((p) => (
-          <ProviderRow key={p.id} provider={p} />
-        ))}
-      </ul>
-    </section>
+      <section className="set-group" aria-labelledby="providers-title">
+        <h3 id="providers-title">Providers</h3>
+        <p className="set-intro">Keys and sign-ins are stored on the computer running Rails, never in the browser.</p>
+        <ul className="provider-list" aria-label="Providers">
+          {settings.providers.map((p) => (
+            <ProviderRow key={p.id} provider={p} />
+          ))}
+        </ul>
+      </section>
+    </>
   );
 }
 
@@ -99,7 +106,7 @@ function ProviderRow({ provider: p }: { provider: ModelProvider }) {
   };
 
   return (
-    <li className="provider-row">
+    <li className="provider-row" id={`setting-provider-${p.id}`} data-settings-row tabIndex={-1}>
       <div className="provider-main">
         <span className="provider-name">{p.name}</span>
         <span className={"provider-status" + (p.auth ? " ok" : "")}>{status(p)}</span>

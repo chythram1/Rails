@@ -5,6 +5,7 @@ import { api } from "../../api.ts";
 import { href } from "../../router.ts";
 import { useStore } from "../../store.tsx";
 import { ModelSelect, useModelSettings } from "../ModelSelect.tsx";
+import { useOpenSettings } from "../settings/context.ts";
 import { Sprocket } from "./Sprocket.tsx";
 
 /**
@@ -16,6 +17,7 @@ export function SprocketSettings({ sprocket }: { sprocket: SprocketData }) {
   const { id, name } = sprocket;
   const { projects } = useStore();
   const { settings: models } = useModelSettings();
+  const openSettings = useOpenSettings();
   const [memory, setMemory] = useState(sprocket.coreMemory);
   const [base, setBase] = useState(sprocket.coreMemory);
   // The Sprocket can edit its memory meanwhile (or another device can): follow along unless the user is editing.
@@ -87,7 +89,9 @@ export function SprocketSettings({ sprocket }: { sprocket: SprocketData }) {
             )}
             <p className="muted small">
               {models && !models.models.length ? "No providers are set up yet. " : ""}
-              <a href={href.customize()}>Set up providers in Customize</a>
+              <button type="button" className="link" onClick={() => openSettings("models")}>
+                Set up providers in Settings
+              </button>
             </p>
           </div>
 

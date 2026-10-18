@@ -18,9 +18,10 @@ domain concept, add it here first.
 | **Look** | What a Sprocket looks like: its shape (`character` in code), colour and accessory. | |
 | **Run** | One bounded attempt by a Sprocket to reply: it starts when the user writes and ends with a reply or a notice. | A panel's process. |
 | **Core memory** | A Sprocket's short note (at most 1,500 characters) about its user. It stays with the Sprocket when it moves to another project. | Its chat, which belongs to one project. |
-| **Model provider** | A service Sprockets run on (OpenAI, Anthropic, OpenRouter, …), set up with an API key or a sign-in in Customize → Models. | A Provider (Claude Code, Codex, pi). |
+| **Model provider** | A service Sprockets run on (OpenAI, Anthropic, OpenRouter, …), set up with an API key or a sign-in in Settings → Models. | A Provider (Claude Code, Codex, pi). |
 | **Resume** | Opening an existing session in a panel with the provider's own command: `claude --resume <id>`, `pi --session <id>`, `codex resume <id>`. Opening a session that already has a panel focuses that panel instead. | — |
 | **Client** | A browser tab or device connected to the server over WebSocket. There can be many at once, each attached to panels as its own tmux client. | A user. v1 has exactly one user. |
-| **Access token** | A shared secret that gates the whole server. v1 is single-user. | — |
+| **Access token** | A shared secret that gates the whole server. v1 is single-user. "Sign out everywhere" (Settings → Account) replaces it. | — |
+| **Settings** | The modal for the app itself (this server, model providers, the account), opened from the account row at the foot of the sidebar. Its search finds single settings by name or synonym. | Customize, which is for agent profiles, prompts and tools (not built yet). |
 | **Automation** _(future)_ | A saved prompt plus project plus schedule or trigger that starts sessions without a human. | — |
 | **Harness** _(future)_ | Rails' own agent loop, as opposed to driving a third-party provider. | — |
