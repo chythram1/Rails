@@ -16,7 +16,7 @@ describe("the run log", () => {
       ok("read_file", { path: "src/api.ts" }),
       ok("search_files", { query: "fetchUser" }),
     ];
-    expect(summarize(capabilities, calls)).toBe("Looked at the board, read 2 conversations, read src/api.ts and searched for “fetchUser”");
+    expect(summarize(capabilities, calls)).toBe("Looked at the board, read the latest messages of 2 conversations, read src/api.ts and searched for “fetchUser”");
   });
 
   it("counts failed steps and leaves out ones a script's end cut off", () => {

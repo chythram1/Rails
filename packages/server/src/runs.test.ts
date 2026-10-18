@@ -64,6 +64,25 @@ describe("runs", () => {
     expect(listMessages(s.id).at(-1)!.activity).toBe("Updated its memory");
   });
 
+  it("shows the model the tool work behind its recent replies, so it knows what it looked at", async () => {
+    const s = sprocket();
+    let seen: string[] = [];
+    faux.setResponses([
+      fauxAssistantMessage([fauxToolCall("codemode", { code: 'text("the board says: all idle")' })], { stopReason: "toolUse" }),
+      fauxAssistantMessage("Everything is idle."),
+      (context) => {
+        seen = context.messages.map((m) => (m.role === "toolResult" ? `toolResult: ${(m.content[0] as { text: string }).text.split("\n").at(-1)}` : m.role));
+        return fauxAssistantMessage("Yes, I checked the board.");
+      },
+    ]);
+    sendMessage(s.id, "what's going on?");
+    await idle();
+    sendMessage(s.id, "did you check?");
+    await idle();
+    // The faux model gets the system prompt as a message of its own.
+    expect(seen).toEqual(["system", "user", "assistant", "toolResult: the board says: all idle", "assistant", "user"]);
+  });
+
   it("stops a run that keeps calling tools", async () => {
     const s = sprocket();
     const loop = fauxAssistantMessage([fauxToolCall("codemode", { code: 'text("still looking")' })], { stopReason: "toolUse" });

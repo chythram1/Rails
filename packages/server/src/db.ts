@@ -56,6 +56,8 @@ addColumn("sprockets", "description", "TEXT NOT NULL DEFAULT ''");
 addColumn("sprockets", "codemode_store", "TEXT NOT NULL DEFAULT '{}'");
 addColumn("sprocket_messages", "author", "TEXT NOT NULL DEFAULT 'user'");
 addColumn("sprocket_messages", "activity", "TEXT");
+/** On a reply: the run's tool calls and results (pi-ai messages, JSON), replayed to later runs. Never sent to browsers. */
+addColumn("sprocket_messages", "steps", "TEXT");
 addColumn("panels", "bridge_token", "TEXT");
 db.exec(`
   CREATE TABLE IF NOT EXISTS session_events (
@@ -259,17 +261,29 @@ export const sprocketMessages = {
     const r = db.prepare("SELECT * FROM sprocket_messages WHERE sprocket_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(sprocketId) as MessageRow | undefined;
     return r && toMessage(r);
   },
-  create(sprocketId: string, author: SprocketAuthor, text: string, createdAt = new Date().toISOString(), activity?: string): SprocketMessage {
+  create(
+    sprocketId: string,
+    author: SprocketAuthor,
+    text: string,
+    createdAt = new Date().toISOString(),
+    { activity, steps }: { activity?: string; steps?: unknown[] } = {},
+  ): SprocketMessage {
     const m: SprocketMessage = { id: randomUUID(), sprocketId, author, text, createdAt, ...(activity ? { activity } : {}) };
-    db.prepare("INSERT INTO sprocket_messages (id, sprocket_id, author, text, created_at, activity) VALUES (?, ?, ?, ?, ?, ?)").run(
+    db.prepare("INSERT INTO sprocket_messages (id, sprocket_id, author, text, created_at, activity, steps) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
       m.id,
       m.sprocketId,
       m.author,
       m.text,
       m.createdAt,
       activity ?? null,
+      steps?.length ? JSON.stringify(steps) : null,
     );
     return m;
+  },
+  /** The stored tool steps of a Sprocket's replies, by message id. */
+  steps(sprocketId: string): Map<string, unknown[]> {
+    const rows = db.prepare("SELECT id, steps FROM sprocket_messages WHERE sprocket_id = ? AND steps IS NOT NULL").all(sprocketId) as { id: string; steps: string }[];
+    return new Map(rows.map((r) => [r.id, JSON.parse(r.steps)]));
   },
 };
 

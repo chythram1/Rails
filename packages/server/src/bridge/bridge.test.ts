@@ -138,6 +138,10 @@ describe("bridge", () => {
     expect(out).toContain("Claude Code (2026-10-01 10:00): Here's a plan.");
     expect(out).toMatch(/x{1500}…/); // long messages are cut
     expect(await run({ session: "plan the scaffold", messages: 1 })).toContain("Earlier messages aren't shown.");
+    // The bridge saw nothing of it, so the board takes its latest exchange from the transcript.
+    const board = (await projectCapabilities.find((c) => c.name === "project_board")!.run({}, { sprocketId: "s", project, signal: new AbortController().signal })) as string;
+    expect(board).toMatch(/asked \(latest in its transcript, [^)]*\): x{100}/);
+    expect(board).toMatch(/last reply \(in its transcript, [^)]*\): Here's a plan\./);
   });
 });
 

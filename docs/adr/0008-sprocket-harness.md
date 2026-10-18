@@ -33,6 +33,9 @@ Decisions:
   stopped after 512 KB, a listing looks at 1,000 entries at most. Search uses ripgrep when it's installed,
   else `git grep`.
 
+- **Runs see their recent tool work.** Each reply saves the run's tool calls and results (results trimmed to
+  6,000 characters, never sent to browsers), and later runs get them back for the 3 most recent such replies.
+  Without them a model sees its earlier answers with nothing behind them, and doubts or redoes its own work.
 - **A run log.** Each capability says, in a few words, what a call is doing ("Reading src/api.ts") and what
   a run's calls of it did ("read 2 conversations"). Browsers get the step and the summary so far as
   `sprockets.activity`; the summary is saved with the reply, and the chat shows it above the reply.

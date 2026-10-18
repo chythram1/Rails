@@ -32,7 +32,8 @@ Decisions:
   last 25 events), `session_conversation` (the latest messages of one session, from the last 1 MB of its
   transcript, so it covers what was said before the panel was opened in Rails) and `git_status`, read-only
   and scoped to their project. Reading a transcript's end on demand is bounded and cheap; whole transcripts
-  are never read.
+  are never read. For sessions the bridge saw little of (resumed ones), the board and `list_sessions` take the
+  latest exchange from the session's transcript.
 
 Consequences:
 - Panels started before this (or outside Rails) don't report until they're reopened in Rails; the board

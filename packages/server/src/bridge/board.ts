@@ -28,6 +28,8 @@ export interface SessionCard {
   lastActivity?: string;
   /** Claude Code's message socket (step 3 delivers through it). */
   inbox?: string;
+  /** The latest exchange in its transcript, for sessions the bridge saw little of (resumed ones). */
+  transcript?: { asked?: string; askedAt?: string; replied?: string; repliedAt?: string };
 }
 
 const MAX_FILES = 8;
@@ -107,10 +109,13 @@ export function boardText(project: { name: string; path: string }, cards: Sessio
   const sorted = [...live].sort((a, b) => (b.lastActivity ?? "").localeCompare(a.lastActivity ?? ""));
   const blocks = sorted.map((c) => {
     const lines = [`- "${c.title}" (${AGENT[c.kind]}, id ${c.panelId.slice(0, 8)}): ${c.status === "unknown" ? "no reports (opened before Rails could see it)" : c.status}${c.waitingFor ? `, waiting for ${c.waitingFor}` : ""}${c.error ? `: ${short(c.error, 200)}` : ""}, ${ago(c.lastActivity, now)}`];
+    const t = c.transcript;
     if (c.intent) lines.push(`  asked: ${short(c.intent.replace(/\s+/g, " "), 300)}`);
+    else if (t?.asked) lines.push(`  asked (latest in its transcript, ${ago(t.askedAt, now)}): ${short(t.asked.replace(/\s+/g, " "), 300)}`);
     if (c.edited.length) lines.push(`  changed: ${c.edited.map((f) => rel(project.path, f)).join(", ")}`);
     if (c.lastCommand) lines.push(`  last command: ${short(c.lastCommand, 120)}`);
     if (c.lastOutcome) lines.push(`  last reply: ${short(c.lastOutcome.replace(/\s+/g, " "), 400)}`);
+    else if (t?.replied) lines.push(`  last reply (in its transcript, ${ago(t.repliedAt, now)}): ${short(t.replied.replace(/\s+/g, " "), 400)}`);
     return lines.join("\n");
   });
   const shared = sharedFiles(live).map(({ file, panelIds }) => `- ${rel(project.path, file)}: changed by ${panelIds.map((id) => `"${live.find((c) => c.panelId === id)?.title}"`).join(" and ")}`);
