@@ -38,8 +38,11 @@ function modeFor(card: SessionCard, title: string): Suggestion["mode"] {
   }
 }
 
-/** A Coordinator suggests a reply to a session. Its earlier pending suggestion for that session goes. */
-export function suggest(sprocketId: string, panel: Panel, title: string, raw: string): Suggestion {
+/**
+ * A Coordinator suggests a reply to a session, following one of its rules (its text) or its own judgment.
+ * Its earlier pending suggestion for that session goes.
+ */
+export function suggest(sprocketId: string, panel: Panel, title: string, raw: string, rule?: string): Suggestion {
   const text = raw.trim();
   if (!text) throw new Error("The reply is empty.");
   if (text.length > SUGGESTION_MAX) throw new Error(`Replies can be at most ${SUGGESTION_MAX} characters; this one is ${text.length}.`);
@@ -48,7 +51,7 @@ export function suggest(sprocketId: string, panel: Panel, title: string, raw: st
     if (old.messageId) suggestions.setStatus(old.id, ["pending"], "expired", { error: "A newer suggestion replaced it." });
     else suggestions.drop([old.id]); // from this same run: never shown
   }
-  const s = suggestions.create({ sprocketId, panelId: panel.id, kind: panel.kind, title, sessionId: panel.sessionId, mode, text });
+  const s = suggestions.create({ sprocketId, panelId: panel.id, kind: panel.kind, title, sessionId: panel.sessionId, mode, text, rule });
   changes.emit();
   return shown(s);
 }

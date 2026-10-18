@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
-import { IconChevronLeft as ChevronLeft, IconLayoutSidebarRightCollapse as Collapse } from "@tabler/icons-react";
-import { SPROCKET_DESCRIPTION_MAX, type Sprocket as SprocketData, type SprocketSettings as Settings } from "@rails/shared";
+import { IconChevronLeft as ChevronLeft, IconLayoutSidebarRightCollapse as Collapse, IconX as X } from "@tabler/icons-react";
+import {
+  SPROCKET_DESCRIPTION_MAX,
+  SPROCKET_RULE_MAX,
+  SPROCKET_RULES_MAX,
+  type Sprocket as SprocketData,
+  type SprocketSettings as Settings,
+} from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
 import { useStore } from "../../store.tsx";
@@ -8,11 +14,13 @@ import { Dropdown } from "../Dropdown.tsx";
 import { ModelSelect, useModelSettings } from "../ModelSelect.tsx";
 import { useOpenSettings } from "../settings/context.ts";
 import { Switch } from "../Switch.tsx";
+import { useAutoGrow } from "../useAutoGrow.ts";
 import { Sprocket } from "./Sprocket.tsx";
 
 /**
  * A Sprocket's settings, in a panel beside its chat (ref/sprockets/stage2/chat2.png): its look and name,
- * its description, the project it's attached to, whether it's that project's Coordinator, and its model.
+ * its description, the project it's attached to, whether it's that project's Coordinator (and then its
+ * standing rules), and its model.
  * Its core memory is its own business and isn't shown. Moving it to another project deletes its
  * chat there, so that asks first; its name, look and core memory stay. The panel has its own URL
  * (`#/sprockets/<id>/settings`), so the browser's back button closes it.
@@ -103,6 +111,7 @@ export function SprocketSettings({ sprocket, all }: { sprocket: SprocketData; al
             onChange={(on) => void setCoordinator(on)}
           />
         </div>
+        {sprocket.coordinator && <RulesField sprocket={sprocket} onSave={(rules) => save({ rules })} />}
 
         <div className="settings-field">
           <label htmlFor="sp-model">Model</label>
@@ -157,6 +166,116 @@ function NameField({ sprocket, onError }: { sprocket: SprocketData; onError(mess
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
       />
     </div>
+  );
+}
+
+/**
+ * A Coordinator's standing rules (ADR 0011): one plain sentence each, numbered as the Sprocket reads them.
+ * An edited rule is saved when its field loses focus (Enter does that too: rules are one line of thought);
+ * a new one is added with Enter or Add, and removing one saves at once.
+ */
+function RulesField({ sprocket, onSave }: { sprocket: SprocketData; onSave(rules: string[]): Promise<boolean> }) {
+  const [draft, setDraft] = useState("");
+  const draftRef = useAutoGrow(draft);
+  const full = sprocket.rules.length >= SPROCKET_RULES_MAX;
+  const add = async () => {
+    const rule = draft.trim();
+    if (rule && !full && (await onSave([...sprocket.rules, rule]))) setDraft("");
+  };
+  return (
+    <div className="settings-field sp-rules" role="group" aria-labelledby="sp-rules-label">
+      <p id="sp-rules-label" className="sp-field-label">Rules</p>
+      <p className="muted small">
+        How {sprocket.name} should answer sessions, one sentence each. Every suggestion says which rule it followed.
+      </p>
+      {sprocket.rules.length > 0 && (
+        <ol className="sp-rules-list">
+          {sprocket.rules.map((rule, i) => (
+            <RuleRow
+              key={`${i}:${rule}`}
+              n={i + 1}
+              rule={rule}
+              onSave={(next) => onSave(sprocket.rules.map((r, j) => (j === i ? next : r)).filter((r) => r.trim()))}
+              onRemove={() => onSave(sprocket.rules.filter((_, j) => j !== i))}
+            />
+          ))}
+        </ol>
+      )}
+      {full ? (
+        <p className="muted small">That's {SPROCKET_RULES_MAX} rules, the most a Sprocket can have.</p>
+      ) : (
+        <form
+          className="sp-rule-add"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void add();
+          }}
+        >
+          <textarea
+            ref={draftRef}
+            className="input"
+            rows={1}
+            aria-label="New rule"
+            maxLength={SPROCKET_RULE_MAX}
+            placeholder={sprocket.rules.length ? "Add a rule" : "e.g. \u201cIf it asks whether to continue with its plan, say yes.\u201d"}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value.replace(/\n/g, " "))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void add();
+              }
+            }}
+          />
+          {draft.trim() && (
+            <div className="sp-field-foot">
+              <span className="muted small">{draft.length} / {SPROCKET_RULE_MAX}</span>
+              <span className="grow" />
+              <button type="button" className="btn small" onClick={() => setDraft("")}>Cancel</button>
+              <button className="btn small primary">Add</button>
+            </div>
+          )}
+        </form>
+      )}
+    </div>
+  );
+}
+
+/** One rule, editable in place. Emptying it removes it; Escape puts it back. */
+function RuleRow({ n, rule, onSave, onRemove }: { n: number; rule: string; onSave(next: string): Promise<boolean>; onRemove(): void }) {
+  const [text, setText] = useState(rule);
+  const ref = useAutoGrow(text);
+  const commit = () => {
+    if (text.trim() === rule) return setText(rule);
+    void onSave(text).then((ok) => ok || setText(rule));
+  };
+  return (
+    <li className="sp-rule">
+      <span className="sp-rule-n" aria-hidden>{n}</span>
+      <textarea
+        ref={ref}
+        className="sp-rule-text"
+        rows={1}
+        aria-label={`Rule ${n}`}
+        maxLength={SPROCKET_RULE_MAX}
+        value={text}
+        onChange={(e) => setText(e.target.value.replace(/\n/g, " "))}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+          if (e.key === "Escape") {
+            e.stopPropagation(); // don't close the panel
+            setText(rule);
+          }
+        }}
+      />
+      <button type="button" className="icon-btn sp-rule-remove" aria-label={`Remove rule ${n}`} title="Remove" onClick={onRemove}>
+        <X size={14} />
+      </button>
+    </li>
   );
 }
 

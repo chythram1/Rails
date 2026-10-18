@@ -56,6 +56,8 @@ addColumn("sprockets", "description", "TEXT NOT NULL DEFAULT ''");
 addColumn("sprockets", "codemode_store", "TEXT NOT NULL DEFAULT '{}'");
 /** 1 for its project's Coordinator (at most one per project). */
 addColumn("sprockets", "coordinator", "INTEGER NOT NULL DEFAULT 0");
+/** Its standing rules (ADR 0011), as a JSON array of sentences. */
+addColumn("sprockets", "rules", "TEXT NOT NULL DEFAULT '[]'");
 addColumn("sprocket_messages", "author", "TEXT NOT NULL DEFAULT 'user'");
 addColumn("sprocket_messages", "activity", "TEXT");
 /** On a reply: the run's tool calls and results (pi-ai messages, JSON), replayed to later runs. Never sent to browsers. */
@@ -92,6 +94,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS suggestions_by_panel ON suggestions (panel_id, status);
   CREATE INDEX IF NOT EXISTS suggestions_by_sprocket ON suggestions (sprocket_id, message_id);
 `);
+/** On a suggestion: the rule it followed (ADR 0011). */
+addColumn("suggestions", "rule", "TEXT");
 
 type Row = { id: string; name: string; path: string; created_at: string };
 const toProject = (r: Row): Project => ({ id: r.id, name: r.name, path: r.path, createdAt: r.created_at });
@@ -214,6 +218,7 @@ type SprocketRow = {
   description: string;
   core_memory: string;
   coordinator: number;
+  rules: string;
 };
 /** A stored Sprocket, with its internal core memory (never sent to browsers). */
 const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running"> & { look: unknown; coreMemory: string } => ({
@@ -225,6 +230,7 @@ const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running"> & { look
   model: r.model ?? undefined,
   description: r.description,
   coordinator: r.coordinator === 1,
+  rules: JSON.parse(r.rules),
   coreMemory: r.core_memory,
 });
 
@@ -281,6 +287,9 @@ export const sprockets = {
   },
   setModel(id: string, model: string | null): void {
     db.prepare("UPDATE sprockets SET model = ? WHERE id = ?").run(model, id);
+  },
+  setRules(id: string, rules: string[]): void {
+    db.prepare("UPDATE sprockets SET rules = ? WHERE id = ?").run(JSON.stringify(rules), id);
   },
   setDescription(id: string, text: string): void {
     db.prepare("UPDATE sprockets SET description = ? WHERE id = ?").run(text, id);
@@ -363,6 +372,7 @@ type SuggestionRow = {
   session_id: string | null;
   mode: Suggestion["mode"];
   text: string;
+  rule: string | null;
   status: Suggestion["status"];
   error: string | null;
   created_at: string;
@@ -378,6 +388,7 @@ const toSuggestion = (r: SuggestionRow): Suggestion & { sprocketId: string; mess
   ...(r.session_id ? { sessionId: r.session_id } : {}),
   mode: r.mode,
   text: r.text,
+  ...(r.rule ? { rule: r.rule } : {}),
   status: r.status,
   ...(r.error ? { error: r.error } : {}),
   createdAt: r.created_at,
@@ -385,12 +396,12 @@ const toSuggestion = (r: SuggestionRow): Suggestion & { sprocketId: string; mess
 });
 
 export const suggestions = {
-  create(s: { sprocketId: string; panelId: string; kind: PanelKind; title: string; sessionId?: string; mode: Suggestion["mode"]; text: string }) {
+  create(s: { sprocketId: string; panelId: string; kind: PanelKind; title: string; sessionId?: string; mode: Suggestion["mode"]; text: string; rule?: string }) {
     const id = randomUUID();
     const now = new Date().toISOString();
     db.prepare(
-      "INSERT INTO suggestions (id, sprocket_id, panel_id, kind, title, session_id, mode, text, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
-    ).run(id, s.sprocketId, s.panelId, s.kind, s.title, s.sessionId ?? null, s.mode, s.text, now, now);
+      "INSERT INTO suggestions (id, sprocket_id, panel_id, kind, title, session_id, mode, text, rule, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+    ).run(id, s.sprocketId, s.panelId, s.kind, s.title, s.sessionId ?? null, s.mode, s.text, s.rule ?? null, now, now);
     return this.get(id)!;
   },
   get(id: string) {

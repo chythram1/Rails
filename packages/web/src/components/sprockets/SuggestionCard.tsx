@@ -1,12 +1,14 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { IconCheck as Check } from "@tabler/icons-react";
 import { sessionKey, type Suggestion } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href } from "../../router.ts";
 import { PanelIcon } from "../PanelMenu.tsx";
+import { useAutoGrow } from "../useAutoGrow.ts";
 
 /**
- * A reply a Coordinator suggests for a session, under its message (server suggestions.ts, ADR 0010).
+ * A reply a Coordinator suggests for a session, under its message (server suggestions.ts, ADR 0010), with
+ * the standing rule it followed, if any (ADR 0011).
  * The user edits it and sends it, or dismisses it; nothing reaches the session until they send it. A
  * dialog's answer is picked in the panel, so that card links there instead. Once it's sent, dismissed or
  * out of date, a muted line says so.
@@ -15,15 +17,7 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
   const [text, setText] = useState(s.text);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const field = useRef<HTMLTextAreaElement>(null);
-
-  // The field grows with the text (up to a limit, then scrolls).
-  useLayoutEffect(() => {
-    const el = field.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [text]);
+  const field = useAutoGrow(text);
 
   const act = async (call: () => Promise<unknown>) => {
     setBusy(true);
@@ -59,6 +53,7 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
       <span className="sp-event-title truncate" title={s.title}>{s.title}</span>
     </p>
   );
+  const rule = s.rule ? <p className="sp-suggestion-rule">Following your rule: {s.rule}</p> : null;
 
   if (s.mode === "answer") {
     const open = projectId && (s.sessionId && s.kind !== "shell" ? href.session(projectId, sessionKey(s.kind, s.sessionId)) : href.project(projectId));
@@ -66,6 +61,7 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
       <div className="sp-suggestion">
         {head}
         <p className="sp-suggestion-answer">{s.text}</p>
+        {rule}
         {error && <p className="error small" role="alert">{error}</p>}
         <div className="sp-suggestion-actions">
           <span className="muted small grow">It's waiting on a question in its panel.</span>
@@ -106,6 +102,7 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
           }
         }}
       />
+      {rule}
       {problem && <p className="error small" role="alert">{problem}</p>}
       <div className="sp-suggestion-actions">
         <button type="button" className="btn small" disabled={sending} onClick={dismiss}>Dismiss</button>

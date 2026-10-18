@@ -133,6 +133,11 @@ export interface Sprocket {
    * user (step 3). At most one per project.
    */
   coordinator: boolean;
+  /**
+   * Its standing rules for answering sessions as a Coordinator, one plain sentence each ("If it asks
+   * whether to continue with its plan, say yes."). Each suggestion says which one it followed (ADR 0011).
+   */
+  rules: string[];
   /** True while it's working on a reply. */
   running: boolean;
   /** The newest message in its chat, for the list preview. */
@@ -141,6 +146,9 @@ export interface Sprocket {
 
 /** A Sprocket's description is short on purpose: it goes into every run. */
 export const SPROCKET_DESCRIPTION_MAX = 500;
+/** At most this many standing rules, each at most SPROCKET_RULE_MAX characters. */
+export const SPROCKET_RULES_MAX = 10;
+export const SPROCKET_RULE_MAX = 200;
 
 /** Body of "change a Sprocket's settings". Only the fields present change; null clears. */
 export interface SprocketSettings {
@@ -149,6 +157,8 @@ export interface SprocketSettings {
   description?: string;
   /** Make it its project's Coordinator (taking over from any other), or stop. Needs a project. */
   coordinator?: boolean;
+  /** Replace its standing rules (empty ones are dropped). */
+  rules?: string[];
 }
 
 /** Body of "create a Sprocket" and "edit a Sprocket". */
@@ -212,6 +222,8 @@ export interface Suggestion {
   /** "reply": text Rails sends into the session; "answer": the option to pick in a dialog, in the panel. */
   mode: "reply" | "answer";
   text: string;
+  /** The rule it followed, as it read then; none when it used its own judgment. */
+  rule?: string;
   status: "pending" | "sending" | "sent" | "failed" | "dismissed" | "expired";
   /** Why it failed, or why it can't be sent anymore. */
   error?: string;

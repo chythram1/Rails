@@ -21,6 +21,7 @@ domain concept, add it here first.
 | **Coordinator** | The one Sprocket per project that Rails wakes when a session there waits for the user (ADR 0009), set with a switch in its settings. Later the only one that may message sessions. | Any Sprocket attached to the project. |
 | **Watch** | How Rails follows a project's sessions for its Coordinator: code that decides when a wait (a question in a dialog, or a turn that ends with one) is worth waking it for. | A Sprocket reading the board when asked. |
 | **Event** | A message from Rails in a Coordinator's chat: which session waits for the user and what it asked. The Coordinator's reply follows, or a "nothing needed" mark. | A SessionEvent, what the bridge records. |
+| **Rule** | One of a Coordinator's standing rules (ADR 0011): a plain sentence from the user on how to answer sessions ("If it asks whether to continue with its plan, say yes."). Each suggestion says which rule it followed. | Its description, which covers everything it does. |
 | **Suggestion** | A reply a Coordinator drafts for a session (ADR 0010), shown under its message. The user sends it (edited or not) or dismisses it; a dialog's suggested answer is picked in the panel. It expires when the session moves on. | A message a Sprocket sends on its own (not yet). |
 | **Look** | What a Sprocket looks like: its shape (`character` in code), colour and accessory. | |
 | **Run** | One bounded attempt by a Sprocket to reply: it starts when the user writes (or an event wakes a Coordinator) and ends with a reply or a notice. | A panel's process. |

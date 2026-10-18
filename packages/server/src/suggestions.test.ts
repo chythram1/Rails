@@ -10,7 +10,7 @@ import { receive } from "./bridge/index.ts";
 import { panels, projects, settings } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
-import { createSprocket, listMessages, sendMessage, updateSettings } from "./sprockets.ts";
+import { createSprocket, listMessages, listSprockets, sendMessage, updateSettings } from "./sprockets.ts";
 import { dismissSuggestion, sendSuggestion, startSuggestions, suggest } from "./suggestions.ts";
 
 const look = { character: "bell", color: "purple", accessory: "none" } as const;
@@ -157,6 +157,71 @@ describe("suggested replies", () => {
     const reply = await suggestThroughRun(lead.id, panel.id, "Yes.", "");
     expect(reply.author).toBe("notice");
     expect(listMessages(lead.id).some((m) => m.suggestions)).toBe(false);
+  });
+});
+
+describe("standing rules", () => {
+  it("keeps rules trimmed and within limits", () => {
+    const s = createSprocket({ name: "Rules", look });
+    expect(updateSettings(s.id, { rules: ["  If it asks to continue,   say yes. ", "", " "] }).rules).toEqual(["If it asks to continue, say yes."]);
+    expect(() => updateSettings(s.id, { rules: Array.from({ length: 11 }, (_, i) => `Rule ${i}`) })).toThrow("at most 10 rules");
+    expect(() => updateSettings(s.id, { rules: ["x".repeat(201)] })).toThrow("at most 200 characters");
+    expect(() => updateSettings(s.id, { rules: "say yes" as never })).toThrow("list of sentences");
+    expect(listSprockets().find((x) => x.id === s.id)!.rules).toEqual(["If it asks to continue, say yes."]);
+  });
+
+  it("gives a Coordinator its rules, numbered, and shows which one a suggestion followed", async () => {
+    const { lead, panel } = setup();
+    updateSettings(lead.id, { rules: ["Never agree to delete files.", "If it asks whether to update tests, say yes."] });
+    let prompt = "";
+    const code = `return await tools.suggest_reply({ session: ${JSON.stringify(panel.id.slice(0, 8))}, reply: "Yes, update them.", rule: 2 })`;
+    faux.setResponses([
+      (context) => {
+        prompt = JSON.stringify(context.messages.filter((m) => (m.role as string) === "system"));
+        return fauxAssistantMessage([fauxToolCall("codemode", { code })], { stopReason: "toolUse" });
+      },
+      fauxAssistantMessage("Your rule says yes."),
+    ]);
+    // Rules change while it runs: the number still means the rule it read.
+    sendMessage(lead.id, "what should I tell it?");
+    updateSettings(lead.id, { rules: ["Always ask me first."] });
+    await idle();
+    expect(prompt).toContain("<rules>\\n1. Never agree to delete files.\\n2. If it asks whether to update tests, say yes.\\n</rules>");
+    expect(listMessages(lead.id).at(-1)!.suggestions![0].rule).toBe("If it asks whether to update tests, say yes.");
+  });
+
+  it("tells the model when the rule it cites doesn't exist", async () => {
+    const { lead, panel } = setup();
+    let result = "";
+    const code = `return await tools.suggest_reply({ session: ${JSON.stringify(panel.id.slice(0, 8))}, reply: "Yes.", rule: 3 })`;
+    faux.setResponses([
+      fauxAssistantMessage([fauxToolCall("codemode", { code })], { stopReason: "toolUse" }),
+      (context) => {
+        const last = context.messages.at(-1);
+        result = last?.role === "toolResult" ? (last.content[0] as { text: string }).text : "";
+        return fauxAssistantMessage("I'll leave the rule out.");
+      },
+    ]);
+    sendMessage(lead.id, "what should I tell it?");
+    await idle();
+    expect(result).toContain("There's no rule 3: you have 0.");
+    expect(listMessages(lead.id).at(-1)!.suggestions).toBeUndefined();
+  });
+
+  it("leaves rules out of other Sprockets' prompts", async () => {
+    const s = createSprocket({ name: "Helper", look });
+    updateSettings(s.id, { rules: ["Say yes."] });
+    let prompt = "";
+    faux.setResponses([
+      (context) => {
+        prompt = JSON.stringify(context.messages.filter((m) => (m.role as string) === "system"));
+        return fauxAssistantMessage("Hi.");
+      },
+    ]);
+    sendMessage(s.id, "hi");
+    await idle();
+    expect(prompt).toContain("You are Helper");
+    expect(prompt).not.toContain("<rules>");
   });
 });
 

@@ -624,6 +624,7 @@ ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
 }
 .sp-suggestion-text:focus-visible { outline: none; } /* the card's border shows focus */
 .sp-suggestion-text:disabled { color: var(--text-2); }
+.sp-suggestion-rule { margin: 0; color: var(--muted); font-size: 13px; text-wrap: pretty; }
 .sp-suggestion-answer { margin: 0; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .sp-suggestion-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .sp-suggestion-actions .muted { text-wrap: pretty; }
@@ -646,7 +647,21 @@ ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
 .sp-field-foot { display: flex; align-items: center; gap: 8px; }
 .sp-switch-field { flex-direction: row; align-items: flex-start; gap: 16px; }
 .sp-switch-text { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-.sp-switch-text > label { font-weight: 500; }
+.sp-switch-text > label, .sp-field-label { font-weight: 500; }
+/* A Coordinator's rules (SprocketSettings.tsx): numbered rows that are fields themselves (the row takes the
+   field's focus border), each with a remove button, then a field to add one. */
+.sp-rules-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.sp-rule {
+  display: flex; align-items: flex-start; gap: 8px; padding: 5px 3px 5px 11px;
+  border: 1px solid var(--border-strong); border-radius: 10px; background: var(--bg);
+}
+.sp-rule:focus-within { border-color: var(--border-focus); }
+.sp-rule-n { flex: none; min-width: 1ch; padding-top: 2px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.sp-rule-text { flex: 1; min-width: 0; padding: 2px 0; border: 0; background: none; font-size: 14px; line-height: 1.5; resize: none; overflow: hidden; }
+.sp-rule-text:focus-visible { outline: none; } /* the row's border shows focus */
+.sp-rule-remove { flex: none; width: 26px; height: 26px; }
+.sp-rule-add { display: flex; flex-direction: column; gap: 6px; }
+.sp-rule-add textarea.input { width: 100%; resize: none; overflow: hidden; }
 /* On/off switch (Switch.tsx): Paper White when on, like the one primary button; no slide (no chrome motion). */
 .switch {
   flex: none; display: inline-flex; align-items: center; width: 36px; height: 20px; padding: 2px;

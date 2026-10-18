@@ -7,6 +7,8 @@ import {
   SPROCKET_CHARACTERS,
   SPROCKET_COLORS,
   SPROCKET_DESCRIPTION_MAX,
+  SPROCKET_RULE_MAX,
+  SPROCKET_RULES_MAX,
   type Sprocket,
   type SprocketEvent,
   type SprocketInput,
@@ -127,7 +129,7 @@ export function postEvent(sprocketId: string, event: SprocketEvent, text: string
  */
 export function updateSettings(id: string, body: SprocketSettings | undefined): Sprocket {
   const s = getSprocket(id);
-  const { projectId, model, description, coordinator } = body ?? {};
+  const { projectId, model, description, coordinator, rules } = body ?? {};
   const moving = projectId !== undefined && (projectId ?? undefined) !== s.projectId;
   if (moving) {
     if (projectId !== null && (typeof projectId !== "string" || !projects.get(projectId))) throw new ServiceError("Unknown project", 400);
@@ -139,6 +141,7 @@ export function updateSettings(id: string, body: SprocketSettings | undefined): 
     if (description.trim().length > SPROCKET_DESCRIPTION_MAX)
       throw new ServiceError(`Descriptions can be at most ${SPROCKET_DESCRIPTION_MAX} characters.`, 400);
   }
+  const ruleList = rules === undefined ? undefined : parseRules(rules);
   if (coordinator !== undefined) {
     if (typeof coordinator !== "boolean") throw new ServiceError("coordinator must be true or false", 400);
     if (coordinator && !(moving ? projectId : s.projectId)) throw new ServiceError("Attach it to a project first.", 400);
@@ -148,8 +151,18 @@ export function updateSettings(id: string, body: SprocketSettings | undefined): 
   if (model !== undefined) sprockets.setModel(id, model);
   if (description !== undefined) sprockets.setDescription(id, description.trim());
   if (coordinator !== undefined) sprockets.setCoordinator(id, coordinator);
+  if (ruleList) sprockets.setRules(id, ruleList);
   changed();
   return getSprocket(id);
+}
+
+/** Standing rules from a request: trimmed, empty ones dropped, within the limits. */
+function parseRules(raw: unknown): string[] {
+  if (!Array.isArray(raw) || raw.some((r) => typeof r !== "string")) throw new ServiceError("Rules must be a list of sentences", 400);
+  const rules = (raw as string[]).map((r) => r.replace(/\s+/g, " ").trim()).filter(Boolean);
+  if (rules.length > SPROCKET_RULES_MAX) throw new ServiceError(`A Sprocket can have at most ${SPROCKET_RULES_MAX} rules.`, 400);
+  if (rules.some((r) => r.length > SPROCKET_RULE_MAX)) throw new ServiceError(`Rules can be at most ${SPROCKET_RULE_MAX} characters.`, 400);
+  return rules;
 }
 
 /** A project is being removed from rails: its Sprockets are detached (and their chats there deleted). */
