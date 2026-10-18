@@ -53,6 +53,17 @@ addColumn("sprockets", "project_id", "TEXT");
 addColumn("sprockets", "model", "TEXT");
 addColumn("sprockets", "core_memory", "TEXT NOT NULL DEFAULT ''");
 addColumn("sprocket_messages", "author", "TEXT NOT NULL DEFAULT 'user'");
+addColumn("panels", "bridge_token", "TEXT");
+db.exec(`
+  CREATE TABLE IF NOT EXISTS session_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    panel_id TEXT NOT NULL,
+    session_id TEXT,
+    at TEXT NOT NULL,
+    event TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS session_events_by_panel ON session_events (panel_id, id);
+`);
 
 type Row = { id: string; name: string; path: string; created_at: string };
 const toProject = (r: Row): Project => ({ id: r.id, name: r.name, path: r.path, createdAt: r.created_at });
@@ -89,6 +100,9 @@ export const panels = {
   list(projectId: string): Panel[] {
     return (db.prepare("SELECT * FROM panels WHERE project_id = ? ORDER BY created_at").all(projectId) as PanelRow[]).map(toPanel);
   },
+  all(): Panel[] {
+    return (db.prepare("SELECT * FROM panels ORDER BY created_at").all() as PanelRow[]).map(toPanel);
+  },
   get(id: string): Panel | undefined {
     const r = db.prepare("SELECT * FROM panels WHERE id = ?").get(id) as PanelRow | undefined;
     return r && toPanel(r);
@@ -111,6 +125,37 @@ export const panels = {
   },
   remove(id: string): void {
     db.prepare("DELETE FROM panels WHERE id = ?").run(id);
+  },
+  setSession(id: string, sessionId: string): void {
+    db.prepare("UPDATE panels SET session_id = ? WHERE id = ?").run(sessionId, id);
+  },
+  /** The panel's bridge token (ADR 0007), made when the panel starts. Never sent to browsers. */
+  bridgeToken(id: string): string | undefined {
+    return (db.prepare("SELECT bridge_token FROM panels WHERE id = ?").get(id) as { bridge_token: string | null } | undefined)?.bridge_token ?? undefined;
+  },
+  setBridgeToken(id: string, token: string): void {
+    db.prepare("UPDATE panels SET bridge_token = ? WHERE id = ?").run(token, id);
+  },
+};
+
+/** What sessions reported through the bridge (ADR 0007), kept short: the last EVENTS_PER_PANEL per panel. */
+const EVENTS_PER_PANEL = 200;
+export const sessionEvents = {
+  add(panelId: string, sessionId: string | undefined, event: unknown, at = new Date().toISOString()): void {
+    db.prepare("INSERT INTO session_events (panel_id, session_id, at, event) VALUES (?, ?, ?, ?)").run(panelId, sessionId ?? null, at, JSON.stringify(event));
+    db.prepare("DELETE FROM session_events WHERE panel_id = ? AND id <= (SELECT id FROM session_events WHERE panel_id = ? ORDER BY id DESC LIMIT 1 OFFSET ?)").run(
+      panelId,
+      panelId,
+      EVENTS_PER_PANEL,
+    );
+  },
+  list(panelId: string): { at: string; sessionId?: string; event: any }[] {
+    return (db.prepare("SELECT at, session_id, event FROM session_events WHERE panel_id = ? ORDER BY id").all(panelId) as { at: string; session_id: string | null; event: string }[]).map(
+      (r) => ({ at: r.at, sessionId: r.session_id ?? undefined, event: JSON.parse(r.event) }),
+    );
+  },
+  removePanel(panelId: string): void {
+    db.prepare("DELETE FROM session_events WHERE panel_id = ?").run(panelId);
   },
 };
 

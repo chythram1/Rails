@@ -46,6 +46,9 @@ export interface SessionSummary {
   panelId?: string;
 }
 
+/** Why a panel needs the user (ADR 0007): its agent waits for a permission or an answer, or its turn failed. */
+export type AttentionReason = "waiting" | "failed";
+
 /** What runs in a panel: one of the agents' native TUIs, or a plain shell in the project folder. */
 export type PanelKind = ProviderId | "shell";
 
@@ -228,6 +231,8 @@ export type ServerMsg =
   | { type: "panels.changed"; projectId: string }
   /** Every busy panel (its agent is thinking or replying), across all projects. Sent on connect and on change. */
   | { type: "panels.busy"; panelIds: string[] }
+  /** Every panel that needs the user, across all projects. Sent on connect and on change. */
+  | { type: "panels.attention"; panels: { panelId: string; reason: AttentionReason }[] }
   /** Sprockets or their messages changed (possibly on another device). */
   | { type: "sprockets.changed" }
   /** A Sprocket's reply so far, while it's being written; null when it's done. */

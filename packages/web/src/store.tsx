@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import type { Project, ProviderInfo, SessionSummary } from "@rails/shared";
+import type { AttentionReason, Project, ProviderInfo, SessionSummary } from "@rails/shared";
 import { api } from "./api.ts";
 import { href, navigate } from "./router.ts";
 import { socket } from "./ws.ts";
@@ -10,6 +10,8 @@ interface Store {
   connected: boolean;
   /** Panels whose agent is working right now (thinking or replying). */
   busy: Set<string>;
+  /** Panels whose agent needs the user, and why (ADR 0007). */
+  attention: Map<string, AttentionReason>;
   sessions: Record<string, SessionSummary[]>;
   /** The panel focused in the open workspace (highlights its session in the sidebar). */
   activePanelId?: string;
@@ -32,6 +34,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [connected, setConnected] = useState(socket.connected);
   const [busy, setBusy] = useState<Set<string>>(new Set());
+  const [attention, setAttention] = useState<Map<string, AttentionReason>>(new Map());
   const [sessions, setSessions] = useState<Record<string, SessionSummary[]>>({});
   const [activePanelId, setActivePanelId] = useState<string>();
   const [picking, setPicking] = useState(false);
@@ -61,6 +64,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Opening or closing a panel changes which sessions are open.
       if (m.type === "panels.changed") void refreshSessions(m.projectId);
       if (m.type === "panels.busy") setBusy(new Set(m.panelIds));
+      if (m.type === "panels.attention") setAttention(new Map(m.panels.map((a) => [a.panelId, a.reason])));
     });
     // Pick up sessions started outside rails and new transcripts of freshly started panels.
     const poll = setInterval(() => projectsRef.current.forEach((p) => void refreshSessions(p.id)), 20_000);
@@ -103,6 +107,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     providers,
     connected,
     busy,
+    attention,
     sessions,
     activePanelId,
     setActivePanelId,

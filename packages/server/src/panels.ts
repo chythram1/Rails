@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 import { userInfo } from "node:os";
 import type { OpenPanel, Panel, PanelKind, ProviderId, Workspace } from "@rails/shared";
 import { layouts, panels } from "./db.ts";
+import { bridgeEnv, forgetPanel } from "./bridge/index.ts";
+import { onCodexSession, unwatchCodexIfIdle, watchCodex } from "./bridge/codex.ts";
+import { bridgeFlags } from "./bridge/wiring.ts";
 import { ServiceError } from "./errors.ts";
 import { getProject } from "./projects.ts";
 import { discovery, findSession, installed } from "./providers/index.ts";
@@ -55,10 +58,20 @@ const listeners = new Set<(projectId: string) => void>();
 export const onPanelsChanged = (fn: (projectId: string) => void) => listeners.add(fn);
 const changed = (projectId: string) => listeners.forEach((fn) => fn(projectId));
 
+// Codex picks a new session's id itself; the bridge learns it from Codex's daemon (bridge/codex.ts).
+onCodexSession((panelId, threadId) => {
+  const panel = panels.get(panelId);
+  if (!panel || panel.sessionId || panels.bySession(threadId)) return;
+  panels.setSession(panelId, threadId);
+  changed(panel.projectId);
+});
+
 /** Stop a panel's tmux session (if still there), drop the panel and tell every browser. */
 async function removePanel(panel: Panel): Promise<void> {
   await tmux.killSession(panel.id); // stops the process; already gone is fine
   panels.remove(panel.id);
+  forgetPanel(panel.id);
+  if (panel.kind === "codex") unwatchCodexIfIdle();
   changed(panel.projectId);
 }
 
@@ -123,11 +136,15 @@ async function openSession(projectId: string, kind: ProviderId, sessionId: strin
 async function start(projectId: string, kind: PanelKind, sessionId: string | undefined, title: string, cwd: string, argv: string[]) {
   const panel = panels.create({ projectId, kind, sessionId, title });
   try {
-    await tmux.startSession(panel.id, cwd, argv);
+    // Agents report to the bridge (ADR 0007): their flags go after the program name, the token in the env.
+    const [program, ...rest] = argv;
+    const wired = kind === "shell" ? argv : [program, ...bridgeFlags(kind, panel.id), ...rest];
+    await tmux.startSession(panel.id, cwd, wired, kind === "shell" ? {} : bridgeEnv(panel.id));
   } catch (e) {
     panels.remove(panel.id);
     throw e;
   }
+  if (kind === "codex") watchCodex(panels.all(), sessionId ? undefined : { panelId: panel.id, cwd });
   changed(projectId);
   return panel;
 }

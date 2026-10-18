@@ -65,10 +65,11 @@ export async function version(): Promise<string | null> {
 
 const sessionName = (panelId: string) => `p-${panelId}`;
 
-/** Start `argv` detached in a new tmux session for the panel. */
-export async function startSession(panelId: string, cwd: string, argv: string[]): Promise<void> {
+/** Start `argv` detached in a new tmux session for the panel, with `env` added to its environment. */
+export async function startSession(panelId: string, cwd: string, argv: string[], env: Record<string, string> = {}): Promise<void> {
+  const vars = Object.entries(env).flatMap(([k, v]) => ["-e", `${k}=${v}`]);
   // A single argv entry would go through `sh -c`; several are exec'd as-is (no shell quoting issues).
-  await tmux("new-session", "-d", "-s", sessionName(panelId), "-x", "160", "-y", "48", "-c", cwd, "--", ...argv);
+  await tmux("new-session", "-d", "-s", sessionName(panelId), "-x", "160", "-y", "48", "-c", cwd, ...vars, "--", ...argv);
   await tmux("source-file", CONF); // apply config changes to an already-running tmux server
 }
 

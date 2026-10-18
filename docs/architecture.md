@@ -59,6 +59,14 @@ packages/
   after printing in two polls in a row (idle agents print the odd one-off update) and idle after 2s
   without output. Changes are broadcast as `panels.busy`, and the sidebar shows those sessions' dots
   yellow. Typing into an agent also counts as output, and an agent waiting on a permission prompt is idle.
+- **Bridge** (ADR 0007, `bridge/`): agents in Rails panels report what they do. `start()` in `panels.ts`
+  adds the wiring after the program name (Claude Code `--settings` hooks, pi `--extension bridge/pi/rails.ts`)
+  and the panel's bridge token to its tmux environment (`RAILS_BRIDGE`, `RAILS_PANEL_TOKEN`). Reports arrive
+  at `POST /bridge/<panelId>/<agent>/<event>` (loopback, token checked) and become `session_events`. Codex
+  panels report through Codex's app-server daemon instead (`bridge/codex.ts`, a client only while Codex
+  panels are open), which also gives new Codex panels their session id. Events fold into board cards
+  (`bridge/board.ts`); panels waiting for the user or with a failed turn are broadcast as
+  `panels.attention` (red dots). Attached Sprockets read the board through `bridge/tools.ts`.
 - **Persistence:** panels survive browser disconnects and server restarts (`tsx watch` included).
   On a reboot the tmux server is gone; the next workspace read drops panels whose tmux session no
   longer exists. Their transcripts remain, so sessions can be resumed from the sidebar.
@@ -106,7 +114,10 @@ packages/
 | --- | --- | --- |
 | claude | ✅ `~/.claude/projects/*/*.jsonl` | ✅ `claude --session-id <uuid> [-- prompt]` / `claude --resume <id>` |
 | pi | ✅ `~/.pi/agent/sessions/*/*.jsonl` | ✅ `pi --session-id <uuid> [-- prompt]` / `pi --session <id>` |
-| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl` (path verified with Codex 0.163; line format from docs) | ⚠️ `codex [-- prompt]` / `codex resume <id>` (run fine in tmux with Codex 0.163; not yet tested through Rails) |
+| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl` (checked with Codex 0.163) | ✅ `codex [-- prompt]` / `codex resume <id>`; a new panel learns its session id from Codex's daemon (ADR 0007) |
+
+Every provider panel reports to the bridge (ADR 0007): Claude Code through hooks, pi through the Rails
+extension, Codex through its app-server daemon.
 
 A provider is only offered when its CLI is on the server's `PATH` (`ProviderInfo.installed`).
 Transcript format notes are in [providers.md](./providers.md).

@@ -196,6 +196,13 @@ function PanelBody({ panel, focused }: { panel: Panel; focused: boolean }) {
   );
 }
 
+/** A small red dot on a panel's tab when its agent needs the user (ADR 0007). */
+function AttentionMark({ panelId }: { panelId: string }) {
+  const reason = useStore().attention.get(panelId);
+  if (!reason) return null;
+  return <span className="tab-attention" role="img" aria-label={reason === "waiting" ? "Needs you" : "Turn failed"} title={reason === "waiting" ? "Needs you" : "Turn failed"} />;
+}
+
 function PanelTab(props: IDockviewPanelHeaderProps) {
   const ws = useWs();
   const panel = usePanel(props.api.id);
@@ -205,6 +212,7 @@ function PanelTab(props: IDockviewPanelHeaderProps) {
     <div className="panel-tab" title={title}>
       <PanelIcon kind={panel.kind} />
       <span className="truncate">{title}</span>
+      <AttentionMark panelId={panel.id} />
       <button
         className="tab-close"
         aria-label={`Close ${title}`}
@@ -295,6 +303,7 @@ function MobilePanels() {
             <button role="tab" aria-selected={p.id === active?.id} className="mobile-tab" onClick={() => setActiveId(p.id)}>
               <PanelIcon kind={p.kind} />
               <span className="truncate">{ws.title(p)}</span>
+              <AttentionMark panelId={p.id} />
             </button>
             {p.id === active?.id && (
               <button className="tab-close" aria-label={`Close ${ws.title(p)}`} onClick={() => void ws.close(p)}>

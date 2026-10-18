@@ -144,6 +144,8 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .dot { width: 7px; height: 7px; border-radius: 50%; background: #555; flex-shrink: 0; }
 .dot.on, .dot.live { background: var(--green); }
 .dot.off, .dot.busy { background: var(--amber); }
+.dot.attention { background: var(--red); }
+.tab-attention { width: 7px; height: 7px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
 
 .provider-icon { width: 16px; height: 16px; flex-shrink: 0; display: block; }
 

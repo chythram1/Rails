@@ -4,6 +4,7 @@ import type { ClientMsg, ServerMsg } from "@rails/shared";
 import { watchBusy } from "./activity.ts";
 import { panels } from "./db.ts";
 import { onPanelsChanged, panelEnded } from "./panels.ts";
+import { attentionList, onAttention } from "./bridge/index.ts";
 import { onModelsChanged, onSignIn } from "./models.ts";
 import { onTyping } from "./runs.ts";
 import { onSprocketsChanged } from "./sprockets.ts";
@@ -25,11 +26,13 @@ export class TerminalHub {
     onTyping((sprocketId, text) => this.broadcast({ type: "sprockets.typing", sprocketId, text }));
     onModelsChanged(() => this.broadcast({ type: "models.changed" }));
     onSignIn((signIn) => this.broadcast({ type: "models.signIn", signIn }));
+    onAttention((list) => this.broadcast({ type: "panels.attention", panels: list }));
   }
 
   connect(ws: WebSocket) {
     this.clients.set(ws, new Map());
     send(ws, { type: "panels.busy", panelIds: this.busy });
+    send(ws, { type: "panels.attention", panels: attentionList() });
     this.stopWatching ??= watchBusy((ids) => {
       this.busy = ids;
       this.broadcast({ type: "panels.busy", panelIds: ids });

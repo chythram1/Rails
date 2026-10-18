@@ -3,13 +3,17 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
+import { getConnInfo } from "@hono/node-server/conninfo";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono, type Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { WebSocketServer } from "ws";
 import { serverInfo, onSignedOutEverywhere, signOutEverywhere } from "./account.ts";
 import { accessToken, HOST, PORT } from "./config.ts";
-import { projects } from "./db.ts";
+import { watchCodex } from "./bridge/codex.ts";
+import { loadAttention, receive, tokenOk as bridgeTokenOk } from "./bridge/index.ts";
+import { panels, projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
 import type { OpenPanel, SprocketInput, SprocketSettings } from "@rails/shared";
 import { closePanel, getWorkspace, openPanel, saveLayout } from "./panels.ts";
@@ -66,6 +70,20 @@ app.use("/api/*", async (c, next) => {
     return c.json({ error: "Cross-origin request refused" }, 403);
   }
   await next();
+});
+
+// ---- bridge: agents in panels report what they do (ADR 0007). Loopback only, with the panel's own token
+// (not the access token, which panels never get). Claude Code hooks read the empty JSON reply as "go on".
+const LOOPBACK = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+// Claude Code's PostToolUse report holds the whole content of a file it wrote, so allow a few MB.
+const BRIDGE_BODY_LIMIT = 4 * 1024 * 1024;
+app.post("/bridge/:panelId/:source/:event", bodyLimit({ maxSize: BRIDGE_BODY_LIMIT, onError: (c) => c.json({}, 413) }), async (c) => {
+  if (!LOOPBACK.has(getConnInfo(c).remote.address ?? "")) return c.json({ error: "Forbidden" }, 403);
+  const panelId = c.req.param("panelId");
+  if (!bridgeTokenOk(panelId, c.req.header("authorization")?.replace(/^Bearer\s+/i, ""))) return c.json({ error: "Unauthorized" }, 401);
+  const body = await c.req.json().catch(() => ({}));
+  receive(panelId, c.req.param("source"), c.req.param("event"), body, { inbox: c.req.query("inbox")?.slice(0, 300) || undefined });
+  return c.json({});
 });
 
 // ---- auth ----
@@ -197,6 +215,9 @@ if (existsSync(webDist)) {
 }
 
 // ---- server + websocket ----
+loadAttention(panels.all());
+watchCodex(panels.all()); // Codex panels that survived a restart
+
 void tmuxVersion().then((v) => {
   if (!v) console.warn("warning: tmux isn't installed, so panels can't run. Run `make system-deps`.");
 });

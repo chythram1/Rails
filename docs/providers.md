@@ -18,6 +18,8 @@ only reads transcripts for discovery (cwd, title, dates); the agents' TUIs rende
 - `claude --resume` appends `mode`, `permission-mode` and `cost-state` lines on start, even without a
   message, so the transcript's mtime (and its "last active" in Rails) changes just from reopening it.
 - CLI (verified): `claude --session-id <uuid> [-- prompt]` starts a session with a known id; `claude --resume <id>` reopens one. The first run in a new folder shows Claude's folder-trust prompt.
+- Hooks (verified with 2.1.302, used by the bridge, ADR 0007): `--settings <json>` adds hooks without touching the user's settings. `type:"http"` hooks POST the hook input as JSON (`headers` can use env vars listed in `allowedEnvVars`), except SessionStart, where only `type:"command"` hooks fire. Inputs carry `session_id`, `cwd`, `transcript_path`; PostToolUse has `tool_name`, `tool_input` (Write/Edit: absolute `file_path`), `tool_response`; Stop has `last_assistant_message`. PermissionRequest fires as soon as a permission dialog shows; the Notification hook's `idle_prompt` fires after every finished turn left alone for a minute, so it isn't a "needs you" signal.
+- Each session binds a message socket (`$CLAUDE_CODE_MESSAGING_SOCKET`, e.g. `/tmp/cc-socks/<pid>.sock`); a line `{"type":"user","message":{"role":"user","content":…}}` written to it reaches the session (undocumented, used from step 3).
 
 ## pi — `~/.pi/agent/sessions/--<cwd with / → ->--/<iso>_<sessionId>.jsonl`
 
@@ -33,6 +35,7 @@ only reads transcripts for discovery (cwd, title, dates); the agents' TUIs rende
 - User text can begin with a `<skill name="…">…</skill>` wrapper. Titles render it as `/<skill> rest`.
 - Entries form a tree through `id` / `parentId`. v1 renders them in file order.
 - CLI (verified): `pi --session-id <uuid> [-- prompt]` creates a session with that id; `pi --session <id>` reopens one. pi warns when tmux `extended-keys` is off, so Rails turns it on.
+- Extensions (verified with 1.3): `--extension <file.ts>` loads one for a run (pi lists it by file name). Events used by the Rails extension: `session_start` (`ctx.sessionManager.getSessionId()/getCwd()`), `before_agent_start` (`messageType`, `prompt`), `tool_call` (`toolName`, `input`, paths relative to cwd), `ui_prompt_start/end` (approval dialogs from other extensions), `agent_end` (`messages`), `session_shutdown`.
 
 ## Codex CLI — `~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl`
 
@@ -49,3 +52,4 @@ the first thread exists. The line format still comes from the public docs and is
   its socket). Clients speak JSON-RPC over a WebSocket on that Unix socket: `thread/list` filters by `cwd`, and
   thread events are broadcast to clients. Any `-c`, `--enable`, `--disable` or `--search` flag makes the TUI run
   embedded instead, so its thread is invisible to the daemon.
+- Daemon details (verified with 0.163): every client gets `thread/started` (thread `id`, `cwd`, `createdAt`, `ephemeral`) and `thread/status/changed` (`activeFlags`: `waitingOnApproval`, `waitingOnUserInput`). `thread/resume {threadId, excludeTurns:true}` subscribes to turns and items (`item/completed`: `userMessage`, `commandExecution`, `fileChange`; `turn/completed` with the final `agentMessage`), but fails ("no rollout found") until a new thread has saved its first turn. The TUI also starts short-lived helper threads; skip `ephemeral` ones.

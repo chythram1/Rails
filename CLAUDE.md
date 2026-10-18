@@ -104,6 +104,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 | `packages/server/src/sprockets.ts` | Sprocket services (ADR 0005, 0006): create/edit/delete, settings (project, model, core memory) and messages. Emits `onSprocketsChanged`. |
 | `packages/server/src/runs.ts` | Sprocket runs (ADR 0006): one bounded pi-agent-core loop per reply, the runaway guards, the `remember` tool. |
 | `packages/server/src/models.ts` | Model providers for Sprockets (pi-ai): API keys, sign-in, the default model. Credentials live in `credentials.ts` (`RAILS_HOME/credentials.json`). |
+| `packages/server/src/bridge/` | The bridge (ADR 0007): how agents report (`wiring.ts` flags, `pi/rails.ts` extension, `codex.ts` daemon client), the event shape (`events.ts`), the board and attention (`board.ts`, `index.ts`), and Sprockets' read tools (`tools.ts`). |
 | `packages/server/src/account.ts` | Settings → Account and General: sign out everywhere (replaces the access token), facts about this server. |
 | `packages/web/src/components/settings/` | The Settings modal (`SettingsDialog`, opened with `useOpenSettings()` from `context.ts`, e.g. by the sidebar's account row), its sections (General, Models, Account) and its search (`search.ts`). |
 | `packages/server/src/signin.ts` | Rails' own "Continue with ChatGPT" and OpenRouter sign-in flows (so every page says Rails); they store credentials in pi-ai's shape (ADR 0006). |
@@ -140,7 +141,8 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - Provider transcripts are the source of truth for sessions. Rails reads them and **never writes** them (the agents do, inside panels). The DB only stores projects, panels and layouts.
 - Panel processes live in tmux, not in the server. A browser disconnecting or the server restarting must never kill an agent; only closing the panel does.
 - The server's panel list is the source of truth; the saved layout is only an arrangement. Reconcile layout against the list, never the other way round.
-- The access token must never reach panel processes: keep the env cleaning in `tmux.ts`.
+- The access token must never reach panel processes: keep the env cleaning in `tmux.ts`. Panels get only their own bridge token (ADR 0007).
+- Wire agents to the bridge with command-line flags only (`bridge/wiring.ts`); never write the user's agent settings files. Codex panels must start without `-c` flags, or Codex leaves its daemon and Rails can't see them.
 - Discovery must stay cheap. Provider stores can be huge (a pi store can reach hundreds of MB), so scans read only the head and tail of each file and cache by mtime and size. Never read whole files during a scan.
 - The web client must work over plain HTTP on the LAN or Tailscale, so don't use secure-context-only browser APIs (for example `crypto.randomUUID` or the async clipboard API).
 - Keep server logic in plain service functions, not inside Hono route handlers. Routes should only parse input and call services, so Sprockets can reuse those services as tools.
@@ -158,7 +160,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - Native `<select>` can't show images, so the agent picker on Home shows text.
 - Sprocket SVGs: a CSS `transform` replaces the SVG `transform` attribute, so position with an outer `<g transform>` and animate an inner group (`transform-box: fill-box`). Headless browsers often report reduced motion, which stops Sprocket animations: emulate `prefers-reduced-motion: no-preference` to check them.
 - Upgrading pi-ai (`@earendil-works/pi-ai`, pinned `~1.3`): `signin.ts` runs the sign-in flows itself but stores pi-ai's credential shape, and pi-ai refreshes those tokens. `make test` (`signin.test.ts`) fails if the shape no longer fits; also compare `signin.ts` with pi-ai's `dist/auth/oauth/openai-chatgpt.js` and `openrouter.js` for flow changes (ADR 0006).
-- Codex is the least tested provider: check Codex changes against a real Codex install. Codex 0.16x runs interactive sessions on a shared app-server daemon, and any `-c` override on the command line makes it run without the daemon (see `docs/providers.md`).
+- Codex is the least tested provider: check Codex changes against a real Codex install. Codex 0.16x runs interactive sessions on a shared app-server daemon (other clients see its threads), and any `-c` override makes it run without the daemon (see `docs/providers.md`). A brand-new thread can't be subscribed to (`thread/resume`) until Codex has saved its first turn.
 
 ## Long-term direction
 Rails may ship as a desktop app later. A Node-based shell such as Electron is fine, so the Node server can
