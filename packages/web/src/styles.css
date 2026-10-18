@@ -514,7 +514,23 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-message.sprocket .sp-bubble { background: none; padding: 4px 0; max-width: min(680px, 100%); }
 .sp-message.notice { align-items: center; }
 .sp-message.notice .sp-bubble { background: none; color: var(--muted); font-size: 13px; text-align: center; padding: 4px 0; }
-.sp-settings { width: 100%; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 26px; }
+/* A Sprocket's chat with its settings panel beside it (ref/sprockets/stage2/chat2.png). */
+.sp-main { position: relative; }
+.sp-detail { flex: 1; min-height: 0; display: flex; }
+.sp-detail > .sp-chat { flex: 1; min-width: 0; }
+.sp-panel { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--border); background: var(--bg); }
+.sp-panel-head { display: flex; align-items: center; gap: 6px; height: 52px; flex-shrink: 0; padding: 7px 10px 0; border-bottom: 1px solid var(--border); }
+.sp-panel-head h2 { flex: 1; margin: 0; font-size: 15px; font-weight: 600; text-align: center; }
+.sp-panel-back { display: none; }
+.sp-panel-back + h2 { padding-left: 32px; } /* centred: the hidden back button leaves the close button alone on the right */
+.sp-panel-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 20px 16px 24px; display: flex; flex-direction: column; gap: 22px; }
+.sp-panel-look { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.sp-panel .settings-field > .input { width: 100%; }
+.sp-memory-foot { display: flex; align-items: center; gap: 8px; }
+/* Not enough room beside the chat: the panel lies over it instead of squeezing it. */
+@container (max-width: 720px) {
+  .sp-panel { position: absolute; inset: 0 0 0 auto; width: min(340px, 100%); z-index: 2; box-shadow: -12px 0 32px rgb(0 0 0 / 0.4); }
+}
 .sp-thinking { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; color: var(--muted); font-size: 14px; }
 .sp-project {
   max-width: 40%; padding: 2px 9px; border: 1px solid var(--border-strong); border-radius: 999px;
@@ -612,6 +628,12 @@ textarea.input { resize: vertical; line-height: 1.5; }
   .sp-list { width: 100%; border-right: 0; }
   .sp-list-head, .sp-head { padding-left: 52px; } /* room for the sidebar toggle */
   .sp-back { display: inline-grid; }
+  /* Phones: the panel is the whole screen, with a back arrow instead of the collapse button. */
+  .sp-panel { width: 100%; box-shadow: none; }
+  .sp-panel-back { display: inline-grid; }
+  .sp-panel-head { padding-left: 52px; } /* room for the sidebar toggle, as in the chat header */
+  .sp-panel-collapse { visibility: hidden; }
+  .sp-panel-back + h2 { padding-left: 0; }
   .main:has(> .sprockets) > .nav-toggle { top: 14px; } /* on the Sprockets header's centre line */
   .page { padding: 64px 16px 32px; }
   .hero { font-size: 28px; }

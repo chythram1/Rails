@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { IconChevronLeft as ChevronLeft, IconDotsVertical as EllipsisVertical } from "@tabler/icons-react";
+import { IconChevronLeft as ChevronLeft, IconDotsVertical as EllipsisVertical, IconLayoutSidebarRight as PanelRight } from "@tabler/icons-react";
 import type { Sprocket as SprocketData, SprocketMessage } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
@@ -30,7 +30,7 @@ function stamp(iso: string): string {
  * do), and time labels break it up where there are gaps. The user's messages sit on the right, replies on
  * the left, and rails' own notices (no model yet, errors) in the middle. A reply shows as it's written.
  */
-export function SprocketChat({ sprocket }: { sprocket: SprocketData }) {
+export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; panelOpen: boolean }) {
   const { id, name } = sprocket;
   const { projects } = useStore();
   const project = projects.find((p) => p.id === sprocket.projectId);
@@ -95,14 +95,23 @@ export function SprocketChat({ sprocket }: { sprocket: SprocketData }) {
         <h2 id="sp-chat-title" className="truncate" title={name}>{name}</h2>
         {project && <span className="sp-project truncate" title={`Attached to ${project.name}`}>{project.name}</span>}
         <span className="grow" />
+        <a
+          className={"icon-btn" + (panelOpen ? " active" : "")}
+          href={panelOpen ? href.sprocket(id) : href.sprocketSettings(id)}
+          aria-label={`${name} settings`}
+          aria-expanded={panelOpen}
+          title={panelOpen ? "Close settings" : "Settings"}
+        >
+          <PanelRight size={18} />
+        </a>
         <MenuButton
           label={`${name} actions`}
           title="More"
           icon={<EllipsisVertical size={16} />}
           align="right"
           items={[
-            { label: "Settings", shortcut: "s", onSelect: () => navigate(href.sprocketSettings(id)) },
-            { label: "Edit look", shortcut: "e", onSelect: () => navigate(href.editSprocket(id)) },
+            { label: "Settings", shortcut: "s", onSelect: () => navigate(panelOpen ? href.sprocket(id) : href.sprocketSettings(id)) },
+            { label: "Change look", shortcut: "l", onSelect: () => navigate(href.editSprocket(id)) },
             { label: "Delete", shortcut: "d", danger: true, onSelect: () => void remove() },
           ]}
         />

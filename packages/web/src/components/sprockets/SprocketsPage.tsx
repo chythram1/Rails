@@ -45,10 +45,15 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
     main = <SprocketCreator key="new" taken={list.map((s) => s.name)} onSaved={(s) => navigate(href.sprocket(s.id))} onCancel={list.length ? () => navigate(href.sprockets()) : undefined} />;
   } else if (route.view === "edit" && current) {
     main = <SprocketCreator key={current.id} sprocket={current} taken={[]} onSaved={(s) => navigate(href.sprocket(s.id))} onCancel={() => navigate(href.sprocket(current.id))} />;
-  } else if (route.view === "settings" && current) {
-    main = <SprocketSettings key={current.id} sprocket={current} />;
-  } else if (route.view === "chat" && current) {
-    main = <SprocketChat key={current.id} sprocket={current} />;
+  } else if ((route.view === "chat" || route.view === "settings") && current) {
+    // The chat stays put while its settings panel opens and closes beside it.
+    const panel = route.view === "settings";
+    main = (
+      <div className={"sp-detail" + (panel ? " with-panel" : "")}>
+        <SprocketChat key={current.id} sprocket={current} panelOpen={panel} />
+        {panel && <SprocketSettings key={current.id} sprocket={current} />}
+      </div>
+    );
   } else if (route.id) {
     main = <p className="sp-placeholder muted">This one doesn't exist anymore. It may have been deleted on another device.</p>;
   } else {
