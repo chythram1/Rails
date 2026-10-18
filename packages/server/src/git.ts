@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import type { GitStatus } from "@rails/shared";
 
@@ -50,4 +50,63 @@ export async function gitDiff(cwd: string, path: string): Promise<string> {
   } catch {
     return (await git(cwd, "diff", "--cached", "--", path)).stdout; // no HEAD yet
   }
+}
+
+/** A commit name or range from a script: refused if it could pass for an option. */
+function revision(rev: string): string {
+  if (!/^[\w./~^@{}:-]+$/.test(rev) || rev.startsWith("-")) throw new Error(`"${rev}" isn't a commit name.`);
+  return rev;
+}
+
+/** Recent commits, newest first (touching `path`, if given). */
+export async function gitLog(cwd: string, limit: number, path?: string): Promise<{ commit: string; date: string; author: string; subject: string }[]> {
+  const { stdout } = await git(cwd, "log", `-n${Math.max(1, Math.floor(limit))}`, "--format=%h%x1f%aI%x1f%an%x1f%s", "--", ...(path ? [path] : []));
+  return stdout
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [commit, date, author, subject] = line.split("\x1f");
+      return { commit, date, author, subject };
+    });
+}
+
+/** A git command's output, but no more than `maxBytes` of it: git is stopped once that much has arrived. */
+function gitCapped(cwd: string, args: string[], maxBytes: number): Promise<{ text: string; cut: boolean }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("git", ["-C", cwd, ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let cut = false;
+    let err = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      if (cut) return;
+      chunks.push(chunk);
+      size += chunk.length;
+      if (size >= maxBytes) {
+        cut = true;
+        child.kill();
+      }
+    });
+    child.stderr.on("data", (d) => (err += d));
+    child.on("error", reject);
+    child.on("close", (code) => {
+      // The last line may be cut mid-way: keep whole lines only.
+      const text = Buffer.concat(chunks).subarray(0, maxBytes).toString("utf8");
+      if (cut) resolve({ text: text.slice(0, text.lastIndexOf("\n") + 1), cut });
+      else if (code === 0) resolve({ text, cut });
+      else reject(new Error(err.trim() || `git ${args[0]} failed`));
+    });
+  });
+}
+
+/** One commit: its message, the files it changed and its patch, up to `maxBytes`. */
+export async function gitShow(cwd: string, commit: string, maxBytes: number): Promise<{ text: string; cut: boolean }> {
+  return gitCapped(cwd, ["show", "--stat", "--patch", "--no-color", "--format=fuller", revision(commit)], maxBytes);
+}
+
+/** Uncommitted changes against HEAD, up to `maxBytes`, plus the names of untracked files. */
+export async function gitDiffAll(cwd: string, maxBytes: number): Promise<{ text: string; cut: boolean; untracked: string[] }> {
+  const diff = await gitCapped(cwd, ["diff", "HEAD", "--no-color"], maxBytes).catch(() => gitCapped(cwd, ["diff", "--cached", "--no-color"], maxBytes)); // no HEAD yet
+  const untracked = (await gitStatus(cwd)).files.filter((f) => f.status === "??").map((f) => f.path);
+  return { ...diff, untracked };
 }

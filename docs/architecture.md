@@ -67,7 +67,7 @@ packages/
   panels report through Codex's app-server daemon instead (`bridge/codex.ts`, a client only while Codex
   panels are open), which also gives new Codex panels their session id. Events fold into board cards
   (`bridge/board.ts`); panels waiting for the user or with a failed turn are broadcast as
-  `panels.attention` (red dots). Attached Sprockets read the board through `bridge/tools.ts`.
+  `panels.attention` (red dots). Attached Sprockets read the board through their capabilities (`harness/project.ts`).
 - **Persistence:** panels survive browser disconnects and server restarts (`tsx watch` included).
   On a reboot the tmux server is gone; the next workspace read drops panels whose tmux session no
   longer exists. Their transcripts remain, so sessions can be resumed from the sidebar.
@@ -78,7 +78,9 @@ packages/
 - **Sprockets** (ADR 0005, 0006): `sprockets.ts` stores Sprockets, their chats and settings (project, model,
   description; core memory stays internal) in SQLite and broadcasts `sprockets.changed`. A user message starts a run (`runs.ts`): a
   pi-agent-core loop on the Sprocket's model, streamed to browsers as `sprockets.typing`, capped at 12 model
-  calls, 30 runs per Sprocket per hour and 2 runs at once. `models.ts` holds the model providers (pi-ai),
+  calls, 30 runs per Sprocket per hour and 2 runs at once. Its one tool is codemode (ADR 0008,
+  `harness/codemode.ts`): scripts run in pi's QuickJS sandbox and call the Sprocket's capabilities (`harness/`:
+  memory; and for attached Sprockets the board, sessions, git and read-only files, `files.ts`). `models.ts` holds the model providers (pi-ai),
   the default model and sign-ins; credentials are in `RAILS_HOME/credentials.json`. `signin.ts` runs the
   sign-ins (ChatGPT, OpenRouter) itself and stores pi-ai's credential shape; callbacks land on the server's
   `127.0.0.1` (OpenAI: port 1455). The web renders each Sprocket as an SVG character from data

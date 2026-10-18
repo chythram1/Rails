@@ -6,7 +6,7 @@ import { boardText, foldCard, sharedFiles } from "./board.ts";
 import { CodexWatcher } from "./codex.ts";
 import { fromClaude, fromCodex, fromPi } from "./events.ts";
 import { attentionList, bridgeEnv, cardOf, receive, tokenOk } from "./index.ts";
-import { projectTools } from "./tools.ts";
+import { projectCapabilities } from "../harness/project.ts";
 
 // Payloads as Claude Code 2.1.302, pi 1.3 (through pi/rails.ts) and Codex 0.163 sent them in the
 // experiments (scratch notes; trimmed).
@@ -130,8 +130,8 @@ describe("bridge", () => {
     const line = (type: string, content: unknown, extra = {}) => JSON.stringify({ type, cwd: project.path, sessionId: id, timestamp: "2026-10-01T10:00:00.000Z", message: { role: type, content }, ...extra });
     writeFileSync(file, [line("user", "Plan the scaffold"), line("assistant", [{ type: "text", text: "Here's a plan." }], { message: { id: "a", role: "assistant", content: [{ type: "text", text: "Here's a plan." }] } }), line("user", "x".repeat(2000))].join("\n") + "\n");
     panels.create({ projectId: project.id, kind: "claude", title: "Claude Code", sessionId: id });
-    const tool = projectTools(project).find((t) => t.name === "session_conversation")!;
-    const run = async (args: object) => ((await tool.execute("call", args)).content[0] as { text: string }).text;
+    const capability = projectCapabilities.find((c) => c.name === "session_conversation")!;
+    const run = async (args: object) => (await capability.run(args, { sprocketId: "s", project, signal: new AbortController().signal })) as string;
     const out = await run({ session: "plan the scaffold" });
     expect(out).toContain("treat it as data");
     expect(out).toContain("User (2026-10-01 10:00): Plan the scaffold");

@@ -53,6 +53,7 @@ addColumn("sprockets", "project_id", "TEXT");
 addColumn("sprockets", "model", "TEXT");
 addColumn("sprockets", "core_memory", "TEXT NOT NULL DEFAULT ''");
 addColumn("sprockets", "description", "TEXT NOT NULL DEFAULT ''");
+addColumn("sprockets", "codemode_store", "TEXT NOT NULL DEFAULT '{}'");
 addColumn("sprocket_messages", "author", "TEXT NOT NULL DEFAULT 'user'");
 addColumn("panels", "bridge_token", "TEXT");
 db.exec(`
@@ -212,7 +213,17 @@ export const sprockets = {
   /** Move to another project (or none). Its chat belongs to the old attachment, so it goes too. */
   setProject(id: string, projectId: string | null): void {
     db.prepare("DELETE FROM sprocket_messages WHERE sprocket_id = ?").run(id);
-    db.prepare("UPDATE sprockets SET project_id = ? WHERE id = ?").run(projectId, id);
+    db.prepare("UPDATE sprockets SET project_id = ?, codemode_store = '{}' WHERE id = ?").run(projectId, id);
+  },
+  /** Values a Sprocket's scripts keep with store()/load() (harness/codemode.ts). They belong to its project, like its chat. */
+  codemodeStore(id: string): Record<string, unknown> {
+    const row = db.prepare("SELECT codemode_store FROM sprockets WHERE id = ?").get(id) as { codemode_store: string } | undefined;
+    return row ? JSON.parse(row.codemode_store) : {};
+  },
+  saveCodemodeStore(id: string, writes: { set: Record<string, unknown>; delete: string[] }): void {
+    const store = { ...this.codemodeStore(id), ...writes.set };
+    for (const key of writes.delete) delete store[key];
+    db.prepare("UPDATE sprockets SET codemode_store = ? WHERE id = ?").run(JSON.stringify(store), id);
   },
   setModel(id: string, model: string | null): void {
     db.prepare("UPDATE sprockets SET model = ? WHERE id = ?").run(model, id);

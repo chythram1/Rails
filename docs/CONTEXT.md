@@ -21,6 +21,7 @@ domain concept, add it here first.
 | **Look** | What a Sprocket looks like: its shape (`character` in code), colour and accessory. | |
 | **Run** | One bounded attempt by a Sprocket to reply: it starts when the user writes and ends with a reply or a notice. | A panel's process. |
 | **Description** | What the user wants from a Sprocket, in a few sentences (at most 500 characters): its standing instructions, like a small AGENTS.md. It follows it in every reply and keeps it across projects. | Its core memory, which the Sprocket writes itself. |
+| **Capability** | Something a Sprocket can do (read the board, a session's conversation, git, a file; remember), as a server function with a schema. The Sprocket's model reaches capabilities through codemode: it writes a script that calls them (ADR 0008). | A Provider's own tools inside a panel. |
 | **Core memory** | A Sprocket's own short note (at most 1,500 characters) about its user, kept with its `remember` tool. Internal: not shown in the UI. It stays with the Sprocket when it moves to another project. | Its chat, which belongs to one project. |
 | **Model provider** | A service Sprockets run on (OpenAI, Anthropic, OpenRouter, …), set up with an API key or a sign-in in Settings → Models. | A Provider (Claude Code, Codex, pi). |
 | **Resume** | Opening an existing session in a panel with the provider's own command: `claude --resume <id>`, `pi --session <id>`, `codex resume <id>`. Opening a session that already has a panel focuses that panel instead. | — |

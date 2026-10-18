@@ -3,7 +3,8 @@ import { SPROCKET_DESCRIPTION_MAX } from "@rails/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { projects, settings, sprockets } from "./db.ts";
 import { models, refOf } from "./models.ts";
-import { CORE_MEMORY_MAX, editMemory, idle, onTyping, readableError } from "./runs.ts";
+import { CORE_MEMORY_MAX, editMemory } from "./harness/memory.ts";
+import { idle, onTyping, readableError } from "./runs.ts";
 import { sprocketMessages } from "./db.ts";
 import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings } from "./sprockets.ts";
 
@@ -46,10 +47,10 @@ describe("runs", () => {
     expect(authors(s.id)).toEqual(["user: hello", "notice: Pick a model first: set up a provider in Settings → Models."]);
   });
 
-  it("edits its core memory with the remember tool", async () => {
+  it("edits its core memory with the remember tool, from a codemode script", async () => {
     const s = sprocket();
     faux.setResponses([
-      fauxAssistantMessage([fauxToolCall("remember", { op: "add", text: "Prefers short answers." })], { stopReason: "toolUse" }),
+      fauxAssistantMessage([fauxToolCall("codemode", { code: 'return await tools.remember({ op: "add", text: "Prefers short answers." })' })], { stopReason: "toolUse" }),
       fauxAssistantMessage("Got it."),
     ]);
     sendMessage(s.id, "keep it short from now on");
@@ -60,7 +61,7 @@ describe("runs", () => {
 
   it("stops a run that keeps calling tools", async () => {
     const s = sprocket();
-    const loop = fauxAssistantMessage([fauxToolCall("remember", { op: "rewrite", text: "x" })], { stopReason: "toolUse" });
+    const loop = fauxAssistantMessage([fauxToolCall("codemode", { code: 'text("still looking")' })], { stopReason: "toolUse" });
     faux.setResponses(Array.from({ length: 20 }, () => loop));
     sendMessage(s.id, "go");
     await idle();

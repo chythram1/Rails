@@ -28,7 +28,7 @@ Decisions:
 - **Needs attention:** a panel whose agent waits for a permission, a question or a form, or whose turn
   failed, shows a red dot in the sidebar and on its tab (`panels.attention`). Claude Code's idle reminders
   don't count; only real waits do.
-- **Attached Sprockets can look** (`bridge/tools.ts`): `project_board`, `session_activity` (one session's
+- **Attached Sprockets can look** (`harness/project.ts`, through codemode since ADR 0008): `project_board`, `session_activity` (one session's
   last 25 events), `session_conversation` (the latest messages of one session, from the last 1 MB of its
   transcript, so it covers what was said before the panel was opened in Rails) and `git_status`, read-only
   and scoped to their project. Reading a transcript's end on demand is bounded and cheap; whole transcripts
