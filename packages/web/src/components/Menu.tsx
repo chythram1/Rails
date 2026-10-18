@@ -28,7 +28,8 @@ interface Props {
   items: MenuItem[];
 }
 
-type Position = { top: number; left?: number; right?: number };
+/** Where the popover sits: below the trigger (`top`), or above it, growing upwards (`bottom`). */
+type Position = { top?: number; bottom?: number; left?: number; right?: number };
 
 /**
  * Open/close state and placement for a popover under a trigger button. The popover is fixed-positioned
@@ -62,20 +63,23 @@ export function usePopover(align: "left" | "right") {
 
   // Keep the popover on screen before it's painted: shift it in from the left/right edge (e.g. a
   // right-aligned menu in a narrow sidebar), and open it above the trigger if it would run off the
-  // bottom (or pin it to the bottom edge if it fits neither way). Runs after every render, not only on
-  // open, because the content can grow after opening (e.g. the folder list arriving).
+  // bottom (or pin it to the bottom edge if it fits neither way). Above the trigger it's anchored by its
+  // bottom edge, so it stays against the trigger when its content shrinks (a filtered list). Runs after
+  // every render, not only on open, because the content can grow after opening (e.g. the folder list
+  // arriving).
   useLayoutEffect(() => {
     const r = panel.current?.getBoundingClientRect();
     if (!at || !r) return;
-    let { top } = at;
     let left = r.left;
     if (r.left < 8) left = 8;
     else if (r.right > innerWidth - 8) left = Math.max(8, innerWidth - 8 - r.width);
-    if (r.bottom > innerHeight - 8) {
-      const above = trigger.current!.getBoundingClientRect().top - 6 - r.height;
-      top = above >= 8 ? above : Math.max(8, innerHeight - 8 - r.height);
+    let { top, bottom } = at;
+    if (top !== undefined && r.bottom > innerHeight - 8) {
+      const triggerTop = trigger.current!.getBoundingClientRect().top;
+      if (triggerTop - 6 - r.height >= 8) [top, bottom] = [undefined, innerHeight - triggerTop + 6];
+      else top = Math.max(8, innerHeight - 8 - r.height);
     }
-    if (left !== r.left || top !== at.top) setAt({ top, left });
+    if (left !== r.left || top !== at.top || bottom !== at.bottom) setAt({ top, bottom, left });
   });
 
   return { at, trigger, panel, close, toggle };

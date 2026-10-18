@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ModelSettings } from "@rails/shared";
 import { api } from "../api.ts";
 import { socket } from "../ws.ts";
+import { Dropdown, type DropdownOption } from "./Dropdown.tsx";
 
 /** The model settings (providers, models, default), kept fresh across devices. */
 export function useModelSettings() {
@@ -25,8 +26,8 @@ export function useModelSettings() {
 }
 
 /**
- * A native select of the models of the providers that are set up, grouped by provider. `empty` labels
- * the "no choice" option (e.g. "Use the default model").
+ * The models of the providers that are set up, grouped by provider, in a Dropdown. `empty` labels the
+ * "no choice" option (e.g. "Default (…)").
  */
 export function ModelSelect({
   id,
@@ -44,23 +45,11 @@ export function ModelSelect({
   disabled?: boolean;
 }) {
   const names = new Map(settings.providers.map((p) => [p.id, p.name]));
-  const groups = new Map<string, typeof settings.models>();
-  for (const m of settings.models) groups.set(m.provider, [...(groups.get(m.provider) ?? []), m]);
-  // A saved model whose provider was removed still shows, so the select doesn't silently change.
-  const missing = value && !settings.models.some((m) => m.ref === value);
-  return (
-    <select id={id} className="input" value={value ?? ""} disabled={disabled} onChange={(e) => onChange(e.target.value || null)}>
-      <option value="">{empty}</option>
-      {missing && <option value={value}>{value} (not available)</option>}
-      {[...groups].map(([provider, list]) => (
-        <optgroup key={provider} label={names.get(provider) ?? provider}>
-          {list.map((m) => (
-            <option key={m.ref} value={m.ref}>
-              {m.name}
-            </option>
-          ))}
-        </optgroup>
-      ))}
-    </select>
-  );
+  const options: DropdownOption[] = [
+    { value: "", label: empty },
+    // A saved model whose provider was removed still shows, so the choice doesn't silently change.
+    ...(value && !settings.models.some((m) => m.ref === value) ? [{ value, label: `${value} (not available)` }] : []),
+    ...settings.models.map((m) => ({ value: m.ref, label: m.name, group: names.get(m.provider) ?? m.provider })),
+  ];
+  return <Dropdown id={id} value={value ?? ""} options={options} disabled={disabled} onChange={(v) => onChange(v || null)} />;
 }

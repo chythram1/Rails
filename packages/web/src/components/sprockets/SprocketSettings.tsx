@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import { IconChevronLeft as ChevronLeft, IconLayoutSidebarRightCollapse as Collapse } from "@tabler/icons-react";
-import { CORE_MEMORY_MAX, type Sprocket as SprocketData, type SprocketSettings as Settings } from "@rails/shared";
+import { SPROCKET_DESCRIPTION_MAX, type Sprocket as SprocketData, type SprocketSettings as Settings } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
 import { useStore } from "../../store.tsx";
+import { Dropdown } from "../Dropdown.tsx";
 import { ModelSelect, useModelSettings } from "../ModelSelect.tsx";
 import { useOpenSettings } from "../settings/context.ts";
 import { Sprocket } from "./Sprocket.tsx";
 
 /**
  * A Sprocket's settings, in a panel beside its chat (ref/sprockets/stage2/chat2.png): its look and name,
- * the project it's attached to, its model and its core memory. Moving it to another project deletes its
+ * its description, the project it's attached to and its model. Its core memory is its own business and
+ * isn't shown. Moving it to another project deletes its
  * chat there, so that asks first; its name, look and core memory stay. The panel has its own URL
  * (`#/sprockets/<id>/settings`), so the browser's back button closes it.
  */
@@ -60,15 +62,17 @@ export function SprocketSettings({ sprocket }: { sprocket: SprocketData }) {
         </div>
 
         <NameField sprocket={sprocket} onError={setError} />
+        <DescriptionField sprocket={sprocket} onSave={(description) => save({ description })} />
 
         <div className="settings-field">
           <label htmlFor="sp-project">Project</label>
-          <select id="sp-project" className="input" value={sprocket.projectId ?? ""} disabled={sprocket.running} onChange={(e) => void move(e.target.value)}>
-            <option value="">None</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+          <Dropdown
+            id="sp-project"
+            value={sprocket.projectId ?? ""}
+            disabled={sprocket.running}
+            options={[{ value: "", label: "None" }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+            onChange={(v) => void move(v)}
+          />
           <p className="muted small">
             {sprocket.running ? `${name} is replying. You can move it when it's done.` : "A Sprocket helps with one project at a time. Moving it starts a new chat."}
           </p>
@@ -93,7 +97,6 @@ export function SprocketSettings({ sprocket }: { sprocket: SprocketData }) {
           </p>
         </div>
 
-        <MemoryField sprocket={sprocket} onSave={(coreMemory) => save({ coreMemory })} />
         {error && <p className="error" role="alert">{error}</p>}
       </div>
     </aside>
@@ -131,41 +134,40 @@ function NameField({ sprocket, onError }: { sprocket: SprocketData; onError(mess
   );
 }
 
-/** Core memory: a short note the user and the Sprocket both edit. Follows the Sprocket's own edits unless the user is mid-edit. */
-function MemoryField({ sprocket, onSave }: { sprocket: SprocketData; onSave(text: string): Promise<boolean> }) {
-  const [memory, setMemory] = useState(sprocket.coreMemory);
-  const [base, setBase] = useState(sprocket.coreMemory);
+/**
+ * The description: what the user wants from this Sprocket, in a few sentences. It's its standing
+ * instructions, a small AGENTS.md that goes into every run, and it stays with it across projects.
+ */
+function DescriptionField({ sprocket, onSave }: { sprocket: SprocketData; onSave(text: string): Promise<boolean> }) {
+  const [text, setText] = useState(sprocket.description);
   const [saved, setSaved] = useState(false);
-  useEffect(() => {
-    if (memory.trim() === base.trim()) setMemory(sprocket.coreMemory);
-    setBase(sprocket.coreMemory);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sprocket.coreMemory]);
-  const dirty = memory.trim() !== sprocket.coreMemory;
+  useEffect(() => setText(sprocket.description), [sprocket.description]);
+  const dirty = text.trim() !== sprocket.description;
   return (
     <form
       className="settings-field"
       onSubmit={async (e) => {
         e.preventDefault();
-        if (await onSave(memory)) setSaved(true);
+        if (await onSave(text)) setSaved(true);
       }}
     >
-      <label htmlFor="sp-memory">Core memory</label>
-      <p className="muted small">A short note that stays with {sprocket.name}, even when it moves to another project. {sprocket.name} edits it too.</p>
+      <label htmlFor="sp-description">Description</label>
+      <p id="sp-description-help" className="muted small">{sprocket.name} follows this in every reply, in any project.</p>
       <textarea
-        id="sp-memory"
+        id="sp-description"
         className="input"
-        rows={6}
-        maxLength={CORE_MEMORY_MAX}
-        value={memory}
-        onChange={(e) => (setMemory(e.target.value), setSaved(false))}
-        aria-describedby="sp-memory-count"
+        rows={4}
+        maxLength={SPROCKET_DESCRIPTION_MAX}
+        placeholder="What it's for and how it should work, e.g. “Keep an eye on the PRs in this project and tell me what looks risky.”"
+        value={text}
+        onChange={(e) => (setText(e.target.value), setSaved(false))}
+        aria-describedby="sp-description-help"
       />
-      <div className="sp-memory-foot">
-        <span id="sp-memory-count" className="muted small">{memory.length} / {CORE_MEMORY_MAX}</span>
+      <div className="sp-field-foot">
+        <span className="muted small">{text.length} / {SPROCKET_DESCRIPTION_MAX}</span>
         <span className="grow" />
-        {saved && <span className="muted small" role="status">Saved</span>}
-        {dirty && <button type="button" className="btn small" onClick={() => setMemory(sprocket.coreMemory)}>Undo</button>}
+        {saved && !dirty && <span className="muted small" role="status">Saved</span>}
+        {dirty && <button type="button" className="btn small" onClick={() => setText(sprocket.description)}>Undo</button>}
         <button className="btn small primary" disabled={!dirty}>Save</button>
       </div>
     </form>

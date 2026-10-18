@@ -123,22 +123,25 @@ export interface Sprocket {
   projectId?: string;
   /** The model it runs on (`provider/model`), or none to use the default model. */
   model?: string;
-  /** Its core memory: a short sheet that stays with it, even when it moves to another project. */
-  coreMemory: string;
+  /**
+   * What the user wants from it, in their words: its standing instructions, like a small AGENTS.md (or
+   * Muse's and Hermes' identity files). Stays with it across projects. Its core memory is internal.
+   */
+  description: string;
   /** True while it's working on a reply. */
   running: boolean;
   /** The newest message in its chat, for the list preview. */
   lastMessage?: SprocketMessage;
 }
 
-/** Core memory is kept short on purpose (a frozen snapshot loaded into every run). */
-export const CORE_MEMORY_MAX = 1500;
+/** A Sprocket's description is short on purpose: it goes into every run. */
+export const SPROCKET_DESCRIPTION_MAX = 500;
 
 /** Body of "change a Sprocket's settings". Only the fields present change; null clears. */
 export interface SprocketSettings {
   projectId?: string | null;
   model?: string | null;
-  coreMemory?: string;
+  description?: string;
 }
 
 /** Body of "create a Sprocket" and "edit a Sprocket". */

@@ -1,11 +1,12 @@
 // Sprockets: always-on agents (ADR 0005, 0006): their look, name, chat and settings. A Sprocket is
 // attached to at most one project; moving it (or detaching it) deletes the chat it had there, while its
-// name, look and core memory stay. Replies are written by runs.ts.
+// name, look, description and core memory stay. Replies are written by runs.ts. Core memory is the
+// Sprocket's own (it edits it with the remember tool) and never leaves the server.
 import {
-  CORE_MEMORY_MAX,
   SPROCKET_ACCESSORIES,
   SPROCKET_CHARACTERS,
   SPROCKET_COLORS,
+  SPROCKET_DESCRIPTION_MAX,
   type Sprocket,
   type SprocketInput,
   type SprocketLook,
@@ -56,7 +57,7 @@ function parseInput(body: Partial<SprocketInput> | undefined): SprocketInput {
   return { name, look: parseLook(body?.look) };
 }
 
-function withLook(row: ReturnType<typeof sprockets.list>[number]): Sprocket {
+function withLook({ coreMemory: _internal, ...row }: ReturnType<typeof sprockets.list>[number]): Sprocket {
   return { ...row, look: repairLook(row.look), running: isRunning(row.id), lastMessage: sprocketMessages.last(row.id) };
 }
 
@@ -115,21 +116,22 @@ export function sendMessage(sprocketId: string, rawText: unknown): SprocketMessa
  */
 export function updateSettings(id: string, body: SprocketSettings | undefined): Sprocket {
   const s = getSprocket(id);
-  const { projectId, model, coreMemory } = body ?? {};
+  const { projectId, model, description } = body ?? {};
   const moving = projectId !== undefined && (projectId ?? undefined) !== s.projectId;
   if (moving) {
     if (projectId !== null && (typeof projectId !== "string" || !projects.get(projectId))) throw new ServiceError("Unknown project", 400);
     if (isRunning(id)) throw new ServiceError(`${s.name} is replying. Try again when it's done.`, 409);
   }
   if (model !== undefined && model !== null && (typeof model !== "string" || !findModel(model))) throw new ServiceError("Unknown model", 400);
-  if (coreMemory !== undefined) {
-    if (typeof coreMemory !== "string") throw new ServiceError("Core memory must be text", 400);
-    if (coreMemory.trim().length > CORE_MEMORY_MAX) throw new ServiceError(`Core memory can be at most ${CORE_MEMORY_MAX} characters.`, 400);
+  if (description !== undefined) {
+    if (typeof description !== "string") throw new ServiceError("The description must be text", 400);
+    if (description.trim().length > SPROCKET_DESCRIPTION_MAX)
+      throw new ServiceError(`Descriptions can be at most ${SPROCKET_DESCRIPTION_MAX} characters.`, 400);
   }
 
   if (moving) sprockets.setProject(id, projectId ?? null);
   if (model !== undefined) sprockets.setModel(id, model);
-  if (coreMemory !== undefined) sprockets.setCoreMemory(id, coreMemory.trim());
+  if (description !== undefined) sprockets.setDescription(id, description.trim());
   changed();
   return getSprocket(id);
 }

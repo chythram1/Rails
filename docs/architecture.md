@@ -75,7 +75,7 @@ packages/
   restores the layout, then adds panels missing from it and removes ones that were closed.
   `panels.changed` broadcasts keep other devices' panel lists current.
 - **Sprockets** (ADR 0005, 0006): `sprockets.ts` stores Sprockets, their chats and settings (project, model,
-  core memory) in SQLite and broadcasts `sprockets.changed`. A user message starts a run (`runs.ts`): a
+  description; core memory stays internal) in SQLite and broadcasts `sprockets.changed`. A user message starts a run (`runs.ts`): a
   pi-agent-core loop on the Sprocket's model, streamed to browsers as `sprockets.typing`, capped at 12 model
   calls, 30 runs per Sprocket per hour and 2 runs at once. `models.ts` holds the model providers (pi-ai),
   the default model and sign-ins; credentials are in `RAILS_HOME/credentials.json`. `signin.ts` runs the

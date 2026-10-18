@@ -174,13 +174,23 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
   padding: 8px 12px; font-size: 14px; outline: none; min-width: 0;
 }
 .input:focus-visible { border-color: #6a6a6a; }
-/* Our own chevron (as in .select), so it sits 14px in from the edge rather than where the browser puts it. */
-select.input {
-  appearance: none; padding-right: 36px; cursor: pointer;
-  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
-  background-position: calc(100% - 18px) 55%, calc(100% - 14px) 55%; background-size: 4px 4px; background-repeat: no-repeat;
+/* Dropdown (components/Dropdown.tsx): a field-like button and a list in a menu popover. */
+.dropdown {
+  display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 12px; text-align: left;
+  background: var(--bg); border: 1px solid var(--border-strong); border-radius: 10px; font-size: 14px; color: var(--text);
 }
-select.input:disabled { cursor: default; opacity: 0.6; }
+.dropdown > span { flex: 1; }
+.dropdown > svg { flex-shrink: 0; color: var(--muted); }
+.dropdown[aria-expanded="true"], .dropdown:focus-visible { border-color: #6a6a6a; outline: none; }
+.dropdown:disabled { opacity: 0.6; cursor: default; }
+.dropdown-menu { min-width: 200px; max-width: calc(100vw - 16px); }
+.dropdown-list { max-height: 300px; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
+.dropdown-list button { width: 100%; }
+.dropdown-check { margin-left: auto; flex-shrink: 0; }
+.dropdown-search {
+  margin: 0 0 4px; padding: 7px 10px; border: 0; border-bottom: 1px solid var(--border-strong); border-radius: 0;
+  background: none; outline: none; font-size: 14px; color: var(--text);
+}
 textarea.input { resize: vertical; line-height: 1.5; }
 
 /* ---- settings forms (Settings → Models, Sprocket settings) ---- */
@@ -250,7 +260,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .set-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .set-text label, .set-label { font-size: 14px; font-weight: 500; }
 .set-text p { margin: 0; color: var(--muted); font-size: 13px; text-wrap: pretty; }
-.set-row > select.input { width: min(300px, 50%); flex-shrink: 0; }
+.set-row > .dropdown { width: min(300px, 50%); flex-shrink: 0; }
 .set-row > .btn { flex-shrink: 0; }
 .set-facts { margin: 0; }
 .set-facts dt { font-size: 14px; }
@@ -513,7 +523,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-message.sprocket { align-items: flex-start; }
 .sp-message.sprocket .sp-bubble { background: none; padding: 4px 0; max-width: min(680px, 100%); }
 .sp-message.notice { align-items: center; }
-.sp-message.notice .sp-bubble { background: none; color: var(--muted); font-size: 13px; text-align: center; padding: 4px 0; }
+.sp-message.notice .sp-bubble { background: none; color: var(--muted); font-size: 13px; text-align: center; padding: 4px 0; max-width: 100%; text-wrap: balance; }
 /* A Sprocket's chat with its settings panel beside it (ref/sprockets/stage2/chat2.png). */
 .sp-main { position: relative; }
 .sp-detail { flex: 1; min-height: 0; display: flex; }
@@ -525,8 +535,8 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-panel-back + h2 { padding-left: 32px; } /* centred: the hidden back button leaves the close button alone on the right */
 .sp-panel-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 20px 16px 24px; display: flex; flex-direction: column; gap: 22px; }
 .sp-panel-look { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.sp-panel .settings-field > .input { width: 100%; }
-.sp-memory-foot { display: flex; align-items: center; gap: 8px; }
+.sp-panel .settings-field > :is(.input, .dropdown) { width: 100%; }
+.sp-field-foot { display: flex; align-items: center; gap: 8px; }
 /* Not enough room beside the chat: the panel lies over it instead of squeezing it. */
 @container (max-width: 720px) {
   .sp-panel { position: absolute; inset: 0 0 0 auto; width: min(340px, 100%); z-index: 2; box-shadow: -12px 0 32px rgb(0 0 0 / 0.4); }
@@ -647,7 +657,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
   .settings-close { top: 12px; right: 10px; } /* beside the search field */
   .settings-panel-body { padding: 20px 16px 24px; gap: 32px; }
   .set-row { flex-wrap: wrap; gap: 10px 24px; }
-  .set-row > select.input { width: 100%; }
+  .set-row > .dropdown { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
   /* Sprockets are excluded: their motion has its own setting, off by default here (sprockets/motion.ts). */

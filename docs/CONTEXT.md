@@ -20,7 +20,8 @@ domain concept, add it here first.
 | **Sprocket** | One of the user's always-on agents (ADR 0005): a shape (one of 8), a colour, one accessory or none, a name, and a chat. It replies on a model the user sets up and can be attached to one project (ADR 0006). Sprockets replace the earlier "home agent" idea. | A provider or a panel. |
 | **Look** | What a Sprocket looks like: its shape (`character` in code), colour and accessory. | |
 | **Run** | One bounded attempt by a Sprocket to reply: it starts when the user writes and ends with a reply or a notice. | A panel's process. |
-| **Core memory** | A Sprocket's short note (at most 1,500 characters) about its user. It stays with the Sprocket when it moves to another project. | Its chat, which belongs to one project. |
+| **Description** | What the user wants from a Sprocket, in a few sentences (at most 500 characters): its standing instructions, like a small AGENTS.md. It follows it in every reply and keeps it across projects. | Its core memory, which the Sprocket writes itself. |
+| **Core memory** | A Sprocket's own short note (at most 1,500 characters) about its user, kept with its `remember` tool. Internal: not shown in the UI. It stays with the Sprocket when it moves to another project. | Its chat, which belongs to one project. |
 | **Model provider** | A service Sprockets run on (OpenAI, Anthropic, OpenRouter, …), set up with an API key or a sign-in in Settings → Models. | A Provider (Claude Code, Codex, pi). |
 | **Resume** | Opening an existing session in a panel with the provider's own command: `claude --resume <id>`, `pi --session <id>`, `codex resume <id>`. Opening a session that already has a panel focuses that panel instead. | — |
 | **Client** | A browser tab or device connected to the server over WebSocket. There can be many at once, each attached to panels as its own tmux client. | A user. v1 has exactly one user. |

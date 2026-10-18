@@ -1,9 +1,9 @@
 import { fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall } from "@earendil-works/pi-ai";
-import { CORE_MEMORY_MAX } from "@rails/shared";
+import { SPROCKET_DESCRIPTION_MAX } from "@rails/shared";
 import { beforeEach, describe, expect, it } from "vitest";
-import { projects, settings } from "./db.ts";
+import { projects, settings, sprockets } from "./db.ts";
 import { models, refOf } from "./models.ts";
-import { editMemory, idle, onTyping, readableError } from "./runs.ts";
+import { CORE_MEMORY_MAX, editMemory, idle, onTyping, readableError } from "./runs.ts";
 import { sprocketMessages } from "./db.ts";
 import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings } from "./sprockets.ts";
 
@@ -54,7 +54,7 @@ describe("runs", () => {
     ]);
     sendMessage(s.id, "keep it short from now on");
     await idle();
-    expect(listSprockets().find((x) => x.id === s.id)!.coreMemory).toBe("Prefers short answers.");
+    expect(sprockets.get(s.id)!.coreMemory).toBe("Prefers short answers.");
     expect(authors(s.id).at(-1)).toBe("sprocket: Got it.");
   });
 
@@ -95,16 +95,19 @@ describe("runs", () => {
 });
 
 describe("settings", () => {
-  it("moving to another project deletes the chat but keeps the core memory", async () => {
+  it("moving to another project deletes the chat but keeps the description and core memory", async () => {
     const s = sprocket();
     const p = projects.create("app", "/work/app-" + s.id);
-    updateSettings(s.id, { coreMemory: "Likes tea." });
+    updateSettings(s.id, { description: "Watch the PRs." });
+    sprockets.setCoreMemory(s.id, "Likes tea.");
     sendMessage(s.id, "hello");
     faux.setResponses([fauxAssistantMessage("hi")]);
     await idle();
     const moved = updateSettings(s.id, { projectId: p.id });
     expect(moved.projectId).toBe(p.id);
-    expect(moved.coreMemory).toBe("Likes tea.");
+    expect(moved.description).toBe("Watch the PRs.");
+    expect(sprockets.get(s.id)!.coreMemory).toBe("Likes tea.");
+    expect("coreMemory" in moved).toBe(false); // internal: never sent to browsers
     expect(listMessages(s.id)).toEqual([]);
   });
 
@@ -115,16 +118,16 @@ describe("settings", () => {
     faux.setResponses([fauxAssistantMessage("ok")]);
     await idle();
     expect(() => updateSettings(s.id, { projectId: p.id, model: "nope/nope" })).toThrow("Unknown model");
-    expect(() => updateSettings(s.id, { projectId: p.id, coreMemory: "x".repeat(CORE_MEMORY_MAX + 1) })).toThrow("at most");
+    expect(() => updateSettings(s.id, { projectId: p.id, description: "x".repeat(SPROCKET_DESCRIPTION_MAX + 1) })).toThrow("at most");
     expect(listSprockets().find((x) => x.id === s.id)!.projectId).toBeUndefined();
     expect(listMessages(s.id).map((m) => m.text)).toEqual(["keep me", "ok"]);
   });
 
-  it("validates project, model and core memory", () => {
+  it("validates project, model and description", () => {
     const s = sprocket();
     expect(() => updateSettings(s.id, { projectId: "nope" })).toThrow("Unknown project");
     expect(() => updateSettings(s.id, { model: "nope/nope" })).toThrow("Unknown model");
-    expect(() => updateSettings(s.id, { coreMemory: "x".repeat(CORE_MEMORY_MAX + 1) })).toThrow(`at most ${CORE_MEMORY_MAX}`);
+    expect(() => updateSettings(s.id, { description: "x".repeat(SPROCKET_DESCRIPTION_MAX + 1) })).toThrow(`at most ${SPROCKET_DESCRIPTION_MAX}`);
     expect(updateSettings(s.id, { model: ref }).model).toBe(ref);
     expect(updateSettings(s.id, { model: null }).model).toBeUndefined();
   });

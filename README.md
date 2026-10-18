@@ -35,7 +35,7 @@ Status:
 - Read-only git status and diffs
 - Official agent logos in the sidebar
 - Sprockets (ADR 0005, 0006): always-on agent characters that reply on your own model provider (API key
-  or "Continue with ChatGPT"), attach to a project, keep a short core memory and see what every session
+  or "Continue with ChatGPT"), attach to a project, follow a short description you write and see what every session
   in the project is doing (ADR 0007)
 - A red dot when an agent needs you (a permission, a question) or its turn failed
 

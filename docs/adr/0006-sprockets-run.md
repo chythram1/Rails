@@ -1,6 +1,6 @@
 # ADR 0006: Sprockets run, on the user's own model providers
 
-Status: accepted (stage 2, part 1: replies, models, projects, core memory).
+Status: accepted (stage 2, part 1: replies, models, projects, description and core memory).
 
 ADR 0005 gave Sprockets a look and a chat that nobody answered. Sprockets are meant to be project-first:
 each one helps with one project, and later acts as a coordination layer between that project's agent
@@ -44,12 +44,12 @@ Decisions:
   (`sprockets.typing`), and Rails' own notices (no model, model errors, guard stops) show in the chat.
 - **One project per Sprocket**, any number of Sprockets per project. Moving a Sprocket to another project,
   or detaching it, deletes its chat (it belonged to that project). Removing a project detaches its Sprockets.
-- **Core memory** stays with a Sprocket wherever it goes: one short sheet (at most 1,500 characters), loaded
-  as a snapshot at the start of each run (as Hermes does), edited by the user in the Sprocket's settings and
-  by the Sprocket with its `remember` tool. It's for durable facts about the user, not project details.
-
-Not yet (later parts of stage 2): seeing the project's sessions, messaging them, the coordination jobs.
-
-Consequences:
+- **A description and a core memory**, both staying with a Sprocket wherever it goes:
+  - the **description** (at most 500 characters) is the user's standing instructions for it, like a small
+    AGENTS.md or Muse's and Hermes' identity files. The user writes it in the Sprocket's settings; every run
+    follows it.
+  - the **core memory** (at most 1,500 characters) is the Sprocket's own: durable facts about its user that
+    it keeps with its `remember` tool, loaded as a snapshot at the start of each run (as Hermes does). It's
+    internal: it isn't shown in the UI or sent to browsers.
 - New dependencies on the server: pi-ai and pi-agent-core (and the provider SDKs they load lazily).
 - `make test` (Vitest) runs the run engine against pi-ai's scripted "faux" provider.

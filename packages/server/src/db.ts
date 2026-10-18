@@ -52,6 +52,7 @@ function addColumn(table: string, column: string, definition: string) {
 addColumn("sprockets", "project_id", "TEXT");
 addColumn("sprockets", "model", "TEXT");
 addColumn("sprockets", "core_memory", "TEXT NOT NULL DEFAULT ''");
+addColumn("sprockets", "description", "TEXT NOT NULL DEFAULT ''");
 addColumn("sprocket_messages", "author", "TEXT NOT NULL DEFAULT 'user'");
 addColumn("panels", "bridge_token", "TEXT");
 db.exec(`
@@ -176,14 +177,16 @@ export const layouts = {
 };
 
 // Sprockets (ADR 0005, 0006). `look` is stored as JSON and validated by the service when read.
-type SprocketRow = { id: string; name: string; look: string; created_at: string; project_id: string | null; model: string | null; core_memory: string };
-const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running"> & { look: unknown } => ({
+type SprocketRow = { id: string; name: string; look: string; created_at: string; project_id: string | null; model: string | null; description: string; core_memory: string };
+/** A stored Sprocket, with its internal core memory (never sent to browsers). */
+const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running"> & { look: unknown; coreMemory: string } => ({
   id: r.id,
   name: r.name,
   look: JSON.parse(r.look),
   createdAt: r.created_at,
   projectId: r.project_id ?? undefined,
   model: r.model ?? undefined,
+  description: r.description,
   coreMemory: r.core_memory,
 });
 
@@ -213,6 +216,9 @@ export const sprockets = {
   },
   setModel(id: string, model: string | null): void {
     db.prepare("UPDATE sprockets SET model = ? WHERE id = ?").run(model, id);
+  },
+  setDescription(id: string, text: string): void {
+    db.prepare("UPDATE sprockets SET description = ? WHERE id = ?").run(text, id);
   },
   setCoreMemory(id: string, text: string): void {
     db.prepare("UPDATE sprockets SET core_memory = ? WHERE id = ?").run(text, id);
