@@ -1,9 +1,12 @@
 // What a Coordinator drafts for sessions (ADR 0010): suggest_reply answers a question a session asked its
 // user; suggest_message passes on something the user asked it to tell a session. Both are "act" capabilities,
 // but all they change is what the user is shown: nothing reaches a session until the user sends it. Whether
-// the Sprocket may suggest at all is checked when it's called, not when the run started.
+// the Sprocket may suggest at all is checked when it's called, not when the run started. plan_handoff and
+// cancel_handoff (ADR 0015) set up a message for later: when one session finishes, for another.
+import { HANDOFF_NOTE_MAX } from "@rails/shared";
 import { Type } from "@earendil-works/pi-ai";
-import { sprockets } from "../db.ts";
+import { handoffs, sprockets, type StoredHandoff } from "../db.ts";
+import { completeHandoff, dropHandoff, findHandoff, HANDOFF_TTL_MS, planHandoff } from "../handoffs.ts";
 import { suggest, SUGGESTION_MAX, type Purpose } from "../suggestions.ts";
 import type { Capability, RunContext } from "./capabilities.ts";
 import { findOpen, session } from "./project.ts";
@@ -14,12 +17,21 @@ import { findOpen, session } from "./project.ts";
  * model read.
  */
 export function replyCapabilities(rules: string[], made: (id: string) => void): Capability[] {
-  const draft = async (ctx: RunContext, name: string, sessionArg: string, text: string, opts: { rule?: string; purpose: Purpose }) => {
+  /** The run's project, if this Sprocket is its Coordinator now. */
+  const coordinating = (ctx: RunContext, name: string) => {
     const me = sprockets.get(ctx.sprocketId);
     if (!ctx.project || !me?.coordinator || me.projectId !== ctx.project.id)
       throw new Error(`Only your project's Coordinator can use ${name}. Your user can make you the Coordinator in your settings.`);
-    const found = await findOpen(ctx.project, sessionArg);
+    return ctx.project;
+  };
+  /** Draft a suggestion; with `handoff`, the message that carries it out (ADR 0015). */
+  const draft = async (ctx: RunContext, name: string, sessionArg: string, text: string, opts: { rule?: string; purpose: Purpose }, handoff?: StoredHandoff) => {
+    const found = await findOpen(coordinating(ctx, name), sessionArg);
+    // Nothing waits from here on, so a handoff the user cancels while the session was looked up gets no draft.
+    if (handoff && !handoffs.pending(ctx.sprocketId).some((x) => x.id === handoff.id))
+      throw new Error("That handoff isn't waiting anymore: your user cancelled it, or it ended. Don't draft its message.");
     const s = suggest(ctx.sprocketId, found, found.title, text, opts);
+    if (handoff) completeHandoff(handoff);
     made(s.id);
     return { s, title: found.title };
   };
@@ -50,15 +62,51 @@ export function replyCapabilities(rules: string[], made: (id: string) => void): 
     {
       name: "suggest_message",
       description: `Draft a message for a session in your project: something your user asked you to pass on ("tell it to stop and summarize"), or a heads-up when Rails tells you two sessions changed the same files. Your user sees it under your message and sends it, edits it or dismisses it: nothing reaches the session until they do. A session that's busy or waiting on a question gets it after its current turn, in its own queue. Write it as your user would, in the first person (at most ${SUGGESTION_MAX} characters). For answering a question a session asked, use suggest_reply. One suggestion per session: a new one replaces the last. Resolves to what happens next.`,
-      params: Type.Object({ session, message: Type.String({ description: "The message, as your user would write it." }) }),
+      params: Type.Object({
+        session,
+        message: Type.String({ description: "The message, as your user would write it." }),
+        handoff: Type.Optional(Type.String({ description: "The id of the handoff this message carries out, when Rails woke you for one." })),
+      }),
       effect: "act",
       log: {
         doing: () => "Drafting a message",
         done: (calls) => (calls.length > 1 ? `drafted ${calls.length} messages` : "drafted a message"),
       },
       run: async (args, ctx) => {
-        const { title } = await draft(ctx, "suggest_message", args.session, args.message, { purpose: "message" });
-        return `Drafted. Your user sees it under your message and decides whether to send it to "${title}"; if it's busy, it gets it after its current turn. Don't repeat the message in your message.`;
+        // A handoff's message goes to the session the handoff is for.
+        const h = args.handoff === undefined ? undefined : findHandoff(ctx.sprocketId, args.handoff);
+        const { title } = await draft(ctx, "suggest_message", h ? h.to.panelId : args.session, args.message, { purpose: "message" }, h);
+        return `Drafted. Your user sees it under your message and decides whether to send it to "${title}"; if it's busy, it gets it after its current turn.${h ? " That carries out the handoff." : ""} Don't repeat the message in your message.`;
+      },
+    },
+    {
+      name: "plan_handoff",
+      description: `When your user asks you to pass something on once a session finishes ("when the auth session is done, tell the UI session to use the new endpoint"), plan a handoff instead of drafting the message now. Rails wakes you each time \`from\` ends a turn without asking your user anything; you then check its work is done and draft the message for \`to\` with suggest_message, passing the handoff's id. \`note\` is what to pass on, in your user's words (at most ${HANDOFF_NOTE_MAX} characters). It waits at most ${HANDOFF_TTL_MS / 3_600_000} hours and is cancelled if either session ends; your user sees it in your panel and can cancel it. Resolves to its id.`,
+      params: Type.Object({
+        from: Type.String({ description: "The session to wait for: its id from list_sessions or project_board, or its title." }),
+        to: Type.String({ description: "The session to pass it on to: its id or its title." }),
+        note: Type.String({ description: "What to pass on once `from` is done, in your user's words." }),
+      }),
+      effect: "act",
+      log: { doing: () => "Planning a handoff", done: (calls) => (calls.length > 1 ? `planned ${calls.length} handoffs` : "planned a handoff") },
+      run: async (args, ctx) => {
+        const project = coordinating(ctx, "plan_handoff");
+        const [from, to] = await Promise.all([findOpen(project, args.from), findOpen(project, args.to)]);
+        const h = planHandoff(ctx.sprocketId, { panel: from, title: from.title }, { panel: to, title: to.title }, args.note);
+        return `Planned (id ${h.id.slice(0, 8)}). Rails wakes you when "${from.title}" finishes a turn. Tell your user in a sentence; they see it in your panel.`;
+      },
+    },
+    {
+      name: "cancel_handoff",
+      description: "Cancel one of your pending handoffs, when your user asks or it no longer makes sense. They're listed in your instructions with their ids.",
+      params: Type.Object({ handoff: Type.String({ description: "The handoff's id." }) }),
+      effect: "act",
+      log: { doing: () => "Cancelling a handoff", done: () => "cancelled a handoff" },
+      run: async (args, ctx) => {
+        coordinating(ctx, "cancel_handoff");
+        const h = findHandoff(ctx.sprocketId, args.handoff);
+        dropHandoff(h);
+        return `Cancelled the handoff from "${h.from.title}" to "${h.to.title}".`;
       },
     },
   ];

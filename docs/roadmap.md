@@ -10,8 +10,8 @@ Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
   capabilities: sessions, git, files), and ADR 0009 wakes a project's Coordinator when a session waits
   for the user; ADR 0010 lets it suggest the answer, which the user sends with one tap, and ADR 0011
   gives it standing rules. The workspace's side panel has the project's Sprockets beside its sessions,
-  a fast decision model can judge in shadow (ADR 0012), and the Sprocket list is grouped by project. Next: tune the decision model's bars from the shadow log (ADR 0013 lets it add wakes), automatic answers for trusted rules, handoffs (overlap warnings
-  are ADR 0014), digests.
+  a fast decision model can judge in shadow (ADR 0012), and the Sprocket list is grouped by project. Next: tune the decision model's bars from the shadow log (ADR 0013 lets it add wakes), automatic answers for trusted rules, a project brief, digests.
+  Overlap warnings (ADR 0014) and handoffs (ADR 0015) cover coordinating sessions.
   Sprockets replace the earlier "home agent" idea.
 - Adopt sessions running in the user's own terminal (today only panels started by Rails are shared)
 - Adding projects from another device: Recent works anywhere, but "Open folder…" opens on the server's screen (ADR 0004)

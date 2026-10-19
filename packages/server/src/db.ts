@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { DecisionEntry, Panel, PanelKind, Project, Sprocket, SprocketAuthor, SprocketEvent, SprocketLook, SprocketMessage, Suggestion } from "@rails/shared";
+import type { DecisionEntry, Handoff, Panel, PanelKind, Project, Sprocket, SprocketAuthor, SprocketEvent, SprocketLook, SprocketMessage, Suggestion } from "@rails/shared";
 import { RAILS_HOME } from "./config.ts";
 
 const db = new DatabaseSync(join(RAILS_HOME, "rails.db"));
@@ -117,6 +117,24 @@ db.exec(`
     event_message_id TEXT
   );
   CREATE INDEX IF NOT EXISTS decisions_by_panel ON decisions (panel_id, at);
+`);
+db.exec(`
+  -- Handoffs a Coordinator planned (ADR 0015). Status: pending, done, cancelled or expired.
+  CREATE TABLE IF NOT EXISTS handoffs (
+    id TEXT PRIMARY KEY,
+    sprocket_id TEXT NOT NULL,
+    from_panel_id TEXT NOT NULL,
+    from_kind TEXT NOT NULL,
+    from_title TEXT NOT NULL,
+    to_panel_id TEXT NOT NULL,
+    to_kind TEXT NOT NULL,
+    to_title TEXT NOT NULL,
+    note TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS handoffs_pending ON handoffs (status, sprocket_id);
 `);
 /** On a judgment: 1 when it woke the Coordinator itself (ADR 0013). */
 addColumn("decisions", "acted", "INTEGER NOT NULL DEFAULT 0");
@@ -245,7 +263,7 @@ type SprocketRow = {
   rules: string;
 };
 /** A stored Sprocket, with its internal core memory (never sent to browsers). */
-const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running" | "pending"> & { look: unknown; coreMemory: string } => ({
+const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running" | "pending" | "handoffs"> & { look: unknown; coreMemory: string } => ({
   id: r.id,
   name: r.name,
   look: JSON.parse(r.look),
@@ -571,5 +589,54 @@ export const settings = {
   set(key: string, value: string | null): void {
     if (value === null) db.prepare("DELETE FROM settings WHERE key = ?").run(key);
     else db.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
+  },
+};
+
+type HandoffRow = {
+  id: string;
+  sprocket_id: string;
+  from_panel_id: string;
+  from_kind: PanelKind;
+  from_title: string;
+  to_panel_id: string;
+  to_kind: PanelKind;
+  to_title: string;
+  note: string;
+  status: string;
+  created_at: string;
+};
+export type StoredHandoff = Handoff & { sprocketId: string };
+const toHandoff = (r: HandoffRow): StoredHandoff => ({
+  id: r.id,
+  sprocketId: r.sprocket_id,
+  from: { panelId: r.from_panel_id, kind: r.from_kind, title: r.from_title },
+  to: { panelId: r.to_panel_id, kind: r.to_kind, title: r.to_title },
+  note: r.note,
+  createdAt: r.created_at,
+});
+/** Handoffs Coordinators planned (ADR 0015); only pending ones are read back. */
+export const handoffs = {
+  create(sprocketId: string, h: Omit<Handoff, "id" | "createdAt">): StoredHandoff {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    db.prepare(
+      "INSERT INTO handoffs (id, sprocket_id, from_panel_id, from_kind, from_title, to_panel_id, to_kind, to_title, note, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+    ).run(id, sprocketId, h.from.panelId, h.from.kind, h.from.title, h.to.panelId, h.to.kind, h.to.title, h.note, now, now);
+    return { id, sprocketId, ...h, createdAt: now };
+  },
+  /** Pending ones, oldest first: a Sprocket's, or all of them. */
+  pending(sprocketId?: string): StoredHandoff[] {
+    const rows = sprocketId
+      ? db.prepare("SELECT * FROM handoffs WHERE status = 'pending' AND sprocket_id = ? ORDER BY created_at, rowid").all(sprocketId)
+      : db.prepare("SELECT * FROM handoffs WHERE status = 'pending' ORDER BY created_at, rowid").all();
+    return (rows as HandoffRow[]).map(toHandoff);
+  },
+  /** Pending ones that start or end at a panel. */
+  pendingAt(panelId: string): StoredHandoff[] {
+    return (db.prepare("SELECT * FROM handoffs WHERE status = 'pending' AND (from_panel_id = ? OR to_panel_id = ?) ORDER BY created_at, rowid").all(panelId, panelId) as HandoffRow[]).map(toHandoff);
+  },
+  /** End a pending one. False when it wasn't pending (someone else ended it first). */
+  end(id: string, status: "done" | "cancelled" | "expired"): boolean {
+    return db.prepare("UPDATE handoffs SET status = ?, updated_at = ? WHERE id = ? AND status = 'pending'").run(status, new Date().toISOString(), id).changes > 0;
   },
 };

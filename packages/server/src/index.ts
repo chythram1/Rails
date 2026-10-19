@@ -26,6 +26,7 @@ import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessag
 import { TerminalHub } from "./terminals.ts";
 import { startWatches } from "./watches.ts";
 import { startOverlaps } from "./overlaps.ts";
+import { cancelHandoff, startHandoffs } from "./handoffs.ts";
 import { dismissSuggestion, sendSuggestion, startSuggestions } from "./suggestions.ts";
 import { decisionLog, setDecisionModel, startDecisions } from "./decisions.ts";
 import { version as tmuxVersion } from "./tmux.ts";
@@ -237,6 +238,10 @@ app.post("/api/suggestions/:id/send", async (c) => {
   return c.json(await sendSuggestion(c.req.param("id"), body.text));
 });
 app.post("/api/suggestions/:id/dismiss", (c) => c.json(dismissSuggestion(c.req.param("id"))));
+app.post("/api/handoffs/:id/cancel", (c) => {
+  cancelHandoff(c.req.param("id"));
+  return c.json({ ok: true });
+});
 
 // ---- static web build (production) ----
 const webDist = join(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
@@ -249,6 +254,7 @@ if (existsSync(webDist)) {
 loadAttention(panels.all());
 startWatches(); // Coordinators hear about sessions that wait for the user
 startOverlaps(); // and about sessions changing the same files; their tabs show it
+startHandoffs(); // and when a session a handoff waits for finishes
 startSuggestions(); // suggested replies expire as their sessions move on
 startDecisions(); // the fast decision model judges in shadow, if the user picked one
 watchCodex(panels.all()); // Codex panels that survived a restart

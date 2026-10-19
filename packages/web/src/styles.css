@@ -747,6 +747,17 @@ textarea.input.sp-grow { resize: none; overflow: hidden; }
 .sp-rule-text:focus-visible { outline: none; } /* the row's border shows focus */
 .sp-rule-remove { flex: none; width: 26px; height: 26px; }
 .sp-rule-add { display: flex; flex-direction: column; gap: 6px; }
+/* Pending handoffs (ADR 0015): bordered rows like the rules, the route on top and the note under it. */
+.sp-handoffs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.sp-handoff {
+  display: flex; align-items: flex-start; gap: 8px; padding: 7px 3px 7px 11px;
+  border: 1px solid var(--border-strong); border-radius: 10px; background: var(--bg);
+}
+.sp-handoff-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sp-handoff-route { display: flex; align-items: center; gap: 6px; min-width: 0; margin: 0; color: var(--text-2); font-size: 13px; }
+.sp-handoff-route .truncate { flex: 0 1 auto; min-width: 0; }
+.sp-handoff-arrow { flex: none; color: var(--muted); }
+.sp-handoff-note { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .sp-rule-add textarea.input { width: 100%; resize: none; overflow: hidden; }
 /* On/off switch (Switch.tsx): Paper White when on, like the one primary button; no slide (no chrome motion). */
 .switch {

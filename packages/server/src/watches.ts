@@ -9,10 +9,13 @@
 //   comes sooner wakes it once the cooldown is over, if the session is still waiting then).
 // Permission prompts never wake it, nor other dialogs pi extensions show (they may be approvals): Sprockets
 // don't answer those, and the tab's attention mark covers them.
+// A turn that ends without a question also wakes the Coordinator for each handoff waiting on that session
+// (ADR 0015, handoffs.ts).
 import type { Panel, SessionQuestion, SprocketEvent } from "@rails/shared";
 import { ASKING, type SessionEvent } from "./bridge/events.ts";
 import { onEvents, onPanelForgotten } from "./bridge/index.ts";
-import { panels, projects, sprockets } from "./db.ts";
+import { handoffs, panels, projects, sprockets, type StoredHandoff } from "./db.ts";
+import { end as endHandoff } from "./handoffs.ts";
 import { sessionsFor } from "./providers/index.ts";
 import { postEvent } from "./sprockets.ts";
 import { listeners } from "./util.ts";
@@ -205,6 +208,29 @@ function wakeCoordinator(panelId: string, wake: Wake): boolean {
   return true;
 }
 
+/**
+ * A session a handoff waits for finished a turn (ADR 0015): wake its Coordinator, if it still is one, to check the
+ * work is done and draft the message.
+ */
+async function wakeForHandoff(h: StoredHandoff, from: Panel, text: string): Promise<void> {
+  const s = sprockets.get(h.sprocketId);
+  if (!s?.coordinator || s.projectId !== from.projectId) return void endHandoff(h, "cancelled", "its Sprocket isn't this project's Coordinator anymore.");
+  const to = panels.get(h.to.panelId);
+  if (!to) return void endHandoff(h, "cancelled", `\u201c${h.to.title}\u201d was closed.`);
+  const [title, toTitle] = await Promise.all([sessionTitle(from), sessionTitle(to)]);
+  const event: SprocketEvent = {
+    panelId: from.id,
+    kind: from.kind,
+    title,
+    ...(from.sessionId ? { sessionId: from.sessionId } : {}),
+    what: "handoff",
+    handoff: { id: h.id, to: { panelId: to.id, kind: to.kind, title: toTitle, ...(to.sessionId ? { sessionId: to.sessionId } : {}) }, note: h.note },
+  };
+  // Still pending, and still its Coordinator (the lookups took a moment)?
+  const now = sprockets.get(h.sprocketId);
+  if (now?.coordinator && now.projectId === from.projectId && handoffs.pending(h.sprocketId).some((x) => x.id === h.id)) postEvent(h.sprocketId, event, tail(text));
+}
+
 let watching: Watches | undefined;
 
 /**
@@ -225,6 +251,10 @@ export function startWatches(): void {
   onEvents((panel, events) => {
     try {
       watches.handle(panel.id, events);
+      // A turn that ends asking the user something, or fails, isn't finished.
+      for (const e of events)
+        if (e.kind === "turn_end" && !looksLikeQuestion(e.text))
+          for (const h of handoffs.pendingAt(panel.id)) if (h.from.panelId === panel.id) void wakeForHandoff(h, panel, e.text).catch((err) => console.error("handoffs:", err));
     } catch (e) {
       console.error("watches:", e);
     }

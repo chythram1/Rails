@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { IconChevronLeft as ChevronLeft, IconLayoutSidebarRight as PanelRight, IconSettings as Cog, IconX as X } from "@tabler/icons-react";
+import { IconArrowRight as ArrowRight, IconChevronLeft as ChevronLeft, IconLayoutSidebarRight as PanelRight, IconSettings as Cog, IconX as X } from "@tabler/icons-react";
 import {
   SPROCKET_DESCRIPTION_MAX,
   SPROCKET_RULE_MAX,
@@ -10,7 +10,9 @@ import {
 import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
 import { useStore } from "../../store.tsx";
+import { shortTitle } from "../../util.ts";
 import { Dropdown } from "../Dropdown.tsx";
+import { PanelIcon } from "../PanelMenu.tsx";
 import { ModelSelect, useModelSettings } from "../ModelSelect.tsx";
 import { useOpenSettings } from "../settings/context.ts";
 import { Switch } from "../Switch.tsx";
@@ -176,6 +178,7 @@ export function SprocketSettings({ sprocket, all }: { sprocket: SprocketData; al
               />
             </div>
             {sprocket.coordinator && <RulesField sprocket={sprocket} onSave={(rules) => save({ rules })} />}
+            {sprocket.coordinator && <HandoffsField sprocket={sprocket} />}
           </section>
         ) : (
           <>
@@ -361,6 +364,56 @@ function RuleRow({ n, rule, onSave, onRemove }: { n: number; rule: string; onSav
         <X size={14} />
       </button>
     </li>
+  );
+}
+
+/**
+ * A Coordinator's pending handoffs (ADR 0015): what it passes on when a session finishes, each with Cancel.
+ * They're planned in the chat ("When the auth session is done, tell the UI session to …").
+ */
+function HandoffsField({ sprocket }: { sprocket: SprocketData }) {
+  const [error, setError] = useState("");
+  const cancel = async (id: string) => {
+    setError("");
+    try {
+      await api.cancelHandoff(id);
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+  return (
+    <div className="settings-field" role="group" aria-labelledby="sp-handoffs-label">
+      <p id="sp-handoffs-label" className="sp-field-label">Handoffs</p>
+      <p className="muted small">
+        {sprocket.handoffs.length
+          ? "What it passes on when a session finishes."
+          : `None waiting. Ask ${sprocket.name} in the chat, e.g. “When the auth session is done, tell the UI session to use the new endpoint.”`}
+      </p>
+      {sprocket.handoffs.length > 0 && (
+        <ul className="sp-handoffs">
+          {sprocket.handoffs.map((h) => (
+            <li key={h.id} className="sp-handoff">
+              <div className="sp-handoff-text">
+                <p className="sp-handoff-route">
+                  <span className="sr-only">When </span>
+                  <PanelIcon kind={h.from.kind} />
+                  <span className="truncate" title={h.from.title}>{shortTitle(h.from.title)}</span>
+                  <span className="sr-only"> finishes, to </span>
+                  <ArrowRight size={13} className="sp-handoff-arrow" aria-hidden />
+                  <PanelIcon kind={h.to.kind} />
+                  <span className="truncate" title={h.to.title}>{shortTitle(h.to.title)}</span>
+                </p>
+                <p className="sp-handoff-note">{h.note}</p>
+              </div>
+              <button type="button" className="icon-btn sp-rule-remove" aria-label={`Cancel the handoff to ${h.to.title}`} title="Cancel" onClick={() => void cancel(h.id)}>
+                <X size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {error && <p className="error" role="alert">{error}</p>}
+    </div>
   );
 }
 

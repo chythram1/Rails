@@ -150,11 +150,34 @@ export interface Sprocket {
   rules: string[];
   /** Panels where a reply it suggested waits for the user to send it (or answer in the panel). */
   pending: string[];
+  /** As a Coordinator: the handoffs it planned that still wait for their session to finish (ADR 0015). */
+  handoffs: Handoff[];
   /** True while it's working on a reply. */
   running: boolean;
   /** The newest message in its chat, for the list preview. */
   lastMessage?: SprocketMessage;
 }
+
+/** A session in a handoff, as it was titled when the handoff was planned. */
+export interface HandoffSession {
+  panelId: string;
+  kind: PanelKind;
+  title: string;
+}
+
+/**
+ * A handoff a Coordinator planned (ADR 0015): when `from` finishes a turn without asking the user anything,
+ * Rails wakes the Coordinator to check the work is done and draft a message for `to`, which the user sends.
+ */
+export interface Handoff {
+  id: string;
+  from: HandoffSession;
+  to: HandoffSession;
+  /** What to pass on, in the user's words. */
+  note: string;
+  createdAt: string;
+}
+export const HANDOFF_NOTE_MAX = 300;
 
 /** A Sprocket's description is short on purpose: it goes into every run. */
 export const SPROCKET_DESCRIPTION_MAX = 500;
@@ -199,10 +222,10 @@ export interface SprocketEvent {
   title: string;
   sessionId?: string;
   /**
-   * It asked in a dialog (or a form), it ended its turn with what looks like a question, or it changed files
-   * other sessions changed shortly before (ADR 0014).
+   * It asked in a dialog (or a form), it ended its turn with what looks like a question, it changed files
+   * other sessions changed shortly before (ADR 0014), or it finished a turn a handoff waits for (ADR 0015).
    */
-  what: "question" | "turn_end" | "overlap";
+  what: "question" | "turn_end" | "overlap" | "handoff";
   questions?: SessionQuestion[];
   /** The Coordinator looked and decided the user needn't hear about it. */
   quiet?: boolean;
@@ -210,6 +233,8 @@ export interface SprocketEvent {
   byModel?: boolean;
   /** For an overlap: the other sessions, and the files each also changed (relative to the project). */
   overlaps?: { panelId: string; kind: PanelKind; title: string; sessionId?: string; files: string[] }[];
+  /** For a handoff: which one, the session it's for and what to pass on. */
+  handoff?: { id: string; to: HandoffSession & { sessionId?: string }; note: string };
 }
 
 /** One message in a Sprocket's chat. */

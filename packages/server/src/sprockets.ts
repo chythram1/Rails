@@ -16,8 +16,9 @@ import {
   type SprocketMessage,
   type SprocketSettings,
 } from "@rails/shared";
-import { projects, sprocketMessages, sprockets, suggestions } from "./db.ts";
+import { handoffs, projects, sprocketMessages, sprockets, suggestions } from "./db.ts";
 import { ServiceError } from "./errors.ts";
+import { settleHandoffs } from "./handoffs.ts";
 import { findModel } from "./models.ts";
 import { isRunning, onRunsChanged, requestReply, userMessageTime } from "./runs.ts";
 import { onSuggestionsChanged } from "./suggestions.ts";
@@ -63,7 +64,14 @@ function parseInput(body: Partial<SprocketInput> | undefined): SprocketInput {
 }
 
 function withLook({ coreMemory: _internal, ...row }: ReturnType<typeof sprockets.list>[number]): Sprocket {
-  return { ...row, look: repairLook(row.look), pending: suggestions.pendingPanels(row.id), running: isRunning(row.id), lastMessage: sprocketMessages.last(row.id) };
+  return {
+    ...row,
+    look: repairLook(row.look),
+    pending: suggestions.pendingPanels(row.id),
+    handoffs: row.coordinator ? handoffs.pending(row.id).map(({ sprocketId: _s, ...h }) => h) : [],
+    running: isRunning(row.id),
+    lastMessage: sprocketMessages.last(row.id),
+  };
 }
 
 function getSprocket(id: string): Sprocket {
@@ -95,6 +103,7 @@ export function updateSprocket(id: string, body: Partial<SprocketInput> | undefi
 export function deleteSprocket(id: string): void {
   getSprocket(id);
   sprockets.remove(id);
+  settleHandoffs();
   changed();
 }
 
@@ -153,6 +162,7 @@ export function updateSettings(id: string, body: SprocketSettings | undefined): 
   if (description !== undefined) sprockets.setDescription(id, description.trim());
   if (coordinator !== undefined) sprockets.setCoordinator(id, coordinator);
   if (ruleList) sprockets.setRules(id, ruleList);
+  if (moving || coordinator !== undefined) settleHandoffs(); // it, or the Coordinator it took over from, may have lost the role
   changed();
   return getSprocket(id);
 }
@@ -170,5 +180,8 @@ function parseRules(raw: unknown): string[] {
 export function detachFromProject(projectId: string): void {
   const attached = sprockets.byProject(projectId);
   for (const s of attached) sprockets.setProject(s.id, null);
-  if (attached.length) changed();
+  if (attached.length) {
+    settleHandoffs();
+    changed();
+  }
 }

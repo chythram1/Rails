@@ -91,6 +91,7 @@ export const api = {
     req<Sprocket>(`/api/sprockets/${enc(id)}/settings`, { method: "PUT", body: JSON.stringify(body) }),
   sendSuggestion: (id: string, text: string) => req<Suggestion>(`/api/suggestions/${enc(id)}/send`, { method: "POST", body: JSON.stringify({ text }) }),
   dismissSuggestion: (id: string) => req<Suggestion>(`/api/suggestions/${enc(id)}/dismiss`, { method: "POST" }),
+  cancelHandoff: (id: string) => req<{ ok: true }>(`/api/handoffs/${enc(id)}/cancel`, { method: "POST" }),
   models: () => req<ModelSettings>("/api/models"),
   setDefaultModel: (model: string | null) => req("/api/models/default", { method: "PUT", body: JSON.stringify({ model }) }),
   setDecisionModel: (model: string | null) => req("/api/models/decisions", { method: "PUT", body: JSON.stringify({ model }) }),
