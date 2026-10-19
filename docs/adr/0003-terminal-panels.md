@@ -33,4 +33,4 @@ Consequences:
   matter more now.
 - Rails can no longer see message-level detail live (no "waiting for approval" dot). The sidebar only
   knows whether a session has an open panel.
-- Codex is still untested on the dev machine.
+- Codex is still untested on the dev machine. (Since checked live with Codex 0.163, 2026-10-19: panels, the bridge, replies, overlaps and handoffs.)

@@ -28,8 +28,8 @@ Use `make dev-lan`, or set `RAILS_HOST=0.0.0.0`, to reach it from other devices 
 `~/.rails/config.json`.
 
 Status:
-- Discovery for Claude Code, pi and Codex (Codex is untested)
-- Terminal panels running `claude`, `pi`, `codex` (untested) or a shell, backed by tmux so they survive
+- Discovery for Claude Code, pi and Codex
+- Terminal panels running `claude`, `pi`, `codex` or a shell, backed by tmux so they survive
   server restarts and are shared across devices
 - Per-project split/tab layouts, saved on the server
 - Read-only git status and diffs
