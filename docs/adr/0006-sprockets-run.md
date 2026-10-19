@@ -19,6 +19,10 @@ Decisions:
   key. Rails ignores provider env vars (`OPENAI_API_KEY`, …) so it never bills a key set for something else.
   With a ChatGPT sign-in only the plan's models work, so Rails offers the ones OpenAI's `/v1/models` lists
   for the account (`visibility: "list"`), not pi-ai's whole OpenAI catalog.
+- **Keys are checked before they're saved** (added later): Rails asks the key's own provider for something free
+  (its model list, or the key's info for OpenRouter; TypeSafe has nothing free, so one tiny classification).
+  A key the provider refuses (401/403) isn't saved, and the user is told; one Rails couldn't check (no answer,
+  rate limits, an unknown provider) is saved with a note saying so.
 - **Credentials stay on the server**, in `RAILS_HOME/credentials.json` (mode 0600). The API only says which
   providers are set up. Sign-in runs on the server: the provider redirects to a callback on the server's own
   `127.0.0.1` (OpenAI's is port 1455, shared with the Codex CLI and pi). A browser on another device can't

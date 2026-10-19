@@ -191,8 +191,7 @@ app.put("/api/models/default", async (c) => {
   return c.json({ ok: true });
 });
 app.put("/api/models/providers/:id/key", async (c) => {
-  await setApiKey(c.req.param("id"), (await c.req.json<{ key: unknown }>()).key);
-  return c.json({ ok: true });
+  return c.json(await setApiKey(c.req.param("id"), (await c.req.json<{ key: unknown }>()).key));
 });
 app.delete("/api/models/providers/:id", async (c) => {
   await removeCredential(c.req.param("id"));

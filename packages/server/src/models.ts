@@ -113,13 +113,64 @@ export async function modelSettings(): Promise<ModelSettings> {
   return { providers, models: choices, defaultModel: settings.get("defaultModel"), classifiers: await classifierChoices(), decisionModel: settings.get("decisionModel") };
 }
 
-export async function setApiKey(providerId: string, rawKey: unknown): Promise<void> {
-  provider(providerId);
+// ---- Checking a key before it's saved: a request that costs nothing (listing models, or the key's own info),
+// sent only to the key's provider. TypeSafe has none, so it gets one tiny classification (about $0.00002).
+
+/** How long a provider has to answer a key check. */
+const CHECK_MS = 8000;
+const bearer = (key: string) => ({ authorization: `Bearer ${key}` });
+const KEY_CHECKS: Record<string, (key: string) => Request> = {
+  openai: (k) => new Request("https://api.openai.com/v1/models", { headers: bearer(k) }),
+  anthropic: (k) => new Request("https://api.anthropic.com/v1/models", { headers: { "x-api-key": k, "anthropic-version": "2023-06-01" } }),
+  openrouter: (k) => new Request("https://openrouter.ai/api/v1/key", { headers: bearer(k) }),
+  google: (k) => new Request("https://generativelanguage.googleapis.com/v1beta/models", { headers: { "x-goog-api-key": k } }),
+  xai: (k) => new Request("https://api.x.ai/v1/models", { headers: bearer(k) }),
+  mistral: (k) => new Request("https://api.mistral.ai/v1/models", { headers: bearer(k) }),
+  groq: (k) => new Request("https://api.groq.com/openai/v1/models", { headers: bearer(k) }),
+  deepseek: (k) => new Request("https://api.deepseek.com/models", { headers: bearer(k) }),
+};
+
+/** What a provider said about a key: it works, it's refused, or it couldn't be told. */
+export type KeyCheck = { verdict: "ok" } | { verdict: "rejected" } | { verdict: "unknown"; reason: string };
+
+/** Ask the provider whether a key works, without using it for anything else. */
+export async function checkKey(providerId: string, key: string, fetchFn: typeof fetch = fetch): Promise<KeyCheck> {
+  const signal = AbortSignal.timeout(CHECK_MS);
+  try {
+    if (providerId === "typesafe") {
+      const jev = models.getModelsOfType("classifier", "typesafe")[0];
+      if (!jev) return { verdict: "unknown", reason: "it has no model to check with" };
+      const question = { type: "bool" as const, instructions: "Is this a greeting?", criteria: { true: "It is.", false: "It isn't." } };
+      const r = await models.classify(jev, { state: { text: "hello" }, questions: { check: question } }, { apiKey: key, signal });
+      if (r.stopReason === "stop") return { verdict: "ok" };
+      return /\b(401|403)\b|unauthori[sz]ed|invalid api key|forbidden/i.test(r.errorMessage ?? "") ? { verdict: "rejected" } : { verdict: "unknown", reason: r.errorMessage ?? "no answer" };
+    }
+    const make = KEY_CHECKS[providerId];
+    if (!make) return { verdict: "unknown", reason: "Rails can't check its keys" };
+    const res = await fetchFn(make(key), { signal });
+    if (res.ok) return { verdict: "ok" };
+    if (res.status === 401 || res.status === 403) return { verdict: "rejected" };
+    if (res.status === 429) return { verdict: "unknown", reason: "it's rate-limiting this key, or the key is out of credit" };
+    return { verdict: "unknown", reason: `it answered ${res.status}` };
+  } catch (e) {
+    return { verdict: "unknown", reason: signal.aborted ? "it didn't answer in time" : "Rails couldn't reach it" };
+  }
+}
+
+/**
+ * Save a provider's API key, once the provider has accepted it. A key it refuses isn't saved; one it couldn't
+ * be asked about is saved, and `note` says so.
+ */
+export async function setApiKey(providerId: string, rawKey: unknown, check: (providerId: string, key: string) => Promise<KeyCheck> = checkKey): Promise<{ note?: string }> {
+  const p = provider(providerId);
   const key = typeof rawKey === "string" ? rawKey.trim() : "";
   if (!key) throw new ServiceError("Enter an API key.", 400);
+  const result = await check(providerId, key);
+  if (result.verdict === "rejected") throw new ServiceError(`${p.name} rejected this key. Check that you copied all of it, and that it's still active.`, 400);
   await credentials.modify(providerId, async () => ({ type: "api_key", key }));
   openaiChanged(providerId);
   changed();
+  return result.verdict === "unknown" ? { note: `Saved, but Rails couldn't check it: ${result.reason}.` } : {};
 }
 
 export async function removeCredential(providerId: string): Promise<void> {

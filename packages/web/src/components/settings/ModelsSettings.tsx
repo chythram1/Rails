@@ -74,14 +74,17 @@ function ProviderRow({ provider: p }: { provider: ModelProvider }) {
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [note, setNote] = useState("");
   const [signIn, setSignIn] = useState<SignIn | null>(null);
 
   const saveKey = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError("");
+    setNote("");
     try {
-      await api.setProviderKey(p.id, key);
+      const { note } = await api.setProviderKey(p.id, key);
+      setNote(note ?? "");
       setAdding(false);
       setKey("");
     } catch (e: any) {
@@ -155,7 +158,7 @@ function ProviderRow({ provider: p }: { provider: ModelProvider }) {
             onChange={(e) => setKey(e.target.value)}
             autoFocus
           />
-          <button className="btn small primary" disabled={busy || !key.trim()}>Save</button>
+          <button className="btn small primary" disabled={busy || !key.trim()}>{busy ? "Checking…" : "Save"}</button>
           <button type="button" className="btn small" onClick={() => (setAdding(false), setKey(""), setError(""))}>
             Cancel
           </button>
@@ -163,6 +166,7 @@ function ProviderRow({ provider: p }: { provider: ModelProvider }) {
       )}
       {signIn && <SignInPanel key={signIn.id} signIn={signIn} onClose={() => setSignIn(null)} onDifferentAccount={() => void startSignIn(true)} />}
       {error && <p className="error" role="alert">{error}</p>}
+      {note && <p className="muted small" role="status">{note}</p>}
     </li>
   );
 }

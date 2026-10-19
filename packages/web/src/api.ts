@@ -95,7 +95,8 @@ export const api = {
   setDefaultModel: (model: string | null) => req("/api/models/default", { method: "PUT", body: JSON.stringify({ model }) }),
   setDecisionModel: (model: string | null) => req("/api/models/decisions", { method: "PUT", body: JSON.stringify({ model }) }),
   decisions: () => req<DecisionLog>("/api/decisions"),
-  setProviderKey: (id: string, key: string) => req(`/api/models/providers/${enc(id)}/key`, { method: "PUT", body: JSON.stringify({ key }) }),
+  /** Saves a key the provider accepted; `note` when it couldn't be checked. Refused keys come back as errors. */
+  setProviderKey: (id: string, key: string) => req<{ note?: string }>(`/api/models/providers/${enc(id)}/key`, { method: "PUT", body: JSON.stringify({ key }) }),
   removeProvider: (id: string) => req(`/api/models/providers/${enc(id)}`, { method: "DELETE" }),
   startSignIn: (id: string, fresh = false) =>
     req<SignIn>(`/api/models/providers/${enc(id)}/sign-in`, { method: "POST", body: JSON.stringify({ fresh }) }),
