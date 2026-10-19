@@ -136,10 +136,9 @@ describe("suggested replies", () => {
     await suggestThroughRun(lead.id, panel.id, "Yes, but skip the e2e tests.");
     const shown = listMessages(lead.id).flatMap((m) => m.suggestions ?? []);
     expect(shown.map((s) => [s.text, s.status])).toEqual([
-      ["Yes.", "expired"],
+      ["Yes.", "replaced"],
       ["Yes, but skip the e2e tests.", "pending"],
     ]);
-    expect(shown[0].error).toBe("A newer suggestion replaced it.");
   });
 
   it("only lets the project's Coordinator suggest", async () => {

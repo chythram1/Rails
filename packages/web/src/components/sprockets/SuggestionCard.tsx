@@ -3,6 +3,7 @@ import { IconCheck as Check } from "@tabler/icons-react";
 import { sessionKey, type Suggestion } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href } from "../../router.ts";
+import { shortTitle } from "../../util.ts";
 import { PanelIcon } from "../PanelMenu.tsx";
 import { useAutoGrow } from "../useAutoGrow.ts";
 
@@ -38,20 +39,22 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
         <p className="sp-suggestion-line">
           <Check size={14} aria-hidden />
           <span className="sp-suggestion-label">{s.queued ? "Queued for" : "Sent to"}</span>
-          <span className="sp-event-title truncate" title={s.title}>{s.title}</span>
+          <span className="sp-event-title truncate" title={s.title}>{shortTitle(s.title)}</span>
           {s.queued && <span className="sp-suggestion-label">· after its current turn</span>}
         </p>
         <blockquote className="sp-event-quote">{s.text}</blockquote>
       </div>
     );
-  if (s.status === "dismissed") return <p className="sp-suggestion-line">You dismissed the reply to {s.title}.</p>;
-  if (s.status === "expired") return <p className="sp-suggestion-line">Not sent: {s.error ?? `${s.title} moved on.`}</p>;
+  // A newer suggestion for the same session sits further down: this one would only be noise.
+  if (s.status === "replaced") return null;
+  if (s.status === "dismissed") return <p className="sp-suggestion-line">Dismissed.</p>;
+  if (s.status === "expired") return <p className="sp-suggestion-line">Not sent: {lower(s.error ?? "The session moved on.")}</p>;
 
   const head = (
     <p className="sp-suggestion-head">
       <PanelIcon kind={s.kind} />
       <span className="sp-suggestion-label">{s.mode === "answer" ? "Answer for" : s.mode === "message" ? "Message for" : "Reply to"}</span>
-      <span className="sp-event-title truncate" title={s.title}>{s.title}</span>
+      <span className="sp-event-title truncate" title={s.title}>{shortTitle(s.title)}</span>
     </p>
   );
   const rule = s.rule ? <p className="sp-suggestion-rule">Following your rule: {s.rule}</p> : null;
@@ -112,3 +115,6 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
     </form>
   );
 }
+
+/** "The session moved on." → "the session moved on.", to follow "Not sent:". */
+const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);

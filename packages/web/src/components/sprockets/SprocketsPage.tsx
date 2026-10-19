@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react";
-import { IconPlus as Plus, IconSearch as Search } from "@tabler/icons-react";
+import { IconFilter as Filter, IconPlus as Plus, IconSearch as Search } from "@tabler/icons-react";
 import type { Project, Sprocket as SprocketData } from "@rails/shared";
 import { href, navigate, type Route } from "../../router.ts";
 import { useStore } from "../../store.tsx";
 import { timeAgo } from "../../util.ts";
+import { MenuButton } from "../Menu.tsx";
 import { Sprocket } from "./Sprocket.tsx";
 import { SprocketChat } from "./SprocketChat.tsx";
 import { SprocketCreator } from "./SprocketCreator.tsx";
 import { SprocketSettings } from "./SprocketSettings.tsx";
-import { GENERAL, groupSprockets, lastActive, type Group } from "./groups.ts";
+import { groupSprockets, lastActive } from "./groups.ts";
 import { useSprockets } from "./useSprockets.ts";
 
 type SprocketsRoute = Extract<Route, { name: "sprockets" }>;
@@ -20,7 +21,7 @@ type SprocketsRoute = Extract<Route, { name: "sprockets" }>;
 export function SprocketsPage({ route }: { route: SprocketsRoute }) {
   const { list, error } = useSprockets();
   const { projects } = useStore();
-  /** Which group the list (and the gallery) shows: all, a project's id, or "general" (unattached). */
+  /** Which group the list shows: all, a project's id, or "general" (unattached). */
   const [filter, setFilter] = useState("all");
 
   if (!list) return error ? <p className="error pad" role="alert">{error}</p> : null;
@@ -32,8 +33,6 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
   let main;
   if (creating) {
     main = <SprocketCreator key="new" taken={list.map((s) => s.name)} onSaved={(s) => navigate(href.sprocket(s.id))} onCancel={list.length ? () => navigate(href.sprockets()) : undefined} />;
-  } else if (route.view === "edit" && current) {
-    main = <SprocketCreator key={current.id} sprocket={current} taken={[]} onSaved={(s) => navigate(href.sprocket(s.id))} onCancel={() => navigate(href.sprocket(current.id))} />;
   } else if ((route.view === "chat" || route.view === "settings") && current) {
     // The chat stays put while its settings panel opens and closes beside it. The key is on the wrapper:
     // another Sprocket gets a fresh chat and panel (siblings sharing one key would pile up old chats).
@@ -47,7 +46,7 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
   } else if (route.id) {
     main = <p className="sp-placeholder muted">This one doesn't exist anymore. It may have been deleted on another device.</p>;
   } else {
-    main = <Gallery groups={groupSprockets(list, projects, shownFilter)} />;
+    main = <Gallery list={list} />;
   }
 
   return (
@@ -59,20 +58,20 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
 }
 
 /**
- * The list column. Its header is a search field (as in Telegram, Lindy or ref chat.png) rather than a title;
- * under it, filter tabs like Telegram's chat folders: All, each project with Sprockets, General. Rows are
- * grouped by project with a small heading.
+ * The list column. Its header is a search field (as in Telegram, Lindy or ref chat.png) and, when there's more
+ * than one group, a filter menu: All, each project with Sprockets, General. Rows are grouped by project under
+ * small headings. New Sprockets are made from the gallery (and, on phones, a row at the end of the list).
  */
 function SprocketList(props: { list: SprocketData[]; projects: Project[]; filter: string; onFilter(key: string): void; activeId?: string }) {
-  const { list, projects, activeId } = props;
+  const { list, projects, filter, onFilter, activeId } = props;
   const [query, setQuery] = useState("");
-  const tabs = useMemo(() => groupSprockets(list, projects), [list, projects]);
-  const { filter } = props;
+  const all = useMemo(() => groupSprockets(list, projects), [list, projects]);
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
     const match = (s: SprocketData) => !q || s.name.toLowerCase().includes(q) || !!s.lastMessage?.text.toLowerCase().includes(q);
     return groupSprockets(list.filter(match), projects, filter);
   }, [list, projects, filter, query]);
+  const shownName = filter === "all" ? "All Sprockets" : all.find((g) => g.key === filter)?.title;
   return (
     <aside className="sp-list" aria-labelledby="sp-list-title">
       <h1 id="sp-list-title" className="sr-only">Sprockets</h1>
@@ -81,20 +80,21 @@ function SprocketList(props: { list: SprocketData[]; projects: Project[]; filter
           <Search size={15} aria-hidden />
           <input type="search" placeholder="Search" aria-label="Search Sprockets" value={query} onChange={(e) => setQuery(e.target.value)} />
         </label>
-        <a className="icon-btn" href={href.newSprocket()} aria-label="New Sprocket" title="New Sprocket">
-          <Plus size={18} />
-        </a>
+        {all.length > 1 && (
+          <MenuButton
+            label={`Show: ${shownName}`}
+            title={filter === "all" ? "Filter by project" : `Showing ${shownName}`}
+            className={filter === "all" ? undefined : "active"}
+            icon={<Filter size={16} />}
+            align="right"
+            items={[
+              { label: "All Sprockets", checked: filter === "all", onSelect: () => onFilter("all") },
+              "separator",
+              ...all.map((g) => ({ label: g.title, checked: filter === g.key, onSelect: () => onFilter(g.key) })),
+            ]}
+          />
+        )}
       </div>
-      {/* Only worth showing when there's more than one group to choose from. */}
-      {tabs.length > 1 && (
-        <div className="sp-filters" role="group" aria-label="Show">
-          {[{ key: "all", title: "All" }, ...tabs].map((t) => (
-            <button key={t.key} type="button" className="sp-filter" aria-pressed={filter === t.key} onClick={() => props.onFilter(t.key)} title={t.title}>
-              <span className="truncate">{t.title}</span>
-            </button>
-          ))}
-        </div>
-      )}
       {list.length === 0 ? (
         <p className="muted small pad">Your first one will show up here.</p>
       ) : groups.length === 0 ? (
@@ -103,8 +103,7 @@ function SprocketList(props: { list: SprocketData[]; projects: Project[]; filter
         <div className="sp-groups">
           {groups.map((g) => (
             <section key={g.key} className="sp-group" aria-labelledby={`sp-group-${g.key}`}>
-              {/* With one group chosen, its tab already says which: no heading (it stays for screen readers). */}
-              <h2 id={`sp-group-${g.key}`} className={filter === "all" ? "sp-group-title truncate" : "sr-only"} title={g.title}>{g.title}</h2>
+              <h2 id={`sp-group-${g.key}`} className="sp-group-title truncate" title={g.title}>{g.title}</h2>
               <ul className="sp-rows">
                 {g.list.map((s) => (
                   <li key={s.id}>
@@ -114,6 +113,12 @@ function SprocketList(props: { list: SprocketData[]; projects: Project[]; filter
               </ul>
             </section>
           ))}
+          <a className="sp-row sp-new-row" href={href.newSprocket()}>
+            <span className="sp-new-icon" aria-hidden>
+              <Plus size={18} />
+            </span>
+            New Sprocket
+          </a>
         </div>
       )}
     </aside>
@@ -143,41 +148,33 @@ function SprocketRow({ sprocket: s, active }: { sprocket: SprocketData; active: 
 
 /**
  * The page with no Sprocket open (desktop): every Sprocket as a card with its character idling, like a
- * cast line-up (ref core-characters.png, Grok's companions), grouped like the list. The card that makes a
- * new one is with General, where new Sprockets start, or else after the last group shown.
+ * cast line-up (ref core-characters.png, Grok's companions), and a card that makes a new one. One grid in the
+ * order they were made, so cards never move around (ref/sprockets/stage2/gallery.png was the busier, grouped
+ * version); the list beside it groups them by project.
  */
-function Gallery({ groups }: { groups: Group[] }) {
-  const withNew = groups.find((g) => g.key === GENERAL) ?? groups.at(-1);
+function Gallery({ list }: { list: SprocketData[] }) {
   return (
     <div className="sp-gallery">
       <h2 className="sr-only">All Sprockets</h2>
-      {groups.map((g) => (
-        <section key={g.key} className="sp-gallery-group" aria-labelledby={`sp-gallery-${g.key}`}>
-          <h3 id={`sp-gallery-${g.key}`} className="sp-group-title">{g.title}</h3>
-          <ul className="sp-cards">
-            {g.list.map((s) => (
-              <li key={s.id}>
-                <a className="sp-card" href={href.sprocket(s.id)} title={s.name}>
-                  <Sprocket look={s.look} size={84} seed={s.id} />
-                  <span className="sp-card-name truncate">{s.name}</span>
-                  {s.coordinator && <span className="sp-row-role">Coordinator</span>}
-                  <span className="muted small truncate">{preview(s)}</span>
-                </a>
-              </li>
-            ))}
-            {g === withNew && (
-              <li>
-                <a className="sp-card sp-card-new" href={href.newSprocket()}>
-                  <span className="sp-card-plus" aria-hidden>
-                    <Plus size={28} />
-                  </span>
-                  <span className="sp-card-name">New</span>
-                </a>
-              </li>
-            )}
-          </ul>
-        </section>
-      ))}
+      <ul className="sp-cards">
+        {list.map((s) => (
+          <li key={s.id}>
+            <a className="sp-card" href={href.sprocket(s.id)} title={s.name}>
+              <Sprocket look={s.look} size={84} seed={s.id} />
+              <span className="sp-card-name truncate">{s.name}</span>
+              <span className="muted small truncate">{preview(s)}</span>
+            </a>
+          </li>
+        ))}
+        <li>
+          <a className="sp-card sp-card-new" href={href.newSprocket()}>
+            <span className="sp-card-plus" aria-hidden>
+              <Plus size={28} />
+            </span>
+            <span className="sp-card-name">New</span>
+          </a>
+        </li>
+      </ul>
     </div>
   );
 }

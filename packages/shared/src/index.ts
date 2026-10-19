@@ -230,7 +230,8 @@ export interface Suggestion {
   text: string;
   /** The rule it followed, as it read then; none when it used its own judgment. */
   rule?: string;
-  status: "pending" | "sending" | "sent" | "failed" | "dismissed" | "expired";
+  /** "replaced": a newer suggestion for the same session took its place (it isn't shown). */
+  status: "pending" | "sending" | "sent" | "failed" | "dismissed" | "expired" | "replaced";
   /** Why it failed, or why it can't be sent anymore. */
   error?: string;
   /** Sent while the session was busy: it's in the session's own queue, for after its current turn. */

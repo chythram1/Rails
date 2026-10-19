@@ -12,7 +12,8 @@ name ideas (an empty name takes the one showing). The list column's header is a 
 title, so the word "Sprockets" shows once (the nav item). With no Sprocket open, the page shows them all as cards; a chat
 opens with the Sprocket itself, and time labels mark gaps between messages.
 
-Stage 1 is visual only. Sprockets can be created, restyled, renamed and deleted, and the user can send
+Stage 1 is visual only. Sprockets can be created, restyled, renamed and deleted (restyling was dropped
+later: a Sprocket's look is chosen once, when it's made), and the user can send
 them messages, but nothing runs: no Sprocket replies, and the chat says so. How they run (a harness,
 prompts, tools, schedules) is a later stage and gets its own decision.
 

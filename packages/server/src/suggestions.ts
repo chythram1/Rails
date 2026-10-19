@@ -55,7 +55,7 @@ export function suggest(sprocketId: string, panel: Panel, title: string, raw: st
   if (text.length > SUGGESTION_MAX) throw new Error(`It can be at most ${SUGGESTION_MAX} characters; this is ${text.length}.`);
   const mode = modeFor(cardOf(panel), title, purpose);
   for (const old of suggestions.pendingFor(panel.id).filter((s) => s.sprocketId === sprocketId)) {
-    if (old.messageId) suggestions.setStatus(old.id, ["pending"], "expired", { error: "A newer suggestion replaced it." });
+    if (old.messageId) suggestions.setStatus(old.id, ["pending"], "replaced");
     else suggestions.drop([old.id]); // from this same run: never shown
   }
   const s = suggestions.create({ sprocketId, panelId: panel.id, kind: panel.kind, title, sessionId: panel.sessionId, mode, text, rule });
@@ -63,12 +63,15 @@ export function suggest(sprocketId: string, panel: Panel, title: string, raw: st
   return shown(s);
 }
 
-/** Why this can't go into the session now, if it can't. A message can wait in the session's queue; an answer can't. */
-function blocked(card: SessionCard, title: string, mode: Suggestion["mode"]): string | undefined {
-  if (card.status === "ended") return `${title} has ended.`;
+/**
+ * Why this can't go into the session now, if it can't. A message can wait in the session's queue; an answer
+ * can't. Shown on the card under the session's name, so it says "the session", not its (long) title.
+ */
+function blocked(card: SessionCard, mode: Suggestion["mode"]): string | undefined {
+  if (card.status === "ended") return "The session has ended.";
   if (mode === "message") return undefined;
-  if (card.status === "working") return `${title} is working on something else now.`;
-  if (card.status === "waiting") return `${title} is waiting for you in its panel.`;
+  if (card.status === "working") return "The session is working on something else now.";
+  if (card.status === "waiting") return "The session is waiting for you in its panel.";
 }
 
 /** The user sends a suggested reply, possibly edited. */
@@ -84,7 +87,7 @@ export async function sendSuggestion(id: string, rawText: unknown): Promise<Sugg
 
   const panel = panels.get(s.panelId);
   const card = panel && cardOf(panel);
-  const why = !panel || !card ? "The panel was closed." : panel.projectId !== sprockets.get(s.sprocketId)?.projectId ? "It's not in this project anymore." : blocked(card, s.title, s.mode);
+  const why = !panel || !card ? "The panel was closed." : panel.projectId !== sprockets.get(s.sprocketId)?.projectId ? "It's not in this project anymore." : blocked(card, s.mode);
   if (why) {
     if (suggestions.setStatus(id, ["pending", "failed"], "expired", { error: why })) changes.emit();
     throw new ServiceError(why, 409);

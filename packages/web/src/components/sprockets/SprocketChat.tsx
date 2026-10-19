@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { IconArrowDown as ArrowDown, IconChevronLeft as ChevronLeft, IconDotsVertical as EllipsisVertical, IconLayoutSidebarRight as PanelRight } from "@tabler/icons-react";
+import { IconArrowDown as ArrowDown, IconChevronLeft as ChevronLeft } from "@tabler/icons-react";
 import type { Sprocket as SprocketData, SprocketMessage } from "@rails/shared";
 import { api } from "../../api.ts";
-import { href, navigate } from "../../router.ts";
+import { href } from "../../router.ts";
 import { socket } from "../../ws.ts";
 import { Composer } from "../Composer.tsx";
-import { MenuButton } from "../Menu.tsx";
 import { useStore } from "../../store.tsx";
 import { Sprocket } from "./Sprocket.tsx";
+import { PanelToggle } from "./SprocketSettings.tsx";
 import { EventRow } from "./EventRow.tsx";
 import { SuggestionCard } from "./SuggestionCard.tsx";
 import { MessageActions } from "./MessageActions.tsx";
@@ -32,7 +32,7 @@ function stamp(iso: string): string {
 
 /**
  * A Sprocket's chat (ADR 0005, 0006). The thread opens with the Sprocket itself (as Dot, Pi and hilos
- * do), and time labels break it up where there are gaps. The user's messages sit on the right, replies on
+ * do; once there are messages, one quiet line), and time labels break it up where there are gaps. The user's messages sit on the right, replies on
  * the left, and rails' own notices (no model yet, errors) in the middle. A Coordinator's chat also has the
  * sessions that waited for the user (EventRow). A reply shows as it's written. `embedded` is the chat in a
  * workspace's side panel (SidePanel.tsx), which has a header of its own.
@@ -117,15 +117,6 @@ export function SprocketChat({ sprocket, panelOpen, embedded = false }: { sprock
     await load();
   };
 
-  const remove = async () => {
-    if (!confirm(`Delete ${name}? Its chat is deleted too.`)) return;
-    try {
-      await api.deleteSprocket(id);
-      navigate(href.sprockets());
-    } catch (e: any) {
-      alert(e.message);
-    }
-  };
 
   return (
     <section className="sp-chat" {...(embedded ? { "aria-label": `Chat with ${name}` } : { "aria-labelledby": "sp-chat-title" })}>
@@ -136,28 +127,9 @@ export function SprocketChat({ sprocket, panelOpen, embedded = false }: { sprock
           </a>
           <Sprocket look={sprocket.look} size={28} seed={id} />
           <h2 id="sp-chat-title" className="truncate" title={name}>{name}</h2>
-          {project && <span className="sp-project truncate" title={`Attached to ${project.name}`}>{project.name}</span>}
           <span className="grow" />
-          <a
-            className={"icon-btn" + (panelOpen ? " active" : "")}
-            href={panelOpen ? href.sprocket(id) : href.sprocketSettings(id)}
-            aria-label={`${name} settings`}
-            aria-expanded={panelOpen}
-            title={panelOpen ? "Close settings" : "Settings"}
-          >
-            <PanelRight size={18} />
-          </a>
-          <MenuButton
-            label={`${name} actions`}
-            title="More"
-            icon={<EllipsisVertical size={16} />}
-            align="right"
-            items={[
-              { label: "Settings", shortcut: "s", onSelect: () => navigate(panelOpen ? href.sprocket(id) : href.sprocketSettings(id)) },
-              { label: "Change look", shortcut: "l", onSelect: () => navigate(href.editSprocket(id)) },
-              { label: "Delete", shortcut: "d", danger: true, onSelect: () => void remove() },
-            ]}
-          />
+          {/* While the settings panel is open, its toggle sits at the panel's top right instead. */}
+          {!panelOpen && <PanelToggle sprocket={sprocket} open={false} />}
         </header>
       )}
       <div className="sp-thread" ref={thread}>
@@ -167,19 +139,17 @@ export function SprocketChat({ sprocket, panelOpen, embedded = false }: { sprock
             <button className="btn" onClick={() => void load()}>Try again</button>
           </div>
         )}
-        {messages && (
-          <div className={"sp-intro" + (messages.length ? "" : " alone")}>
-            <Sprocket look={sprocket.look} size={messages.length ? 88 : 120} seed={id} />
-            <p className="sp-intro-title">{messages.length ? name : `Say hello to ${name}`}</p>
-            <p className="muted small">
-              {messages.length
-                ? `This is the beginning of your chat with ${name}${project ? ` in ${project.name}` : ""}.`
-                : project
-                  ? `${name} is attached to ${project.name}.`
-                  : `${name} isn't attached to a project. You can attach it in Settings.`}
-            </p>
-          </div>
-        )}
+        {/* The character greets an empty chat; once it has messages, one quiet line marks where it starts. */}
+        {messages &&
+          (messages.length ? (
+            <p className="sp-intro-line muted small">This is the beginning of your chat with {name}{project ? ` in ${project.name}` : ""}.</p>
+          ) : (
+            <div className="sp-intro alone">
+              <Sprocket look={sprocket.look} size={120} seed={id} />
+              <p className="sp-intro-title">Say hello to {name}</p>
+              <p className="muted small">{project ? `${name} is attached to ${project.name}.` : `${name} isn't attached to a project. You can attach it in Settings.`}</p>
+            </div>
+          ))}
         {!!messages?.length && (
           // A log: screen readers announce new messages (not the reply while it's being written, which sits
           // in the list, where the reply will be, but hidden from them).
@@ -228,7 +198,7 @@ export function SprocketChat({ sprocket, panelOpen, embedded = false }: { sprock
                   </p>
                 ) : (
                   <p className="sp-thinking">
-                    <Sprocket look={sprocket.look} size={22} seed={id} /> {activity.step ? `${activity.step}…` : "Thinking…"}
+                    {activity.step ? `${activity.step}…` : "Thinking…"}
                   </p>
                 )}
               </li>

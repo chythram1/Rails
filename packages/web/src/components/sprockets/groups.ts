@@ -7,7 +7,7 @@ export interface Group {
   list: Sprocket[];
 }
 
-export const GENERAL = "general";
+const GENERAL = "general";
 export const lastActive = (s: Sprocket) => s.lastMessage?.createdAt ?? s.createdAt;
 
 /**

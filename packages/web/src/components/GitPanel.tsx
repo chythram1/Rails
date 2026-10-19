@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { IconRefresh as RefreshCw, IconX as X } from "@tabler/icons-react";
+import { IconRefresh as RefreshCw } from "@tabler/icons-react";
 import type { GitStatus } from "@rails/shared";
 import { api } from "../api.ts";
 
-/** The side panel's Git view (SidePanel.tsx): changed files and a file's diff. */
-export function GitPanel({ projectId, refreshKey, onClose }: { projectId: string; refreshKey: string; onClose(): void }) {
+/** The side panel's Git tab (SidePanel.tsx): the branch, changed files and a file's diff. */
+export function GitPanel({ projectId, refreshKey }: { projectId: string; refreshKey: string }) {
   const [status, setStatus] = useState<GitStatus | null>(null);
   const [file, setFile] = useState<string | null>(null);
   const [diff, setDiff] = useState("");
@@ -28,8 +28,7 @@ export function GitPanel({ projectId, refreshKey, onClose }: { projectId: string
 
   return (
     <>
-      <header className="side-head">
-        <h2>Git</h2>
+      <div className="side-bar side-git-bar">
         {status?.branch && (
           <span className="muted small truncate">
             {status.branch}
@@ -38,13 +37,10 @@ export function GitPanel({ projectId, refreshKey, onClose }: { projectId: string
           </span>
         )}
         <span className="grow" />
-        <button className="icon-btn" aria-label="Refresh" onClick={load}>
+        <button className="icon-btn" aria-label="Refresh git status" title="Refresh" onClick={load}>
           <RefreshCw size={16} />
         </button>
-        <button className="icon-btn" aria-label="Close the side panel" onClick={onClose}>
-          <X size={16} />
-        </button>
-      </header>
+      </div>
       {error && !status ? (
         <div className="pad">
           <p className="error small" role="alert">{error}</p>

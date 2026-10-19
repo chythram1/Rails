@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { IconCheck as Check } from "@tabler/icons-react";
 
 export type MenuItem = "separator" | MenuAction;
 
@@ -11,6 +12,8 @@ interface MenuAction {
   disabled?: boolean;
   /** Muted text after the label, e.g. why an item is disabled. */
   note?: string;
+  /** For a menu of choices (one is current): this item is the current one, marked with a check. */
+  checked?: boolean;
   onSelect(): void;
 }
 
@@ -143,11 +146,19 @@ export function MenuButton({ label, title, icon, className, plain, align = "left
             item === "separator" ? (
               <div key={i} className="menu-sep" role="separator" />
             ) : (
-              <button key={item.label} role="menuitem" className={item.danger ? "danger" : undefined} disabled={item.disabled} onClick={() => pick(item)}>
+              <button
+                key={item.label}
+                role={item.checked === undefined ? "menuitem" : "menuitemradio"}
+                aria-checked={item.checked}
+                className={item.danger ? "danger" : undefined}
+                disabled={item.disabled}
+                onClick={() => pick(item)}
+              >
                 {item.icon}
-                <span>{item.label}</span>
+                <span className="truncate">{item.label}</span>
                 {item.note && <span className="muted small">{item.note}</span>}
                 {item.shortcut && <kbd className="menu-key">{item.shortcut.toUpperCase()}</kbd>}
+                {item.checked && <Check size={15} className="menu-check" aria-hidden />}
               </button>
             ),
           )}

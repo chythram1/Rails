@@ -37,8 +37,6 @@ function useNameIdea(taken: string[], cycling: boolean): string {
 const MAX_NAME = 40;
 
 interface Props {
-  /** The Sprocket to edit; omit to create one. */
-  sprocket?: SprocketData;
   /** Names already in use, which the name ideas skip. */
   taken: string[];
   onSaved(s: SprocketData): void;
@@ -46,18 +44,18 @@ interface Props {
 }
 
 /**
- * Make or restyle a Sprocket (ref/sprockets/stage1/create-bot.jpg): the preview on top, then rows for
- * colour, accessory (drawn on its own) and shape, then the name.
+ * Make a Sprocket (ref/sprockets/stage1/create-bot.jpg): the preview on top, then rows for colour, accessory
+ * (drawn on its own) and shape, then the name. Its look is chosen once, here: it can't be changed later.
  */
-export function SprocketCreator({ sprocket, taken, onSaved, onCancel }: Props) {
-  const [look, setLook] = useState<SprocketLook>(sprocket?.look ?? NEW_LOOK);
-  const [name, setName] = useState(sprocket?.name ?? "");
+export function SprocketCreator({ taken, onSaved, onCancel }: Props) {
+  const [look, setLook] = useState<SprocketLook>(NEW_LOOK);
+  const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const ideas = !sprocket && !name;
+  const ideas = !name;
   const idea = useNameIdea(taken, ideas);
-  // An empty name falls back to the idea showing (or, when editing, the current name).
-  const shownName = name.trim() || (sprocket?.name ?? idea);
+  // An empty name falls back to the idea showing.
+  const shownName = name.trim() || idea;
   const set = <K extends keyof SprocketLook>(key: K) => (v: SprocketLook[K]) => setLook((l) => ({ ...l, [key]: v }));
 
   const submit = async (e: FormEvent) => {
@@ -66,7 +64,7 @@ export function SprocketCreator({ sprocket, taken, onSaved, onCancel }: Props) {
     setError("");
     try {
       const body = { name: shownName, look };
-      onSaved(sprocket ? await api.updateSprocket(sprocket.id, body) : await api.createSprocket(body));
+      onSaved(await api.createSprocket(body));
     } catch (err: any) {
       setError(err.message);
       setSaving(false);
@@ -76,10 +74,10 @@ export function SprocketCreator({ sprocket, taken, onSaved, onCancel }: Props) {
   return (
     <form className="sp-creator" onSubmit={submit} aria-labelledby="sp-creator-title">
       <header className="sp-head">
-        <a className="icon-btn sp-back" href={sprocket ? href.sprocket(sprocket.id) : href.sprockets()} aria-label="Back">
+        <a className="icon-btn sp-back" href={href.sprockets()} aria-label="Back">
           <ChevronLeft size={18} />
         </a>
-        <h2 id="sp-creator-title" className="truncate">{sprocket ? `Edit ${sprocket.name}` : "New Sprocket"}</h2>
+        <h2 id="sp-creator-title" className="truncate">New Sprocket</h2>
       </header>
       <div className="sp-creator-body">
         <Sprocket look={look} size={150} follow label={`Preview of ${shownName}`} />
@@ -100,7 +98,7 @@ export function SprocketCreator({ sprocket, taken, onSaved, onCancel }: Props) {
           <span>Name</span>
           <span className="sp-name-input">
             {/* The placeholder holds the idea for screen readers; sighted users see it animate in the span. */}
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={sprocket?.name ?? idea} maxLength={MAX_NAME} autoComplete="off" spellCheck={false} />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={idea} maxLength={MAX_NAME} autoComplete="off" spellCheck={false} />
             {ideas && (
               <span key={idea} className="sp-name-idea" aria-hidden>
                 {idea}
@@ -115,7 +113,7 @@ export function SprocketCreator({ sprocket, taken, onSaved, onCancel }: Props) {
               Cancel
             </button>
           )}
-          <button className="btn primary" disabled={saving}>{sprocket ? "Save changes" : "Get started"}</button>
+          <button className="btn primary" disabled={saving}>Get started</button>
         </div>
       </div>
     </form>

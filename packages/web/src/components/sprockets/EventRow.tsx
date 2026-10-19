@@ -1,5 +1,6 @@
 import { sessionKey, type SprocketMessage } from "@rails/shared";
 import { href } from "../../router.ts";
+import { shortTitle } from "../../util.ts";
 import { PanelIcon } from "../PanelMenu.tsx";
 
 /**
@@ -14,7 +15,7 @@ export function EventRow({ message, projectId, name }: { message: SprocketMessag
     <div className="sp-event">
       <p className="sp-event-head">
         <PanelIcon kind={e.kind} />
-        <span className="sp-event-title truncate" title={e.title}>{e.title}</span>
+        <span className="sp-event-title truncate" title={e.title}>{shortTitle(e.title)}</span>
         <span className="sp-event-what">{e.what === "turn_end" ? "is waiting for your reply" : "is asking you"}</span>
         {open && (
           <a className="sp-event-open" href={open}>

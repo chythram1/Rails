@@ -10,7 +10,7 @@ import {
   type IWatermarkPanelProps,
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
-import { IconGitBranch as GitBranch, IconRobotFace as RobotFace, IconX as X } from "@tabler/icons-react";
+import { IconLayoutSidebarRight as PanelRight, IconX as X } from "@tabler/icons-react";
 import { parseSessionKey, sessionKey, type Panel, type PanelKind } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate } from "../router.ts";
@@ -18,6 +18,7 @@ import { useStore } from "../store.tsx";
 import { SidePanel, type SideView } from "./SidePanel.tsx";
 import { useSprockets } from "./sprockets/useSprockets.ts";
 import { PanelIcon, PanelMenu } from "./PanelMenu.tsx";
+import { onTabKeys } from "./tabKeys.ts";
 import { TerminalView } from "./TerminalView.tsx";
 import { useWorkspace, type WorkspaceState } from "./useWorkspace.ts";
 
@@ -27,10 +28,10 @@ const MOBILE = "(max-width: 860px)";
 interface Ctx extends WorkspaceState {
   /** Open a panel and place it in `group` (or the active group). */
   openIn(kind: PanelKind, group?: DockviewGroupPanel): void;
-  /** What the side panel shows, if it's open. */
-  side: SideView | null;
-  /** Open the side panel on `view`, or close it if it's showing that already. */
-  toggleSide(view: SideView): void;
+  /** Whether the side panel is open. */
+  sideOpen: boolean;
+  /** Open the side panel (on Sprockets if a reply waits, else its last tab), or close it. */
+  toggleSide(): void;
   /** Panels whose session has a reply waiting in one of the project's Sprockets (ADR 0010). */
   replyReady: Set<string>;
 }
@@ -43,7 +44,8 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
   const project = projects.find((p) => p.id === projectId);
   const ws = useWorkspace(projectId);
   const [mobile, setMobile] = useState(() => matchMedia(MOBILE).matches);
-  const [side, setSide] = useState<SideView | null>(null);
+  const [sideOpen, setSideOpen] = useState(false);
+  const [sideView, setSideView] = useState<SideView>("sprockets");
   // The project's Sprockets, its Coordinator first.
   const { list: allSprockets } = useSprockets();
   const sprockets = (allSprockets ?? []).filter((s) => s.projectId === projectId).sort((a, b) => Number(b.coordinator) - Number(a.coordinator));
@@ -81,7 +83,18 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
   if (!project) return <div className="page center muted">Project not found.</div>;
 
   return (
-    <WorkspaceCtx.Provider value={{ ...ws, openIn, side, toggleSide: (view) => setSide((v) => (v === view ? null : view)), replyReady }}>
+    <WorkspaceCtx.Provider
+      value={{
+        ...ws,
+        openIn,
+        sideOpen,
+        toggleSide: () => {
+          if (!sideOpen && replyReady.size) setSideView("sprockets");
+          setSideOpen(!sideOpen);
+        },
+        replyReady,
+      }}
+    >
       <div className="workspace">
         {ws.error && (
           <div className="workspace-error" role="alert">
@@ -93,14 +106,15 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
         )}
         <div className="workspace-body">
           {ws.panels === null ? null : mobile ? <MobilePanels /> : <Dock projectId={projectId} targetGroup={targetGroup} focusId={focusId} onFocused={() => setFocusId(undefined)} />}
-          {side && (
+          {sideOpen && (
             <SidePanel
-              view={side}
+              view={sideView}
+              onView={setSideView}
               projectId={projectId}
               projectName={project.name}
               sprockets={sprockets}
               refreshKey={String(ws.panels?.length)}
-              onClose={() => setSide(null)}
+              onClose={() => setSideOpen(false)}
             />
           )}
         </div>
@@ -261,21 +275,18 @@ function HeaderAdd(props: IDockviewHeaderActionsProps) {
 }
 
 /**
- * The side panel's toggles, Sprockets and Git (SidePanel.tsx). Desktop shows them once, at the right end of
- * the top-right pane's tab bar. The Sprockets one carries a dot while a reply waits.
+ * The side panel's toggle (SidePanel.tsx: Sprockets and Git). Desktop shows it once, at the right end of the
+ * top-right pane's tab bar. It carries a dot while a reply waits in one of the project's Sprockets.
  */
 function SideToggles() {
-  const { side, toggleSide, replyReady } = useWs();
+  const { sideOpen, toggleSide, replyReady } = useWs();
   const ready = replyReady.size;
-  const sprocketsLabel = ready ? `Sprockets: ${ready > 1 ? `${ready} replies` : "a reply"} ready` : "Sprockets";
+  const label = `Sprockets and Git${ready ? ` (${ready > 1 ? `${ready} replies` : "1 reply"} waiting)` : ""}`;
   return (
     <div className="side-toggles">
-      <button className={"icon-btn" + (side === "sprockets" ? " active" : "")} aria-label={sprocketsLabel} aria-pressed={side === "sprockets"} title={sprocketsLabel} onClick={() => toggleSide("sprockets")}>
-        <RobotFace size={16} />
+      <button className={"icon-btn" + (sideOpen ? " active" : "")} aria-label={label} aria-pressed={sideOpen} title={label} onClick={toggleSide}>
+        <PanelRight size={16} />
         {ready > 0 && <span className="toggle-dot" aria-hidden />}
-      </button>
-      <button className={"icon-btn" + (side === "git" ? " active" : "")} aria-label="Git" aria-pressed={side === "git"} title="Git" onClick={() => toggleSide("git")}>
-        <GitBranch size={16} />
       </button>
     </div>
   );
@@ -331,10 +342,10 @@ function MobilePanels() {
 
   return (
     <div className="mobile-panels">
-      <div className="mobile-tabs" role="tablist">
+      <div className="mobile-tabs" role="tablist" aria-label="Panels" onKeyDown={onTabKeys}>
         {panels.map((p) => (
           <div key={p.id} className={"panel-tab" + (p.id === active?.id ? " active" : "")}>
-            <button role="tab" aria-selected={p.id === active?.id} className="mobile-tab" onClick={() => setActiveId(p.id)}>
+            <button role="tab" aria-selected={p.id === active?.id} tabIndex={p.id === active?.id ? 0 : -1} className="mobile-tab" onClick={() => setActiveId(p.id)}>
               <PanelIcon kind={p.kind} />
               <span className="truncate">{ws.title(p)}</span>
               <AttentionMark panelId={p.id} />
