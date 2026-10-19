@@ -3,9 +3,9 @@
 // `setting-<rowId>` so a result can open its section, scroll to the row and focus the row's control.
 import type { ModelProvider } from "@rails/shared";
 
-export type SettingsSection = "general" | "models" | "account";
+export type SettingsSection = "general" | "providers" | "models" | "account";
 
-export const SECTION_LABELS: Record<SettingsSection, string> = { general: "General", models: "Models", account: "Account" };
+export const SECTION_LABELS: Record<SettingsSection, string> = { general: "General", providers: "Providers", models: "Models", account: "Account" };
 
 export interface SettingEntry {
   section: SettingsSection;
@@ -40,10 +40,10 @@ const PROVIDER_PHRASES: Record<string, string[]> = {
   typesafe: ["Jev", "System 1", "classifier", "fast decisions"],
 };
 
-/** The provider rows of Settings → Models, which come from the server. */
+/** The provider rows of Settings → Providers, which come from the server. */
 export const providerEntries = (providers: ModelProvider[]): SettingEntry[] =>
   providers.map((p) => ({
-    section: "models",
+    section: "providers",
     rowId: `provider-${p.id}`,
     label: p.name,
     phrases: ["provider", "API key", ...(p.signIn ? ["sign in"] : []), ...(PROVIDER_PHRASES[p.id] ?? [])],

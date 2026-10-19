@@ -12,7 +12,7 @@ judges, Rails logs, nothing acts on it.
 
 Decisions:
 - **Any classifier pi-ai offers** (`models.classify()`): TypeSafe's Jev (TypeSafe is now a provider in
-  Settings → Models, API key only, with no chat models), OpenAI's GPT-6 Luna as a classifier (`openai-decisions`),
+  Settings → Providers, API key only, with no chat models), OpenAI's GPT-6 Luna as a classifier (`openai-decisions`),
   and others pi-ai lists. One setting, the decision model, off by default.
 - **What it judges, in projects with a Coordinator only:**
   - every turn end: "does the end of this message ask the user something?" (a yes/no with its probability), next

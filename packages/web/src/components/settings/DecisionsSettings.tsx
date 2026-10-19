@@ -6,6 +6,7 @@ import { timeAgo } from "../../util.ts";
 import { socket } from "../../ws.ts";
 import { Dropdown } from "../Dropdown.tsx";
 import { PanelIcon } from "../PanelMenu.tsx";
+import { useOpenSettings } from "./context.ts";
 
 /**
  * Settings → Models → Fast decisions (ADR 0012, 0013): one picker. A decision model, once picked, hears the
@@ -14,6 +15,7 @@ import { PanelIcon } from "../PanelMenu.tsx";
  * keeps it to judging, to evaluate a model.)
  */
 export function DecisionsSettings({ settings }: { settings: ModelSettings }) {
+  const openSettings = useOpenSettings();
   const [error, setError] = useState("");
   const pick = async (ref: string) => {
     setError("");
@@ -39,7 +41,14 @@ export function DecisionsSettings({ settings }: { settings: ModelSettings }) {
             {!settings.decisionModel
               ? settings.classifiers.length
                 ? "Off until you pick one."
-                : "Set up TypeSafe (for Jev) or OpenAI with an API key (for GPT-6 Luna) under Providers."
+                : (
+                  <>
+                    Connect TypeSafe (for Jev), or OpenAI with an API key (for GPT-6 Luna).{" "}
+                    <button type="button" className="link" onClick={() => openSettings("providers")}>
+                      Go to Providers
+                    </button>
+                  </>
+                )
               : settings.decisionsInShadow
                 ? "Judging only (RAILS_DECISIONS=shadow): it doesn't wake anyone."
                 : "Wakes the Coordinator when it's sure: 90% for a reply, 95% for a dialog."}

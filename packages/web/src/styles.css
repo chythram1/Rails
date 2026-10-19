@@ -889,8 +889,10 @@ textarea.input.sp-grow { resize: none; overflow: hidden; }
   .settings-dialog { width: 100vw; height: 100dvh; border: 0; border-radius: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .settings-nav { gap: 10px; padding: 10px 56px 10px 12px; border-right: 0; border-bottom: 1px solid var(--border); max-height: 45dvh; }
   .settings-nav-title { display: none; }
-  .settings-sections [role="tablist"] { flex-direction: row; overflow-x: auto; }
+  /* Four sections fit in one row: text only, and the full width (the close button sits beside the search). */
+  .settings-sections [role="tablist"] { flex-direction: row; overflow-x: auto; margin-right: -44px; }
   .settings-tab { width: auto; }
+  .settings-tab svg { display: none; }
   .settings-close { top: 12px; right: 10px; } /* beside the search field */
   .settings-panel-body { padding: 20px 16px 24px; gap: 32px; }
   .set-row { flex-wrap: wrap; gap: 10px 24px; }

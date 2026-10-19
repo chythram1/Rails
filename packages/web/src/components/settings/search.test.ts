@@ -29,6 +29,11 @@ describe("settings search", () => {
     expect(r).not.toContain("provider-anthropic"); // it takes only an API key
   });
 
+  it("puts provider rows in Providers, and model choices in Models", () => {
+    expect(providers.map((e) => e.section)).toEqual(["providers", "providers"]);
+    expect(SETTINGS.find((e) => e.rowId === "default-model")!.section).toBe("models");
+  });
+
   it("finds nothing for an empty or unrelated query", () => {
     expect(find("  ")).toEqual([]);
     expect(find("zebra")).toEqual([]);

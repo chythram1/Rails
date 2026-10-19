@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
   IconCpu as Cpu,
+  IconPlugConnected as Plug,
   IconSearch as Search,
   IconServer2 as Server,
   IconUserCircle as UserCircle,
@@ -10,11 +11,13 @@ import { useModelSettings } from "../ModelSelect.tsx";
 import { AccountSettings } from "./AccountSettings.tsx";
 import { GeneralSettings } from "./GeneralSettings.tsx";
 import { ModelsSettings } from "./ModelsSettings.tsx";
+import { ProvidersSettings } from "./ProvidersSettings.tsx";
 import { providerEntries, searchSettings, SECTION_LABELS, SETTINGS, type SettingEntry, type SettingsSection } from "./search.ts";
 
 
 const SECTIONS: { id: SettingsSection; icon: ReactNode; body: () => ReactNode }[] = [
   { id: "general", icon: <Server size={17} />, body: () => <GeneralSettings /> },
+  { id: "providers", icon: <Plug size={17} />, body: () => <ProvidersSettings /> },
   { id: "models", icon: <Cpu size={17} />, body: () => <ModelsSettings /> },
   { id: "account", icon: <UserCircle size={17} />, body: () => <AccountSettings /> },
 ];
@@ -40,6 +43,12 @@ export function SettingsDialog({ section, onSection, onClose }: { section: Setti
     d.showModal(); // focuses the search field, the first control
     return () => d.close();
   }, []);
+
+  // A link elsewhere in Settings that opens another section ("Connect a provider") disappears with its page;
+  // give focus to the section's tab rather than losing it to the page behind.
+  useEffect(() => {
+    if (!dialog.current?.contains(document.activeElement)) tabs.current?.querySelector<HTMLElement>(`#settings-tab-${section}`)?.focus();
+  }, [section]);
 
   const found = useMemo(() => searchSettings(query, [...SETTINGS, ...providerEntries(models?.providers ?? [])]), [query, models]);
 

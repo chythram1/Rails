@@ -44,7 +44,7 @@ describe("runs", () => {
     const s = sprocket();
     sendMessage(s.id, "hello");
     await idle();
-    expect(authors(s.id)).toEqual(["user: hello", "notice: Pick a model first: set up a provider in Settings → Models."]);
+    expect(authors(s.id)).toEqual(["user: hello", "notice: Pick a model first: connect a provider in Settings → Providers."]);
   });
 
   it("edits its core memory with the remember tool, from a codemode script", async () => {

@@ -311,6 +311,7 @@ Soft rectangles throughout, with radius growing with the size of the thing.
 
 ### Dialogs
 - Native `<dialog>` (focus trap, Escape, inert page), `--surface`, 16px radius, Popover/Dialog shadow. Escape and a backdrop click close only the topmost dialog.
+- **Settings sections:** General, Providers (connecting model services: one row per provider, its status and actions), Models (which models to use: the default and the decision model) and Account. A tab per section with a 17px icon, in a column; on phones a single row of text-only tabs under the search. A setting that needs another section links to it ("Connect a provider"), and focus moves to that section's tab.
 - **Settings rows:** what it is (and why) on the left, the control on the right, a hairline between rows; rows wrap under each other on phones.
 
 ### Chat (Sprockets)

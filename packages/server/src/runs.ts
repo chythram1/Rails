@@ -125,7 +125,7 @@ async function run(id: string) {
   const ref = s.model ?? settings.get("defaultModel");
   const model = findModel(ref);
   if (!model) {
-    notice(id, ref ? `The model ${ref} isn't available. Check its provider in Settings → Models.` : "Pick a model first: set up a provider in Settings → Models.");
+    notice(id, ref ? `The model ${ref} isn't available. Check its provider in Settings → Providers.` : "Pick a model first: connect a provider in Settings → Providers.");
     return;
   }
   if (!underRateLimit(id)) return;

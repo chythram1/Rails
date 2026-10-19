@@ -196,8 +196,8 @@ export function SprocketSettings({ sprocket, all }: { sprocket: SprocketData; al
                 {models && !models.models.length && (
                   <p className="muted small">
                     No models yet.{" "}
-                    <button type="button" className="link" onClick={() => openSettings("models")}>
-                      Set up a model provider
+                    <button type="button" className="link" onClick={() => openSettings("providers")}>
+                      Connect a provider
                     </button>
                   </p>
                 )}
