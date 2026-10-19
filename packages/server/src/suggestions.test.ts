@@ -164,6 +164,49 @@ describe("suggested replies", () => {
   });
 });
 
+describe("messages the user asks for", () => {
+  /** The Coordinator, asked in its chat, drafts `message` for the panel with suggest_message. */
+  async function messageThroughRun(leadId: string, panelId: string, message: string) {
+    const code = `return await tools.suggest_message({ session: ${JSON.stringify(panelId.slice(0, 8))}, message: ${JSON.stringify(message)} })`;
+    faux.setResponses([fauxAssistantMessage([fauxToolCall("codemode", { code })], { stopReason: "toolUse" }), fauxAssistantMessage("Drafted it below.")]);
+    sendMessage(leadId, "tell it to stop and summarize");
+    await idle();
+    return listMessages(leadId).at(-1)!;
+  }
+
+  it("drafts a message for a busy session, which goes into its queue when sent", async () => {
+    const { lead, panel } = setup();
+    receive(panel.id, "claude", "UserPromptSubmit", { prompt: "refactor everything" }); // it's working
+    const reply = await messageThroughRun(lead.id, panel.id, "Stop and summarize what you've done.");
+    expect(reply.activity).toBe("Drafted a message");
+    const [s] = reply.suggestions!;
+    expect(s).toMatchObject({ mode: "message", status: "pending" });
+    // It doesn't go stale while the session works.
+    receive(panel.id, "claude", "PostToolUse", { tool_name: "Edit", tool_input: { file_path: "/work/a.ts" } });
+    expect(listMessages(lead.id).at(-1)!.suggestions![0].status).toBe("pending");
+    expect(await sendSuggestion(s.id, s.text)).toMatchObject({ status: "sent", queued: true });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(JSON.parse(received.at(-1)!).message.content).toBe("From your user, sent with Rails:\nStop and summarize what you've done.");
+  });
+
+  it("sends a message to an idle session at once, and drops it when the session ends", async () => {
+    const { lead, panel } = setup();
+    const [s] = (await messageThroughRun(lead.id, panel.id, "Summarize.")).suggestions!;
+    expect(await sendSuggestion(s.id, s.text)).toMatchObject({ status: "sent" });
+    expect(listMessages(lead.id).at(-1)!.suggestions![0].queued).toBeUndefined();
+    const [t] = (await messageThroughRun(lead.id, panel.id, "And then stop.")).suggestions!;
+    receive(panel.id, "claude", "SessionEnd", {});
+    expect(listMessages(lead.id).at(-1)!.suggestions![0]).toMatchObject({ id: t.id, status: "expired", error: "The session ended." });
+  });
+
+  it("points the Coordinator to suggest_message when it tries to answer a session that isn't asking", () => {
+    const { lead, panel } = setup();
+    receive(panel.id, "claude", "UserPromptSubmit", { prompt: "go" });
+    expect(() => suggest(lead.id, panel, "Fix sidebar", "stop")).toThrow("use suggest_message");
+    expect(suggest(lead.id, panel, "Fix sidebar", "stop", { purpose: "message" }).mode).toBe("message");
+  });
+});
+
 describe("standing rules", () => {
   it("keeps rules trimmed and within limits", () => {
     const s = createSprocket({ name: "Rules", look });
@@ -238,8 +281,18 @@ describe("delivery", () => {
     expect(m.text).toBe("hello");
     box.ack("other", m.id, true); // another panel can't answer for it
     box.ack("p1", m.id, true);
-    await expect(sent).resolves.toBeUndefined();
+    await expect(sent).resolves.toEqual({ queued: false });
     await expect(box.hand("p1", "again", { takeMs: 150 })).rejects.toThrow("Rails can't reach this pi session");
+  });
+
+  it("lets a pi message wait in pi's queue, and says so", async () => {
+    const box = new PiInbox();
+    const poll = box.poll("p1", new AbortController().signal);
+    const sent = box.hand("p1", "stop and summarize", { queue: true });
+    const [m] = await poll;
+    expect(m.queue).toBe(true);
+    box.ack("p1", m.id, true, true);
+    await expect(sent).resolves.toEqual({ queued: true });
   });
 
   it("fails a pi reply the extension turned down (pi was busy) or never confirmed", async () => {

@@ -33,12 +33,15 @@ export default function railsBridge(pi: any) {
       try {
         const r = await fetch(`${base}/pi/inbox`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(35_000) });
         if (!r.ok) throw new Error(String(r.status));
-        const { messages } = (await r.json()) as { messages?: { id?: string; text?: string }[] };
+        const { messages } = (await r.json()) as { messages?: { id?: string; text?: string; queue?: boolean }[] };
         for (const m of messages ?? []) {
-          // Only into an idle session: if pi started on something else meanwhile, the reply no longer fits.
-          const ok = typeof m?.text === "string" && m.text !== "" && ctx.isIdle();
-          if (ok) pi.sendUserMessage(m.text);
-          post("delivered", { id: m?.id, ok });
+          // An idle session gets it now. A busy one gets a message that may wait (`queue`) after its current
+          // run; an answer, which no longer fits once pi has started on something else, is turned down.
+          const idle = ctx.isIdle();
+          const ok = typeof m?.text === "string" && m.text !== "" && (idle || m.queue === true);
+          if (ok && idle) pi.sendUserMessage(m.text);
+          else if (ok) pi.sendUserMessage(m.text, { deliverAs: "followUp" });
+          post("delivered", { id: m?.id, ok, queued: ok && !idle });
         }
       } catch {
         await new Promise((r) => setTimeout(r, 5000)); // Rails is down or restarting

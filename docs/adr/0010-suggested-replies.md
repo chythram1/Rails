@@ -12,7 +12,7 @@ Decisions:
   capability, Coordinators only, checked when it's called). It creates a suggestion shown under the reply the
   run saves; a run that saves no reply drops its suggestions. Nothing reaches a session until the user sends
   it, so a Sprocket never acts in a session on its own yet. When the user asks a Coordinator to "tell it …",
-  that's a suggestion too.
+  it drafts a **message** instead (`suggest_message`, below).
 - **Two kinds, by the session's state when it's suggested** (`suggestions.ts`):
   - **reply**: the session's turn ended (or failed): the user can edit the text, then Send or Dismiss;
   - **answer**: the session waits on a question in a dialog (Claude Code's AskUserQuestion, a pi question
@@ -21,6 +21,14 @@ Decisions:
     come later).
   - Never for a working session, a permission prompt, or any other dialog a pi extension shows (it may be an
     approval): those stay the user's to answer in the panel.
+  - **message** (`suggest_message`, added after the user's first tries): something the user asked the
+    Coordinator to pass on. Unlike an answer it doesn't belong to a moment, so it doesn't expire when the
+    session moves on (only when it ends or its panel closes), and it can be sent whatever the session is doing:
+    a busy session (working, or waiting on a dialog) gets it in its own queue, after its current turn. Each
+    agent queues by itself: Claude Code's message socket, Codex's `thread/queue/add`, and pi's follow-up queue
+    (the extension uses it only for messages, never for answers). The card then says "Queued for …".
+    Treating both as answers made a "tell it to stop" request into an un-sendable dialog answer while the
+    session had a question open, and dropped it as soon as the session moved on.
 - **Suggestions go stale.** One per session per Coordinator (a newer one replaces the older). Anything the
   session does (a prompt, a tool, the dialog answered, the session ending, the panel closing) expires its
   pending suggestions. Sending checks everything again: the panel is open and in the Coordinator's project,

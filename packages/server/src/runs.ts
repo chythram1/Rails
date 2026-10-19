@@ -11,7 +11,7 @@ import { stepText, summarize, type Capability } from "./harness/capabilities.ts"
 import { codemodeTool, type CallRecord } from "./harness/codemode.ts";
 import { CORE_MEMORY_MAX, memoryCapability } from "./harness/memory.ts";
 import { projectCapabilities } from "./harness/project.ts";
-import { suggestReplyCapability } from "./harness/reply.ts";
+import { replyCapabilities } from "./harness/reply.ts";
 import { findModel, models } from "./models.ts";
 import { listeners } from "./util.ts";
 
@@ -141,7 +141,7 @@ async function run(id: string) {
   const capabilities = [
     memoryCapability(changed),
     ...(project ? projectCapabilities : []),
-    ...(project && s.coordinator ? [suggestReplyCapability(s.rules, (sid) => made.push(sid))] : []),
+    ...(project && s.coordinator ? replyCapabilities(s.rules, (sid) => made.push(sid)) : []),
   ];
   // The run log: every call's outcome, and the ones going now (scripts can run several at once).
   const done: { name: string; args: unknown; status: CallRecord["status"] }[] = [];
@@ -290,7 +290,7 @@ function systemPrompt(name: string, projectName: string | undefined, description
       : "You aren't attached to a project, so you're simply chatting with your user.",
     ...(projectName && rules
       ? [
-          `You're the Coordinator of "${projectName}". When one of its sessions waits for your user (it asked a question, or ended its turn with one), Rails wakes you with a message that starts with [Rails event]; those come from Rails, not your user. Find out what the session needs (session_conversation for that session, project_board for what else is going on). If one of your user's rules (below) fits, suggest the reply it calls for with suggest_reply, passing the rule's number; a rule beats your own judgment. If none fits but you can tell what your user would answer, from their description, your memory and the project, suggest it without a rule number. Then say in a sentence or two what the session asks and why you'd answer that; your user sends the reply with one tap. If you can't tell, don't guess: say what it's asking and what your user needs to decide. If it doesn't need your user after all (it isn't really a question, or it's already answered), reply with exactly (quiet) and nothing else. When your user asks you to tell a session something, suggest that too: they send it. Never suggest approving a permission or a command; those are your user's to answer in the panel.`,
+          `You're the Coordinator of "${projectName}". When one of its sessions waits for your user (it asked a question, or ended its turn with one), Rails wakes you with a message that starts with [Rails event]; those come from Rails, not your user. Find out what the session needs (session_conversation for that session, project_board for what else is going on). If one of your user's rules (below) fits, suggest the reply it calls for with suggest_reply, passing the rule's number; a rule beats your own judgment. If none fits but you can tell what your user would answer, from their description, your memory and the project, suggest it without a rule number. Then say in a sentence or two what the session asks and why you'd answer that; your user sends the reply with one tap. If you can't tell, don't guess: say what it's asking and what your user needs to decide. If it doesn't need your user after all (it isn't really a question, or it's already answered), reply with exactly (quiet) and nothing else. When your user asks you to tell a session something, draft it with suggest_message: they send it, and a busy session gets it after its current turn. Never suggest approving a permission or a command; those are your user's to answer in the panel.`,
         ]
       : []),
     "Keep replies short and plain: this is a chat, not a document. Use Markdown only for code.",

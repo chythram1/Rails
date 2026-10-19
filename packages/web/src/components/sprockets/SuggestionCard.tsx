@@ -7,11 +7,11 @@ import { PanelIcon } from "../PanelMenu.tsx";
 import { useAutoGrow } from "../useAutoGrow.ts";
 
 /**
- * A reply a Coordinator suggests for a session, under its message (server suggestions.ts, ADR 0010), with
- * the standing rule it followed, if any (ADR 0011).
- * The user edits it and sends it, or dismisses it; nothing reaches the session until they send it. A
- * dialog's answer is picked in the panel, so that card links there instead. Once it's sent, dismissed or
- * out of date, a muted line says so.
+ * What a Coordinator drafts for a session, under its message (server suggestions.ts, ADR 0010): an answer to
+ * its question (with the standing rule it followed, if any, ADR 0011) or a message the user asked it to pass
+ * on. The user edits it and sends it, or dismisses it; nothing reaches the session until they send it. A
+ * dialog's answer is picked in the panel, so that card links there instead. Once it's sent (or queued in a
+ * busy session), dismissed or out of date, a muted line says so.
  */
 export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Suggestion; projectId?: string }) {
   const [text, setText] = useState(s.text);
@@ -37,8 +37,9 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
       <div className="sp-suggestion-done">
         <p className="sp-suggestion-line">
           <Check size={14} aria-hidden />
-          <span className="sp-suggestion-label">Sent to</span>
+          <span className="sp-suggestion-label">{s.queued ? "Queued for" : "Sent to"}</span>
           <span className="sp-event-title truncate" title={s.title}>{s.title}</span>
+          {s.queued && <span className="sp-suggestion-label">· after its current turn</span>}
         </p>
         <blockquote className="sp-event-quote">{s.text}</blockquote>
       </div>
@@ -49,7 +50,7 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
   const head = (
     <p className="sp-suggestion-head">
       <PanelIcon kind={s.kind} />
-      <span className="sp-suggestion-label">{s.mode === "answer" ? "Answer for" : "Reply to"}</span>
+      <span className="sp-suggestion-label">{s.mode === "answer" ? "Answer for" : s.mode === "message" ? "Message for" : "Reply to"}</span>
       <span className="sp-event-title truncate" title={s.title}>{s.title}</span>
     </p>
   );
@@ -64,7 +65,7 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
         {rule}
         {error && <p className="error small" role="alert">{error}</p>}
         <div className="sp-suggestion-actions">
-          <span className="muted small grow">It's waiting on a question in its panel.</span>
+          <span className="muted small grow">Pick this in its panel: Rails doesn't answer dialogs.</span>
           <button type="button" className="btn small" disabled={busy} onClick={dismiss}>Dismiss</button>
           {open && <a className="btn small primary" href={open}>Open panel</a>}
         </div>
@@ -89,7 +90,7 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
       <textarea
         ref={field}
         className="sp-suggestion-text"
-        aria-label={`Reply to ${s.title}`}
+        aria-label={`${s.mode === "message" ? "Message for" : "Reply to"} ${s.title}`}
         rows={1}
         maxLength={4000}
         value={text}

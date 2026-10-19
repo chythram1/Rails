@@ -221,14 +221,20 @@ export interface Suggestion {
   /** The session's title when it was suggested. */
   title: string;
   sessionId?: string;
-  /** "reply": text Rails sends into the session; "answer": the option to pick in a dialog, in the panel. */
-  mode: "reply" | "answer";
+  /**
+   * "reply": an answer to a question the session ended its turn with, which Rails sends into it; "answer": the
+   * option to pick in a dialog, in the panel; "message": something the user asked the Coordinator to pass on,
+   * which Rails sends now or, if the session is busy, into its own queue for after its current turn.
+   */
+  mode: "reply" | "answer" | "message";
   text: string;
   /** The rule it followed, as it read then; none when it used its own judgment. */
   rule?: string;
   status: "pending" | "sending" | "sent" | "failed" | "dismissed" | "expired";
   /** Why it failed, or why it can't be sent anymore. */
   error?: string;
+  /** Sent while the session was busy: it's in the session's own queue, for after its current turn. */
+  queued?: boolean;
   createdAt: string;
   /** When its status last changed (sent, dismissed, expired). */
   updatedAt: string;

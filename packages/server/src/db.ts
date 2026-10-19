@@ -96,6 +96,8 @@ db.exec(`
 `);
 /** On a suggestion: the rule it followed (ADR 0011). */
 addColumn("suggestions", "rule", "TEXT");
+/** On a sent suggestion: 1 if it went into the session's own queue (it was busy). */
+addColumn("suggestions", "queued", "INTEGER NOT NULL DEFAULT 0");
 
 type Row = { id: string; name: string; path: string; created_at: string };
 const toProject = (r: Row): Project => ({ id: r.id, name: r.name, path: r.path, createdAt: r.created_at });
@@ -373,6 +375,7 @@ type SuggestionRow = {
   mode: Suggestion["mode"];
   text: string;
   rule: string | null;
+  queued: number;
   status: Suggestion["status"];
   error: string | null;
   created_at: string;
@@ -391,6 +394,7 @@ const toSuggestion = (r: SuggestionRow): Suggestion & { sprocketId: string; mess
   ...(r.rule ? { rule: r.rule } : {}),
   status: r.status,
   ...(r.error ? { error: r.error } : {}),
+  ...(r.queued ? { queued: true } : {}),
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -436,11 +440,11 @@ export const suggestions = {
     for (const id of ids) db.prepare("DELETE FROM suggestions WHERE id = ? AND message_id IS NULL").run(id);
   },
   /** Change the status if it's one of `from`. False when it wasn't (someone else changed it first). */
-  setStatus(id: string, from: Suggestion["status"][], to: Suggestion["status"], extra: { error?: string; text?: string } = {}): boolean {
+  setStatus(id: string, from: Suggestion["status"][], to: Suggestion["status"], extra: { error?: string; text?: string; queued?: boolean } = {}): boolean {
     const marks = from.map(() => "?").join(", ");
     const r = db
-      .prepare(`UPDATE suggestions SET status = ?, error = ?, text = COALESCE(?, text), updated_at = ? WHERE id = ? AND status IN (${marks})`)
-      .run(to, extra.error ?? null, extra.text ?? null, new Date().toISOString(), id, ...from);
+      .prepare(`UPDATE suggestions SET status = ?, error = ?, text = COALESCE(?, text), queued = ?, updated_at = ? WHERE id = ? AND status IN (${marks})`)
+      .run(to, extra.error ?? null, extra.text ?? null, extra.queued ? 1 : 0, new Date().toISOString(), id, ...from);
     return r.changes > 0;
   },
 };

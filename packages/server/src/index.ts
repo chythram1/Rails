@@ -88,8 +88,8 @@ app.get("/bridge/:panelId/pi/inbox", async (c) => {
 app.post("/bridge/:panelId/pi/delivered", async (c) => {
   const panelId = c.req.param("panelId");
   if (!fromPanel(c, panelId)) return c.json({ error: "Unauthorized" }, 401);
-  const body = await c.req.json<{ id?: unknown; ok?: unknown }>().catch(() => ({}) as { id?: unknown; ok?: unknown });
-  piInbox.ack(panelId, body.id, body.ok);
+  const body = await c.req.json<{ id?: unknown; ok?: unknown; queued?: unknown }>().catch(() => ({}) as { id?: unknown; ok?: unknown; queued?: unknown });
+  piInbox.ack(panelId, body.id, body.ok, body.queued);
   return c.json({});
 });
 app.post("/bridge/:panelId/:source/:event", bodyLimit({ maxSize: BRIDGE_BODY_LIMIT, onError: (c) => c.json({}, 413) }), async (c) => {
