@@ -5,8 +5,10 @@
 // cancel_handoff (ADR 0015) set up a message for later: when one session finishes, for another.
 import { HANDOFF_NOTE_MAX } from "@rails/shared";
 import { Type } from "@earendil-works/pi-ai";
-import { handoffs, sprockets, type StoredHandoff } from "../db.ts";
+import { cardOf } from "../bridge/index.ts";
+import { handoffs, panels, sprockets, type StoredHandoff } from "../db.ts";
 import { completeHandoff, dropHandoff, findHandoff, HANDOFF_TTL_MS, planHandoff } from "../handoffs.ts";
+import { MAX_OWNED, setOwner } from "../owners.ts";
 import { MAX_PENDING_MESSAGES, suggest, SUGGESTION_MAX, type Purpose } from "../suggestions.ts";
 import type { Capability, RunContext } from "./capabilities.ts";
 import { findOpen, session } from "./project.ts";
@@ -27,10 +29,14 @@ export function replyCapabilities(rules: string[], made: (id: string) => void): 
   /** Draft a suggestion; with `handoff`, the message that carries it out (ADR 0015). */
   const draft = async (ctx: RunContext, name: string, sessionArg: string, text: string, opts: { rule?: string; purpose: Purpose }, handoff?: StoredHandoff) => {
     const found = await findOpen(coordinating(ctx, name), sessionArg);
+    // A handoff's message carries what the finished session said last, word for word.
+    const from = handoff && panels.get(handoff.from.panelId);
+    const said = from && cardOf(from).lastOutcome;
+    const attachment = handoff && said ? { title: handoff.from.title, text: said } : undefined;
     // Nothing waits from here on, so a handoff the user cancels while the session was looked up gets no draft.
     if (handoff && !handoffs.pending(ctx.sprocketId).some((x) => x.id === handoff.id))
       throw new Error("That handoff isn't waiting anymore: your user cancelled it, or it ended. Don't draft its message.");
-    const s = suggest(ctx.sprocketId, found, found.title, text, opts);
+    const s = suggest(ctx.sprocketId, found, found.title, text, { ...opts, attachment });
     if (handoff) completeHandoff(handoff);
     made(s.id);
     return { s, title: found.title };
@@ -61,7 +67,7 @@ export function replyCapabilities(rules: string[], made: (id: string) => void): 
     },
     {
       name: "suggest_message",
-      description: `Draft a message for a session in your project: something your user asked you to pass on ("tell it to stop and summarize"), or a heads-up when Rails tells you two sessions changed the same files. Your user sees it under your message and sends it, edits it or dismisses it: nothing reaches the session until they do. A session that's busy or waiting on a question gets it after its current turn, in its own queue. Write it as your user would, in the first person (at most ${SUGGESTION_MAX} characters). For answering a question a session asked, use suggest_reply. Messages don't replace each other: one session can have up to ${MAX_PENDING_MESSAGES} of yours waiting, so draft a new one only for something new. Resolves to what happens next.`,
+      description: `Draft a message for a session in your project: something your user asked you to pass on ("tell it to stop and summarize"), or a heads-up when Rails tells you two sessions changed the same files. Your user sees it under your message and sends it, edits it or dismisses it: nothing reaches the session until they do. A session that's busy or waiting on a question gets it after its current turn, in its own queue. Write it as your user would, in the first person (at most ${SUGGESTION_MAX} characters). For answering a question a session asked, use suggest_reply. With \`handoff\`, it carries out that handoff and goes to the session the handoff is for, and Rails attaches what the finished session said last, word for word: don't repeat or summarize it, say what to do with it. Messages don't replace each other: one session can have up to ${MAX_PENDING_MESSAGES} of yours waiting, so draft a new one only for something new. Resolves to what happens next.`,
       params: Type.Object({
         session,
         message: Type.String({ description: "The message, as your user would write it." }),
@@ -94,6 +100,22 @@ export function replyCapabilities(rules: string[], made: (id: string) => void): 
         const [from, to] = await Promise.all([findOpen(project, args.from), findOpen(project, args.to)]);
         const h = planHandoff(ctx.sprocketId, { panel: from, title: from.title }, { panel: to, title: to.title }, args.note);
         return `Planned (id ${h.id.slice(0, 8)}). Rails wakes you when "${from.title}" finishes a turn. Tell your user in a sentence; they see it in your panel.`;
+      },
+    },
+    {
+      name: "set_owner",
+      description: `Record which files or folders a session owns, when your user tells you ("Claude owns src/engine and index.html"). Paths are relative to the project (at most ${MAX_OWNED}); this replaces what that session owned, and an empty list clears it. Owners are listed in your instructions: send your user's requests about those files to their owner, and Rails wakes you when another session changes them. Your user sees owners in your panel.`,
+      params: Type.Object({
+        session,
+        paths: Type.Array(Type.String(), { description: "Files or folders, relative to the project, e.g. src/engine." }),
+      }),
+      effect: "act",
+      log: { doing: () => "Recording owners", done: (calls) => (calls.length > 1 ? `recorded ${calls.length} owners` : "recorded an owner") },
+      run: async (args, ctx) => {
+        const project = coordinating(ctx, "set_owner");
+        const found = await findOpen(project, args.session);
+        const paths = setOwner(project, found, args.paths);
+        return paths.length ? `Recorded: "${found.title}" owns ${paths.join(", ")}.` : `"${found.title}" owns nothing now.`;
       },
     },
     {

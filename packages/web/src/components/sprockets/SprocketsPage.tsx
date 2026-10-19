@@ -134,7 +134,6 @@ function SprocketRow({ sprocket: s, active }: { sprocket: SprocketData; active: 
       <span className="sp-row-text">
         <span className="sp-row-top">
           <span className="sp-row-name truncate">{s.name}</span>
-          {s.coordinator && <span className="sp-row-role">Coordinator</span>}
           <span className="muted small session-time">{timeAgo(lastActive(s))}</span>
         </span>
         <span className="sp-row-bottom">

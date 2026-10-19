@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconCheck as Check } from "@tabler/icons-react";
+import { IconCheck as Check, IconChevronRight as ChevronRight } from "@tabler/icons-react";
 import { sessionKey, type Suggestion } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href } from "../../router.ts";
@@ -12,8 +12,21 @@ import { useAutoGrow } from "../useAutoGrow.ts";
  * its question (with the standing rule it followed, if any, ADR 0011) or a message the user asked it to pass
  * on. The user edits it and sends it, or dismisses it; nothing reaches the session until they send it. A
  * dialog's answer is picked in the panel, so that card links there instead. Once it's sent (or queued in a
- * busy session), dismissed or out of date, a muted line says so.
+ * busy session), dismissed or out of date, a muted line says so. A handoff's message also carries what the
+ * finished session said last (ADR 0015), sent as it is under the text: collapsed, to read if you want.
  */
+function Attachment({ attachment }: { attachment: NonNullable<Suggestion["attachment"]> }) {
+  return (
+    <details className="sp-attachment">
+      <summary className="sp-attachment-summary">
+        <ChevronRight size={14} className="sp-attachment-chevron" aria-hidden />
+        <span className="truncate">Includes what {shortTitle(attachment.title)} said when it finished</span>
+      </summary>
+      <div className="sp-attachment-text">{attachment.text}</div>
+    </details>
+  );
+}
+
 export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Suggestion; projectId?: string }) {
   const [text, setText] = useState(s.text);
   const [busy, setBusy] = useState(false);
@@ -43,6 +56,7 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
           {s.queued && <span className="sp-suggestion-label">· after its current turn</span>}
         </p>
         <blockquote className="sp-event-quote">{s.text}</blockquote>
+        {s.attachment && <Attachment attachment={s.attachment} />}
       </div>
     );
   // A newer suggestion for the same session sits further down: this one would only be noise.
@@ -106,6 +120,7 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
           }
         }}
       />
+      {s.attachment && <Attachment attachment={s.attachment} />}
       {rule}
       {problem && <p className="error small" role="alert">{problem}</p>}
       <div className="sp-suggestion-actions">

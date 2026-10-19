@@ -14,7 +14,7 @@ import type { Panel } from "@rails/shared";
 import { CODEX_HOME } from "../config.ts";
 import { panels } from "../db.ts";
 import { fromCodex } from "./events.ts";
-import { record } from "./index.ts";
+import { noteShell, record } from "./index.ts";
 
 const SOCKET = join(CODEX_HOME, "app-server-control", "app-server-control.sock");
 /** A new panel's thread starts within this long, or the panel stays unmapped. */
@@ -76,6 +76,7 @@ export class CodexWatcher {
     const panel = panels.bySession(threadId);
     if (!panel || panel.kind !== "codex") return; // the user's own Codex sessions outside Rails
     if (!this.subscribed.has(threadId)) this.subscribe(threadId);
+    noteShell(panel.id, "codex", msg.method, params);
     record(panel.id, fromCodex(msg.method, params), threadId);
   }
 

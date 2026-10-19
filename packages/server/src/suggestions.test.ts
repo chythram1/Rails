@@ -35,7 +35,7 @@ afterAll(() => server.close());
 function setup() {
   const project = projects.create("app", `/work/sugg-${Math.random()}`);
   const lead = createSprocket({ name: "Lead", look });
-  updateSettings(lead.id, { projectId: project.id, coordinator: true });
+  updateSettings(lead.id, { projectId: project.id });
   const sessionId = `c-${Math.random()}`;
   const panel = panels.create({ projectId: project.id, kind: "claude", title: "Fix sidebar", sessionId });
   receive(panel.id, "claude", "SessionStart", { session_id: sessionId }, { inbox });
@@ -152,18 +152,16 @@ describe("suggested replies", () => {
     ]);
   });
 
-  it("only lets the project's Coordinator suggest", async () => {
-    const { project, lead, panel } = setup();
+  it("only lets the project's own Sprocket suggest", async () => {
+    const { project, lead } = setup();
     const helper = createSprocket({ name: "Helper", look });
-    updateSettings(helper.id, { projectId: project.id });
-    const code = `return await tools.suggest_reply({ session: ${JSON.stringify(panel.id.slice(0, 8))}, reply: "Yes." })`;
-    faux.setResponses([fauxAssistantMessage([fauxToolCall("codemode", { code })], { stopReason: "toolUse" }), fauxAssistantMessage("I can't.")]);
+    expect(() => updateSettings(helper.id, { projectId: project.id })).toThrow("Lead already looks after app. Detach it first.");
+    // Unattached, it has no project and no capabilities to suggest with.
+    faux.setResponses([fauxAssistantMessage("I'm not attached to a project.")]);
     sendMessage(helper.id, "tell it yes");
     await idle();
     expect(listMessages(helper.id).at(-1)!.suggestions).toBeUndefined();
-    // The role is checked when the capability runs: a Coordinator that lost it mid-run can't suggest either.
-    updateSettings(lead.id, { coordinator: false });
-    expect(listMessages(lead.id)).toEqual([]);
+    expect(listSprockets().find((s) => s.id === lead.id)!.coordinator).toBe(true);
   });
 
   it("drops suggestions from a run that saved no reply", async () => {
@@ -303,6 +301,18 @@ describe("delivery", () => {
     expect(m.queue).toBe(true);
     box.ack("p1", m.id, true, true);
     await expect(sent).resolves.toEqual({ queued: true });
+  });
+
+  it("takes back a message pi put in its editor when its run was stopped", () => {
+    const { lead, project } = setup();
+    const pi = panels.create({ projectId: project.id, kind: "pi", title: "Notes" });
+    receive(pi.id, "pi", "prompt", { text: "go" }); // busy
+    const s = suggest(lead.id, pi, "Notes", "Stop and summarize.", { purpose: "message" });
+    suggestions.setStatus(s.id, ["pending"], "sent", { queued: true }); // it went into pi's queue
+    receive(pi.id, "pi", "returned", { text: "Something else." });
+    expect(suggestions.get(s.id)!.status).toBe("sent");
+    receive(pi.id, "pi", "returned", { text: "Stop and summarize." }); // Escape: back in pi's editor
+    expect(suggestions.get(s.id)).toMatchObject({ status: "expired", error: "pi put it back in its input box when its turn was stopped. Send it from there." });
   });
 
   it("fails a pi reply the extension turned down (pi was busy) or never confirmed", async () => {

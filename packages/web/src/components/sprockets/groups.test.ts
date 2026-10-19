@@ -4,7 +4,7 @@ import { groupSprockets } from "./groups.ts";
 
 const look = { character: "cog", color: "green", accessory: "none" } as const;
 const sp = (id: string, projectId: string | undefined, at: string, coordinator = false): Sprocket => ({
-  id, name: id, look, createdAt: at, projectId, description: "", coordinator, rules: [], pending: [], handoffs: [], running: false,
+  id, name: id, look, createdAt: at, projectId, description: "", coordinator, rules: [], pending: [], handoffs: [], owners: [], usage: { runs: 0, tokens: 0, cost: 0 }, running: false,
 });
 const projects: Project[] = [
   { id: "a", name: "app", path: "/a", createdAt: "" },

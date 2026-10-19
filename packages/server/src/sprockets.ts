@@ -16,9 +16,10 @@ import {
   type SprocketMessage,
   type SprocketSettings,
 } from "@rails/shared";
-import { handoffs, projects, sprocketMessages, sprockets, suggestions } from "./db.ts";
+import { handoffs, projects, sprocketMessages, sprockets, suggestions, usage } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { settleHandoffs } from "./handoffs.ts";
+import { projectOwners } from "./owners.ts";
 import { findModel } from "./models.ts";
 import { isRunning, onRunsChanged, requestReply, userMessageTime } from "./runs.ts";
 import { onSuggestionsChanged } from "./suggestions.ts";
@@ -69,6 +70,8 @@ function withLook({ coreMemory: _internal, ...row }: ReturnType<typeof sprockets
     look: repairLook(row.look),
     pending: suggestions.pendingPanels(row.id),
     handoffs: row.coordinator ? handoffs.pending(row.id).map(({ sprocketId: _s, ...h }) => h) : [],
+    owners: row.projectId ? projectOwners(row.projectId) : [],
+    usage: usage.total(row.id),
     running: isRunning(row.id),
     lastMessage: sprocketMessages.last(row.id),
   };
@@ -133,16 +136,19 @@ export function postEvent(sprocketId: string, event: SprocketEvent, text: string
 }
 
 /**
- * Change a Sprocket's project, model, description or role. Every field is checked before any is applied,
- * so a rejected request changes nothing (moving a Sprocket deletes its chat). Moving it also ends its role
- * as Coordinator, unless the same request asks for it in the new project.
+ * Change a Sprocket's project, model, description or rules. Every field is checked before any is applied,
+ * so a rejected request changes nothing (moving a Sprocket deletes its chat). A project has one Sprocket, its
+ * Coordinator (ADR 0016): attaching makes it that, and a project that has one already is taken.
  */
 export function updateSettings(id: string, body: SprocketSettings | undefined): Sprocket {
   const s = getSprocket(id);
-  const { projectId, model, description, coordinator, rules } = body ?? {};
+  const { projectId, model, description, rules } = body ?? {};
   const moving = projectId !== undefined && (projectId ?? undefined) !== s.projectId;
   if (moving) {
-    if (projectId !== null && (typeof projectId !== "string" || !projects.get(projectId))) throw new ServiceError("Unknown project", 400);
+    const to = projectId === null ? undefined : typeof projectId === "string" ? projects.get(projectId) : undefined;
+    if (projectId !== null && !to) throw new ServiceError("Unknown project", 400);
+    const holder = to && sprockets.byProject(to.id)[0];
+    if (holder) throw new ServiceError(`${holder.name} already looks after ${to.name}. Detach it first.`, 409);
     if (isRunning(id)) throw new ServiceError(`${s.name} is replying. Try again when it's done.`, 409);
   }
   if (model !== undefined && model !== null && (typeof model !== "string" || !findModel(model))) throw new ServiceError("Unknown model", 400);
@@ -152,17 +158,12 @@ export function updateSettings(id: string, body: SprocketSettings | undefined): 
       throw new ServiceError(`Descriptions can be at most ${SPROCKET_DESCRIPTION_MAX} characters.`, 400);
   }
   const ruleList = rules === undefined ? undefined : parseRules(rules);
-  if (coordinator !== undefined) {
-    if (typeof coordinator !== "boolean") throw new ServiceError("coordinator must be true or false", 400);
-    if (coordinator && !(moving ? projectId : s.projectId)) throw new ServiceError("Attach it to a project first.", 400);
-  }
 
   if (moving) sprockets.setProject(id, projectId ?? null);
   if (model !== undefined) sprockets.setModel(id, model);
   if (description !== undefined) sprockets.setDescription(id, description.trim());
-  if (coordinator !== undefined) sprockets.setCoordinator(id, coordinator);
   if (ruleList) sprockets.setRules(id, ruleList);
-  if (moving || coordinator !== undefined) settleHandoffs(); // it, or the Coordinator it took over from, may have lost the role
+  if (moving) settleHandoffs(); // its handoffs belong to the project it left
   changed();
   return getSprocket(id);
 }

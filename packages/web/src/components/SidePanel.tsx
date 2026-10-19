@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { IconArrowUpRight as ArrowUpRight, IconX as X } from "@tabler/icons-react";
 import type { Sprocket as SprocketData } from "@rails/shared";
 import { href } from "../router.ts";
@@ -19,12 +18,12 @@ export function SidePanel(props: {
   onView(view: SideView): void;
   projectId: string;
   projectName: string;
-  sprockets: SprocketData[];
+  sprocket?: SprocketData;
   refreshKey: string;
   onClose(): void;
 }) {
-  const { view, onView, projectId, projectName, sprockets, onClose } = props;
-  const waiting = sprockets.reduce((n, s) => n + s.pending.length, 0);
+  const { view, onView, projectId, projectName, sprocket, onClose } = props;
+  const waiting = sprocket?.pending.length ?? 0;
   const tab = (id: SideView, label: string, dot = false) => (
     <button
       type="button"
@@ -53,26 +52,19 @@ export function SidePanel(props: {
         </button>
       </header>
       <div id="side-view" className="side-view" role="tabpanel" aria-labelledby={`side-tab-${view}`}>
-        {view === "git" ? <GitPanel projectId={projectId} refreshKey={props.refreshKey} /> : <SprocketsView projectName={projectName} sprockets={sprockets} />}
+        {view === "git" ? <GitPanel projectId={projectId} refreshKey={props.refreshKey} /> : <SprocketView projectName={projectName} sprocket={sprocket} />}
       </div>
     </aside>
   );
 }
 
-/**
- * The project's Sprockets as a row of tabs (its Coordinator first) over the chosen one's chat. It starts on
- * one with a reply waiting, else the Coordinator.
- */
-function SprocketsView({ projectName, sprockets }: { projectName: string; sprockets: SprocketData[] }) {
-  const [chosen, setChosen] = useState<string>();
-  const current =
-    sprockets.find((s) => s.id === chosen) ?? sprockets.find((s) => s.pending.length) ?? sprockets.find((s) => s.coordinator) ?? sprockets[0];
-
-  if (!current)
+/** The project's Sprocket (it has one, ADR 0016): its name over its chat, or how to get one. */
+function SprocketView({ projectName, sprocket }: { projectName: string; sprocket?: SprocketData }) {
+  if (!sprocket)
     return (
       <div className="side-empty">
-        <p>No Sprockets in {projectName} yet.</p>
-        <p className="muted small">Attach one to this project, and make it its Coordinator: it tells you when a session waits for you and drafts your reply.</p>
+        <p>No Sprocket looks after {projectName} yet.</p>
+        <p className="muted small">Attach one to this project: it tells you when a session waits for you, passes things on between sessions and watches for clashes.</p>
         <a className="btn small" href={href.sprockets()}>Go to Sprockets</a>
       </div>
     );
@@ -80,33 +72,20 @@ function SprocketsView({ projectName, sprockets }: { projectName: string; sprock
   return (
     <>
       <div className="side-bar">
-        <div className="side-tabs" role="tablist" aria-label={`Sprockets in ${projectName}`} onKeyDown={onTabKeys}>
-          {sprockets.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              role="tab"
-              aria-selected={s.id === current.id}
-              tabIndex={s.id === current.id ? 0 : -1}
-              className="side-tab"
-              title={s.coordinator ? `${s.name}, Coordinator of ${projectName}` : s.name}
-              onClick={() => setChosen(s.id)}
-            >
-              <Sprocket look={s.look} size={20} seed={s.id} />
-              <span className="truncate">{s.name}</span>
-              {s.pending.length > 0 && (
-                <span className="tab-attention" role="img" aria-label={s.pending.length > 1 ? `${s.pending.length} replies waiting` : "1 reply waiting"} />
-              )}
-            </button>
-          ))}
-        </div>
-        <a className="icon-btn" href={href.sprocket(current.id)} aria-label={`Open ${current.name} in Sprockets`} title="Open in Sprockets">
+        <p className="side-sprocket">
+          <Sprocket look={sprocket.look} size={20} seed={sprocket.id} />
+          <span className="truncate">{sprocket.name}</span>
+          {sprocket.pending.length > 0 && (
+            <span className="tab-attention" role="img" aria-label={sprocket.pending.length > 1 ? `${sprocket.pending.length} replies waiting` : "1 reply waiting"} />
+          )}
+        </p>
+        <a className="icon-btn" href={href.sprocket(sprocket.id)} aria-label={`Open ${sprocket.name} in Sprockets`} title="Open in Sprockets">
           <ArrowUpRight size={16} />
         </a>
       </div>
       {/* A fresh chat per Sprocket, as on the Sprockets page. */}
-      <div key={current.id} className="side-chat">
-        <SprocketChat sprocket={current} panelOpen={false} embedded />
+      <div key={sprocket.id} className="side-chat">
+        <SprocketChat sprocket={sprocket} panelOpen={false} embedded />
       </div>
     </>
   );

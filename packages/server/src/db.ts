@@ -63,6 +63,15 @@ addColumn("sprockets", "codemode_store", "TEXT NOT NULL DEFAULT '{}'");
 addColumn("sprockets", "coordinator", "INTEGER NOT NULL DEFAULT 0");
 /** Its standing rules (ADR 0011), as a JSON array of sentences. */
 addColumn("sprockets", "rules", "TEXT NOT NULL DEFAULT '[]'");
+// One Sprocket per project (ADR 0016), which is its Coordinator. Where a project still has several, its Coordinator
+// (or else the oldest) keeps it; the others are detached and keep their chats, so nothing is lost.
+db.exec(`
+  UPDATE sprockets SET project_id = NULL, coordinator = 0, codemode_store = '{}'
+    WHERE project_id IS NOT NULL AND id != (
+      SELECT s2.id FROM sprockets s2 WHERE s2.project_id = sprockets.project_id ORDER BY s2.coordinator DESC, s2.created_at, s2.id LIMIT 1);
+  UPDATE sprockets SET coordinator = (project_id IS NOT NULL);
+  CREATE UNIQUE INDEX IF NOT EXISTS sprockets_one_per_project ON sprockets (project_id) WHERE project_id IS NOT NULL;
+`);
 addColumn("sprocket_messages", "author", "TEXT NOT NULL DEFAULT 'user'");
 addColumn("sprocket_messages", "activity", "TEXT");
 /** On a reply: the run's tool calls and results (pi-ai messages, JSON), replayed to later runs. Never sent to browsers. */
@@ -103,6 +112,8 @@ db.exec(`
 addColumn("suggestions", "rule", "TEXT");
 /** On a sent suggestion: 1 if it went into the session's own queue (it was busy). */
 addColumn("suggestions", "queued", "INTEGER NOT NULL DEFAULT 0");
+/** On a handoff's message: what the finished session said last, as JSON {title, text} (ADR 0015). */
+addColumn("suggestions", "attachment", "TEXT");
 db.exec(`
   -- Shadow judgments of the fast decision model (ADR 0012). Kept to the latest few hundred.
   CREATE TABLE IF NOT EXISTS decisions (
@@ -140,6 +151,23 @@ db.exec(`
     updated_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS handoffs_pending ON handoffs (status, sprocket_id);
+  -- Which files or folders each session owns (ADR 0016), relative to its project.
+  CREATE TABLE IF NOT EXISTS owners (
+    panel_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    path TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (panel_id, path)
+  );
+  CREATE INDEX IF NOT EXISTS owners_by_project ON owners (project_id);
+  -- What each Sprocket run used (tokens, and cost when the provider reports it), quiet runs included.
+  CREATE TABLE IF NOT EXISTS sprocket_usage (
+    sprocket_id TEXT NOT NULL,
+    at TEXT NOT NULL,
+    tokens INTEGER NOT NULL,
+    cost REAL NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS sprocket_usage_by_sprocket ON sprocket_usage (sprocket_id);
 `);
 /** On a judgment: 1 when it woke the Coordinator itself (ADR 0013). */
 addColumn("decisions", "acted", "INTEGER NOT NULL DEFAULT 0");
@@ -268,7 +296,7 @@ type SprocketRow = {
   rules: string;
 };
 /** A stored Sprocket, with its internal core memory (never sent to browsers). */
-const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running" | "pending" | "handoffs"> & { look: unknown; coreMemory: string } => ({
+const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running" | "pending" | "handoffs" | "owners" | "usage"> & { look: unknown; coreMemory: string } => ({
   id: r.id,
   name: r.name,
   look: JSON.parse(r.look),
@@ -300,23 +328,14 @@ export const sprockets = {
   byProject(projectId: string) {
     return (db.prepare("SELECT * FROM sprockets WHERE project_id = ? ORDER BY created_at").all(projectId) as SprocketRow[]).map(toSprocket);
   },
-  /** Move to another project (or none). Its chat and its role belong to the old attachment, so they go too. */
+  /**
+   * Move to another project (or none). Its chat belongs to the old attachment, so it goes. Attached, it's the
+   * project's Coordinator (ADR 0016); the unique index keeps it to one per project.
+   */
   setProject(id: string, projectId: string | null): void {
     db.prepare("DELETE FROM sprocket_messages WHERE sprocket_id = ?").run(id);
     db.prepare("DELETE FROM suggestions WHERE sprocket_id = ?").run(id);
-    db.prepare("UPDATE sprockets SET project_id = ?, codemode_store = '{}', coordinator = 0 WHERE id = ?").run(projectId, id);
-  },
-  /** Make a Sprocket its project's Coordinator, taking over from any other, or stop. */
-  setCoordinator(id: string, on: boolean): void {
-    db.exec("BEGIN");
-    try {
-      if (on) db.prepare("UPDATE sprockets SET coordinator = 0 WHERE project_id = (SELECT project_id FROM sprockets WHERE id = ?)").run(id);
-      db.prepare("UPDATE sprockets SET coordinator = ? WHERE id = ? AND project_id IS NOT NULL").run(on ? 1 : 0, id);
-      db.exec("COMMIT");
-    } catch (e) {
-      db.exec("ROLLBACK");
-      throw e;
-    }
+    db.prepare("UPDATE sprockets SET project_id = ?, codemode_store = '{}', coordinator = ? WHERE id = ?").run(projectId, projectId ? 1 : 0, id);
   },
   coordinatorOf(projectId: string) {
     const r = db.prepare("SELECT * FROM sprockets WHERE project_id = ? AND coordinator = 1").get(projectId) as SprocketRow | undefined;
@@ -347,6 +366,7 @@ export const sprockets = {
   remove(id: string): void {
     db.prepare("DELETE FROM sprocket_messages WHERE sprocket_id = ?").run(id);
     db.prepare("DELETE FROM suggestions WHERE sprocket_id = ?").run(id);
+    db.prepare("DELETE FROM sprocket_usage WHERE sprocket_id = ?").run(id);
     db.prepare("DELETE FROM sprockets WHERE id = ?").run(id);
   },
 };
@@ -420,6 +440,7 @@ type SuggestionRow = {
   mode: Suggestion["mode"];
   text: string;
   rule: string | null;
+  attachment: string | null;
   queued: number;
   status: Suggestion["status"];
   error: string | null;
@@ -437,6 +458,7 @@ const toSuggestion = (r: SuggestionRow): Suggestion & { sprocketId: string; mess
   mode: r.mode,
   text: r.text,
   ...(r.rule ? { rule: r.rule } : {}),
+  ...(r.attachment ? { attachment: JSON.parse(r.attachment) as NonNullable<Suggestion["attachment"]> } : {}),
   status: r.status,
   ...(r.error ? { error: r.error } : {}),
   ...(r.queued ? { queued: true } : {}),
@@ -445,12 +467,22 @@ const toSuggestion = (r: SuggestionRow): Suggestion & { sprocketId: string; mess
 });
 
 export const suggestions = {
-  create(s: { sprocketId: string; panelId: string; kind: PanelKind; title: string; sessionId?: string; mode: Suggestion["mode"]; text: string; rule?: string }) {
+  create(s: {
+    sprocketId: string;
+    panelId: string;
+    kind: PanelKind;
+    title: string;
+    sessionId?: string;
+    mode: Suggestion["mode"];
+    text: string;
+    rule?: string;
+    attachment?: Suggestion["attachment"];
+  }) {
     const id = randomUUID();
     const now = new Date().toISOString();
     db.prepare(
-      "INSERT INTO suggestions (id, sprocket_id, panel_id, kind, title, session_id, mode, text, rule, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
-    ).run(id, s.sprocketId, s.panelId, s.kind, s.title, s.sessionId ?? null, s.mode, s.text, s.rule ?? null, now, now);
+      "INSERT INTO suggestions (id, sprocket_id, panel_id, kind, title, session_id, mode, text, rule, attachment, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+    ).run(id, s.sprocketId, s.panelId, s.kind, s.title, s.sessionId ?? null, s.mode, s.text, s.rule ?? null, s.attachment ? JSON.stringify(s.attachment) : null, now, now);
     return this.get(id)!;
   },
   get(id: string) {
@@ -475,6 +507,13 @@ export const suggestions = {
   /** Pending ones for a panel (from any Sprocket). */
   pendingFor(panelId: string) {
     return (db.prepare("SELECT * FROM suggestions WHERE panel_id = ? AND status = 'pending'").all(panelId) as SuggestionRow[]).map(toSuggestion);
+  },
+  /** Sent to a panel in the last hour, newest first. */
+  sentTo(panelId: string) {
+    const since = new Date(Date.now() - 3_600_000).toISOString();
+    return (db.prepare("SELECT * FROM suggestions WHERE panel_id = ? AND status = 'sent' AND updated_at >= ? ORDER BY updated_at DESC").all(panelId, since) as SuggestionRow[]).map(
+      toSuggestion,
+    );
   },
   /** Show a run's suggestions under the reply it saved. */
   attach(ids: string[], messageId: string): void {
@@ -650,5 +689,46 @@ export const handoffs = {
   /** End a pending one. False when it wasn't pending (someone else ended it first). */
   end(id: string, status: "done" | "cancelled" | "expired"): boolean {
     return db.prepare("UPDATE handoffs SET status = ?, updated_at = ? WHERE id = ? AND status = 'pending'").run(status, new Date().toISOString(), id).changes > 0;
+  },
+};
+
+/** Which files or folders sessions own (ADR 0016). */
+export const owners = {
+  list(projectId: string): { panelId: string; path: string }[] {
+    return (db.prepare("SELECT panel_id, path FROM owners WHERE project_id = ? ORDER BY created_at, rowid").all(projectId) as { panel_id: string; path: string }[]).map(
+      (r) => ({ panelId: r.panel_id, path: r.path }),
+    );
+  },
+  /** Replace what a panel owns. */
+  set(projectId: string, panelId: string, paths: string[]): void {
+    const now = new Date().toISOString();
+    db.exec("BEGIN");
+    try {
+      db.prepare("DELETE FROM owners WHERE panel_id = ?").run(panelId);
+      for (const p of paths) db.prepare("INSERT INTO owners (panel_id, project_id, path, created_at) VALUES (?, ?, ?, ?)").run(panelId, projectId, p, now);
+      db.exec("COMMIT");
+    } catch (e) {
+      db.exec("ROLLBACK");
+      throw e;
+    }
+  },
+  /** True when it owned anything. */
+  clear(panelId: string): boolean {
+    return db.prepare("DELETE FROM owners WHERE panel_id = ?").run(panelId).changes > 0;
+  },
+};
+
+/** What Sprocket runs used. */
+export const usage = {
+  add(sprocketId: string, tokens: number, cost: number): void {
+    db.prepare("INSERT INTO sprocket_usage (sprocket_id, at, tokens, cost) VALUES (?, ?, ?, ?)").run(sprocketId, new Date().toISOString(), tokens, cost);
+  },
+  total(sprocketId: string): { runs: number; tokens: number; cost: number } {
+    const r = db.prepare("SELECT count(*) AS runs, coalesce(sum(tokens), 0) AS tokens, coalesce(sum(cost), 0) AS cost FROM sprocket_usage WHERE sprocket_id = ?").get(sprocketId) as {
+      runs: number;
+      tokens: number;
+      cost: number;
+    };
+    return { runs: Number(r.runs), tokens: Number(r.tokens), cost: Number(r.cost) };
   },
 };

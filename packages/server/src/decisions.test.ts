@@ -45,7 +45,7 @@ const asks = (p: number) => () => ({ answers: { asks_user: { type: "bool" as con
 
 function project(coordinated = true) {
   const p = projects.create("app", `/work/dec-${Math.random()}`);
-  if (coordinated) updateSettings(createSprocket({ name: "Lead", look }).id, { projectId: p.id, coordinator: true });
+  if (coordinated) updateSettings(createSprocket({ name: "Lead", look }).id, { projectId: p.id });
   return { project: p, panel: panels.create({ projectId: p.id, kind: "claude", title: "Fix sidebar" }) };
 }
 

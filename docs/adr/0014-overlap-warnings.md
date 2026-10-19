@@ -14,7 +14,8 @@ Decisions:
 - **Only edits the agents report count:** Claude Code's edit tools (PostToolUse, which fires only after a tool
   worked), pi's `edit` and `write` (the extension now reports them again when they end without an error; the call itself,
   which comes before another extension's approval, doesn't count),
-  Codex's file changes (not failed or declined ones). Files changed by shell commands aren't seen.
+  Codex's file changes (not failed or declined ones). Files changed by shell commands weren't seen at first; ADR
+  0016 adds them, and an edit to files another session owns.
 - **Both tabs show it**, in every project, with or without a Coordinator: a small amber warning that names the
   other session and the files (`panels.overlaps`). It goes when the window passes, a session ends or a panel
   closes.

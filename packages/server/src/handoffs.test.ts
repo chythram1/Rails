@@ -9,6 +9,7 @@ import { cancelHandoff, expireHandoffs, HANDOFF_TTL_MS, MAX_HANDOFFS, planHandof
 import { models, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
 import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings } from "./sprockets.ts";
+import { deliveredText } from "./suggestions.ts";
 import { startWatches } from "./watches.ts";
 
 const look = { character: "cog", color: "green", accessory: "none" } as const;
@@ -23,7 +24,7 @@ startHandoffs();
 function setup() {
   const project = projects.create("app", `/work/handoff-${Math.random()}`);
   const lead = createSprocket({ name: "Lead", look });
-  updateSettings(lead.id, { projectId: project.id, coordinator: true });
+  updateSettings(lead.id, { projectId: project.id });
   const auth = panels.create({ projectId: project.id, kind: "claude", title: "Auth", sessionId: `a-${Math.random()}` });
   const ui = panels.create({ projectId: project.id, kind: "pi", title: "UI" });
   const plan = (note = "Use the new /login endpoint.") => planHandoff(lead.id, { panel: auth, title: "Auth" }, { panel: ui, title: "UI" }, note);
@@ -89,7 +90,15 @@ describe("a handoff's session finishing", () => {
     expect(event.event).toMatchObject({ panelId: auth.id, what: "handoff", handoff: { id: h.id, to: { panelId: ui.id, kind: "pi", title: "UI" }, note: h.note } });
     expect(event.text).toBe("Done: /login now issues tokens.");
     expect(prompt).toContain(`passing handoff: \\"${h.id.slice(0, 8)}\\"`);
-    expect(reply.suggestions?.[0]).toMatchObject({ panelId: ui.id, mode: "message", text: "Auth is done: use the new /login endpoint." });
+    expect(reply.suggestions?.[0]).toMatchObject({
+      panelId: ui.id,
+      mode: "message",
+      text: "Auth is done: use the new /login endpoint.",
+      attachment: { title: "Auth", text: "Done: /login now issues tokens." }, // its own words, not a summary
+    });
+    expect(deliveredText(reply.suggestions![0].text, reply.suggestions![0].attachment)).toBe(
+      'Auth is done: use the new /login endpoint.\n\n---\nWhat "Auth" said when it finished, word for word:\n\nDone: /login now issues tokens.',
+    );
     expect(pending()).toEqual([]);
   });
 
@@ -184,31 +193,22 @@ describe("handoffs that can't happen", () => {
     expect(pending()).toEqual([]);
   });
 
-  it("end when their Sprocket stops being the Coordinator: switched off, replaced, moved or deleted", () => {
-    const { lead, plan, pending } = setup();
+  it("end when their Sprocket leaves the project: moved, detached or deleted", () => {
+    const { lead, plan } = setup();
     const project = listSprockets().find((s) => s.id === lead.id)!.projectId!;
-    const ended = () => notices(lead.id).filter((t) => t.endsWith("isn't the project's Coordinator anymore."));
 
-    plan();
-    updateSettings(lead.id, { coordinator: false });
-    expect(pending()).toEqual([]);
-    expect(ended()).toHaveLength(1);
-
-    updateSettings(lead.id, { coordinator: true });
-    plan();
-    const other = createSprocket({ name: "Other", look });
-    updateSettings(other.id, { projectId: project, coordinator: true }); // takes over
-    expect(pending()).toEqual([]);
-    expect(ended()).toHaveLength(2);
-
-    updateSettings(lead.id, { coordinator: true });
     plan();
     const elsewhere = projects.create("lib", `/work/handoff-${Math.random()}`);
-    updateSettings(lead.id, { projectId: elsewhere.id, coordinator: true }); // Coordinator there now, not here
+    updateSettings(lead.id, { projectId: elsewhere.id });
     expect(handoffs.pending(lead.id)).toEqual([]);
     expect(listMessages(lead.id)).toEqual([]); // its chat went with the move: nothing to say there
 
-    updateSettings(lead.id, { projectId: project, coordinator: true });
+    updateSettings(lead.id, { projectId: project });
+    plan();
+    updateSettings(lead.id, { projectId: null });
+    expect(handoffs.pending(lead.id)).toEqual([]);
+
+    updateSettings(lead.id, { projectId: project });
     plan();
     deleteSprocket(lead.id);
     expect(handoffs.pending(lead.id)).toEqual([]);

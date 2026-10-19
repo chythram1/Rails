@@ -7,6 +7,7 @@ import { onPanelsChanged, panelEnded } from "./panels.ts";
 import { attentionList, onAttention } from "./bridge/index.ts";
 import { onOverlaps, overlapList } from "./overlaps.ts";
 import { onHandoffsChanged } from "./handoffs.ts";
+import { onOwnersChanged } from "./owners.ts";
 import { onDecisionsChanged } from "./decisions.ts";
 import { onModelsChanged, onSignIn } from "./models.ts";
 import { getProfile, onProfileChanged } from "./profile.ts";
@@ -28,6 +29,7 @@ export class TerminalHub {
     onPanelsChanged((projectId) => this.broadcast({ type: "panels.changed", projectId }));
     onSprocketsChanged(() => this.broadcast({ type: "sprockets.changed" }));
     onHandoffsChanged(() => this.broadcast({ type: "sprockets.changed" })); // they show in the Coordinator's panel
+    onOwnersChanged(() => this.broadcast({ type: "sprockets.changed" })); // so do owners
     onTyping((sprocketId, text) => this.broadcast({ type: "sprockets.typing", sprocketId, text }));
     onActivity((sprocketId, step, summary) => this.broadcast({ type: "sprockets.activity", sprocketId, step, summary }));
     onModelsChanged(() => this.broadcast({ type: "models.changed" }));

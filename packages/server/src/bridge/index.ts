@@ -8,7 +8,7 @@ import type { AttentionReason, Panel } from "@rails/shared";
 import { PORT } from "../config.ts";
 import { panels, sessionEvents } from "../db.ts";
 import { attentionOf, foldCard, type SessionCard } from "./board.ts";
-import { fromClaude, fromPi, type SessionEvent } from "./events.ts";
+import { fromClaude, fromPi, shellCall, type SessionEvent, type ShellCall } from "./events.ts";
 import { listeners, sameSecret } from "../util.ts";
 
 /** Environment for a panel's process: where to report, and its token. */
@@ -53,6 +53,21 @@ export function record(panelId: string, events: SessionEvent[], sessionId?: stri
   recorded.emit(panel, events);
 }
 
+const returnedTexts = listeners<[panelId: string, text: string]>();
+/** pi put a message Rails had queued back in its editor, unsent (the user stopped its run). */
+export const onReturned = returnedTexts.on;
+
+const shellCalls = listeners<[panel: Panel, call: ShellCall]>();
+/** A session's shell command started or ended (shellEdits.ts finds the files it changed). */
+export const onShellCall = shellCalls.on;
+
+/** Pass on a shell command starting or ending, from any agent's report. */
+export function noteShell(panelId: string, source: string, name: string, body: unknown): void {
+  const call = shellCall(source, name, body);
+  const panel = call && panels.get(panelId);
+  if (panel) shellCalls.emit(panel, call!);
+}
+
 const forgotten = listeners<[panelId: string]>();
 /** A panel closed. */
 export const onPanelForgotten = forgotten.on;
@@ -74,6 +89,9 @@ export function loadAttention(open: Panel[]): void {
 
 /** A report from Claude Code (a hook) or pi (the extension), already checked against the panel's token. */
 export function receive(panelId: string, source: string, name: string, body: unknown, extra: { inbox?: string } = {}): void {
+  noteShell(panelId, source, name, body);
+  const returned = (body as any)?.text;
+  if (source === "pi" && name === "returned" && typeof returned === "string") returnedTexts.emit(panelId, returned);
   const events = source === "claude" ? fromClaude(name, body, extra) : source === "pi" ? fromPi(name, body) : [];
   const sessionId = (body as any)?.session_id ?? (body as any)?.sessionId;
   record(panelId, events, typeof sessionId === "string" ? sessionId : undefined);

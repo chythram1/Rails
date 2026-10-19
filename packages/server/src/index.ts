@@ -27,6 +27,8 @@ import { TerminalHub } from "./terminals.ts";
 import { startWatches } from "./watches.ts";
 import { startOverlaps } from "./overlaps.ts";
 import { cancelHandoff, startHandoffs } from "./handoffs.ts";
+import { clearOwner, startOwners } from "./owners.ts";
+import { startShellEdits } from "./shellEdits.ts";
 import { dismissSuggestion, sendSuggestion, startSuggestions } from "./suggestions.ts";
 import { decisionLog, setDecisionModel, startDecisions } from "./decisions.ts";
 import { version as tmuxVersion } from "./tmux.ts";
@@ -238,6 +240,10 @@ app.post("/api/suggestions/:id/send", async (c) => {
   return c.json(await sendSuggestion(c.req.param("id"), body.text));
 });
 app.post("/api/suggestions/:id/dismiss", (c) => c.json(dismissSuggestion(c.req.param("id"))));
+app.delete("/api/owners/:panelId", (c) => {
+  clearOwner(c.req.param("panelId"));
+  return c.json({ ok: true });
+});
 app.post("/api/handoffs/:id/cancel", (c) => {
   cancelHandoff(c.req.param("id"));
   return c.json({ ok: true });
@@ -255,6 +261,8 @@ loadAttention(panels.all());
 startWatches(); // Coordinators hear about sessions that wait for the user
 startOverlaps(); // and about sessions changing the same files; their tabs show it
 startHandoffs(); // and when a session a handoff waits for finishes
+startOwners(); // owners go with their panels
+startShellEdits(); // files shell commands change count as edits too
 startSuggestions(); // suggested replies expire as their sessions move on
 startDecisions(); // the fast decision model judges in shadow, if the user picked one
 watchCodex(panels.all()); // Codex panels that survived a restart

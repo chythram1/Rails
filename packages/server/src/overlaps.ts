@@ -5,12 +5,14 @@
 //   matters and draft a heads-up for that session, which the user sends. A session's edits within BATCH_MS
 //   go in one wake, and a pair of sessions wakes it once per file per OVERLAP_MS.
 // Only edits the agents report count (their edit tools, Codex's file changes), not files that shell commands
-// change.
+// change. An edit to files another live session owns (owners.ts, ADR 0016) wakes the Coordinator the same way,
+// marked as theirs, whether or not the owner changed them lately; tabs are marked only for real overlaps.
 import type { PanelOverlap, SprocketEvent } from "@rails/shared";
 import { OVERLAP_MS, rel, sharedFiles } from "./bridge/board.ts";
 import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
 import { panels, projects, sprockets } from "./db.ts";
 import { postEvent } from "./sprockets.ts";
+import { ownerOf } from "./owners.ts";
 import { listeners } from "./util.ts";
 import { sessionTitle } from "./titles.ts";
 
@@ -19,18 +21,18 @@ export const BATCH_MS = 15_000;
 /** Most files an event names per other session. */
 const MAX_FILES = 10;
 
-type Others = { panelId: string; files: string[] }[];
+type Others = { panelId: string; files: string[]; owns?: boolean }[];
 
 /** Overlap wakes waiting for their batch to close, per session, and which ones were already reported. */
 export class OverlapWakes {
-  private pending = new Map<string, { others: Map<string, Set<string>>; timer: ReturnType<typeof setTimeout> }>();
+  private pending = new Map<string, { others: Map<string, { files: Set<string>; owns: boolean }>; timer: ReturnType<typeof setTimeout> }>();
   /** When each pair of sessions was last reported for a file. */
   private reported = new Map<string, number>();
 
   constructor(private fire: (panelId: string, others: Others) => void) {}
 
-  /** `panelId` just changed `file`, which `otherPanelId` changed shortly before. */
-  add(panelId: string, otherPanelId: string, file: string): void {
+  /** `panelId` just changed `file`, which `otherPanelId` changed shortly before, or (`owns`) owns. */
+  add(panelId: string, otherPanelId: string, file: string, owns = false): void {
     const now = Date.now();
     const key = `${[panelId, otherPanelId].sort().join(" ")} ${file}`;
     if (now - (this.reported.get(key) ?? -Infinity) < OVERLAP_MS) return;
@@ -43,13 +45,16 @@ export class OverlapWakes {
       p = { others: new Map(), timer };
       this.pending.set(panelId, p);
     }
-    p.others.set(otherPanelId, (p.others.get(otherPanelId) ?? new Set()).add(file));
+    const o = p.others.get(otherPanelId) ?? { files: new Set<string>(), owns: false };
+    o.files.add(file);
+    o.owns ||= owns;
+    p.others.set(otherPanelId, o);
   }
 
   private flush(panelId: string) {
     const p = this.pending.get(panelId);
     this.pending.delete(panelId);
-    if (p?.others.size) this.fire(panelId, [...p.others].map(([id, files]) => ({ panelId: id, files: [...files] })));
+    if (p?.others.size) this.fire(panelId, [...p.others].map(([id, o]) => ({ panelId: id, files: [...o.files], ...(o.owns ? { owns: true } : {}) })));
   }
 
   /** The panel closed. */
@@ -112,7 +117,7 @@ async function wakeCoordinator(panelId: string, others: Others): Promise<void> {
   if (!panel || !project || !coordinator) return;
   const open = others.flatMap((o) => {
     const p = panels.get(o.panelId);
-    return p ? [{ panel: p, files: o.files.slice(0, MAX_FILES).map((f) => rel(project.path, f)) }] : [];
+    return p ? [{ panel: p, files: o.files.slice(0, MAX_FILES).map((f) => rel(project.path, f)), owns: o.owns }] : [];
   });
   if (!open.length) return;
   const [title, ...titles] = await Promise.all([sessionTitle(panel), ...open.map((o) => sessionTitle(o.panel))]);
@@ -128,9 +133,10 @@ async function wakeCoordinator(panelId: string, others: Others): Promise<void> {
       title: titles[i],
       ...(o.panel.sessionId ? { sessionId: o.panel.sessionId } : {}),
       files: o.files,
+      ...(o.owns ? { owns: true } : {}),
     })),
   };
-  const text = event.overlaps!.map((o) => `${o.files.join(", ")} (also changed by "${o.title}")`).join("\n");
+  const text = event.overlaps!.map((o) => `${o.files.join(", ")} (${o.owns ? "owned" : "also changed"} by "${o.title}")`).join("\n");
   // Still this project's Coordinator (the lookups took a moment)?
   const now = sprockets.get(coordinator.id);
   if (now?.coordinator && now.projectId === panel.projectId) postEvent(coordinator.id, event, text);
@@ -150,6 +156,14 @@ export function startOverlaps(): void {
         if (!edited.has(file) || !by.some((e) => e.panelId === panel.id)) continue;
         for (const other of by) if (other.panelId !== panel.id) wakes.add(panel.id, other.panelId, file);
       }
+      // Files another live session owns, whether or not it changed them lately.
+      const project = projects.get(panel.projectId);
+      if (project)
+        for (const file of edited) {
+          const owner = ownerOf(project.id, rel(project.path, file));
+          const ownerPanel = owner && owner !== panel.id ? panels.get(owner) : undefined;
+          if (ownerPanel && cardOf(ownerPanel).status !== "ended") wakes.add(panel.id, ownerPanel.id, file, true);
+        }
     } catch (e) {
       console.error("overlaps:", e);
     }

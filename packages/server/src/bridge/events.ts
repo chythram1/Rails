@@ -193,3 +193,29 @@ export function fromCodex(method: string, params: any): SessionEvent[] {
       return [];
   }
 }
+
+// ---- shell commands, for the files they change (shellEdits.ts, ADR 0016) ----
+
+/** A shell command starting or ending in a session, by the agent's id for that call. */
+export interface ShellCall {
+  phase: "start" | "end";
+  id: string;
+}
+
+/** Whether a report is a shell command starting or ending: Claude Code's Bash, pi's bash, Codex's commands. */
+export function shellCall(source: string, name: string, body: any): ShellCall | undefined {
+  const call = (phase: ShellCall["phase"], v: unknown) => (typeof v === "string" && v ? { phase, id: v.slice(0, 200) } : undefined);
+  if (source === "claude" && body?.tool_name === "Bash") {
+    if (name === "PreToolUse") return call("start", body.tool_use_id);
+    if (name === "PostToolUse") return call("end", body.tool_use_id);
+  }
+  if (source === "pi") {
+    if (name === "tool" && body?.tool === "bash" && body?.started) return call("start", body.id);
+    if (name === "tool_end") return call("end", body?.id);
+  }
+  if (source === "codex" && body?.item?.type === "commandExecution") {
+    if (name === "item/started") return call("start", body.item.id);
+    if (name === "item/completed") return call("end", body.item.id);
+  }
+  return undefined;
+}

@@ -192,23 +192,22 @@ describe("Coordinators", () => {
   beforeEach(() => settings.set("defaultModel", refOf(faux.getModel())));
   startWatches();
 
-  it("hands the role over within a project and loses it when moved", () => {
+  it("makes a project's one Sprocket its Coordinator (ADR 0016)", () => {
     const project = projects.create("app", `/work/coord-${Math.random()}`);
     const other = projects.create("lib", `/work/coord-${Math.random()}`);
     const a = createSprocket({ name: "A", look });
     const b = createSprocket({ name: "B", look });
-    expect(() => updateSettings(a.id, { coordinator: true })).toThrow("Attach it to a project first.");
-    updateSettings(a.id, { projectId: project.id, coordinator: true });
-    updateSettings(b.id, { projectId: project.id });
-    expect(updateSettings(b.id, { coordinator: true }).coordinator).toBe(true);
-    expect(listSprockets().find((s) => s.id === a.id)!.coordinator).toBe(false);
-    expect(updateSettings(b.id, { projectId: other.id }).coordinator).toBe(false);
+    expect(updateSettings(a.id, { projectId: project.id }).coordinator).toBe(true);
+    expect(() => updateSettings(b.id, { projectId: project.id })).toThrow("A already looks after app. Detach it first.");
+    expect(updateSettings(a.id, { projectId: other.id }).coordinator).toBe(true); // it moved, still a Coordinator
+    expect(updateSettings(b.id, { projectId: project.id }).coordinator).toBe(true); // the project is free again
+    expect(updateSettings(a.id, { projectId: null }).coordinator).toBe(false);
   });
 
   it("puts a waiting session in the Coordinator's chat and wakes it", async () => {
     const project = projects.create("app", `/work/coord-${Math.random()}`);
     const s = createSprocket({ name: "Lead", look });
-    updateSettings(s.id, { projectId: project.id, coordinator: true });
+    updateSettings(s.id, { projectId: project.id });
     const p = panels.create({ projectId: project.id, kind: "claude", title: "Fix sidebar", sessionId: `c-${Math.random()}` });
     faux.setResponses([fauxAssistantMessage("Fix sidebar asks whether to update the tests. I'd say yes.")]);
 
@@ -229,7 +228,7 @@ describe("Coordinators", () => {
   it("marks an event quiet when the Coordinator finds nothing for the user", async () => {
     const project = projects.create("app", `/work/coord-${Math.random()}`);
     const s = createSprocket({ name: "Lead", look });
-    updateSettings(s.id, { projectId: project.id, coordinator: true });
+    updateSettings(s.id, { projectId: project.id });
     const p = panels.create({ projectId: project.id, kind: "pi", title: "Docs" });
     let prompt = "";
     faux.setResponses([
@@ -253,10 +252,9 @@ describe("Coordinators", () => {
     expect(list[0].event?.quiet).toBe(true);
   });
 
-  it("wakes nobody in a project without a Coordinator", () => {
+  it("wakes nobody in a project without a Sprocket", () => {
     const project = projects.create("app", `/work/coord-${Math.random()}`);
-    const s = createSprocket({ name: "Helper", look });
-    updateSettings(s.id, { projectId: project.id });
+    const s = createSprocket({ name: "Helper", look }); // not attached
     const p = panels.create({ projectId: project.id, kind: "claude", title: "X" });
     vi.useFakeTimers();
     receive(p.id, "claude", "Stop", { last_assistant_message: "Should I go on?" });

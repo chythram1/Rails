@@ -31,6 +31,7 @@ export function Dropdown({
   placeholder = "Choose…",
   label,
   plain,
+  describedBy,
 }: {
   id?: string;
   value: string;
@@ -40,6 +41,8 @@ export function Dropdown({
   placeholder?: string;
   label?: string;
   plain?: boolean;
+  /** The id of the text that explains the choice (its aria-describedby). */
+  describedBy?: string;
 }) {
   const { at, trigger, panel, close, toggle } = usePopover("left");
   const [query, setQuery] = useState("");
@@ -97,6 +100,7 @@ export function Dropdown({
         aria-label={label && `${label}: ${selected?.label ?? placeholder}`}
         aria-haspopup="listbox"
         aria-expanded={!!at}
+        aria-describedby={describedBy}
         disabled={disabled}
         onClick={toggle}
         onKeyDown={(e) => {

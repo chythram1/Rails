@@ -47,10 +47,10 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
   const [mobile, setMobile] = useState(() => matchMedia(MOBILE).matches);
   const [sideOpen, setSideOpen] = useState(false);
   const [sideView, setSideView] = useState<SideView>("sprockets");
-  // The project's Sprockets, its Coordinator first.
+  // The project's Sprocket (one per project, ADR 0016).
   const { list: allSprockets } = useSprockets();
-  const sprockets = (allSprockets ?? []).filter((s) => s.projectId === projectId).sort((a, b) => Number(b.coordinator) - Number(a.coordinator));
-  const replyReady = new Set(sprockets.flatMap((s) => s.pending));
+  const sprocket = (allSprockets ?? []).find((s) => s.projectId === projectId);
+  const replyReady = new Set(sprocket?.pending ?? []);
   const targetGroup = useRef<DockviewGroupPanel>(undefined);
   const [focusId, setFocusId] = useState<string>();
 
@@ -113,7 +113,7 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
               onView={setSideView}
               projectId={projectId}
               projectName={project.name}
-              sprockets={sprockets}
+              sprocket={sprocket}
               refreshKey={String(ws.panels?.length)}
               onClose={() => setSideOpen(false)}
             />

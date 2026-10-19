@@ -7,7 +7,7 @@ import type { Panel, Suggestion } from "@rails/shared";
 import type { SessionCard } from "./bridge/board.ts";
 import { deliver } from "./bridge/deliver.ts";
 import { ASKING, type SessionEvent } from "./bridge/events.ts";
-import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
+import { cardOf, onEvents, onPanelForgotten, onReturned } from "./bridge/index.ts";
 import { panels, sprockets, suggestions } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { listeners } from "./util.ts";
@@ -53,7 +53,13 @@ export type Purpose = "answer" | "message";
  * Coordinator's earlier pending one. Messages are separate things to pass on (a handoff, a heads-up), so they
  * don't replace anything, up to MAX_PENDING_MESSAGES.
  */
-export function suggest(sprocketId: string, panel: Panel, title: string, raw: string, { rule, purpose = "answer" }: { rule?: string; purpose?: Purpose } = {}): Suggestion {
+export function suggest(
+  sprocketId: string,
+  panel: Panel,
+  title: string,
+  raw: string,
+  { rule, purpose = "answer", attachment }: { rule?: string; purpose?: Purpose; attachment?: Suggestion["attachment"] } = {},
+): Suggestion {
   const text = raw.trim();
   if (!text) throw new Error("The text is empty.");
   if (text.length > SUGGESTION_MAX) throw new Error(`It can be at most ${SUGGESTION_MAX} characters; this is ${text.length}.`);
@@ -67,7 +73,7 @@ export function suggest(sprocketId: string, panel: Panel, title: string, raw: st
       if (old.messageId) suggestions.setStatus(old.id, ["pending"], "replaced");
       else suggestions.drop([old.id]); // from this same run: never shown
     }
-  const s = suggestions.create({ sprocketId, panelId: panel.id, kind: panel.kind, title, sessionId: panel.sessionId, mode, text, rule });
+  const s = suggestions.create({ sprocketId, panelId: panel.id, kind: panel.kind, title, sessionId: panel.sessionId, mode, text, rule, attachment });
   changes.emit();
   return shown(s);
 }
@@ -81,6 +87,11 @@ function blocked(card: SessionCard, mode: Suggestion["mode"]): string | undefine
   if (mode === "message") return undefined;
   if (card.status === "working") return "The session is working on something else now.";
   if (card.status === "waiting") return "The session is waiting for you in its panel.";
+}
+
+/** What a session gets: the text, and a handoff's attachment under it, marked as the other session's words. */
+export function deliveredText(text: string, attachment?: Suggestion["attachment"]): string {
+  return attachment ? `${text}\n\n---\nWhat "${attachment.title}" said when it finished, word for word:\n\n${attachment.text}` : text;
 }
 
 /** The user sends a suggested reply, possibly edited. */
@@ -104,7 +115,7 @@ export async function sendSuggestion(id: string, rawText: unknown): Promise<Sugg
   if (!suggestions.setStatus(id, ["pending", "failed"], "sending", { text })) throw new ServiceError("It's already being sent.", 409);
   changes.emit();
   try {
-    const { queued } = await deliver(panel!, card!, text, { queue: s.mode === "message" });
+    const { queued } = await deliver(panel!, card!, deliveredText(text, s.attachment), { queue: s.mode === "message" });
     suggestions.setStatus(id, ["sending"], "sent", { queued });
   } catch (e) {
     suggestions.setStatus(id, ["sending"], "failed", { error: (e as Error).message });
@@ -133,7 +144,15 @@ function expireFor(panelId: string, { all = false, error }: { all?: boolean; err
 }
 
 /** Expire suggestions as sessions move on (answers) or end (everything). */
+/** pi put a queued message back in its editor when the user stopped its run: it wasn't sent after all. */
+function returned(panelId: string, text: string): void {
+  for (const s of suggestions.sentTo(panelId))
+    if (s.queued && deliveredText(s.text, s.attachment) === text && suggestions.setStatus(s.id, ["sent"], "expired", { error: "pi put it back in its input box when its turn was stopped. Send it from there." }))
+      changes.emit();
+}
+
 export function startSuggestions(): void {
+  onReturned(returned);
   onEvents((panel, events) => {
     if (events.some((e) => e.kind === "ended")) expireFor(panel.id, { all: true, error: "The session ended." });
     else if (events.some(movesOn)) expireFor(panel.id);

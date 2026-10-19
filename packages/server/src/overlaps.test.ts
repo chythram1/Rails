@@ -65,11 +65,11 @@ describe("overlaps", () => {
   startOverlaps();
 
   const write = (path: string, file: string) => ({ session_id: "s", cwd: path, tool_name: "Edit", tool_input: { file_path: `${path}/${file}` } });
-  const setup = (coordinator: boolean) => {
+  const setup = (coordinated: boolean) => {
     const path = `/work/overlap-${Math.random()}`;
     const project = projects.create("app", path);
     const s = createSprocket({ name: "Lead", look });
-    updateSettings(s.id, { projectId: project.id, coordinator });
+    if (coordinated) updateSettings(s.id, { projectId: project.id });
     const a = panels.create({ projectId: project.id, kind: "claude", title: "Fix login", sessionId: `a-${Math.random()}` });
     const b = panels.create({ projectId: project.id, kind: "pi", title: "Refactor auth" });
     return { path, s, a, b };
@@ -114,7 +114,7 @@ describe("overlaps", () => {
     });
     expect(prompt).toContain("[Rails event, not from your user]");
     expect(prompt).toContain('\\"Fix login\\" (Claude Code, id');
-    expect(prompt).toContain('with \\"Refactor auth\\" (pi, id');
+    expect(prompt).toContain('also changed by \\"Refactor auth\\" (pi, id');
     expect(prompt).toContain('\\"src/auth.ts\\"'); // quoted: a file name can't break out of the list
     expect(system).toContain("draft a short heads-up with suggest_message for the session that changed the files second");
   });

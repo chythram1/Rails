@@ -15,7 +15,6 @@ import { Dropdown } from "../Dropdown.tsx";
 import { PanelIcon } from "../PanelMenu.tsx";
 import { ModelSelect, useModelSettings } from "../ModelSelect.tsx";
 import { useOpenSettings } from "../settings/context.ts";
-import { Switch } from "../Switch.tsx";
 import { useAutoGrow } from "../useAutoGrow.ts";
 
 /**
@@ -39,8 +38,8 @@ export function PanelToggle({ sprocket, open }: { sprocket: SprocketData; open: 
 
 /**
  * A Sprocket's panel beside its chat (refs: ref/sprockets/stage2/chat2.png, settings1.png and settings2.png,
- * Grok's). It opens on the Sprocket's job: the project it's attached to, whether it's that project's
- * Coordinator, and its standing rules. A cog at the top right leads to Settings, what rarely changes (name,
+ * Grok's). It opens on the Sprocket's job: the project it looks after (one Sprocket per project, ADR 0016), its
+ * standing rules and its pending handoffs. A cog at the top right leads to Settings, what rarely changes (name,
  * description, model, Delete), which has a back arrow at its top left. Everything saves as you go: a field
  * when you leave it, a choice at once, and a quiet "Saved" in the header confirms it. Its core memory is its
  * own business. Moving it to another project deletes its chat there, so that asks first. The panel has its
@@ -51,7 +50,8 @@ export function SprocketSettings({ sprocket, all }: { sprocket: SprocketData; al
   const { id, name } = sprocket;
   const { projects } = useStore();
   const project = projects.find((p) => p.id === sprocket.projectId);
-  const coordinator = all.find((s) => s.projectId && s.projectId === sprocket.projectId && s.coordinator && s.id !== id);
+  // A project has one Sprocket (ADR 0016): projects another one looks after can't be picked.
+  const holderOf = (projectId: string) => all.find((s) => s.projectId === projectId && s.id !== id);
   const { settings: models } = useModelSettings();
   const openSettings = useOpenSettings();
   const [error, setError] = useState("");
@@ -94,11 +94,6 @@ export function SprocketSettings({ sprocket, all }: { sprocket: SprocketData; al
     const question = to ? `Attach ${name} to ${to.name}?` : `Detach ${name} from its project?`;
     if (sprocket.lastMessage && !confirm(`${question}\n\nIts chat is deleted. Its name, look and core memory stay.`)) return;
     await save({ projectId: projectId || null });
-  };
-
-  const setCoordinator = async (on: boolean) => {
-    if (on && coordinator && project && !confirm(`Make ${name} the Coordinator of ${project.name}?\n\n${coordinator.name} stops being it.`)) return;
-    await save({ coordinator: on });
   };
 
   const remove = async () => {
@@ -156,29 +151,27 @@ export function SprocketSettings({ sprocket, all }: { sprocket: SprocketData; al
                 id="sp-project"
                 value={sprocket.projectId ?? ""}
                 disabled={sprocket.running}
-                options={[{ value: "", label: "None" }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+                options={[
+                  { value: "", label: "None" },
+                  ...projects.map((p) => {
+                    const holder = holderOf(p.id);
+                    return { value: p.id, label: holder ? `${p.name} (${holder.name})` : p.name, disabled: !!holder };
+                  }),
+                ]}
+                describedBy="sp-project-help"
                 onChange={(v) => void move(v)}
               />
-              {sprocket.running && <p className="muted small">It's replying. You can move it when it's done.</p>}
-            </div>
-
-            <div className="settings-field sp-switch-field">
-              <div className="sp-switch-text">
-                <label htmlFor="sp-coordinator">Coordinator</label>
-                <p id="sp-coordinator-help" className="muted small">
-                  {!project ? "Attach it to a project first." : coordinator ? `${coordinator.name} is now. Turning this on takes over.` : "Tells you when a session here waits for you."}
-                </p>
-              </div>
-              <Switch
-                id="sp-coordinator"
-                checked={sprocket.coordinator}
-                disabled={!project}
-                aria-describedby="sp-coordinator-help"
-                onChange={(on) => void setCoordinator(on)}
-              />
+              <p id="sp-project-help" className="muted small">
+                {sprocket.running
+                  ? "It's replying. You can move it when it's done."
+                  : project
+                    ? "It looks after this project's sessions: it tells you when one waits for you, passes things on and watches for clashes."
+                    : "Attach it to a project to have it look after that project's sessions. A project has one Sprocket."}
+              </p>
             </div>
             {sprocket.coordinator && <RulesField sprocket={sprocket} onSave={(rules) => save({ rules })} />}
             {sprocket.coordinator && <HandoffsField sprocket={sprocket} />}
+            {sprocket.projectId && <OwnersField sprocket={sprocket} />}
           </section>
         ) : (
           <>
@@ -204,6 +197,10 @@ export function SprocketSettings({ sprocket, all }: { sprocket: SprocketData; al
                     </button>
                   </p>
                 )}
+              </div>
+              <div className="settings-field">
+                <p className="sp-field-label">Usage</p>
+                <p className="muted small">{usageText(sprocket.usage)}</p>
               </div>
             </section>
 
@@ -364,6 +361,61 @@ function RuleRow({ n, rule, onSave, onRemove }: { n: number; rule: string; onSav
         <X size={14} />
       </button>
     </li>
+  );
+}
+
+/** What a Sprocket's runs have used: "No replies yet.", or "12 replies · 312,400 tokens · $0.04". */
+function usageText({ runs, tokens, cost }: SprocketData["usage"]): string {
+  if (!runs) return "No replies yet.";
+  const parts = [`${runs.toLocaleString()} ${runs === 1 ? "reply" : "replies"}`, `${tokens.toLocaleString()} tokens`];
+  if (cost > 0) parts.push(cost < 0.01 ? "under $0.01" : `$${cost.toFixed(2)}`);
+  return parts.join(" \u00b7 ");
+}
+
+/**
+ * Who owns what in the Sprocket's project (ADR 0016): set by telling it in the chat, each removable here. The
+ * session's own title when the sidebar knows it, else its panel's.
+ */
+function OwnersField({ sprocket }: { sprocket: SprocketData }) {
+  const { sessions } = useStore();
+  const [error, setError] = useState("");
+  const titleOf = (o: SprocketData["owners"][number]) => sessions[sprocket.projectId!]?.find((s) => s.panelId === o.panelId)?.title || o.title;
+  const clear = async (panelId: string) => {
+    setError("");
+    try {
+      await api.clearOwner(panelId);
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+  return (
+    <div className="settings-field" role="group" aria-labelledby="sp-owners-label">
+      <p id="sp-owners-label" className="sp-field-label">Owners</p>
+      <p className="muted small">
+        {sprocket.owners.length
+          ? "Who owns which files. It sends requests to their owner and tells you when another session changes them."
+          : `None yet. Tell ${sprocket.name} in the chat, e.g. \u201cClaude owns src/engine and index.html.\u201d`}
+      </p>
+      {sprocket.owners.length > 0 && (
+        <ul className="sp-handoffs">
+          {sprocket.owners.map((o) => (
+            <li key={o.panelId} className="sp-handoff">
+              <div className="sp-handoff-text">
+                <p className="sp-handoff-route">
+                  <PanelIcon kind={o.kind} />
+                  <span className="truncate" title={titleOf(o)}>{shortTitle(titleOf(o))}</span>
+                </p>
+                <p className="sp-owner-paths">{o.paths.join(", ")}</p>
+              </div>
+              <button type="button" className="icon-btn sp-rule-remove" aria-label={`Remove what ${titleOf(o)} owns`} title="Remove" onClick={() => void clear(o.panelId)}>
+                <X size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {error && <p className="error" role="alert">{error}</p>}
+    </div>
   );
 }
 

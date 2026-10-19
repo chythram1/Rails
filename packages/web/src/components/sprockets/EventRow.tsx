@@ -19,7 +19,7 @@ export function EventRow({ message, projectId, name }: { message: SprocketMessag
       <p className="sp-event-head">
         <PanelIcon kind={e.kind} />
         <span className="sp-event-title truncate" title={e.title}>{shortTitle(e.title)}</span>
-        <span className="sp-event-what">{e.what === "handoff" ? "finished a turn; hand off to" : e.what === "overlap" ? "changed the same files as" : e.what === "turn_end" ? "is waiting for your reply" : "is asking you"}</span>
+        <span className="sp-event-what">{e.what === "handoff" ? "finished a turn; hand off to" : e.what === "overlap" ? (e.overlaps?.every((o) => o.owns) ? "changed files owned by" : "changed the same files as") : e.what === "turn_end" ? "is waiting for your reply" : "is asking you"}</span>
         {open && (
           <a className="sp-event-open" href={open}>
             Open<span className="sr-only"> {e.title}</span>
@@ -43,6 +43,7 @@ export function EventRow({ message, projectId, name }: { message: SprocketMessag
               <span className="sp-event-with">
                 <PanelIcon kind={o.kind} />
                 <span className="truncate" title={o.title}>{shortTitle(o.title)}</span>
+                {o.owns && !e.overlaps?.every((x) => x.owns) && <span className="sp-event-owns">owns</span>}
               </span>
               <span className="sp-event-files">{o.files.join(" · ")}</span>
             </li>

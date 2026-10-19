@@ -480,16 +480,10 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .side-view-tab:hover { color: var(--text-2); }
 .side-view-tab[aria-selected="true"] { background: var(--hover); color: var(--text); }
 .side-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-/* Under the tabs, a bar for what the tab is about: the Sprockets to choose from, or the branch. */
+/* Under the tabs, a bar for what the tab is about: the project's Sprocket, or the branch. */
 .side-bar { display: flex; align-items: center; gap: 2px; min-height: 40px; padding: 0 6px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
 .side-git-bar { padding-left: 16px; }
-.side-tabs { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; overflow-x: auto; scrollbar-width: none; }
-.side-tab {
-  display: flex; align-items: center; gap: 6px; flex-shrink: 0; max-width: 160px; height: 28px; padding: 0 9px 0 5px;
-  border-radius: 8px; color: var(--muted); font-size: 13px;
-}
-.side-tab:hover { color: var(--text-2); }
-.side-tab[aria-selected="true"] { background: var(--hover); color: var(--text); }
+.side-sprocket { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 28px; margin: 0; padding: 0 9px 0 5px; color: var(--text); font-size: 13px; }
 .side-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 /* The panel is narrow, so the composer lines up with the messages, 16px in from both edges. */
 .side-chat .sp-thread { padding: 20px 16px; }
@@ -589,7 +583,6 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-row-top .sp-row-name { flex: 0 1 auto; }
 .sp-row-top .session-time { margin-left: auto; }
 /* Its role: plain muted text, not a badge (The Color Means State Rule). */
-.sp-row-role { flex: none; color: var(--muted); font-size: 12px; }
 .sp-row-bottom { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .sp-row-bottom .truncate { flex: 1; }
 .sp-row-top .session-time { width: auto; }
@@ -679,6 +672,7 @@ blockquote.sp-event-quote { display: -webkit-box; -webkit-box-orient: vertical; 
 ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
 .sp-event-options { display: block; color: var(--muted); font-size: 13px; }
 .sp-event-with { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sp-event-owns { flex: none; color: var(--muted); font-size: 13px; }
 .sp-event-files { display: block; color: var(--muted); font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
 .sp-event-note { margin: 0; color: var(--muted); font-size: 13px; }
 .sp-message.event .sp-msg-actions { margin-left: -7px; }
@@ -700,6 +694,16 @@ ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
 .sp-suggestion-text:focus-visible { outline: none; } /* the card's border shows focus */
 .sp-suggestion-text:disabled { color: var(--text-2); }
 .sp-suggestion-rule { margin: 0; color: var(--muted); font-size: 13px; text-wrap: pretty; }
+/* A handoff's attached words (ADR 0015): collapsed under the text, a quote when open, scrolling past 12 lines. */
+.sp-attachment-summary { display: flex; align-items: center; gap: 6px; width: fit-content; max-width: 100%; list-style: none; cursor: pointer; color: var(--muted); font-size: 13px; }
+.sp-attachment-summary::-webkit-details-marker { display: none; }
+.sp-attachment-summary:hover { color: var(--text-2); }
+.sp-attachment[open] .sp-attachment-chevron { transform: rotate(90deg); }
+.sp-attachment-chevron { flex: none; }
+.sp-attachment-text {
+  margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--border-strong); max-height: calc(12 * 1.5em); overflow-y: auto;
+  color: var(--text-2); font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
+}
 .sp-suggestion-answer { margin: 0; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .sp-suggestion-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .sp-suggestion-actions .muted { text-wrap: pretty; }
@@ -731,9 +735,7 @@ textarea.input.sp-grow { resize: none; overflow: hidden; }
 .sp-danger-zone { display: flex; }
 .sp-panel .settings-field > :is(.input, .dropdown) { width: 100%; }
 .sp-field-foot { display: flex; align-items: center; gap: 8px; }
-.sp-switch-field { flex-direction: row; align-items: flex-start; gap: 16px; }
-.sp-switch-text { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-.sp-switch-text > label, .sp-field-label { font-weight: 500; }
+.sp-field-label { font-weight: 500; }
 /* A Coordinator's rules (SprocketSettings.tsx): numbered rows that are fields themselves (the row takes the
    field's focus border), each with a remove button, then a field to add one. */
 .sp-rules-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -758,6 +760,7 @@ textarea.input.sp-grow { resize: none; overflow: hidden; }
 .sp-handoff-route .truncate { flex: 0 1 auto; min-width: 0; }
 .sp-handoff-arrow { flex: none; color: var(--muted); }
 .sp-handoff-note { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.sp-owner-paths { margin: 0; font-family: var(--mono); font-size: 12px; line-height: 1.5; color: var(--text-2); overflow-wrap: anywhere; }
 .sp-rule-add textarea.input { width: 100%; resize: none; overflow: hidden; }
 /* On/off switch (Switch.tsx): Paper White when on, like the one primary button; no slide (no chrome motion). */
 .switch {

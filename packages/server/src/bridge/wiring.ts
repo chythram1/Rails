@@ -17,16 +17,22 @@ const CLAUDE_HOOKS = ["UserPromptSubmit", "PostToolUse", "PermissionRequest", "N
 
 function claudeSettings(panelId: string): string {
   const url = (hook: string) => `http://127.0.0.1:${PORT}/bridge/${panelId}/claude/${hook}`;
-  const http = (hook: string) => ({
+  const http = (hook: string, timeout = 3) => ({
     type: "http",
     url: url(hook),
-    timeout: 3,
+    timeout,
     headers: { Authorization: "Bearer $RAILS_PANEL_TOKEN" },
     allowedEnvVars: ["RAILS_PANEL_TOKEN"],
   });
   const hooks: Record<string, unknown[]> = Object.fromEntries(CLAUDE_HOOKS.map((h) => [h, [{ hooks: [http(h)] }]]));
-  // Questions to the user (AskUserQuestion) wait for an answer: report them before they run.
-  hooks.PreToolUse = [{ matcher: "AskUserQuestion", hooks: [http("PreToolUse")] }];
+  // Questions to the user (AskUserQuestion) wait for an answer: report them before they run. So do shell commands,
+  // so Rails can see which files they change (shellEdits.ts). That one runs before every command, so it waits at
+  // most 1 s: Rails answers at once (and a stopped Rails refuses the connection at once), so only a stuck Rails
+  // could ever make a command wait.
+  hooks.PreToolUse = [
+    { matcher: "AskUserQuestion", hooks: [http("PreToolUse")] },
+    { matcher: "Bash", hooks: [http("PreToolUse", 1)] },
+  ];
   hooks.SessionStart = [
     {
       hooks: [

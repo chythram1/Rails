@@ -16,7 +16,9 @@ Decisions:
   the note. The Coordinator checks the work is really done and drafts the message with `suggest_message`,
   passing the handoff's id, which carries it out. If it isn't done, it replies (quiet) and waits for the next
   turn end.
-- **The user sends the message** (ADR 0010): nothing reaches a session until they do.
+- **The user sends the message** (ADR 0010): nothing reaches a session until they do. It carries what the finished
+  session said last, word for word, under the Coordinator's text (added after a test run, where a summary dropped a
+  detail and caused a bug): the card shows it collapsed, and the Coordinator is told not to repeat it.
 - **A handoff waits at most 24 hours** (`HANDOFF_TTL_MS`), and is cancelled when either session ends or its
   panel closes, or as soon as its Sprocket stops being the project's Coordinator (switched off, replaced, moved
   or deleted). Each of those leaves a line in the chat, except when the Sprocket moved or was deleted (its chat

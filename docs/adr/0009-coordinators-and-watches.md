@@ -9,7 +9,8 @@ can see every session in a project and are always on, so their first job is to u
 user what a session needs and, in the following parts, suggest the answer and send it on the user's tap.
 
 Decisions:
-- **One Coordinator per project.** A switch in a Sprocket's settings makes it its project's Coordinator,
+- **One Coordinator per project.** (Superseded by ADR 0016: a project now has one Sprocket, which is its
+  Coordinator; the switch is gone.) A switch in a Sprocket's settings makes it its project's Coordinator,
   taking the role over from any other (the UI asks first); moving or detaching it ends the role. Only the
   Coordinator is woken by sessions, and later only it may message them. Other Sprockets in the project still
   read everything and report to the user when asked.

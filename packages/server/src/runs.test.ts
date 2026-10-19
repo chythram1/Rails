@@ -29,6 +29,19 @@ describe("runs", () => {
     expect(listSprockets().find((x) => x.id === s.id)!.running).toBe(false);
   });
 
+  it("adds up what its runs use", async () => {
+    const s = sprocket();
+    expect(listSprockets().find((x) => x.id === s.id)!.usage).toEqual({ runs: 0, tokens: 0, cost: 0 });
+    faux.setResponses([fauxAssistantMessage("One."), fauxAssistantMessage("Two.")]);
+    sendMessage(s.id, "hello");
+    await idle();
+    sendMessage(s.id, "again");
+    await idle();
+    const { runs, tokens, cost } = listSprockets().find((x) => x.id === s.id)!.usage;
+    expect([runs, cost]).toEqual([2, 0]);
+    expect(tokens).toBeGreaterThan(0);
+  });
+
   it("streams the reply while it's written", async () => {
     const s = sprocket();
     const seen: (string | null)[] = [];

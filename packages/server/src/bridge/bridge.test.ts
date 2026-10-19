@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { panels, projects } from "../db.ts";
 import { boardText, foldCard, sharedFiles } from "./board.ts";
 import { CodexWatcher } from "./codex.ts";
+import { bridgeFlags } from "./wiring.ts";
 import { fromClaude, fromCodex, fromPi } from "./events.ts";
 import { attentionList, bridgeEnv, cardOf, receive, tokenOk } from "./index.ts";
 import { projectCapabilities } from "../harness/project.ts";
@@ -65,6 +66,17 @@ describe("events", () => {
     expect(fromCodex("turn/completed", { turn: { status: "completed", items: [{ type: "agentMessage", text: "DONE-2", phase: "final_answer" }] } })).toEqual([{ kind: "turn_end", text: "DONE-2" }]);
     expect(fromCodex("turn/completed", { turn: { status: "failed", error: { message: "boom" } } })).toEqual([{ kind: "failed", error: "boom" }]);
     expect(fromCodex("turn/completed", { turn: { status: "interrupted", items: [] } })).toEqual([{ kind: "stopped" }]);
+  });
+});
+
+describe("wiring", () => {
+  it("hooks Claude Code's shell commands with a short wait, so a stuck Rails barely slows them", () => {
+    const flags = bridgeFlags("claude", "p1");
+    const settings = JSON.parse(flags[flags.indexOf("--settings") + 1]);
+    expect(settings.hooks.PreToolUse.map((h: any) => [h.matcher, h.hooks[0].timeout])).toEqual([
+      ["AskUserQuestion", 3],
+      ["Bash", 1],
+    ]);
   });
 });
 

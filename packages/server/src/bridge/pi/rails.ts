@@ -26,6 +26,9 @@ export default function railsBridge(pi: any) {
   // Replies from Rails: one poll at a time, held open by Rails until there's one (or 25 s pass).
   let polling = false;
   let stopped = false;
+  // Messages Rails put in pi's queue during a run. Escape aborts the run and puts them back in the editor, unsent:
+  // Rails is told, so it doesn't show them as sent.
+  const queued = new Set<string>();
   const poll = async (ctx: any) => {
     if (polling) return;
     polling = true;
@@ -39,8 +42,12 @@ export default function railsBridge(pi: any) {
           // run; an answer, which no longer fits once pi has started on something else, is turned down.
           const idle = ctx.isIdle();
           const ok = typeof m?.text === "string" && m.text !== "" && (idle || m.queue === true);
-          if (ok && idle) pi.sendUserMessage(m.text);
-          else if (ok) pi.sendUserMessage(m.text, { deliverAs: "followUp" });
+          const text = m.text as string;
+          if (ok && idle) pi.sendUserMessage(text);
+          else if (ok) {
+            pi.sendUserMessage(text, { deliverAs: "followUp" });
+            queued.add(text);
+          }
           post("delivered", { id: m?.id, ok, queued: ok && !idle });
         }
       } catch {
@@ -55,6 +62,13 @@ export default function railsBridge(pi: any) {
     post("session_start", {});
     void poll(ctx);
   });
+  pi.on("agent_settled", (e: any, ctx: any) => {
+    if (e.aborted) {
+      const editor: string = ctx.ui?.getEditorText?.() ?? "";
+      for (const text of queued) if (editor.includes(text)) post("returned", { text });
+    }
+    queued.clear();
+  });
   pi.on("before_agent_start", (e: any) => {
     if (e.messageType === "user") post("prompt", { text: e.prompt ?? "" });
   });
@@ -68,20 +82,24 @@ export default function railsBridge(pi: any) {
   // the call comes before another extension's approval and the edit may fail, and only a change that happened
   // counts. The end event doesn't carry the input, so it's kept from the call. These are the server's
   // PI_EDIT_TOOLS (events.ts).
+  // A shell command's end is reported too (`tool_end`), so Rails can see which files it changed (ADR 0016).
   const EDITS = new Set(["edit", "write"]);
   const editing = new Map<string, { tool: string; input: unknown }>();
+  const shells = new Set<string>();
 
   pi.on("tool_call", (e: any) => {
     if (mayAsk(e.input)) asking.set(e.toolCallId, e.input);
     if (e.parentToolCallId) return;
-    post("tool", { tool: e.toolName, input: e.input, started: true });
+    post("tool", { tool: e.toolName, input: e.input, started: true, id: e.toolCallId });
     if (EDITS.has(e.toolName)) editing.set(e.toolCallId, { tool: e.toolName, input: e.input });
+    if (e.toolName === "bash") shells.add(e.toolCallId);
   });
   pi.on("tool_execution_end", (e: any) => {
     asking.delete(e.toolCallId);
     const edit = editing.get(e.toolCallId);
     editing.delete(e.toolCallId);
     if (edit && !e.isError) post("tool", edit);
+    if (shells.delete(e.toolCallId)) post("tool_end", { id: e.toolCallId });
   });
   pi.on("ui_prompt_start", (e: any) => {
     const input = [...asking.values()].at(-1);
@@ -91,6 +109,7 @@ export default function railsBridge(pi: any) {
   pi.on("agent_end", (e: any) => {
     asking.clear();
     editing.clear();
+    shells.clear();
     const last = [...(e.messages ?? [])].reverse().find((m: any) => m.role === "assistant");
     const failed = last?.stopReason === "error";
     // Escape aborts the run: it stopped, it didn't finish.

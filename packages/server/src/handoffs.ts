@@ -88,6 +88,7 @@ export function expireHandoffs(): void {
 
 /** Expire old handoffs, and cancel those whose sessions end or close (the watches wake their Coordinators). */
 export function startHandoffs(): void {
+  settleHandoffs(); // Sprockets the move to one per project detached (ADR 0016)
   expireHandoffs();
   setInterval(expireHandoffs, 60_000).unref?.();
   onEvents((panel, events) => {

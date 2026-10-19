@@ -139,8 +139,8 @@ export interface Sprocket {
    */
   description: string;
   /**
-   * Whether it's its project's Coordinator: the one Sprocket Rails wakes when a session there waits for the
-   * user (step 3). At most one per project.
+   * Whether it's its project's Coordinator: the one Sprocket Rails wakes for the project's sessions. A project has
+   * one Sprocket, and it's the Coordinator (ADR 0016), so this is true exactly when it's attached.
    */
   coordinator: boolean;
   /**
@@ -152,10 +152,23 @@ export interface Sprocket {
   pending: string[];
   /** As a Coordinator: the handoffs it planned that still wait for their session to finish (ADR 0015). */
   handoffs: Handoff[];
+  /** As a Coordinator: who owns what in its project (ADR 0016). */
+  owners: ProjectOwner[];
+  /** What its runs have used so far: tokens, and cost where the provider reports one (not on a ChatGPT plan). */
+  usage: { runs: number; tokens: number; cost: number };
   /** True while it's working on a reply. */
   running: boolean;
   /** The newest message in its chat, for the list preview. */
   lastMessage?: SprocketMessage;
+}
+
+/** A session in a project and the files or folders it owns (relative to the project, ADR 0016). */
+export interface ProjectOwner {
+  panelId: string;
+  kind: PanelKind;
+  /** Its panel's title: the browser shows the session's own title when it knows it. */
+  title: string;
+  paths: string[];
 }
 
 /** A session in a handoff, as it was titled when the handoff was planned. */
@@ -190,8 +203,6 @@ export interface SprocketSettings {
   projectId?: string | null;
   model?: string | null;
   description?: string;
-  /** Make it its project's Coordinator (taking over from any other), or stop. Needs a project. */
-  coordinator?: boolean;
   /** Replace its standing rules (empty ones are dropped). */
   rules?: string[];
 }
@@ -231,8 +242,11 @@ export interface SprocketEvent {
   quiet?: boolean;
   /** Rails' rules didn't wake for this; the decision model did (ADR 0013). */
   byModel?: boolean;
-  /** For an overlap: the other sessions, and the files each also changed (relative to the project). */
-  overlaps?: { panelId: string; kind: PanelKind; title: string; sessionId?: string; files: string[] }[];
+  /**
+   * For an overlap: the other sessions, and the files each also changed (relative to the project), or, with
+   * `owns`, the files it owns (ADR 0016).
+   */
+  overlaps?: { panelId: string; kind: PanelKind; title: string; sessionId?: string; files: string[]; owns?: boolean }[];
   /** For a handoff: which one, the session it's for and what to pass on. */
   handoff?: { id: string; to: HandoffSession & { sessionId?: string }; note: string };
 }
@@ -272,6 +286,11 @@ export interface Suggestion {
   text: string;
   /** The rule it followed, as it read then; none when it used its own judgment. */
   rule?: string;
+  /**
+   * A handoff's message (ADR 0015) carries what the finished session said last, word for word, sent under the
+   * text, so nothing it said gets lost in the Coordinator's summary.
+   */
+  attachment?: { title: string; text: string };
   /** "replaced": a newer answer for the same session took its place (it isn't shown). Messages aren't replaced. */
   status: "pending" | "sending" | "sent" | "failed" | "dismissed" | "expired" | "replaced";
   /** Why it failed, or why it can't be sent anymore. */
