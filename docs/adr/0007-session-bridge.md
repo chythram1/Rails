@@ -21,7 +21,7 @@ Decisions:
   it report about itself. It's not the access token, which still never reaches panels. Bridge requests are
   accepted from loopback only. Hooks never block an agent: if Rails is down, agents carry on.
 - **One event shape for all three agents** (`bridge/events.ts`): start, prompt, tool (files, command),
-  waiting, resumed, turn_end, failed, ended. Stored per panel in SQLite (`session_events`, the last 200),
+  waiting, resumed, turn_end, stopped (the user stopped the turn: idle, but nothing finished), failed, ended. Stored per panel in SQLite (`session_events`, the last 200),
   dropped when the panel closes.
 - **The board** (`bridge/board.ts`) folds a panel's events into a card: status, what it was asked, files it
   changed, last command, last reply. Files changed by more than one session are listed too.

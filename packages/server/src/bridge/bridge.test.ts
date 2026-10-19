@@ -52,6 +52,7 @@ describe("events", () => {
     expect(fromPi("ui_prompt_start", { title: "Allow this shell command?" })).toEqual([{ kind: "waiting", reason: "Allow this shell command?" }]);
     expect(fromPi("agent_end", { text: "NOTED" })).toEqual([{ kind: "turn_end", text: "NOTED" }]);
     expect(fromPi("agent_end", { error: "rate limited" })).toEqual([{ kind: "failed", error: "rate limited" }]);
+    expect(fromPi("agent_end", { aborted: true })).toEqual([{ kind: "stopped" }]); // Escape
   });
 
   it("turns Codex notifications into session events", () => {
@@ -63,6 +64,7 @@ describe("events", () => {
       expect(fromCodex("item/completed", { item: { type: "fileChange", status, changes: [{ path: `${cwd}/b.txt` }] } })[0]).toMatchObject({ edit: false });
     expect(fromCodex("turn/completed", { turn: { status: "completed", items: [{ type: "agentMessage", text: "DONE-2", phase: "final_answer" }] } })).toEqual([{ kind: "turn_end", text: "DONE-2" }]);
     expect(fromCodex("turn/completed", { turn: { status: "failed", error: { message: "boom" } } })).toEqual([{ kind: "failed", error: "boom" }]);
+    expect(fromCodex("turn/completed", { turn: { status: "interrupted", items: [] } })).toEqual([{ kind: "stopped" }]);
   });
 });
 

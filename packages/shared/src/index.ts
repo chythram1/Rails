@@ -272,7 +272,7 @@ export interface Suggestion {
   text: string;
   /** The rule it followed, as it read then; none when it used its own judgment. */
   rule?: string;
-  /** "replaced": a newer suggestion for the same session took its place (it isn't shown). */
+  /** "replaced": a newer answer for the same session took its place (it isn't shown). Messages aren't replaced. */
   status: "pending" | "sending" | "sent" | "failed" | "dismissed" | "expired" | "replaced";
   /** Why it failed, or why it can't be sent anymore. */
   error?: string;

@@ -47,6 +47,8 @@ const describe = (e: SessionEvent): string => {
       return "carried on";
     case "turn_end":
       return `replied: ${e.text}`;
+    case "stopped":
+      return "stopped by your user before it finished";
     case "failed":
       return `failed: ${e.error}`;
     case "ended":

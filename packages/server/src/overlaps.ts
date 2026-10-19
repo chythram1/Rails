@@ -12,7 +12,7 @@ import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
 import { panels, projects, sprockets } from "./db.ts";
 import { postEvent } from "./sprockets.ts";
 import { listeners } from "./util.ts";
-import { sessionTitle } from "./watches.ts";
+import { sessionTitle } from "./titles.ts";
 
 /** How long a session's burst of edits is gathered into one wake. */
 export const BATCH_MS = 15_000;

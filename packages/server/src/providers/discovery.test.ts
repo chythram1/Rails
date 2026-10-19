@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { conversation, sessionsFor } from "./index.ts";
+import { firstLine } from "./util.ts";
 
 // Fixture transcripts go into the empty provider homes that vitest.config.ts points the server at.
 const jsonl = (lines: object[]) => lines.map((l) => JSON.stringify(l)).join("\n") + "\n";
@@ -30,6 +31,14 @@ write(join(process.env.CLAUDE_HOME!, "projects", "-work-app", "c2.jsonl"), [
   { type: "user", cwd: `${project}/packages/web`, sessionId: "c2", timestamp: ts, message: { role: "user", content: "hi" } },
   { type: "custom-title", customTitle: "Named by user" },
 ]);
+write(join(process.env.CLAUDE_HOME!, "projects", "-work-app", "c4.jsonl"), [
+  { type: "user", cwd: project, sessionId: "c4", timestamp: ts, message: { role: "user", content: '\n\n<pasted_content id="c959">\nYou own the engine.\nRead BRIEF.md.\n</pasted_content id="c959">\n' } },
+]);
+write(join(process.env.CLAUDE_HOME!, "projects", "-work-app", "c5.jsonl"), [
+  { type: "user", cwd: project, sessionId: "c5", timestamp: ts, message: { role: "user", content: "Build the engine" } },
+  { type: "ai-title", aiTitle: "Engine setup", sessionId: "c5" },
+  { type: "ai-title", aiTitle: "Engine and integration setup", sessionId: "c5" },
+]);
 write(join(process.env.CLAUDE_HOME!, "projects", "-work-other", "c3.jsonl"), [
   { type: "user", cwd: "/work/application", sessionId: "c3", timestamp: ts, message: { role: "user", content: "not in /work/app" } },
 ]);
@@ -50,13 +59,15 @@ write(join(process.env.CODEX_HOME!, "sessions", "2026", "10", "01", "rollout-202
 describe("discovery", () => {
   it("finds sessions of all three providers inside a project, including subfolders", async () => {
     const found = await sessionsFor(project);
-    expect(found.map((s) => `${s.provider}:${s.id}`).sort()).toEqual(["claude:c1", "claude:c2", "codex:x1", "pi:p1"]);
+    expect(found.map((s) => `${s.provider}:${s.id}`).sort()).toEqual(["claude:c1", "claude:c2", "claude:c4", "claude:c5", "codex:x1", "pi:p1"]);
   });
 
   it("titles a session by its first real prompt, skipping harness noise", async () => {
     const byId = Object.fromEntries((await sessionsFor(project)).map((s) => [s.id, s.title]));
     expect(byId.c1).toBe("Fix the login bug");
     expect(byId.c2).toBe("Named by user");
+    expect(byId.c4).toBe("You own the engine."); // a pasted prompt: what's inside the tags
+    expect(byId.c5).toBe("Engine and integration setup"); // Claude Code's own title, the latest
     expect(byId.p1).toBe("Add tests");
     expect(byId.x1).toBe("Rename the API");
   });
@@ -71,5 +82,13 @@ describe("discovery", () => {
 
   it("doesn't match a sibling folder that only shares a prefix", async () => {
     expect((await sessionsFor(project)).some((s) => s.id === "c3")).toBe(false);
+  });
+});
+
+describe("titles from first lines", () => {
+  it("takes a pasted prompt's text, whether it spans lines or not", () => {
+    expect(firstLine('<pasted_content id="x">Fix the bug</pasted_content id="x">')).toBe("Fix the bug");
+    expect(firstLine('\n<pasted_content id="x">\nFix the bug\nmore\n</pasted_content id="x">\n')).toBe("Fix the bug");
+    expect(firstLine("Plain prompt")).toBe("Plain prompt");
   });
 });

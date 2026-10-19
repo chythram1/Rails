@@ -14,6 +14,8 @@ import { listeners } from "./util.ts";
 
 /** Longest reply a Coordinator may suggest. */
 export const SUGGESTION_MAX = 2000;
+/** Most messages one Coordinator can have waiting for one session (they don't replace each other). */
+export const MAX_PENDING_MESSAGES = 3;
 /** Longest reply the user may send (after editing one). */
 export const REPLY_MAX = 4000;
 
@@ -47,17 +49,24 @@ export type Purpose = "answer" | "message";
 
 /**
  * A Coordinator suggests an answer to a session (following one of its rules, by its text, or its own
- * judgment) or a message for it. Its earlier pending suggestion for that session goes.
+ * judgment) or a message for it. A session's question has one answer, so a new answer replaces the
+ * Coordinator's earlier pending one. Messages are separate things to pass on (a handoff, a heads-up), so they
+ * don't replace anything, up to MAX_PENDING_MESSAGES.
  */
 export function suggest(sprocketId: string, panel: Panel, title: string, raw: string, { rule, purpose = "answer" }: { rule?: string; purpose?: Purpose } = {}): Suggestion {
   const text = raw.trim();
   if (!text) throw new Error("The text is empty.");
   if (text.length > SUGGESTION_MAX) throw new Error(`It can be at most ${SUGGESTION_MAX} characters; this is ${text.length}.`);
   const mode = modeFor(cardOf(panel), title, purpose);
-  for (const old of suggestions.pendingFor(panel.id).filter((s) => s.sprocketId === sprocketId)) {
-    if (old.messageId) suggestions.setStatus(old.id, ["pending"], "replaced");
-    else suggestions.drop([old.id]); // from this same run: never shown
-  }
+  const mine = suggestions.pendingFor(panel.id).filter((s) => s.sprocketId === sprocketId);
+  if (mode === "message") {
+    if (mine.filter((s) => s.mode === "message").length >= MAX_PENDING_MESSAGES)
+      throw new Error(`${MAX_PENDING_MESSAGES} of your messages for "${title}" already wait for your user. Say what you'd add in your reply instead.`);
+  } else
+    for (const old of mine.filter((s) => s.mode !== "message")) {
+      if (old.messageId) suggestions.setStatus(old.id, ["pending"], "replaced");
+      else suggestions.drop([old.id]); // from this same run: never shown
+    }
   const s = suggestions.create({ sprocketId, panelId: panel.id, kind: panel.kind, title, sessionId: panel.sessionId, mode, text, rule });
   changes.emit();
   return shown(s);
@@ -113,7 +122,7 @@ export function dismissSuggestion(id: string): Suggestion {
 }
 
 /** The session did something, so an answer suggested for it no longer fits. */
-const movesOn = (e: SessionEvent) => e.kind === "prompt" || e.kind === "tool" || e.kind === "resumed";
+const movesOn = (e: SessionEvent) => e.kind === "prompt" || e.kind === "tool" || e.kind === "resumed" || e.kind === "stopped";
 
 /** Expire a panel's pending answers, or (`all`) its messages too. */
 function expireFor(panelId: string, { all = false, error }: { all?: boolean; error?: string } = {}) {

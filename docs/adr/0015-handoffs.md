@@ -25,7 +25,9 @@ Decisions:
 - **Pending handoffs show on the Coordinator's job page**, under its rules, each with Cancel
   (`POST /api/handoffs/:id/cancel`). They're also in its instructions, with their ids, so it can list or cancel
   them (`cancel_handoff`).
-- **Stored in the `handoffs` table** with the sessions' titles as they were when it was planned.
+- **Stored in the `handoffs` table** with its sessions' titles, kept current as the sessions report prompts and
+  turn ends (a handoff is often planned before a session has a title of its own). A turn the user stopped
+  isn't finished, so it doesn't count.
 
 Consequences:
 - A session that finishes in several turns wakes the Coordinator at each; each run is short, and the runaway

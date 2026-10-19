@@ -143,7 +143,9 @@ Transcript format notes are in [providers.md](./providers.md).
 
 ## Requirements
 
-- Node 24+ (uses `node:sqlite`), tmux 3.2+ on the server host, and the agents' CLIs on `PATH`.
+- Node 24+ (uses `node:sqlite`), tmux 3.2+ on the server host, and the agents' CLIs on `PATH`. The database
+  (`RAILS_HOME/rails.db`) uses write-ahead logging with a 2 s lock wait, so reading it from another process
+  (`sqlite3`, a backup) never blocks the server's writes.
   `make system-deps` checks the tmux version and installs tmux with Homebrew, apt or dnf when it's missing;
   `make dev` / `start` / `install` run it first. Without tmux the server logs a warning at startup and the
   panel endpoints answer 503 with that hint. It never treats a missing tmux as "no panels".

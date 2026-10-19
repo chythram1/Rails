@@ -93,7 +93,9 @@ export default function railsBridge(pi: any) {
     editing.clear();
     const last = [...(e.messages ?? [])].reverse().find((m: any) => m.role === "assistant");
     const failed = last?.stopReason === "error";
-    post("agent_end", failed ? { error: last?.errorMessage ?? "the turn failed" } : { text: textOf(last) });
+    // Escape aborts the run: it stopped, it didn't finish.
+    if (last?.stopReason === "aborted") post("agent_end", { aborted: true });
+    else post("agent_end", failed ? { error: last?.errorMessage ?? "the turn failed" } : { text: textOf(last) });
   });
   pi.on("session_shutdown", () => {
     stopped = true;

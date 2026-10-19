@@ -14,10 +14,10 @@
 import type { Panel, SessionQuestion, SprocketEvent } from "@rails/shared";
 import { ASKING, type SessionEvent } from "./bridge/events.ts";
 import { onEvents, onPanelForgotten } from "./bridge/index.ts";
-import { handoffs, panels, projects, sprockets, type StoredHandoff } from "./db.ts";
+import { handoffs, panels, sprockets, type StoredHandoff } from "./db.ts";
 import { end as endHandoff } from "./handoffs.ts";
-import { sessionsFor } from "./providers/index.ts";
 import { postEvent } from "./sprockets.ts";
+import { sessionTitle } from "./titles.ts";
 import { listeners } from "./util.ts";
 
 /** How long the user has to answer a session themselves before its Coordinator wakes. */
@@ -176,14 +176,6 @@ export class Watches {
 const woke = listeners<[panelId: string, eventMessageId: string, wake: Wake]>();
 /** A Coordinator was woken for a session, with this event message and why (decisions.ts links its judgment). */
 export const onWake = woke.on;
-
-/** A session's title as the user sees it (the tab, the board): its own title when discovery knows it. */
-export async function sessionTitle(panel: Panel): Promise<string> {
-  const project = projects.get(panel.projectId);
-  if (!project || !panel.sessionId) return panel.title;
-  const found = await sessionsFor(project.path).catch(() => []);
-  return found.find((s) => s.id === panel.sessionId)?.title || panel.title;
-}
 
 /** Put a waiting session in its project's Coordinator's chat, and wake it. False when there's none. */
 function wakeCoordinator(panelId: string, wake: Wake): boolean {

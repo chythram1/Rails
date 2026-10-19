@@ -21,7 +21,8 @@ import { ServiceError } from "./errors.ts";
 import { decisionsInShadow } from "./config.ts";
 import { classifierChoices, findClassifier, models, modelsChanged } from "./models.ts";
 import { listeners } from "./util.ts";
-import { eventPosition, looksLikeQuestion, onWake, sessionTitle, wakeFromModel, type Wake } from "./watches.ts";
+import { sessionTitle } from "./titles.ts";
+import { eventPosition, looksLikeQuestion, onWake, wakeFromModel, type Wake } from "./watches.ts";
 
 /** How much of a message's end the model sees. */
 const TEXT = 1500;

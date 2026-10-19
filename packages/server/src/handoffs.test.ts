@@ -1,6 +1,9 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { forgetPanel, receive } from "./bridge/index.ts";
+import { fromCodex } from "./bridge/events.ts";
+import { forgetPanel, receive, record } from "./bridge/index.ts";
 import { handoffs, panels, projects, settings } from "./db.ts";
 import { cancelHandoff, expireHandoffs, HANDOFF_TTL_MS, MAX_HANDOFFS, planHandoff, startHandoffs } from "./handoffs.ts";
 import { models, refOf } from "./models.ts";
@@ -90,6 +93,18 @@ describe("a handoff's session finishing", () => {
     expect(pending()).toEqual([]);
   });
 
+  it("waits when the user stops a turn: stopped isn't finished", async () => {
+    const { lead, auth, ui, pending } = setup();
+    const codex = panels.create({ projectId: panels.get(auth.id)!.projectId, kind: "codex", title: "Codex", sessionId: `t-${Math.random()}` });
+    planHandoff(lead.id, { panel: codex, title: "Codex" }, { panel: auth, title: "Auth" }, "Pass it on.");
+    planHandoff(lead.id, { panel: ui, title: "UI" }, { panel: auth, title: "Auth" }, "Pass it on too.");
+    record(codex.id, fromCodex("turn/completed", { turn: { status: "interrupted", items: [] } })); // Codex, Escape
+    receive(ui.id, "pi", "agent_end", { aborted: true }); // pi, Escape
+    await new Promise((r) => setTimeout(r, 50));
+    expect(listMessages(lead.id).filter((m) => m.author === "event")).toEqual([]);
+    expect(pending()).toHaveLength(2);
+  });
+
   it("waits for the next turn end when the Coordinator finds the work isn't done", async () => {
     const { lead, auth, plan, pending } = setup();
     plan();
@@ -99,6 +114,24 @@ describe("a handoff's session finishing", () => {
     await idle();
     expect(listMessages(lead.id)[0].event?.quiet).toBe(true);
     expect(pending()).toHaveLength(1);
+  });
+});
+
+describe("handoff titles", () => {
+  it("follow their sessions: a handoff is often planned before a session has a title", async () => {
+    const { auth, ui, plan, pending } = setup();
+    const project = projects.get(panels.get(auth.id)!.projectId)!;
+    const sid = `c-${Math.random()}`;
+    panels.setSession(auth.id, sid);
+    plan();
+    expect(pending()[0].from.title).toBe("Auth");
+    // Discovery now knows the session by Claude Code's own title.
+    const dir = join(process.env.CLAUDE_HOME!, "projects", "handoff-titles");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, `${sid}.jsonl`), [{ type: "user", cwd: project.path, sessionId: sid, timestamp: new Date().toISOString(), message: { role: "user", content: "go" } }, { type: "ai-title", aiTitle: "Login endpoint" }].map((l) => JSON.stringify(l)).join("\n") + "\n");
+    receive(auth.id, "claude", "UserPromptSubmit", { prompt: "go" });
+    await vi.waitFor(() => expect(pending()[0].from.title).toBe("Login endpoint"));
+    expect(pending()[0].to.title).toBe("UI");
   });
 });
 

@@ -5,6 +5,11 @@ import type { DecisionEntry, Handoff, Panel, PanelKind, Project, Sprocket, Sproc
 import { RAILS_HOME } from "./config.ts";
 
 const db = new DatabaseSync(join(RAILS_HOME, "rails.db"));
+// Write-ahead logging, so someone reading the file (sqlite3 in a terminal, a backup) can't block a write, and a
+// short wait for another writer instead of failing at once. Without them, session events got lost. The wait is
+// synchronous (node:sqlite), so it holds the event loop, but only while another process writes to the file,
+// which normally never happens.
+db.exec("PRAGMA busy_timeout = 2000; PRAGMA journal_mode = WAL;"); // the wait first: the switch itself may wait for a reader
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS projects (
@@ -634,6 +639,13 @@ export const handoffs = {
   /** Pending ones that start or end at a panel. */
   pendingAt(panelId: string): StoredHandoff[] {
     return (db.prepare("SELECT * FROM handoffs WHERE status = 'pending' AND (from_panel_id = ? OR to_panel_id = ?) ORDER BY created_at, rowid").all(panelId, panelId) as HandoffRow[]).map(toHandoff);
+  },
+  /** A pending one's session got a (better) title. True when one changed. */
+  retitle(panelId: string, title: string): boolean {
+    const now = new Date().toISOString();
+    const a = db.prepare("UPDATE handoffs SET from_title = ?, updated_at = ? WHERE status = 'pending' AND from_panel_id = ? AND from_title != ?").run(title, now, panelId, title).changes;
+    const b = db.prepare("UPDATE handoffs SET to_title = ?, updated_at = ? WHERE status = 'pending' AND to_panel_id = ? AND to_title != ?").run(title, now, panelId, title).changes;
+    return Number(a) + Number(b) > 0;
   },
   /** End a pending one. False when it wasn't pending (someone else ended it first). */
   end(id: string, status: "done" | "cancelled" | "expired"): boolean {

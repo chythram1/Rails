@@ -22,11 +22,15 @@ async function scanFile(file: string): Promise<DiscoveredSession | null> {
   const { head, tail, mtime } = await headTail(file);
   const first = head.find((e) => e.cwd && e.sessionId);
   if (!first) return null;
-  let title = "";
+  // The user's own title wins, then Claude Code's (`ai-title`, rewritten as the session goes on: the latest
+  // counts), then an old-style summary, then the first prompt.
+  let custom = "", ai = "", summary = "";
   for (const e of [...head, ...tail]) {
-    if (e.type === "custom-title" && e.customTitle) title = e.customTitle;
-    else if (e.type === "summary" && e.summary && !title) title = e.summary;
+    if (e.type === "custom-title" && e.customTitle) custom = e.customTitle;
+    else if (e.type === "ai-title" && e.aiTitle) ai = e.aiTitle;
+    else if (e.type === "summary" && e.summary && !summary) summary = e.summary;
   }
+  let title = custom || ai || summary;
   if (!title) {
     const u = head.find((e) => e.type === "user" && !e.isSidechain && !e.isMeta && userText(e.message?.content) && !isMetaText(userText(e.message.content)!));
     title = u ? firstLine(userText(u.message.content)!) : "Untitled session";

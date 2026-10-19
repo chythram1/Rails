@@ -18,6 +18,8 @@ export type SessionEvent =
   | { kind: "resumed" }
   /** The agent finished its turn. `text` is its last message. */
   | { kind: "turn_end"; text: string }
+  /** The user stopped the turn before it finished (Escape): it's idle, but nothing was finished. */
+  | { kind: "stopped" }
   /** The turn failed. */
   | { kind: "failed"; error: string }
   /** The session ended (the agent quit). */
@@ -143,6 +145,7 @@ export function fromPi(event: string, data: any): SessionEvent[] {
     case "ui_prompt_end":
       return [{ kind: "resumed" }];
     case "agent_end":
+      if (data?.aborted) return [{ kind: "stopped" }];
       return data?.error ? [{ kind: "failed", error: clip(data.error, 300) }] : [{ kind: "turn_end", text: clipEnds(data?.text) }];
     case "session_shutdown":
       return [{ kind: "ended" }];
@@ -180,6 +183,7 @@ export function fromCodex(method: string, params: any): SessionEvent[] {
     case "turn/completed": {
       const turn = params?.turn ?? {};
       if (turn.status === "failed") return [{ kind: "failed", error: clip(turn.error?.message ?? "the turn failed", 300) }];
+      if (turn.status === "interrupted") return [{ kind: "stopped" }];
       const final = [...(turn.items ?? [])].reverse().find((i: any) => i?.type === "agentMessage");
       return [{ kind: "turn_end", text: clipEnds(final?.text) }];
     }

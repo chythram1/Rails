@@ -91,8 +91,9 @@ export function cachedScanner(scanFile: (file: string) => Promise<DiscoveredSess
 }
 
 export const firstLine = (s: string, max = 80) => {
-  // Skill invocations are wrapped as <skill name="x">...</skill>; show them as "/x rest".
-  const text = s.replace(/^\s*<skill name="([^"]+)"[\s\S]*?<\/skill>\s*/, "/$1 ");
+  // Skill invocations are wrapped as <skill name="x">...</skill>; show them as "/x rest". Claude Code wraps a long
+  // pasted prompt in <pasted_content id="..."> tags: the title is what's inside.
+  const text = s.replace(/^\s*<skill name="([^"]+)"[\s\S]*?<\/skill>\s*/, "/$1 ").replace(/^\s*<pasted_content[^>]*>\s*/, "").replace(/\s*<\/pasted_content[^>]*>[\s\S]*$/, "");
   const line = text.trim().split("\n")[0] ?? "";
   return line.length > max ? line.slice(0, max - 1) + "…" : line;
 };

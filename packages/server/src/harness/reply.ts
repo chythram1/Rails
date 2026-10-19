@@ -7,7 +7,7 @@ import { HANDOFF_NOTE_MAX } from "@rails/shared";
 import { Type } from "@earendil-works/pi-ai";
 import { handoffs, sprockets, type StoredHandoff } from "../db.ts";
 import { completeHandoff, dropHandoff, findHandoff, HANDOFF_TTL_MS, planHandoff } from "../handoffs.ts";
-import { suggest, SUGGESTION_MAX, type Purpose } from "../suggestions.ts";
+import { MAX_PENDING_MESSAGES, suggest, SUGGESTION_MAX, type Purpose } from "../suggestions.ts";
 import type { Capability, RunContext } from "./capabilities.ts";
 import { findOpen, session } from "./project.ts";
 
@@ -39,7 +39,7 @@ export function replyCapabilities(rules: string[], made: (id: string) => void): 
   return [
     {
       name: "suggest_reply",
-      description: `Suggest an answer to a question a session in your project asked your user: one that ended its turn asking something, or one waiting on a question in a dialog. Your user sees it under your message and sends it, edits it or dismisses it: nothing reaches the session until they do. Write it as your user would, in the first person, short and plain (at most ${SUGGESTION_MAX} characters). For a dialog, give the option you'd pick, exactly as it's labelled, or for an open question (no options) the answer to type; your user answers it in the panel. When one of your user's rules decides the answer, pass its number as \`rule\`; leave it out when you're using your own judgment. To pass on something your user asked you to tell a session, use suggest_message instead. One suggestion per session: a new one replaces the last. Resolves to what happens next.`,
+      description: `Suggest an answer to a question a session in your project asked your user: one that ended its turn asking something, or one waiting on a question in a dialog. Your user sees it under your message and sends it, edits it or dismisses it: nothing reaches the session until they do. Write it as your user would, in the first person, short and plain (at most ${SUGGESTION_MAX} characters). For a dialog, give the option you'd pick, exactly as it's labelled, or for an open question (no options) the answer to type; your user answers it in the panel. When one of your user's rules decides the answer, pass its number as \`rule\`; leave it out when you're using your own judgment. To pass on something your user asked you to tell a session, use suggest_message instead. One answer per session: a new one replaces your last. Resolves to what happens next.`,
       params: Type.Object({
         session,
         reply: Type.String({ description: "The answer, as your user would write it." }),
@@ -61,7 +61,7 @@ export function replyCapabilities(rules: string[], made: (id: string) => void): 
     },
     {
       name: "suggest_message",
-      description: `Draft a message for a session in your project: something your user asked you to pass on ("tell it to stop and summarize"), or a heads-up when Rails tells you two sessions changed the same files. Your user sees it under your message and sends it, edits it or dismisses it: nothing reaches the session until they do. A session that's busy or waiting on a question gets it after its current turn, in its own queue. Write it as your user would, in the first person (at most ${SUGGESTION_MAX} characters). For answering a question a session asked, use suggest_reply. One suggestion per session: a new one replaces the last. Resolves to what happens next.`,
+      description: `Draft a message for a session in your project: something your user asked you to pass on ("tell it to stop and summarize"), or a heads-up when Rails tells you two sessions changed the same files. Your user sees it under your message and sends it, edits it or dismisses it: nothing reaches the session until they do. A session that's busy or waiting on a question gets it after its current turn, in its own queue. Write it as your user would, in the first person (at most ${SUGGESTION_MAX} characters). For answering a question a session asked, use suggest_reply. Messages don't replace each other: one session can have up to ${MAX_PENDING_MESSAGES} of yours waiting, so draft a new one only for something new. Resolves to what happens next.`,
       params: Type.Object({
         session,
         message: Type.String({ description: "The message, as your user would write it." }),

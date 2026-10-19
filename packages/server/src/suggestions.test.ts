@@ -7,7 +7,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { CodexWatcher } from "./bridge/codex.ts";
 import { PiInbox } from "./bridge/deliver.ts";
 import { receive } from "./bridge/index.ts";
-import { panels, projects, settings } from "./db.ts";
+import { panels, projects, settings, suggestions } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
 import { createSprocket, listMessages, listSprockets, sendMessage, updateSettings } from "./sprockets.ts";
@@ -130,7 +130,18 @@ describe("suggested replies", () => {
     expect(suggest(lead.id, pi, "Notes", "Green").mode).toBe("answer");
   });
 
-  it("replaces a session's earlier suggestion with a newer one", async () => {
+  it("keeps a session's messages side by side, up to a limit, and an answer apart from them", () => {
+    const { lead, panel } = setup();
+    for (const t of ["Heads-up: auth.ts changed.", "Handoff: use /login.", "Also: rerun the tests."]) suggest(lead.id, panel, "Fix sidebar", t, { purpose: "message" });
+    expect(() => suggest(lead.id, panel, "Fix sidebar", "One more.", { purpose: "message" })).toThrow("3 of your messages");
+    const answer = suggest(lead.id, panel, "Fix sidebar", "Yes.");
+    suggest(lead.id, panel, "Fix sidebar", "Yes, and skip e2e."); // replaces the answer, not the messages
+    const pending = suggestions.pendingFor(panel.id).map((s) => s.text);
+    expect(pending).toEqual(["Heads-up: auth.ts changed.", "Handoff: use /login.", "Also: rerun the tests.", "Yes, and skip e2e."]);
+    expect(suggestions.get(answer.id)).toBeUndefined(); // never shown (no reply yet), so dropped
+  });
+
+  it("replaces a session's earlier answer with a newer one", async () => {
     const { lead, panel } = setup();
     await suggestThroughRun(lead.id, panel.id, "Yes.");
     await suggestThroughRun(lead.id, panel.id, "Yes, but skip the e2e tests.");

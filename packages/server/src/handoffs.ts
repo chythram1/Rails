@@ -5,11 +5,13 @@
 // which the user sends. If it isn't done, the Coordinator replies (quiet) and waits for the next turn end.
 // A handoff is cancelled when either session ends or its panel closes, and expires after HANDOFF_TTL_MS, so a
 // forgotten one doesn't fire days later. Each of those leaves a line in the Coordinator's chat.
+// Its sessions' titles are kept current: a handoff is often planned before a session has a title of its own.
 // (The capabilities use this module, so it doesn't import sprockets.ts, which imports the runs.)
 import { HANDOFF_NOTE_MAX, type Panel } from "@rails/shared";
 import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
 import { handoffs, panels, sprocketMessages, sprockets, type StoredHandoff } from "./db.ts";
 import { ServiceError } from "./errors.ts";
+import { sessionTitle } from "./titles.ts";
 import { listeners } from "./util.ts";
 
 /** How long a handoff waits for its session to finish. */
@@ -90,6 +92,11 @@ export function startHandoffs(): void {
   setInterval(expireHandoffs, 60_000).unref?.();
   onEvents((panel, events) => {
     try {
+      // A prompt or a finished turn may give the session a title (its first prompt, Claude Code's own title).
+      if (events.some((e) => e.kind === "prompt" || e.kind === "turn_end") && handoffs.pendingAt(panel.id).length)
+        void sessionTitle(panel)
+          .then((title) => handoffs.retitle(panel.id, title) && changes.emit())
+          .catch((err) => console.error("handoffs:", err));
       for (const e of events) {
         if (e.kind !== "ended") continue;
         for (const h of handoffs.pendingAt(panel.id)) {

@@ -75,6 +75,10 @@ export function foldCard(panel: { id: string; kind: PanelKind; title: string; se
         c.waitingFor = undefined;
         if (e.text) c.lastOutcome = e.text;
         break;
+      case "stopped":
+        c.status = "idle";
+        c.waitingFor = undefined;
+        break;
       case "failed":
         c.status = "failed";
         c.waitingFor = undefined;
