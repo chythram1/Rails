@@ -160,8 +160,22 @@ describe("events for watches", () => {
     const tool_input = { questions: [{ question: "Which colour?", header: "Colour", options: [{ label: "Blue", description: "b" }, { label: "Green" }], multiSelect: false }] };
     const expected = [{ kind: "waiting", reason: "question", questions: [{ question: "Which colour?", options: ["Blue", "Green"] }] }];
     expect(fromClaude("PreToolUse", { tool_name: "AskUserQuestion", tool_input })).toEqual(expected);
-    expect(fromPi("tool", { tool: "ask_user_question", input: tool_input })).toEqual(expected);
-    expect(fromPi("tool", { tool: "read", input: { path: "a.ts" } })[0].kind).toBe("tool");
+    // pi: the extension sends the input of the tool that was running when the dialog opened.
+    expect(fromPi("ui_prompt_start", { title: "", kind: "custom", input: tool_input })).toEqual(expected);
+  });
+
+  it("reads pi questions by their shape, whatever the tool is called, open ones included", () => {
+    const one = fromPi("ui_prompt_start", { kind: "custom", input: { question: "Deploy to staging or production?", choices: ["staging", { value: "production" }] } });
+    expect(one).toEqual([{ kind: "waiting", reason: "question", questions: [{ question: "Deploy to staging or production?", options: ["staging", "production"] }] }]);
+    const open = fromPi("ui_prompt_start", { kind: "input", input: { question: "How should I continue?" } });
+    expect(open).toEqual([{ kind: "waiting", reason: "question", questions: [{ question: "How should I continue?", options: [] }] }]);
+  });
+
+  it("doesn't take a tool with a question for a question to the user unless a dialog opens", () => {
+    // A tool that asks something else (here another model): no dialog, so it's just a tool.
+    expect(fromPi("tool", { tool: "ask_expert", input: { question: "What does EPERM mean?" } })).toEqual([{ kind: "tool", tool: "ask_expert", files: [], edit: false }]);
+    // An approval extension's dialog while a write runs: no questions in that input, so it stays unknown.
+    expect(fromPi("ui_prompt_start", { title: "Approve write to notes.txt?", kind: "confirm", input: undefined })).toEqual([{ kind: "waiting", reason: "Approve write to notes.txt?" }]);
   });
 
   it("keeps the end of a long final message", () => {

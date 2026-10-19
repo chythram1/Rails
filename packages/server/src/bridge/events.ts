@@ -41,16 +41,22 @@ const clipEnds = (s: unknown) => {
   return t.length > MAX_TEXT ? `${t.slice(0, HEAD)}\n…\n${t.slice(t.length - (MAX_TEXT - HEAD))}` : t;
 };
 
-/** Questions from a question tool's input (Claude Code's AskUserQuestion, pi's ask_user_question), bounded. */
-function questionsOf(input: any): SessionQuestion[] | undefined {
-  if (!Array.isArray(input?.questions)) return undefined;
-  const list = input.questions
+/**
+ * The questions in a tool's input, by its shape, not the tool's name: a list (`{questions: [{question,
+ * options}]}`, as Claude Code's AskUserQuestion and pi's rpiv-ask-user-question take) or one question
+ * (`{question, options | choices}`). Options are strings or `{label | value | title}`. A question without
+ * options is open: it's answered by typing. Bounded, like everything agents report.
+ */
+export function questionsOf(input: any): SessionQuestion[] | undefined {
+  const raw: any[] = Array.isArray(input?.questions) ? input.questions : typeof input?.question === "string" ? [input] : [];
+  const label = (o: any) => clip(typeof o === "string" ? o : (o?.label ?? o?.value ?? o?.title), 100);
+  const list = raw
     .slice(0, 4)
-    .map((q: any) => ({
-      question: clip(q?.question, 300),
-      options: (Array.isArray(q?.options) ? q.options : []).slice(0, 6).map((o: any) => clip(typeof o === "string" ? o : o?.label, 100)).filter(Boolean),
-    }))
-    .filter((q: SessionQuestion) => q.question);
+    .map((q) => {
+      const options = Array.isArray(q?.options) ? q.options : Array.isArray(q?.choices) ? q.choices : [];
+      return { question: clip(q?.question, 300), options: options.slice(0, 6).map(label).filter(Boolean) };
+    })
+    .filter((q) => q.question);
   return list.length ? list : undefined;
 }
 const abs = (cwd: string | undefined, p: unknown) => (typeof p !== "string" || !p ? [] : [clip(isAbsolute(p) || !cwd ? p : join(cwd, p), 500)]);
@@ -115,9 +121,6 @@ export function fromPi(event: string, data: any): SessionEvent[] {
     case "tool": {
       const tool = clip(data?.tool, 100) || "tool";
       const input = data?.input ?? {};
-      // pi has no question tool of its own; extensions add them (ask_user_question and the like), with Claude's shape.
-      const questions = /question/i.test(tool) ? questionsOf(input) : undefined;
-      if (questions) return [{ kind: "waiting", reason: "question", questions }];
       return [
         {
           kind: "tool",
@@ -128,8 +131,13 @@ export function fromPi(event: string, data: any): SessionEvent[] {
         },
       ];
     }
-    case "ui_prompt_start":
+    case "ui_prompt_start": {
+      // A dialog opened. If a tool whose input holds questions was running (the extension sends its input),
+      // it's that question for the user; otherwise it's some extension's dialog, which may be an approval.
+      const questions = questionsOf(data?.input);
+      if (questions) return [{ kind: "waiting", reason: "question", questions }];
       return [{ kind: "waiting", reason: data?.title ? clip(data.title, 120) : "a prompt" }];
+    }
     case "ui_prompt_end":
       return [{ kind: "resumed" }];
     case "agent_end":

@@ -27,7 +27,7 @@ export function EventRow({ message, projectId, name }: { message: SprocketMessag
           {e.questions.map((q, i) => (
             <li key={i}>
               {q.question}
-              {q.options.length > 0 && <span className="sp-event-options">{q.options.join(" · ")}</span>}
+              <span className="sp-event-options">{q.options.length ? q.options.join(" · ") : "Open question: answered by typing"}</span>
             </li>
           ))}
         </ul>

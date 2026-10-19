@@ -124,8 +124,9 @@ describe("suggested replies", () => {
     receive(panel.id, "claude", "PermissionRequest", { tool_name: "AskUserQuestion" });
     expect(suggest(lead.id, panel, "Fix sidebar", "Green").mode).toBe("answer");
     const pi = panels.create({ projectId: panel.projectId, kind: "pi", title: "Notes" });
-    receive(pi.id, "pi", "tool", { tool: "ask_user_question", input: { questions: [{ question: "Which colour?", options: [] }] } });
-    receive(pi.id, "pi", "ui_prompt_start", { title: "" });
+    const input = { questions: [{ question: "Which colour?", options: [] }] };
+    receive(pi.id, "pi", "tool", { tool: "ask_user_question", input });
+    receive(pi.id, "pi", "ui_prompt_start", { title: "", kind: "custom", input });
     expect(suggest(lead.id, pi, "Notes", "Green").mode).toBe("answer");
   });
 

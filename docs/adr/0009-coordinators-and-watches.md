@@ -23,7 +23,10 @@ Decisions:
   - one wake per wait (agents may report a wait twice), and at most one per session per minute (a sooner
     one waits for the minute to pass);
   - permission prompts never wake it, nor other dialogs pi extensions show (they may be approvals): Sprockets
-    never answer those, and the tab's attention mark covers them.
+    never answer those, and the tab's attention mark covers them. pi has no question tool of its own, so a
+    pi dialog is a question only when it opens while a tool whose input holds questions is running; the
+    questions are read by their shape, whatever the tool is called (docs/providers.md). A question without
+    options is open, and the Coordinator is told it's answered by typing.
 - **Waits arrive as chat messages** from Rails (author `event`), with the session, what it waits for (the
   dialog's questions and options, or the end of its last message) and a link to its panel. The model reads
   them as `[Rails event, not from your user]`, with the session's text quoted as data. The Coordinator's run

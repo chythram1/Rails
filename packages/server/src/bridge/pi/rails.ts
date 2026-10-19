@@ -55,12 +55,24 @@ export default function railsBridge(pi: any) {
   pi.on("before_agent_start", (e: any) => {
     if (e.messageType === "user") post("prompt", { text: e.prompt ?? "" });
   });
+  // Tool calls running now whose input could be a question for the user (any tool: pi has no question tool
+  // of its own, extensions add them under any name). pi's dialog event doesn't say which tool opened it, so
+  // a dialog that opens while one of these runs carries its input, and Rails reads the question from it.
+  const asking = new Map<string, unknown>();
+  const mayAsk = (input: any) => Array.isArray(input?.questions) || typeof input?.question === "string";
+
   pi.on("tool_call", (e: any) => {
+    if (mayAsk(e.input)) asking.set(e.toolCallId, e.input);
     if (!e.parentToolCallId) post("tool", { tool: e.toolName, input: e.input });
   });
-  pi.on("ui_prompt_start", (e: any) => post("ui_prompt_start", { title: e.title ?? "" }));
+  pi.on("tool_execution_end", (e: any) => asking.delete(e.toolCallId));
+  pi.on("ui_prompt_start", (e: any) => {
+    const input = [...asking.values()].at(-1);
+    post("ui_prompt_start", { title: e.title ?? "", kind: e.kind, ...(input ? { input } : {}) });
+  });
   pi.on("ui_prompt_end", () => post("ui_prompt_end", {}));
   pi.on("agent_end", (e: any) => {
+    asking.clear();
     const last = [...(e.messages ?? [])].reverse().find((m: any) => m.role === "assistant");
     const failed = last?.stopReason === "error";
     post("agent_end", failed ? { error: last?.errorMessage ?? "the turn failed" } : { text: textOf(last) });
