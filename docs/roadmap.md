@@ -10,7 +10,7 @@ Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
   capabilities: sessions, git, files), and ADR 0009 wakes a project's Coordinator when a session waits
   for the user; ADR 0010 lets it suggest the answer, which the user sends with one tap, and ADR 0011
   gives it standing rules. The workspace's side panel has the project's Sprockets beside its sessions,
-  and a fast decision model can judge in shadow (ADR 0012). Next: act on the decision model where the
+  a fast decision model can judge in shadow (ADR 0012), and the Sprocket list is grouped by project. Next: act on the decision model where the
   shadow log shows it's better than the rules, automatic answers for trusted rules, conflict warnings and
   handoffs, digests.
   Sprockets replace the earlier "home agent" idea.

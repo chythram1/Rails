@@ -292,6 +292,11 @@ Soft rectangles throughout, with radius growing with the size of the thing.
 ### Switches
 - **Switch** (`components/Switch.tsx`, refs: Replit's and Higgsfield's settings rows) for a setting that applies at once: a 36 × 20 pill with a 14px knob, `--surface-2` with a `--muted` knob when off (the knob lightens on hover), Paper White (`--primary`) with a `--bg` knob when on. No slide: chrome doesn't move. It sits on the right of its row, level with the label; the label and a one-line description (what turning it on does) are on the left. It's a `button` with `role="switch"`, named by its `<label>`.
 
+### The Sprocket list
+- **Grouped by project** (`sprockets/groups.ts`): small 12px muted headings (500) with the project's name, in the sidebar's order, then **General** for unattached Sprockets. In a group the Coordinator comes first, then the most recently active. Each row: the 36px character, the name, a muted 12px "Coordinator" when it is one (plain text, not a badge), the time on the right, then the chat's last line and the red attention dot while one of its replies waits.
+- **Filter tabs** under the search (refs: Telegram's chat folders): 28px pill buttons with a 1px `--border-strong` edge and 13px `--text-2` labels, Paper White with `--bg` text when pressed (`aria-pressed`). All, each project with Sprockets, General; shown only when there's more than one group. One row that scrolls sideways. With a group chosen its heading is dropped (the tab says which), and the gallery shows that group too.
+- **Gallery** (desktop, nothing open): the same groups with 13px headings; the New card sits with General (where new Sprockets start), or after the last group shown.
+
 ### Lists of short texts
 - **Rules** (a Coordinator's settings, ADR 0011): numbered rows that are fields themselves: `--bg`, 1px `--border-strong`, 10px radius, a muted 13px number, the sentence in a borderless 14px textarea that grows with it, and a 26px remove button (14px X). The row takes the `--border-focus` edge while edited; Enter saves, Escape puts it back. Below, an "Add a rule" field (an example sentence as its placeholder while the list is empty) that shows its count, Cancel and Add once something's typed.
 

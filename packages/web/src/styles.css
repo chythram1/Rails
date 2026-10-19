@@ -556,12 +556,28 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-search input::placeholder { color: var(--muted); }
 .sp-search input::-webkit-search-cancel-button { filter: invert(0.6); }
 .sp-list-head .icon-btn { width: 32px; height: 32px; }
-.sp-rows { list-style: none; margin: 0; padding: 6px; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 2px; }
+/* Filter tabs under the search (Telegram's chat folders): All, each project, General. One row that scrolls sideways. */
+.sp-filters { display: flex; gap: 4px; padding: 8px 10px 0 12px; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; }
+.sp-filter {
+  flex-shrink: 0; max-width: 140px; height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--border-strong);
+  color: var(--text-2); font-size: 13px;
+}
+.sp-filter:hover { background: var(--hover); }
+.sp-filter[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--bg); }
+/* The rows, grouped by project under small headings; the groups scroll together. */
+.sp-groups { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 6px 6px; }
+.sp-group-title { margin: 0; padding: 10px 6px 4px; color: var(--muted); font-size: 12px; font-weight: 500; }
+.sp-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .sp-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 6px; border-radius: 10px; }
 .sp-row[aria-current="page"] { background: var(--surface-2); }
 .sp-row-text { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 14px; }
 .sp-row-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.sp-row-top .truncate { flex: 1; }
+.sp-row-top .sp-row-name { flex: 0 1 auto; }
+.sp-row-top .session-time { margin-left: auto; }
+/* Its role: plain muted text, not a badge (The Color Means State Rule). */
+.sp-row-role { flex: none; color: var(--muted); font-size: 12px; }
+.sp-row-bottom { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sp-row-bottom .truncate { flex: 1; }
 .sp-row-top .session-time { width: auto; }
 .sp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; container-type: inline-size; }
 .sp-head { padding: 7px 12px 0 20px; gap: 10px; }
@@ -784,7 +800,10 @@ ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
 .sp-card-name { font-size: 14px; font-weight: 500; color: var(--text); }
 
 /* Gallery: the page with no Sprocket open. Cards hold the character, its name and the last message. */
-.sp-gallery { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 40px 32px 48px; }
+.sp-gallery { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 28px 32px 48px; }
+.sp-gallery-group { max-width: 880px; margin: 0 auto; }
+.sp-gallery-group + .sp-gallery-group { margin-top: 20px; }
+.sp-gallery .sp-group-title { padding: 0 2px 10px; font-size: 13px; }
 .sp-cards { list-style: none; margin: 0 auto; padding: 0; max-width: 880px; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
 .sp-card {
   height: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 24px 14px 18px;
