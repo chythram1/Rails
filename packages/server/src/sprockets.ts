@@ -16,7 +16,7 @@ import {
   type SprocketMessage,
   type SprocketSettings,
 } from "@rails/shared";
-import { projects, sprocketMessages, sprockets } from "./db.ts";
+import { projects, sprocketMessages, sprockets, suggestions } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { findModel } from "./models.ts";
 import { isRunning, onRunsChanged, requestReply, userMessageTime } from "./runs.ts";
@@ -63,7 +63,7 @@ function parseInput(body: Partial<SprocketInput> | undefined): SprocketInput {
 }
 
 function withLook({ coreMemory: _internal, ...row }: ReturnType<typeof sprockets.list>[number]): Sprocket {
-  return { ...row, look: repairLook(row.look), running: isRunning(row.id), lastMessage: sprocketMessages.last(row.id) };
+  return { ...row, look: repairLook(row.look), pending: suggestions.pendingPanels(row.id), running: isRunning(row.id), lastMessage: sprocketMessages.last(row.id) };
 }
 
 function getSprocket(id: string): Sprocket {

@@ -100,7 +100,8 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 | `packages/server/src/db.ts` | SQLite via `node:sqlite`: projects, panels, layouts. |
 | `packages/server/src/git.ts` | Read-only git status and diff through the git CLI. |
 | `packages/server/src/providers/` | One discovery adapter per provider (`scan`: cwd, title, dates from the head/tail of each transcript). `index.ts` holds the registry and `installed()`. |
-| `packages/web/src/components/Workspace.tsx` | The workspace: dockview layout (`Dock`), tabs, `+` menu, and the one-panel-at-a-time mobile view. Data comes from `useWorkspace.ts`. |
+| `packages/web/src/components/Workspace.tsx` | The workspace: dockview layout (`Dock`), tabs, `+` menu, the side panel's toggles, and the one-panel-at-a-time mobile view. Data comes from `useWorkspace.ts`. |
+| `packages/web/src/components/SidePanel.tsx` | The panel beside a workspace: the project's Sprockets' chats (where suggested replies wait) or Git (`GitPanel.tsx`). |
 | `packages/web/src/components/FolderMenu.tsx` | The Add project menu: search + recent agent folders + "Open folder…" (native picker). Popover placement comes from `usePopover` in `Menu.tsx`. |
 | `packages/server/src/sprockets.ts` | Sprocket services (ADR 0005, 0006): create/edit/delete, settings (project, model, description, Coordinator) and messages. Core memory is internal (`runs.ts`, never sent to browsers). Emits `onSprocketsChanged`. |
 | `packages/server/src/runs.ts` | Sprocket runs (ADR 0006): one bounded pi-agent-core loop per reply, the runaway guards, the `remember` tool. |

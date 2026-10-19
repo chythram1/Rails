@@ -90,7 +90,10 @@ describe("suggested replies", () => {
   it("lets the user dismiss a suggestion", async () => {
     const { lead, panel } = setup();
     const [s] = (await suggestThroughRun(lead.id, panel.id, "Yes.")).suggestions!;
+    const pending = () => listSprockets().find((x) => x.id === lead.id)!.pending;
+    expect(pending()).toEqual([panel.id]); // the workspace marks the session's tab
     expect(dismissSuggestion(s.id).status).toBe("dismissed");
+    expect(pending()).toEqual([]);
     await expect(sendSuggestion(s.id, "Yes.")).rejects.toThrow("can't be sent anymore");
   });
 

@@ -34,9 +34,10 @@ function stamp(iso: string): string {
  * A Sprocket's chat (ADR 0005, 0006). The thread opens with the Sprocket itself (as Dot, Pi and hilos
  * do), and time labels break it up where there are gaps. The user's messages sit on the right, replies on
  * the left, and rails' own notices (no model yet, errors) in the middle. A Coordinator's chat also has the
- * sessions that waited for the user (EventRow). A reply shows as it's written.
+ * sessions that waited for the user (EventRow). A reply shows as it's written. `embedded` is the chat in a
+ * workspace's side panel (SidePanel.tsx), which has a header of its own.
  */
-export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; panelOpen: boolean }) {
+export function SprocketChat({ sprocket, panelOpen, embedded = false }: { sprocket: SprocketData; panelOpen: boolean; embedded?: boolean }) {
   const { id, name } = sprocket;
   const { projects } = useStore();
   const project = projects.find((p) => p.id === sprocket.projectId);
@@ -127,36 +128,38 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
   };
 
   return (
-    <section className="sp-chat" aria-labelledby="sp-chat-title">
-      <header className="sp-head">
-        <a className="icon-btn sp-back" href={href.sprockets()} aria-label="All Sprockets">
-          <ChevronLeft size={18} />
-        </a>
-        <Sprocket look={sprocket.look} size={28} seed={id} />
-        <h2 id="sp-chat-title" className="truncate" title={name}>{name}</h2>
-        {project && <span className="sp-project truncate" title={`Attached to ${project.name}`}>{project.name}</span>}
-        <span className="grow" />
-        <a
-          className={"icon-btn" + (panelOpen ? " active" : "")}
-          href={panelOpen ? href.sprocket(id) : href.sprocketSettings(id)}
-          aria-label={`${name} settings`}
-          aria-expanded={panelOpen}
-          title={panelOpen ? "Close settings" : "Settings"}
-        >
-          <PanelRight size={18} />
-        </a>
-        <MenuButton
-          label={`${name} actions`}
-          title="More"
-          icon={<EllipsisVertical size={16} />}
-          align="right"
-          items={[
-            { label: "Settings", shortcut: "s", onSelect: () => navigate(panelOpen ? href.sprocket(id) : href.sprocketSettings(id)) },
-            { label: "Change look", shortcut: "l", onSelect: () => navigate(href.editSprocket(id)) },
-            { label: "Delete", shortcut: "d", danger: true, onSelect: () => void remove() },
-          ]}
-        />
-      </header>
+    <section className="sp-chat" {...(embedded ? { "aria-label": `Chat with ${name}` } : { "aria-labelledby": "sp-chat-title" })}>
+      {!embedded && (
+        <header className="sp-head">
+          <a className="icon-btn sp-back" href={href.sprockets()} aria-label="All Sprockets">
+            <ChevronLeft size={18} />
+          </a>
+          <Sprocket look={sprocket.look} size={28} seed={id} />
+          <h2 id="sp-chat-title" className="truncate" title={name}>{name}</h2>
+          {project && <span className="sp-project truncate" title={`Attached to ${project.name}`}>{project.name}</span>}
+          <span className="grow" />
+          <a
+            className={"icon-btn" + (panelOpen ? " active" : "")}
+            href={panelOpen ? href.sprocket(id) : href.sprocketSettings(id)}
+            aria-label={`${name} settings`}
+            aria-expanded={panelOpen}
+            title={panelOpen ? "Close settings" : "Settings"}
+          >
+            <PanelRight size={18} />
+          </a>
+          <MenuButton
+            label={`${name} actions`}
+            title="More"
+            icon={<EllipsisVertical size={16} />}
+            align="right"
+            items={[
+              { label: "Settings", shortcut: "s", onSelect: () => navigate(panelOpen ? href.sprocket(id) : href.sprocketSettings(id)) },
+              { label: "Change look", shortcut: "l", onSelect: () => navigate(href.editSprocket(id)) },
+              { label: "Delete", shortcut: "d", danger: true, onSelect: () => void remove() },
+            ]}
+          />
+        </header>
+      )}
       <div className="sp-thread" ref={thread}>
         {loadError && !messages && (
           <div className="sp-placeholder">
@@ -243,7 +246,7 @@ export function SprocketChat({ sprocket, panelOpen }: { sprocket: SprocketData; 
           </button>
         )}
         {error && <p className="error" role="alert">{error}</p>}
-        <Composer placeholder={`Message ${name}`} onSubmit={(text) => void send(text)} autoFocus compact />
+        <Composer placeholder={`Message ${name}`} onSubmit={(text) => void send(text)} autoFocus={!embedded} compact />
       </div>
     </section>
   );

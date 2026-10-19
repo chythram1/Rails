@@ -10,12 +10,13 @@ import {
   type IWatermarkPanelProps,
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
-import { IconGitBranch as GitBranch, IconX as X } from "@tabler/icons-react";
+import { IconGitBranch as GitBranch, IconRobotFace as RobotFace, IconX as X } from "@tabler/icons-react";
 import { parseSessionKey, sessionKey, type Panel, type PanelKind } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate } from "../router.ts";
 import { useStore } from "../store.tsx";
-import { GitPanel } from "./GitPanel.tsx";
+import { SidePanel, type SideView } from "./SidePanel.tsx";
+import { useSprockets } from "./sprockets/useSprockets.ts";
 import { PanelIcon, PanelMenu } from "./PanelMenu.tsx";
 import { TerminalView } from "./TerminalView.tsx";
 import { useWorkspace, type WorkspaceState } from "./useWorkspace.ts";
@@ -26,8 +27,12 @@ const MOBILE = "(max-width: 860px)";
 interface Ctx extends WorkspaceState {
   /** Open a panel and place it in `group` (or the active group). */
   openIn(kind: PanelKind, group?: DockviewGroupPanel): void;
-  gitOpen: boolean;
-  toggleGit(): void;
+  /** What the side panel shows, if it's open. */
+  side: SideView | null;
+  /** Open the side panel on `view`, or close it if it's showing that already. */
+  toggleSide(view: SideView): void;
+  /** Panels whose session has a reply waiting in one of the project's Sprockets (ADR 0010). */
+  replyReady: Set<string>;
 }
 const WorkspaceCtx = createContext<Ctx | null>(null);
 const useWs = () => useContext(WorkspaceCtx)!;
@@ -38,7 +43,11 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
   const project = projects.find((p) => p.id === projectId);
   const ws = useWorkspace(projectId);
   const [mobile, setMobile] = useState(() => matchMedia(MOBILE).matches);
-  const [gitOpen, setGitOpen] = useState(false);
+  const [side, setSide] = useState<SideView | null>(null);
+  // The project's Sprockets, its Coordinator first.
+  const { list: allSprockets } = useSprockets();
+  const sprockets = (allSprockets ?? []).filter((s) => s.projectId === projectId).sort((a, b) => Number(b.coordinator) - Number(a.coordinator));
+  const replyReady = new Set(sprockets.flatMap((s) => s.pending));
   const targetGroup = useRef<DockviewGroupPanel>(undefined);
   const [focusId, setFocusId] = useState<string>();
 
@@ -72,7 +81,7 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
   if (!project) return <div className="page center muted">Project not found.</div>;
 
   return (
-    <WorkspaceCtx.Provider value={{ ...ws, openIn, gitOpen, toggleGit: () => setGitOpen((o) => !o) }}>
+    <WorkspaceCtx.Provider value={{ ...ws, openIn, side, toggleSide: (view) => setSide((v) => (v === view ? null : view)), replyReady }}>
       <div className="workspace">
         {ws.error && (
           <div className="workspace-error" role="alert">
@@ -84,7 +93,16 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
         )}
         <div className="workspace-body">
           {ws.panels === null ? null : mobile ? <MobilePanels /> : <Dock projectId={projectId} targetGroup={targetGroup} focusId={focusId} onFocused={() => setFocusId(undefined)} />}
-          {gitOpen && <GitPanel projectId={projectId} refreshKey={String(ws.panels?.length)} onClose={() => setGitOpen(false)} />}
+          {side && (
+            <SidePanel
+              view={side}
+              projectId={projectId}
+              projectName={project.name}
+              sprockets={sprockets}
+              refreshKey={String(ws.panels?.length)}
+              onClose={() => setSide(null)}
+            />
+          )}
         </div>
       </div>
     </WorkspaceCtx.Provider>
@@ -196,11 +214,16 @@ function PanelBody({ panel, focused }: { panel: Panel; focused: boolean }) {
   );
 }
 
-/** A small red dot on a panel's tab when its agent needs the user (ADR 0007). */
+/**
+ * A small red dot on a panel's tab when its agent needs the user (ADR 0007), or when a Sprocket has a reply
+ * ready for it (ADR 0010).
+ */
 function AttentionMark({ panelId }: { panelId: string }) {
   const reason = useStore().attention.get(panelId);
-  if (!reason) return null;
-  return <span className="tab-attention" role="img" aria-label={reason === "waiting" ? "Needs you" : "Turn failed"} title={reason === "waiting" ? "Needs you" : "Turn failed"} />;
+  const ready = useWs().replyReady.has(panelId);
+  const label = reason === "waiting" ? "Needs you" : reason === "failed" ? "Turn failed" : ready ? "A reply is ready in Sprockets" : undefined;
+  if (!label) return null;
+  return <span className="tab-attention" role="img" aria-label={label} title={label} />;
 }
 
 function PanelTab(props: IDockviewPanelHeaderProps) {
@@ -237,13 +260,24 @@ function HeaderAdd(props: IDockviewHeaderActionsProps) {
   );
 }
 
-/** The Git panel toggle. Desktop shows it once, at the right end of the top-right pane's tab bar. */
-function GitToggle() {
-  const { gitOpen, toggleGit } = useWs();
+/**
+ * The side panel's toggles, Sprockets and Git (SidePanel.tsx). Desktop shows them once, at the right end of
+ * the top-right pane's tab bar. The Sprockets one carries a dot while a reply waits.
+ */
+function SideToggles() {
+  const { side, toggleSide, replyReady } = useWs();
+  const ready = replyReady.size;
+  const sprocketsLabel = ready ? `Sprockets: ${ready > 1 ? `${ready} replies` : "a reply"} ready` : "Sprockets";
   return (
-    <button className={"icon-btn" + (gitOpen ? " active" : "")} aria-label="Toggle git panel" aria-pressed={gitOpen} title="Git" onClick={toggleGit}>
-      <GitBranch size={16} />
-    </button>
+    <div className="side-toggles">
+      <button className={"icon-btn" + (side === "sprockets" ? " active" : "")} aria-label={sprocketsLabel} aria-pressed={side === "sprockets"} title={sprocketsLabel} onClick={() => toggleSide("sprockets")}>
+        <RobotFace size={16} />
+        {ready > 0 && <span className="toggle-dot" aria-hidden />}
+      </button>
+      <button className={"icon-btn" + (side === "git" ? " active" : "")} aria-label="Git" aria-pressed={side === "git"} title="Git" onClick={() => toggleSide("git")}>
+        <GitBranch size={16} />
+      </button>
+    </div>
   );
 }
 
@@ -264,7 +298,7 @@ function HeaderGit(props: IDockviewHeaderActionsProps) {
   }, [props.containerApi, props.group]);
   return topRight ? (
     <div className="header-git">
-      <GitToggle />
+      <SideToggles />
     </div>
   ) : null;
 }
@@ -274,7 +308,7 @@ function EmptyWorkspace(_: IWatermarkPanelProps) {
   return (
     <div className="empty-workspace">
       <div className="empty-git">
-        <GitToggle />
+        <SideToggles />
       </div>
       <p className="muted">No panels open. Pick a session in the sidebar, or start something:</p>
       <PanelMenu onPick={(kind) => ws.openIn(kind)} />
@@ -314,7 +348,7 @@ function MobilePanels() {
         ))}
         <PanelMenu onPick={(kind) => void ws.open(kind).then((p) => p && setActiveId(p.id))} />
         <span className="grow" />
-        <GitToggle />
+        <SideToggles />
       </div>
       {active ? (
         <PanelBody key={active.id} panel={active} focused />

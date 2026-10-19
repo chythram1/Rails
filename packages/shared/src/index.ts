@@ -138,6 +138,8 @@ export interface Sprocket {
    * whether to continue with its plan, say yes."). Each suggestion says which one it followed (ADR 0011).
    */
   rules: string[];
+  /** Panels where a reply it suggested waits for the user to send it (or answer in the panel). */
+  pending: string[];
   /** True while it's working on a reply. */
   running: boolean;
   /** The newest message in its chat, for the list preview. */

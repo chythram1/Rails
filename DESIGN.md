@@ -192,7 +192,7 @@ A neutral grayscale ladder with a white accent and three state colors.
 
 ### Neutral
 - **Canvas** (`--bg`): the page, terminal panels and fields (a field is a hole cut into a surface).
-- **Sidebar** (`--sidebar`): the sidebar, the dock's tab strip, the Git panel and the Settings nav.
+- **Sidebar** (`--sidebar`): the sidebar, the dock's tab strip, the side panel's header and the Settings nav.
 - **Surface** (`--surface`): raised things: menus, dialogs, cards, the composer, buttons.
 - **Surface 2** (`--surface-2`): the selected row, user chat bubbles, avatar placeholders.
 - **Hover** (`--hover`): hover and active-item fill.
@@ -319,6 +319,8 @@ Soft rectangles throughout, with radius growing with the size of the thing.
 
 ### Terminal panels
 - Dockview themed from the tokens (`.dockview-theme-dark` overrides in `styles.css`); the xterm theme in `TerminalView.tsx` mirrors `--bg`, `--text` and `--border-strong`. Tab close buttons show on hover or on the active tab.
+- **Tab marks:** a 7px red dot after the title when the session needs the user: it waits for a permission or an answer, its turn failed, or a Sprocket has a reply ready for it. Each has its `aria-label` ("Needs you", "Turn failed", "A reply is ready in Sprockets").
+- **Side panel** (`SidePanel.tsx`, refs: Snowflake's CoCo, Gumloop): 400px on `--bg` beside the panes, with a 1px `--border` edge; on phones it covers the screen. Two 30px icon toggles at the right end of the top-right pane's tab bar choose its view, Sprockets (robot face) and Git (branch); the one showing is `--hover`-filled (`aria-pressed`), and clicking it again closes the panel. The Sprockets toggle carries a 7px red dot (ringed in `--sidebar`) while a reply waits. The panel's header is the same 36px `--sidebar` band as the tab bars: for Sprockets, the project's Sprockets as tabs (20px character, 13px name, `--hover` fill when chosen, the Coordinator first, a red dot on one with a reply waiting), an "Open in Sprockets" ↗ and close; for Git, "Git", the branch, refresh and close. The Sprockets view is the chosen one's chat (the chat rules above, 16px side padding), opening on a Sprocket with a reply waiting, else the Coordinator. With no Sprockets in the project it says how to attach one.
 
 ### Sprockets and avatars (signature)
 - **Sprockets** are the product's personality: SVG characters with idle loops (bob, sway, blink, look-at) on a per-character period and phase, so a group never moves in sync. They're the only looping motion in Rails, and they respect their own motion setting. See ADR 0005 and the gotcha about SVG transforms in `AGENTS.md`.

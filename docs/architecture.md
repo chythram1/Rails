@@ -80,7 +80,9 @@ packages/
 - **Layout:** the web app saves dockview's `toJSON()` per project (`PUT /api/projects/:id/layout`). The
   server stores it opaquely. The server's panel list is the source of truth: on load the client
   restores the layout, then adds panels missing from it and removes ones that were closed.
-  `panels.changed` broadcasts keep other devices' panel lists current.
+  `panels.changed` broadcasts keep other devices' panel lists current. Beside the panes, a side panel
+  (`SidePanel.tsx`) shows the project's Sprockets' chats or Git; panels with a suggested reply waiting
+  (`Sprocket.pending`) get a mark on their tab.
 - **Sprockets** (ADR 0005, 0006): `sprockets.ts` stores Sprockets, their chats and settings (project, model,
   description, whether it's its project's Coordinator; core memory stays internal) in SQLite and broadcasts `sprockets.changed`. A user message (or, for a Coordinator, an event) starts a run (`runs.ts`): a
   pi-agent-core loop on the Sprocket's model, streamed to browsers as `sprockets.typing`, capped at 12 model

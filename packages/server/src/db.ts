@@ -221,7 +221,7 @@ type SprocketRow = {
   rules: string;
 };
 /** A stored Sprocket, with its internal core memory (never sent to browsers). */
-const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running"> & { look: unknown; coreMemory: string } => ({
+const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running" | "pending"> & { look: unknown; coreMemory: string } => ({
   id: r.id,
   name: r.name,
   look: JSON.parse(r.look),
@@ -417,6 +417,11 @@ export const suggestions = {
       map.set(r.message_id!, [...(map.get(r.message_id!) ?? []), s]);
     }
     return map;
+  },
+  /** Panels where a Sprocket's shown suggestions wait for the user. */
+  pendingPanels(sprocketId: string): string[] {
+    const rows = db.prepare("SELECT DISTINCT panel_id FROM suggestions WHERE sprocket_id = ? AND status = 'pending' AND message_id IS NOT NULL").all(sprocketId) as { panel_id: string }[];
+    return rows.map((r) => r.panel_id);
   },
   /** Pending ones for a panel (from any Sprocket). */
   pendingFor(panelId: string) {

@@ -1,14 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { IconPlus as Plus, IconSearch as Search } from "@tabler/icons-react";
 import type { Sprocket as SprocketData } from "@rails/shared";
-import { api } from "../../api.ts";
 import { href, navigate, type Route } from "../../router.ts";
 import { timeAgo } from "../../util.ts";
-import { socket } from "../../ws.ts";
 import { Sprocket } from "./Sprocket.tsx";
 import { SprocketChat } from "./SprocketChat.tsx";
 import { SprocketCreator } from "./SprocketCreator.tsx";
 import { SprocketSettings } from "./SprocketSettings.tsx";
+import { useSprockets } from "./useSprockets.ts";
 
 type SprocketsRoute = Extract<Route, { name: "sprockets" }>;
 
@@ -17,24 +16,7 @@ type SprocketsRoute = Extract<Route, { name: "sprockets" }>;
  * On small screens only one of the two shows at a time.
  */
 export function SprocketsPage({ route }: { route: SprocketsRoute }) {
-  const [list, setList] = useState<SprocketData[] | null>(null);
-  const [error, setError] = useState("");
-
-  const load = useCallback(async () => {
-    try {
-      setList(await api.sprockets());
-      setError("");
-    } catch (e: any) {
-      setError(e.message);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-    return socket.on((m) => {
-      if (m.type === "sprockets.changed") void load();
-    });
-  }, [load]);
+  const { list, error } = useSprockets();
 
   if (!list) return error ? <p className="error pad" role="alert">{error}</p> : null;
 

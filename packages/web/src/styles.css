@@ -388,6 +388,10 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .dv-tab:hover .tab-close, .dv-active-tab .tab-close, .tab-close:focus-visible { opacity: 1; }
 .header-add { display: flex; align-items: center; height: 100%; padding: 0 4px; }
 .header-git { display: flex; align-items: center; height: 100%; padding: 0 6px; }
+.side-toggles { display: flex; align-items: center; gap: 2px; }
+.side-toggles .icon-btn { position: relative; }
+/* A reply waits in the project's Sprockets: a red dot on the toggle's corner, like a tab's attention mark. */
+.toggle-dot { position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 2px var(--sidebar); }
 .empty-git { position: absolute; top: 6px; right: 8px; }
 .shell-icon { color: var(--muted); flex-shrink: 0; }
 /* The padding lives here, not on .term-host: xterm's fit addon sizes the terminal from its container's
@@ -432,12 +436,30 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .mobile-tab { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 180px; }
 .mobile-tabs .tab-close { opacity: 1; }
 
-/* ---- git panel ---- */
-.git-panel {
-  width: 380px; flex-shrink: 0; border-left: 1px solid var(--border); background: var(--sidebar);
+/* ---- side panel (SidePanel.tsx): a project's Sprockets or Git, beside its panes ---- */
+.side-panel {
+  width: 400px; flex-shrink: 0; border-left: 1px solid var(--border); background: var(--bg);
   display: flex; flex-direction: column; min-height: 0;
 }
-.git-head { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 6px 0 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+/* The same 36px band as the panes' tab bars beside it. */
+.side-head {
+  display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 6px 0 16px; flex-shrink: 0;
+  background: var(--sidebar); border-bottom: 1px solid var(--border);
+}
+.side-head h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.side-head.side-sprockets { gap: 2px; padding-left: 6px; }
+.side-tabs { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.side-tab {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0; max-width: 160px; height: 28px; padding: 0 9px 0 5px;
+  border-radius: 8px; color: var(--muted); font-size: 13px;
+}
+.side-tab:hover { color: var(--text-2); }
+.side-tab[aria-selected="true"] { background: var(--hover); color: var(--text); }
+.side-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.side-chat .sp-thread { padding: 20px 16px; }
+.side-chat .sp-compose { padding: 0 4px 12px; }
+.side-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 20px 16px; font-size: 14px; }
+.side-empty p { margin: 0; text-wrap: pretty; }
 .git-files { list-style: none; margin: 0; padding: 6px; max-height: 40%; overflow-y: auto; border-bottom: 1px solid var(--border); }
 .git-file { width: 100%; display: flex; gap: 10px; align-items: center; padding: 5px 10px; border-radius: 6px; font-size: 13px; text-align: left; }
 .git-file.active { background: var(--hover); }
@@ -806,7 +828,7 @@ ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
   .main:has(> .sprockets) > .nav-toggle { top: 14px; } /* on the Sprockets header's centre line */
   .page { padding: 64px 16px 32px; }
   .hero { font-size: 28px; }
-  .git-panel { position: fixed; inset: 0 0 0 auto; width: min(380px, 100vw); z-index: 15; }
+  .side-panel { position: fixed; inset: 0 0 0 auto; width: min(400px, 100vw); z-index: 15; }
   /* Settings fills the screen: search on top, then the sections as a row of tabs. */
   .settings-dialog { width: 100vw; height: 100dvh; border: 0; border-radius: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .settings-nav { gap: 10px; padding: 10px 56px 10px 12px; border-right: 0; border-bottom: 1px solid var(--border); max-height: 45dvh; }

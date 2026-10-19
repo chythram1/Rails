@@ -3,6 +3,7 @@ import { IconRefresh as RefreshCw, IconX as X } from "@tabler/icons-react";
 import type { GitStatus } from "@rails/shared";
 import { api } from "../api.ts";
 
+/** The side panel's Git view (SidePanel.tsx): changed files and a file's diff. */
 export function GitPanel({ projectId, refreshKey, onClose }: { projectId: string; refreshKey: string; onClose(): void }) {
   const [status, setStatus] = useState<GitStatus | null>(null);
   const [file, setFile] = useState<string | null>(null);
@@ -26,9 +27,9 @@ export function GitPanel({ projectId, refreshKey, onClose }: { projectId: string
   }, [projectId, file, refreshKey]);
 
   return (
-    <aside className="git-panel" aria-label="Git">
-      <header className="git-head">
-        <strong>Git</strong>
+    <>
+      <header className="side-head">
+        <h2>Git</h2>
         {status?.branch && (
           <span className="muted small truncate">
             {status.branch}
@@ -40,7 +41,7 @@ export function GitPanel({ projectId, refreshKey, onClose }: { projectId: string
         <button className="icon-btn" aria-label="Refresh" onClick={load}>
           <RefreshCw size={16} />
         </button>
-        <button className="icon-btn" aria-label="Close git panel" onClick={onClose}>
+        <button className="icon-btn" aria-label="Close the side panel" onClick={onClose}>
           <X size={16} />
         </button>
       </header>
@@ -78,7 +79,7 @@ export function GitPanel({ projectId, refreshKey, onClose }: { projectId: string
             : "No diff."}
         </pre>
       )}
-    </aside>
+    </>
   );
 }
 
