@@ -5,6 +5,7 @@ import { watchBusy } from "./activity.ts";
 import { panels } from "./db.ts";
 import { onPanelsChanged, panelEnded } from "./panels.ts";
 import { attentionList, onAttention } from "./bridge/index.ts";
+import { onDecisionsChanged } from "./decisions.ts";
 import { onModelsChanged, onSignIn } from "./models.ts";
 import { getProfile, onProfileChanged } from "./profile.ts";
 import { onActivity, onTyping } from "./runs.ts";
@@ -27,6 +28,7 @@ export class TerminalHub {
     onTyping((sprocketId, text) => this.broadcast({ type: "sprockets.typing", sprocketId, text }));
     onActivity((sprocketId, step, summary) => this.broadcast({ type: "sprockets.activity", sprocketId, step, summary }));
     onModelsChanged(() => this.broadcast({ type: "models.changed" }));
+    onDecisionsChanged(() => this.broadcast({ type: "decisions.changed" }));
     onSignIn((signIn) => this.broadcast({ type: "models.signIn", signIn }));
     onProfileChanged((profile) => this.broadcast({ type: "profile.changed", profile }));
     onAttention((list) => this.broadcast({ type: "panels.attention", panels: list }));

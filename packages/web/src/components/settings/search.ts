@@ -23,6 +23,7 @@ export const SETTINGS: SettingEntry[] = [
   { section: "general", rowId: "tmux", label: "tmux", phrases: ["terminal", "panels"] },
   { section: "general", rowId: "node", label: "Node.js", phrases: ["runtime"] },
   { section: "models", rowId: "default-model", label: "Default model", phrases: ["model", "LLM", "Sprocket model"] },
+  { section: "models", rowId: "decision-model", label: "Decision model", phrases: ["fast decisions", "System 1", "classifier", "Jev", "TypeSafe", "GPT-6 Luna", "shadow log"] },
   { section: "account", rowId: "avatar", label: "Avatar", phrases: ["profile", "picture", "photo", "icon"] },
   { section: "account", rowId: "name", label: "Name", phrases: ["profile", "display name", "computer name", "machine", "rename"] },
   { section: "account", rowId: "sign-out", label: "Sign out on this device", phrases: ["log out", "logout", "sign off"] },
@@ -36,6 +37,7 @@ const PROVIDER_PHRASES: Record<string, string[]> = {
   google: ["Gemini"],
   xai: ["Grok"],
   openrouter: ["Sign in with OpenRouter"],
+  typesafe: ["Jev", "System 1", "classifier", "fast decisions"],
 };
 
 /** The provider rows of Settings → Models, which come from the server. */

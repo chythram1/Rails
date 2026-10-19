@@ -9,12 +9,13 @@
 //   comes sooner wakes it once the cooldown is over, if the session is still waiting then).
 // Permission prompts never wake it, nor other dialogs pi extensions show (they may be approvals): Sprockets
 // don't answer those, and the tab's attention mark covers them.
-import type { SessionQuestion, SprocketEvent } from "@rails/shared";
+import type { Panel, SessionQuestion, SprocketEvent } from "@rails/shared";
 import { ASKING, type SessionEvent } from "./bridge/events.ts";
 import { onEvents, onPanelForgotten } from "./bridge/index.ts";
 import { panels, projects, sprockets } from "./db.ts";
 import { sessionsFor } from "./providers/index.ts";
 import { postEvent } from "./sprockets.ts";
+import { listeners } from "./util.ts";
 
 /** How long the user has to answer a session themselves before its Coordinator wakes. */
 export const GRACE_MS = 20_000;
@@ -147,30 +148,37 @@ export class Watches {
   }
 }
 
+const woke = listeners<[panelId: string, eventMessageId: string, what: Wake["what"]]>();
+/** A Coordinator was woken for a session, with this event message and why (decisions.ts links a turn end's judgment). */
+export const onWake = woke.on;
+
+/** A session's title as the user sees it (the tab, the board): its own title when discovery knows it. */
+export async function sessionTitle(panel: Panel): Promise<string> {
+  const project = projects.get(panel.projectId);
+  if (!project || !panel.sessionId) return panel.title;
+  const found = await sessionsFor(project.path).catch(() => []);
+  return found.find((s) => s.id === panel.sessionId)?.title || panel.title;
+}
+
 /** Put a waiting session in its project's Coordinator's chat, and wake it. False when there's none. */
 function wakeCoordinator(panelId: string, wake: Wake): boolean {
   const panel = panels.get(panelId);
   if (!panel || panel.kind === "shell") return false;
   const coordinator = sprockets.coordinatorOf(panel.projectId);
-  const project = projects.get(panel.projectId);
-  if (!coordinator || !project) return false;
-  // Titled like the tab and the board: by the session's own title when discovery knows it.
-  void sessionsFor(project.path)
-    .catch(() => [])
-    .then((found) => {
-      const title = (panel.sessionId && found.find((s) => s.id === panel.sessionId)?.title) || panel.title;
-      const event: SprocketEvent = {
-        panelId,
-        kind: panel.kind,
-        title,
-        ...(panel.sessionId ? { sessionId: panel.sessionId } : {}),
-        what: wake.what,
-        ...(wake.questions ? { questions: wake.questions } : {}),
-      };
-      // Still this project's Coordinator (the lookup took a moment)?
-      const now = sprockets.get(coordinator.id);
-      if (now?.coordinator && now.projectId === panel.projectId) postEvent(coordinator.id, event, wake.text);
-    });
+  if (!coordinator) return false;
+  void sessionTitle(panel).then((title) => {
+    const event: SprocketEvent = {
+      panelId,
+      kind: panel.kind,
+      title,
+      ...(panel.sessionId ? { sessionId: panel.sessionId } : {}),
+      what: wake.what,
+      ...(wake.questions ? { questions: wake.questions } : {}),
+    };
+    // Still this project's Coordinator (the lookup took a moment)?
+    const now = sprockets.get(coordinator.id);
+    if (now?.coordinator && now.projectId === panel.projectId) woke.emit(panelId, postEvent(coordinator.id, event, wake.text).id, wake.what);
+  });
   return true;
 }
 

@@ -73,7 +73,7 @@ packages/
   project's Coordinator's chat and starts a run. The Coordinator can suggest a reply (`suggest_reply`,
   `suggestions.ts`, ADR 0010), shown under its message; when the user sends it, `bridge/deliver.ts` puts it into
   the session: Claude Code's message socket, the pi extension's long poll (`GET /bridge/<panelId>/pi/inbox`, confirmed with `POST …/pi/delivered`) or
-  Codex's `thread/queue/add`. Suggestions expire as soon as their session moves on. A Coordinator's standing rules (ADR 0011) are in its prompt, numbered; a suggestion records the rule it followed.
+  Codex's `thread/queue/add`. Suggestions expire as soon as their session moves on. A Coordinator's standing rules (ADR 0011) are in its prompt, numbered; a suggestion records the rule it followed. If the user picked a decision model, `decisions.ts` (ADR 0012) asks it about every turn end and unknown dialog in projects with a Coordinator, through pi-ai's `classify()`, and only logs its answers next to Rails' own (`decisions` table, `GET /api/decisions`, `decisions.changed`).
 - **Persistence:** panels survive browser disconnects and server restarts (`tsx watch` included).
   On a reboot the tmux server is gone; the next workspace read drops panels whose tmux session no
   longer exists. Their transcripts remain, so sessions can be resumed from the sidebar.

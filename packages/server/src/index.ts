@@ -26,6 +26,7 @@ import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessag
 import { TerminalHub } from "./terminals.ts";
 import { startWatches } from "./watches.ts";
 import { dismissSuggestion, sendSuggestion, startSuggestions } from "./suggestions.ts";
+import { decisionLog, setDecisionModel, startDecisions } from "./decisions.ts";
 import { version as tmuxVersion } from "./tmux.ts";
 import { sameSecret } from "./util.ts";
 
@@ -180,6 +181,11 @@ app.get("/api/projects/:id/git/diff", async (c) =>
 
 // ---- Models: what Sprockets run on (ADR 0006) ----
 app.get("/api/models", async (c) => c.json(await modelSettings()));
+app.put("/api/models/decisions", async (c) => {
+  await setDecisionModel((await c.req.json<{ model?: unknown }>()).model ?? null);
+  return c.json({ ok: true });
+});
+app.get("/api/decisions", (c) => c.json(decisionLog()));
 app.put("/api/models/default", async (c) => {
   setDefaultModel((await c.req.json<{ model: unknown }>()).model);
   return c.json({ ok: true });
@@ -243,6 +249,7 @@ if (existsSync(webDist)) {
 loadAttention(panels.all());
 startWatches(); // Coordinators hear about sessions that wait for the user
 startSuggestions(); // suggested replies expire as their sessions move on
+startDecisions(); // the fast decision model judges in shadow, if the user picked one
 watchCodex(panels.all()); // Codex panels that survived a restart
 
 void tmuxVersion().then((v) => {

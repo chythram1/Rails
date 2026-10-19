@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { Panel, PanelKind, Project, Sprocket, SprocketAuthor, SprocketEvent, SprocketLook, SprocketMessage, Suggestion } from "@rails/shared";
+import type { DecisionEntry, Panel, PanelKind, Project, Sprocket, SprocketAuthor, SprocketEvent, SprocketLook, SprocketMessage, Suggestion } from "@rails/shared";
 import { RAILS_HOME } from "./config.ts";
 
 const db = new DatabaseSync(join(RAILS_HOME, "rails.db"));
@@ -98,6 +98,26 @@ db.exec(`
 addColumn("suggestions", "rule", "TEXT");
 /** On a sent suggestion: 1 if it went into the session's own queue (it was busy). */
 addColumn("suggestions", "queued", "INTEGER NOT NULL DEFAULT 0");
+db.exec(`
+  -- Shadow judgments of the fast decision model (ADR 0012). Kept to the latest few hundred.
+  CREATE TABLE IF NOT EXISTS decisions (
+    id TEXT PRIMARY KEY,
+    at TEXT NOT NULL,
+    panel_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    question TEXT NOT NULL,
+    text TEXT NOT NULL,
+    rails TEXT NOT NULL,
+    answer TEXT,
+    model TEXT,
+    latency_ms INTEGER,
+    cost REAL,
+    error TEXT,
+    event_message_id TEXT
+  );
+  CREATE INDEX IF NOT EXISTS decisions_by_panel ON decisions (panel_id, at);
+`);
 
 type Row = { id: string; name: string; path: string; created_at: string };
 const toProject = (r: Row): Project => ({ id: r.id, name: r.name, path: r.path, createdAt: r.created_at });
@@ -446,6 +466,92 @@ export const suggestions = {
       .prepare(`UPDATE suggestions SET status = ?, error = ?, text = COALESCE(?, text), queued = ?, updated_at = ? WHERE id = ? AND status IN (${marks})`)
       .run(to, extra.error ?? null, extra.text ?? null, extra.queued ? 1 : 0, new Date().toISOString(), id, ...from);
     return r.changes > 0;
+  },
+};
+
+type DecisionRow = {
+  id: string;
+  at: string;
+  panel_id: string;
+  title: string;
+  kind: PanelKind;
+  question: DecisionEntry["question"];
+  text: string;
+  rails: DecisionEntry["rails"];
+  answer: string | null;
+  model: string | null;
+  latency_ms: number | null;
+  cost: number | null;
+  error: string | null;
+  event_message_id: string | null;
+  quiet: number | null;
+};
+/** Most judgments kept. */
+const DECISIONS_KEPT = 500;
+
+export const decisions = {
+  create(d: { panelId: string; title: string; kind: PanelKind; question: DecisionEntry["question"]; text: string; rails: DecisionEntry["rails"] }): string {
+    const id = randomUUID();
+    db.prepare("INSERT INTO decisions (id, at, panel_id, title, kind, question, text, rails) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(
+      id,
+      new Date().toISOString(),
+      d.panelId,
+      d.title,
+      d.kind,
+      d.question,
+      d.text,
+      d.rails,
+    );
+    db.prepare("DELETE FROM decisions WHERE id NOT IN (SELECT id FROM decisions ORDER BY at DESC LIMIT ?)").run(DECISIONS_KEPT);
+    return id;
+  },
+  setTitle(id: string, title: string): void {
+    db.prepare("UPDATE decisions SET title = ? WHERE id = ?").run(title, id);
+  },
+  /** The model's answer (or why there's none). */
+  finish(id: string, r: { answer?: DecisionEntry["answer"]; model?: string; latencyMs?: number; cost?: number; error?: string }): void {
+    db.prepare("UPDATE decisions SET answer = ?, model = ?, latency_ms = ?, cost = ?, error = ? WHERE id = ?").run(
+      r.answer ? JSON.stringify(r.answer) : null,
+      r.model ?? null,
+      r.latencyMs ?? null,
+      r.cost ?? null,
+      r.error ?? null,
+      id,
+    );
+  },
+  /**
+   * The Coordinator was woken for a panel's turn end: link the event to that turn end's judgment (the latest
+   * one Rails' code said asks, since only those wake it), for the outcome.
+   */
+  linkWake(panelId: string, messageId: string, since: string): void {
+    db.prepare(
+      "UPDATE decisions SET event_message_id = ? WHERE id = (SELECT id FROM decisions WHERE panel_id = ? AND question = 'turn_end' AND rails = 'asks' AND event_message_id IS NULL AND at >= ? ORDER BY at DESC LIMIT 1)",
+    ).run(messageId, panelId, since);
+  },
+  /** The latest judgments, newest first, with the outcome of the wakes they led to. */
+  list(limit: number): DecisionEntry[] {
+    const rows = db
+      .prepare(
+        `SELECT d.*, CASE WHEN m.id IS NULL THEN NULL WHEN json_extract(m.event, '$.quiet') THEN 1 ELSE 0 END AS quiet
+         FROM decisions d LEFT JOIN sprocket_messages m ON m.id = d.event_message_id ORDER BY d.at DESC LIMIT ?`,
+      )
+      .all(limit) as DecisionRow[];
+    return rows.map((r) => ({
+      id: r.id,
+      at: r.at,
+      panelId: r.panel_id,
+      title: r.title,
+      kind: r.kind,
+      question: r.question,
+      text: r.text,
+      rails: r.rails,
+      ...(r.answer ? { answer: JSON.parse(r.answer) } : {}),
+      ...(r.quiet === null ? {} : { outcome: r.quiet ? "nothing needed" : "told you" }),
+      ...(r.model ? { model: r.model } : {}),
+      ...(r.latency_ms !== null ? { latencyMs: r.latency_ms } : {}),
+      ...(r.cost !== null ? { cost: r.cost } : {}),
+      ...(r.error ? { error: r.error } : {}),
+    }));
   },
 };
 

@@ -307,6 +307,54 @@ export interface ModelSettings {
   models: ModelChoice[];
   /** Used by Sprockets that don't pick their own model. */
   defaultModel?: string;
+  /** Fast decision models (classifiers) of the providers that are set up (ADR 0012). */
+  classifiers: ModelChoice[];
+  /** The one that judges in shadow, if any (off by default: it sends session text to its provider). */
+  decisionModel?: string;
+}
+
+/**
+ * One shadow judgment (ADR 0012): what Rails decided in code about a session's moment, and what the fast
+ * decision model would have decided. Nothing acts on the model's answer yet.
+ */
+export interface DecisionEntry {
+  id: string;
+  at: string;
+  panelId: string;
+  /** The session's title and agent then. */
+  title: string;
+  kind: PanelKind;
+  /** "turn_end": does the end of its message ask the user something? "dialog": what is a dialog Rails doesn't know? */
+  question: "turn_end" | "dialog";
+  /** What was judged: the end of the message, or the dialog's title. */
+  text: string;
+  /** Rails' own decision: "asks" or "doesn't ask" for a turn end, "unknown" for a dialog (it doesn't wake anyone). */
+  rails: "asks" | "doesn't ask" | "unknown";
+  /** The model's answer: "asks" / "doesn't ask", or the dialog's kind, with its probability (0–1). */
+  answer?: { label: string; probability: number };
+  /** For a turn end that woke the Coordinator: whether it found something for the user. */
+  outcome?: "told you" | "nothing needed";
+  /** The model as the service reported it (versions matter: pin what you calibrate). */
+  model?: string;
+  latencyMs?: number;
+  /** In dollars, when the service reports usage. */
+  cost?: number;
+  error?: string;
+}
+
+/** The shadow log: the latest judgments, and how the turn-end ones compare with Rails' own. */
+export interface DecisionLog {
+  entries: DecisionEntry[];
+  summary: {
+    /** Turn ends judged without an error. */
+    judged: number;
+    agreed: number;
+    /** The model says it asks; Rails' code didn't wake anyone (questions Rails may be missing). */
+    missed: number;
+    /** Rails woke the Coordinator; the model says it doesn't ask. `quiet`: of those, the Coordinator agreed. */
+    extra: number;
+    quiet: number;
+  };
 }
 
 /** A sign-in with a provider in progress. It runs on the server; the browser opens `authUrl`. */
@@ -347,6 +395,8 @@ export type ServerMsg =
   | { type: "sprockets.activity"; sprocketId: string; step: string | null; summary: string | null }
   /** Providers, sign-ins or the default model changed. */
   | { type: "models.changed" }
+  /** The fast decision model's shadow log has new judgments (ADR 0012). */
+  | { type: "decisions.changed" }
   | { type: "models.signIn"; signIn: SignIn }
   /** The profile. Sent on connect and when it changes (possibly on another device). */
   | { type: "profile.changed"; profile: Profile }

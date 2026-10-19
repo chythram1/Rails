@@ -295,6 +295,9 @@ Soft rectangles throughout, with radius growing with the size of the thing.
 ### Lists of short texts
 - **Rules** (a Coordinator's settings, ADR 0011): numbered rows that are fields themselves: `--bg`, 1px `--border-strong`, 10px radius, a muted 13px number, the sentence in a borderless 14px textarea that grows with it, and a 26px remove button (14px X). The row takes the `--border-focus` edge while edited; Enter saves, Escape puts it back. Below, an "Add a rule" field (an example sentence as its placeholder while the list is empty) that shows its count, Cancel and Add once something's typed.
 
+### Logs
+- **Shadow log** (Settings → Models, `settings/DecisionsSettings.tsx`, ADR 0012): a summary sentence in muted 13px, then a bordered 12px-radius list (scrolls past 420px) with one row per judgment: the agent's logo, the session's title (500, truncated), "ended its turn" / "showed a dialog" and the time in muted 13px; the judged text quoted (2px `--border-strong` rule, `--text-2`, two lines at most); then the verdicts side by side at 13px: "Rails: …", "Model: … (91%)", "Coordinator: …" and the model version, latency and cost in muted. Where the model and Rails differ, an amber "Differs" (a state color, with its word). Errors show in red in place of the model's answer.
+
 ### Navigation
 - **Sidebar:** nav items 40px tall, 18px icons, `--text-2` labels that turn `--text` on hover. The current page gets a `--hover` fill; "New chat" sits on `--surface-2`.
 - **Session rows:** status dot, title, provider logo, time (tabular). Dot colors: gray idle, green live, amber working, red needs you, each with an `aria-label`.

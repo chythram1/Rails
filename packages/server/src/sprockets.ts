@@ -116,10 +116,11 @@ export function sendMessage(sprocketId: string, rawText: unknown): SprocketMessa
 }
 
 /** A session in a Coordinator's project waits for the user (watches.ts): put it in the chat and wake the Coordinator. */
-export function postEvent(sprocketId: string, event: SprocketEvent, text: string): void {
-  sprocketMessages.create(sprocketId, "event", text, userMessageTime(sprocketId), { event });
+export function postEvent(sprocketId: string, event: SprocketEvent, text: string): SprocketMessage {
+  const message = sprocketMessages.create(sprocketId, "event", text, userMessageTime(sprocketId), { event });
   changed();
   requestReply(sprocketId);
+  return message;
 }
 
 /**

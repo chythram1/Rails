@@ -4,10 +4,11 @@ import type { ModelProvider, SignIn } from "@rails/shared";
 import { api } from "../../api.ts";
 import { socket } from "../../ws.ts";
 import { ModelSelect, useModelSettings } from "../ModelSelect.tsx";
+import { DecisionsSettings } from "./DecisionsSettings.tsx";
 
 /**
- * Settings → Models (ADR 0006): the default model and the providers Sprockets can run on, set up with an
- * API key or a sign-in. One row per provider with its status and an action, like Claude's Connectors and
+ * Settings → Models (ADR 0006): the default model, the fast decision model (ADR 0012), and the providers they
+ * run on, set up with an API key or a sign-in. One row per provider with its status and an action, like Claude's Connectors and
  * the provider lists in Braintrust and Retool. Keys and tokens stay on the server; the page only learns
  * which are set.
  */
@@ -46,6 +47,8 @@ export function ModelsSettings() {
         </div>
         {saveError && <p className="error" role="alert">{saveError}</p>}
       </section>
+
+      <DecisionsSettings settings={settings} />
 
       <section className="set-group" aria-labelledby="providers-title">
         <h3 id="providers-title">Providers</h3>

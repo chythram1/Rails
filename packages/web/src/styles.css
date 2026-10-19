@@ -222,6 +222,23 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .provider-form.column { flex-direction: column; align-items: stretch; gap: 8px; }
 .provider-form.column p { margin: 0; }
 .provider-paste { display: flex; flex-direction: column; gap: 6px; }
+/* The decision model's shadow log (DecisionsSettings.tsx): one row per judgment, the two verdicts side by side. */
+.decision-log { display: flex; flex-direction: column; gap: 4px; padding-top: 14px; }
+.decision-log h4 { margin: 0; }
+.decision-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; max-height: 420px; overflow-y: auto; }
+.decision { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; }
+.decision + .decision { border-top: 1px solid var(--border); }
+.decision-head { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 0; font-size: 13px; }
+.decision-title { flex: 0 1 auto; font-weight: 500; }
+.decision-head > .muted { flex: none; white-space: nowrap; }
+.decision-text {
+  margin: 0; padding-left: 10px; border-left: 2px solid var(--border-strong); color: var(--text-2); font-size: 13px;
+  white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.decision-verdicts { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font-size: 13px; }
+.decision-verdicts .error { font-size: 13px; }
+/* Where the model and Rails' code disagree: the cases worth reading. */
+.decision-differs { color: var(--amber); font-weight: 500; }
 
 /* ---- Settings: a modal with sections on the left (Claude's Directory dialog, ChatGPT's settings) ---- */
 .settings-dialog {

@@ -2,7 +2,7 @@
 // pi-ai. Only credentials stored here count; rails ignores provider env vars (OPENAI_API_KEY, …) so it
 // never bills a key the user set for something else.
 import { randomUUID } from "node:crypto";
-import { createModels, type Api, type Model, type Provider } from "@earendil-works/pi-ai";
+import { createModels, type Api, type ClassifierApi, type ClassifierModel, type Model, type Provider } from "@earendil-works/pi-ai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import { deepseekProvider } from "@earendil-works/pi-ai/providers/deepseek";
 import { googleProvider } from "@earendil-works/pi-ai/providers/google";
@@ -10,6 +10,7 @@ import { groqProvider } from "@earendil-works/pi-ai/providers/groq";
 import { mistralProvider } from "@earendil-works/pi-ai/providers/mistral";
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
+import { typesafeProvider } from "@earendil-works/pi-ai/providers/typesafe";
 import { xaiProvider } from "@earendil-works/pi-ai/providers/xai";
 import type { ModelChoice, ModelProvider, ModelSettings, SignIn } from "@rails/shared";
 import { fileCredentialStore } from "./credentials.ts";
@@ -32,6 +33,8 @@ const OFFERED: { make: () => Provider; signIn?: string }[] = [
   { make: mistralProvider },
   { make: groqProvider },
   { make: deepseekProvider },
+  // Only a fast decision model (Jev, ADR 0012): no chat models, so it never shows in a Sprocket's model list.
+  { make: typesafeProvider },
 ];
 
 const credentials = fileCredentialStore();
@@ -49,6 +52,8 @@ for (const o of OFFERED) {
 const modelChanges = listeners();
 export const onModelsChanged = modelChanges.on;
 const changed = modelChanges.emit;
+/** For settings that live elsewhere but show in Settings → Models (decisions.ts). */
+export const modelsChanged = changed;
 
 const signInChanges = listeners<[signIn: SignIn]>();
 export const onSignIn = signInChanges.on;
@@ -105,7 +110,7 @@ export async function modelSettings(): Promise<ModelSettings> {
   await chatgptPlanModels();
   const available = (await models.getAvailable().catch(() => [])).filter(usable);
   const choices: ModelChoice[] = available.map((m) => ({ ref: refOf(m), provider: m.provider, name: m.name }));
-  return { providers, models: choices, defaultModel: settings.get("defaultModel") };
+  return { providers, models: choices, defaultModel: settings.get("defaultModel"), classifiers: await classifierChoices(), decisionModel: settings.get("decisionModel") };
 }
 
 export async function setApiKey(providerId: string, rawKey: unknown): Promise<void> {
@@ -124,6 +129,18 @@ export async function removeCredential(providerId: string): Promise<void> {
   await models.logout(providerId);
   openaiChanged(providerId);
   changed();
+}
+
+/** The fast decision models (classifiers) of the providers that are set up (ADR 0012). */
+export async function classifierChoices(): Promise<ModelChoice[]> {
+  const available = await models.getAvailableOfType("classifier").catch(() => []);
+  return available.map((m) => ({ ref: `${m.provider}/${m.id}`, provider: m.provider, name: m.name }));
+}
+
+/** The classifier a `provider/model` ref names (whether its provider is set up shows when it's called). */
+export function findClassifier(ref: string): ClassifierModel<ClassifierApi> | undefined {
+  const slash = ref.indexOf("/");
+  return slash > 0 ? models.getModelsOfType("classifier", ref.slice(0, slash)).find((m) => m.id === ref.slice(slash + 1)) : undefined;
 }
 
 export function setDefaultModel(ref: unknown): void {

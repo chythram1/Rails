@@ -1,4 +1,5 @@
 import type {
+  DecisionLog,
   GitStatus,
   ModelSettings,
   OpenPanel,
@@ -92,6 +93,8 @@ export const api = {
   dismissSuggestion: (id: string) => req<Suggestion>(`/api/suggestions/${enc(id)}/dismiss`, { method: "POST" }),
   models: () => req<ModelSettings>("/api/models"),
   setDefaultModel: (model: string | null) => req("/api/models/default", { method: "PUT", body: JSON.stringify({ model }) }),
+  setDecisionModel: (model: string | null) => req("/api/models/decisions", { method: "PUT", body: JSON.stringify({ model }) }),
+  decisions: () => req<DecisionLog>("/api/decisions"),
   setProviderKey: (id: string, key: string) => req(`/api/models/providers/${enc(id)}/key`, { method: "PUT", body: JSON.stringify({ key }) }),
   removeProvider: (id: string) => req(`/api/models/providers/${enc(id)}`, { method: "DELETE" }),
   startSignIn: (id: string, fresh = false) =>
