@@ -10,11 +10,12 @@ import {
   type IWatermarkPanelProps,
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
-import { IconLayoutSidebarRight as PanelRight, IconX as X } from "@tabler/icons-react";
+import { IconAlertTriangle as Warning, IconLayoutSidebarRight as PanelRight, IconX as X } from "@tabler/icons-react";
 import { parseSessionKey, sessionKey, type Panel, type PanelKind } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate } from "../router.ts";
 import { useStore } from "../store.tsx";
+import { shortTitle } from "../util.ts";
 import { SidePanel, type SideView } from "./SidePanel.tsx";
 import { useSprockets } from "./sprockets/useSprockets.ts";
 import { PanelIcon, PanelMenu } from "./PanelMenu.tsx";
@@ -240,6 +241,30 @@ function AttentionMark({ panelId }: { panelId: string }) {
   return <span className="tab-attention" role="img" aria-label={label} title={label} />;
 }
 
+/** Up to three files, then how many more. */
+const someFiles = (files: string[]) => (files.length > 3 ? `${files.slice(0, 3).join(", ")} and ${files.length - 3} more` : files.join(", "));
+
+/**
+ * A small amber warning on a panel's tab while another session in the project changed the same files in the
+ * last 30 minutes (ADR 0014): they may be working against each other. It says which session and which files.
+ */
+function OverlapMark({ panelId }: { panelId: string }) {
+  const list = useStore().overlaps.get(panelId);
+  const ws = useWs();
+  if (!list?.length) return null;
+  const label = list
+    .map((o) => {
+      const other = ws.panels?.find((p) => p.id === o.otherPanelId);
+      return `Also changed by ${other ? `‘${shortTitle(ws.title(other))}’` : "another session"}: ${someFiles(o.files)}`;
+    })
+    .join("\n");
+  return (
+    <span className="tab-overlap" role="img" aria-label={label} title={label}>
+      <Warning size={13} aria-hidden />
+    </span>
+  );
+}
+
 function PanelTab(props: IDockviewPanelHeaderProps) {
   const ws = useWs();
   const panel = usePanel(props.api.id);
@@ -249,6 +274,7 @@ function PanelTab(props: IDockviewPanelHeaderProps) {
     <div className="panel-tab" title={title}>
       <PanelIcon kind={panel.kind} />
       <span className="truncate">{title}</span>
+      <OverlapMark panelId={panel.id} />
       <AttentionMark panelId={panel.id} />
       <button
         className="tab-close"
@@ -348,6 +374,7 @@ function MobilePanels() {
             <button role="tab" aria-selected={p.id === active?.id} tabIndex={p.id === active?.id ? 0 : -1} className="mobile-tab" onClick={() => setActiveId(p.id)}>
               <PanelIcon kind={p.kind} />
               <span className="truncate">{ws.title(p)}</span>
+              <OverlapMark panelId={p.id} />
               <AttentionMark panelId={p.id} />
             </button>
             {p.id === active?.id && (

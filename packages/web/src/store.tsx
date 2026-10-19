@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import type { AttentionReason, Profile, ProfileChange, Project, ProviderInfo, SessionSummary } from "@rails/shared";
+import type { AttentionReason, PanelOverlap, Profile, ProfileChange, Project, ProviderInfo, SessionSummary } from "@rails/shared";
 import { api } from "./api.ts";
 import { href, navigate } from "./router.ts";
 import { socket } from "./ws.ts";
@@ -16,6 +16,8 @@ interface Store {
   busy: Set<string>;
   /** Panels whose agent needs the user, and why (ADR 0007). */
   attention: Map<string, AttentionReason>;
+  /** Panels whose session changed files another session also changed in the last 30 minutes (ADR 0014). */
+  overlaps: Map<string, PanelOverlap[]>;
   sessions: Record<string, SessionSummary[]>;
   /** The panel focused in the open workspace (highlights its session in the sidebar). */
   activePanelId?: string;
@@ -40,6 +42,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [attention, setAttention] = useState<Map<string, AttentionReason>>(new Map());
+  const [overlaps, setOverlaps] = useState<Map<string, PanelOverlap[]>>(new Map());
   const [sessions, setSessions] = useState<Record<string, SessionSummary[]>>({});
   const [activePanelId, setActivePanelId] = useState<string>();
   const [picking, setPicking] = useState(false);
@@ -70,6 +73,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (m.type === "panels.changed") void refreshSessions(m.projectId);
       if (m.type === "panels.busy") setBusy(new Set(m.panelIds));
       if (m.type === "panels.attention") setAttention(new Map(m.panels.map((a) => [a.panelId, a.reason])));
+      if (m.type === "panels.overlaps") {
+        const by = new Map<string, PanelOverlap[]>();
+        for (const o of m.overlaps) by.set(o.panelId, [...(by.get(o.panelId) ?? []), o]);
+        setOverlaps(by);
+      }
       if (m.type === "profile.changed") setProfile(m.profile); // on connect too
     });
     // Pick up sessions started outside rails and new transcripts of freshly started panels.
@@ -120,6 +128,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     saveProfile,
     busy,
     attention,
+    overlaps,
     sessions,
     activePanelId,
     setActivePanelId,

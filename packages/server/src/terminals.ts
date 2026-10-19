@@ -5,6 +5,7 @@ import { watchBusy } from "./activity.ts";
 import { panels } from "./db.ts";
 import { onPanelsChanged, panelEnded } from "./panels.ts";
 import { attentionList, onAttention } from "./bridge/index.ts";
+import { onOverlaps, overlapList } from "./overlaps.ts";
 import { onDecisionsChanged } from "./decisions.ts";
 import { onModelsChanged, onSignIn } from "./models.ts";
 import { getProfile, onProfileChanged } from "./profile.ts";
@@ -32,12 +33,14 @@ export class TerminalHub {
     onSignIn((signIn) => this.broadcast({ type: "models.signIn", signIn }));
     onProfileChanged((profile) => this.broadcast({ type: "profile.changed", profile }));
     onAttention((list) => this.broadcast({ type: "panels.attention", panels: list }));
+    onOverlaps((overlaps) => this.broadcast({ type: "panels.overlaps", overlaps }));
   }
 
   connect(ws: WebSocket) {
     this.clients.set(ws, new Map());
     send(ws, { type: "panels.busy", panelIds: this.busy });
     send(ws, { type: "panels.attention", panels: attentionList() });
+    send(ws, { type: "panels.overlaps", overlaps: overlapList() });
     send(ws, { type: "profile.changed", profile: getProfile() });
     this.stopWatching ??= watchBusy((ids) => {
       this.busy = ids;

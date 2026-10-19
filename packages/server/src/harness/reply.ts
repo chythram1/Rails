@@ -49,7 +49,7 @@ export function replyCapabilities(rules: string[], made: (id: string) => void): 
     },
     {
       name: "suggest_message",
-      description: `Draft a message your user asked you to pass on to a session in your project ("tell it to stop and summarize"). Your user sees it under your message and sends it, edits it or dismisses it: nothing reaches the session until they do. A session that's busy or waiting on a question gets it after its current turn, in its own queue. Write it as your user would, in the first person (at most ${SUGGESTION_MAX} characters). For answering a question a session asked, use suggest_reply. One suggestion per session: a new one replaces the last. Resolves to what happens next.`,
+      description: `Draft a message for a session in your project: something your user asked you to pass on ("tell it to stop and summarize"), or a heads-up when Rails tells you two sessions changed the same files. Your user sees it under your message and sends it, edits it or dismisses it: nothing reaches the session until they do. A session that's busy or waiting on a question gets it after its current turn, in its own queue. Write it as your user would, in the first person (at most ${SUGGESTION_MAX} characters). For answering a question a session asked, use suggest_reply. One suggestion per session: a new one replaces the last. Resolves to what happens next.`,
       params: Type.Object({ session, message: Type.String({ description: "The message, as your user would write it." }) }),
       effect: "act",
       log: {

@@ -150,6 +150,8 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .dot.off, .dot.busy { background: var(--amber); }
 .dot.attention { background: var(--red); }
 .tab-attention { width: 7px; height: 7px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
+/* Another session changed the same files lately (ADR 0014): amber, the state colour for changed files. */
+.tab-overlap { display: inline-flex; flex-shrink: 0; color: var(--amber); }
 
 .provider-icon { width: 16px; height: 16px; flex-shrink: 0; display: block; }
 
@@ -676,6 +678,8 @@ textarea.input { resize: vertical; line-height: 1.5; }
 blockquote.sp-event-quote { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; overflow: hidden; }
 ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
 .sp-event-options { display: block; color: var(--muted); font-size: 13px; }
+.sp-event-with { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sp-event-files { display: block; color: var(--muted); font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
 .sp-event-note { margin: 0; color: var(--muted); font-size: 13px; }
 .sp-message.event .sp-msg-actions { margin-left: -7px; }
 /* A reply a Coordinator suggests, under its message (SuggestionCard.tsx). The card is the field: it takes

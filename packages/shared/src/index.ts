@@ -49,6 +49,16 @@ export interface SessionSummary {
 /** Why a panel needs the user (ADR 0007): its agent waits for a permission or an answer, or its turn failed. */
 export type AttentionReason = "waiting" | "failed";
 
+/**
+ * Two live sessions in a project both changed these files in the last 30 minutes (ADR 0014): they may be working
+ * against each other. Paths are relative to the project. One entry per session and other session.
+ */
+export interface PanelOverlap {
+  panelId: string;
+  otherPanelId: string;
+  files: string[];
+}
+
 /** What runs in a panel: one of the agents' native TUIs, or a plain shell in the project folder. */
 export type PanelKind = ProviderId | "shell";
 
@@ -188,13 +198,18 @@ export interface SprocketEvent {
   /** The panel's title then. */
   title: string;
   sessionId?: string;
-  /** It asked in a dialog (or a form), or it ended its turn with what looks like a question. */
-  what: "question" | "turn_end";
+  /**
+   * It asked in a dialog (or a form), it ended its turn with what looks like a question, or it changed files
+   * other sessions changed shortly before (ADR 0014).
+   */
+  what: "question" | "turn_end" | "overlap";
   questions?: SessionQuestion[];
   /** The Coordinator looked and decided the user needn't hear about it. */
   quiet?: boolean;
   /** Rails' rules didn't wake for this; the decision model did (ADR 0013). */
   byModel?: boolean;
+  /** For an overlap: the other sessions, and the files each also changed (relative to the project). */
+  overlaps?: { panelId: string; kind: PanelKind; title: string; sessionId?: string; files: string[] }[];
 }
 
 /** One message in a Sprocket's chat. */
@@ -399,6 +414,7 @@ export type ServerMsg =
   | { type: "panels.busy"; panelIds: string[] }
   /** Every panel that needs the user, across all projects. Sent on connect and on change. */
   | { type: "panels.attention"; panels: { panelId: string; reason: AttentionReason }[] }
+  | { type: "panels.overlaps"; overlaps: PanelOverlap[] }
   /** Sprockets or their messages changed (possibly on another device). */
   | { type: "sprockets.changed" }
   /** A Sprocket's reply so far, while it's being written; null when it's done. */

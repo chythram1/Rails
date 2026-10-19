@@ -149,7 +149,7 @@ export const projectCapabilities: Capability[] = [
           agent: AGENT[panel.kind],
           status: card.status,
           ...(card.waitingFor ? { waitingFor: card.waitingFor } : {}),
-          changed: card.edited,
+          changed: card.edits.slice(0, 8).map((e) => e.file),
           ...(asked ? { lastAsked: clip(asked, 300) } : {}),
           ...(reply ? { lastReply: clip(reply, 300) } : {}),
           ...(card.lastActivity ? { lastActivity: card.lastActivity } : {}),

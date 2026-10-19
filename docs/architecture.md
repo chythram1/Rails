@@ -67,13 +67,14 @@ packages/
   panels report through Codex's app-server daemon instead (`bridge/codex.ts`, a client only while Codex
   panels are open), which also gives new Codex panels their session id. Events fold into board cards
   (`bridge/board.ts`); panels waiting for the user or with a failed turn are broadcast as
-  `panels.attention` (red dots). Attached Sprockets read the board through their capabilities (`harness/project.ts`).
+  `panels.attention` (red dots). Files two live sessions both changed in the last 30 minutes are broadcast as
+  `panels.overlaps` (amber marks; `overlaps.ts`, ADR 0014). Attached Sprockets read the board through their capabilities (`harness/project.ts`).
   Recorded events also go to the watches (`watches.ts`, ADR 0009): when a session asks the user something (a
   dialog, or a turn that ends with a question) and nobody answers within 20 s, Rails puts an event in the
   project's Coordinator's chat and starts a run. The Coordinator can suggest a reply (`suggest_reply`,
   `suggestions.ts`, ADR 0010), shown under its message; when the user sends it, `bridge/deliver.ts` puts it into
   the session: Claude Code's message socket, the pi extension's long poll (`GET /bridge/<panelId>/pi/inbox`, confirmed with `POST …/pi/delivered`) or
-  Codex's `thread/queue/add`. Suggestions expire as soon as their session moves on. A Coordinator's standing rules (ADR 0011) are in its prompt, numbered; a suggestion records the rule it followed. If the user picked a decision model, `decisions.ts` (ADR 0012) asks it about every turn end and unknown dialog in projects with a Coordinator, through pi-ai's `classify()`, and logs its answers next to Rails' own (`decisions` table, `GET /api/decisions`, `decisions.changed`). It may also wake the Coordinator (ADR 0013, `wakeFromModel` in `watches.ts`) for a question the rules missed, unless the session moved on meanwhile; `RAILS_DECISIONS=shadow` keeps it to judging.
+  Codex's `thread/queue/add`. Suggestions expire as soon as their session moves on. An overlap also wakes the Coordinator, for the session that changed the files second (batched over 15 s, once per pair and file per 30 minutes); it judges whether they clash and may draft a heads-up with `suggest_message`. A Coordinator's standing rules (ADR 0011) are in its prompt, numbered; a suggestion records the rule it followed. If the user picked a decision model, `decisions.ts` (ADR 0012) asks it about every turn end and unknown dialog in projects with a Coordinator, through pi-ai's `classify()`, and logs its answers next to Rails' own (`decisions` table, `GET /api/decisions`, `decisions.changed`). It may also wake the Coordinator (ADR 0013, `wakeFromModel` in `watches.ts`) for a question the rules missed, unless the session moved on meanwhile; `RAILS_DECISIONS=shadow` keeps it to judging.
 - **Persistence:** panels survive browser disconnects and server restarts (`tsx watch` included).
   On a reboot the tmux server is gone; the next workspace read drops panels whose tmux session no
   longer exists. Their transcripts remain, so sessions can be resumed from the sidebar.
@@ -133,7 +134,9 @@ packages/
 | codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl` (checked with Codex 0.163) | ✅ `codex [-- prompt]` / `codex resume <id>`; a new panel learns its session id from Codex's daemon (ADR 0007) |
 
 Every provider panel reports to the bridge (ADR 0007): Claude Code through hooks, pi through the Rails
-extension, Codex through its app-server daemon.
+extension, Codex through its app-server daemon. Edits count for overlaps (ADR 0014) once they worked: Claude
+Code's PostToolUse, pi's tool end without an error, Codex's completed file changes (checked live with Claude Code
+and pi; Codex from its protocol schema). Files changed by shell commands aren't seen.
 
 A provider is only offered when its CLI is on the server's `PATH` (`ProviderInfo.installed`).
 Transcript format notes are in [providers.md](./providers.md).

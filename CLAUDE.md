@@ -107,6 +107,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 | `packages/server/src/runs.ts` | Sprocket runs (ADR 0006): one bounded pi-agent-core loop per reply, the runaway guards, the `remember` tool. |
 | `packages/server/src/models.ts` | Model providers for Sprockets (pi-ai): API keys, sign-in, the default model. Credentials live in `credentials.ts` (`RAILS_HOME/credentials.json`). |
 | `packages/server/src/watches.ts` | Watches (ADR 0009): when a session waits for the user, wake its project's Coordinator with an event (grace period, cooldown, `looksLikeQuestion`). |
+| `packages/server/src/overlaps.ts` | Overlaps (ADR 0014): files two live sessions changed in the last 30 minutes, broadcast as `panels.overlaps` (tab marks), and the Coordinator's wake for the session that changed them second (batched, once per pair and file). |
 | `packages/server/src/suggestions.ts` | Suggested replies (ADR 0010): what a Coordinator may suggest, sending (with every check again), dismissing, expiry. The capability is `harness/reply.ts`; delivery into Claude Code, pi and Codex is `bridge/deliver.ts`. |
 | `packages/server/src/decisions.ts` | The decision model (ADR 0012, 0013): typed questions about turn ends and unknown dialogs, the guards, the shadow log, and the wakes it may add. |
 | `packages/server/src/bridge/` | The bridge (ADR 0007): how agents report (`wiring.ts` flags, `pi/rails.ts` extension, `codex.ts` daemon client), the event shape (`events.ts`), the board and attention (`board.ts`, `index.ts`). |

@@ -25,6 +25,7 @@ import { cancelSignIn, modelSettings, removeCredential, setApiKey, setDefaultMod
 import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets.ts";
 import { TerminalHub } from "./terminals.ts";
 import { startWatches } from "./watches.ts";
+import { startOverlaps } from "./overlaps.ts";
 import { dismissSuggestion, sendSuggestion, startSuggestions } from "./suggestions.ts";
 import { decisionLog, setDecisionModel, startDecisions } from "./decisions.ts";
 import { version as tmuxVersion } from "./tmux.ts";
@@ -247,6 +248,7 @@ if (existsSync(webDist)) {
 // ---- server + websocket ----
 loadAttention(panels.all());
 startWatches(); // Coordinators hear about sessions that wait for the user
+startOverlaps(); // and about sessions changing the same files; their tabs show it
 startSuggestions(); // suggested replies expire as their sessions move on
 startDecisions(); // the fast decision model judges in shadow, if the user picked one
 watchCodex(panels.all()); // Codex panels that survived a restart

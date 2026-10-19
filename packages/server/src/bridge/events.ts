@@ -126,7 +126,9 @@ export function fromPi(event: string, data: any): SessionEvent[] {
           kind: "tool",
           tool,
           files: abs(cwd, input.path),
-          edit: PI_EDIT_TOOLS.has(tool),
+          // The call (`started`) isn't the change: the extension reports an edit again once it worked (ADR 0014).
+          // Extensions from before that report only the call.
+          edit: PI_EDIT_TOOLS.has(tool) && !data?.started,
           ...(tool === "bash" && typeof input.command === "string" ? { command: clip(input.command, 200) } : {}),
         },
       ];
@@ -168,8 +170,11 @@ export function fromCodex(method: string, params: any): SessionEvent[] {
         return text.trim() ? [{ kind: "prompt", text: clip(text) }] : [];
       }
       if (item.type === "commandExecution") return [{ kind: "tool", tool: "shell", files: [], edit: false, command: clip(item.command, 200) }];
-      if (item.type === "fileChange")
-        return [{ kind: "tool", tool: "apply_patch", files: (item.changes ?? []).flatMap((c: any) => abs(undefined, c?.path)).slice(0, MAX_FILES), edit: true }];
+      if (item.type === "fileChange") {
+        // A patch that failed or was declined changed nothing.
+        const edit = item.status !== "failed" && item.status !== "declined";
+        return [{ kind: "tool", tool: "apply_patch", files: (item.changes ?? []).flatMap((c: any) => abs(undefined, c?.path)).slice(0, MAX_FILES), edit }];
+      }
       return [];
     }
     case "turn/completed": {
