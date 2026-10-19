@@ -73,7 +73,7 @@ packages/
   project's Coordinator's chat and starts a run. The Coordinator can suggest a reply (`suggest_reply`,
   `suggestions.ts`, ADR 0010), shown under its message; when the user sends it, `bridge/deliver.ts` puts it into
   the session: Claude Code's message socket, the pi extension's long poll (`GET /bridge/<panelId>/pi/inbox`, confirmed with `POST …/pi/delivered`) or
-  Codex's `thread/queue/add`. Suggestions expire as soon as their session moves on. A Coordinator's standing rules (ADR 0011) are in its prompt, numbered; a suggestion records the rule it followed. If the user picked a decision model, `decisions.ts` (ADR 0012) asks it about every turn end and unknown dialog in projects with a Coordinator, through pi-ai's `classify()`, and only logs its answers next to Rails' own (`decisions` table, `GET /api/decisions`, `decisions.changed`).
+  Codex's `thread/queue/add`. Suggestions expire as soon as their session moves on. A Coordinator's standing rules (ADR 0011) are in its prompt, numbered; a suggestion records the rule it followed. If the user picked a decision model, `decisions.ts` (ADR 0012) asks it about every turn end and unknown dialog in projects with a Coordinator, through pi-ai's `classify()`, and logs its answers next to Rails' own (`decisions` table, `GET /api/decisions`, `decisions.changed`). It may also wake the Coordinator (ADR 0013, `wakeFromModel` in `watches.ts`) for a question the rules missed, unless the session moved on meanwhile; `RAILS_DECISIONS=shadow` keeps it to judging.
 - **Persistence:** panels survive browser disconnects and server restarts (`tsx watch` included).
   On a reboot the tmux server is gone; the next workspace read drops panels whose tmux session no
   longer exists. Their transcripts remain, so sessions can be resumed from the sidebar.
@@ -162,6 +162,7 @@ Transcript format notes are in [providers.md](./providers.md).
 | `RAILS_HOST` | `127.0.0.1` | bind address |
 | `RAILS_PORT` | `4317` | server port (Vite dev runs on 5173 and proxies to it) |
 | `RAILS_TOKEN` | generated | access token override |
+| `RAILS_DECISIONS` | — | `shadow`: the decision model only judges and logs, never wakes the Coordinator (for evaluating a model, ADR 0013) |
 | `CLAUDE_HOME` / `PI_HOME` / `CODEX_HOME` | `~/.claude`, `~/.pi/agent`, `~/.codex` | provider store roots |
 
 Attach to a panel from a normal terminal: `tmux -S ~/.rails/tmux.sock ls`, then

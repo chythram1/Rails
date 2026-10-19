@@ -2,7 +2,7 @@ import { fauxAssistantMessage, fauxProvider, type ClassifierContext, type Classi
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { receive } from "./bridge/index.ts";
 import { panels, projects, settings, sprockets } from "./db.ts";
-import { decisionLog, settled, setDecisionModel, startDecisions, toJudge } from "./decisions.ts";
+import { ACT_ASKS, ACT_QUESTION, decisionLog, settled, setDecisionModel, startDecisions, toJudge, wakeFor } from "./decisions.ts";
 import { models, modelSettings, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
 import { createSprocket, listMessages, updateSettings } from "./sprockets.ts";
@@ -14,6 +14,8 @@ const look = { character: "lune", color: "teal", accessory: "none" } as const;
 const faux = fauxProvider();
 models.setProvider(faux.provider);
 let answer: (context: ClassifierContext) => Partial<ClassifierResult> = () => ({});
+/** Holds the model's answer back until a test lets it go (to let a session move on meanwhile). */
+let gate: Promise<void> = Promise.resolve();
 const asked: ClassifierContext[] = [];
 const judge: Provider = {
   ...faux.provider,
@@ -23,6 +25,7 @@ const judge: Provider = {
   getAllModels: () => [{ type: "classifier", id: "judge-1", name: "Judge", api: "judge", provider: "judge", baseUrl: "", input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 32000 }] as never,
   classify: async (_model, context) => {
     asked.push(context);
+    await gate;
     return { api: "judge", provider: "judge", model: "judge-1.2", answers: {}, stopReason: "stop", timestamp: Date.now(), ...answer(context) };
   },
 };
@@ -33,6 +36,8 @@ startDecisions();
 beforeEach(() => {
   settings.set("defaultModel", refOf(faux.getModel()));
   settings.set("decisionModel", null);
+  delete process.env.RAILS_DECISIONS;
+  gate = Promise.resolve();
   asked.length = 0;
 });
 
@@ -148,5 +153,97 @@ describe("the shadow log", () => {
     expect(summary.extra).toBeGreaterThanOrEqual(1);
     expect(summary.quiet).toBeGreaterThanOrEqual(1);
     expect(summary.missed).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("the decision model waking the Coordinator (ADR 0013)", () => {
+  // A picked decision model may act; only RAILS_DECISIONS=shadow keeps it to judging.
+  const turnEnd = (text: string) => toJudge({ kind: "turn_end", text })!;
+  const dialog = (title: string) => toJudge({ kind: "waiting", reason: title })!;
+
+  it("acts only where the rules didn't wake, and only when it's sure", () => {
+    const missed = turnEnd("Curious what you make of the new name.");
+    expect(wakeFor(missed, { label: "asks", probability: ACT_ASKS }, "d1")).toEqual({ what: "turn_end", text: "Curious what you make of the new name.", decisionId: "d1" });
+    expect(wakeFor(missed, { label: "asks", probability: ACT_ASKS - 0.01 }, "d1")).toBeUndefined();
+    expect(wakeFor(turnEnd("Should I push?"), { label: "asks", probability: 0.99 }, "d1")).toBeUndefined(); // the rules wake for it already
+    expect(wakeFor(turnEnd("All done."), { label: "doesn't ask", probability: 0.99 }, "d1")).toBeUndefined(); // it never cancels or adds a "no"
+    expect(wakeFor(dialog("Pick a deploy target"), { label: "question", probability: ACT_QUESTION }, "d2")).toEqual({ what: "question", text: "Pick a deploy target", decisionId: "d2" });
+    expect(wakeFor(dialog("Approve write to a.txt?"), { label: "approval", probability: 1 }, "d2")).toBeUndefined();
+    expect(wakeFor(dialog("Pick a deploy target"), { label: "question", probability: 0.9 }, "d2")).toBeUndefined();
+  });
+
+  it("wakes the Coordinator for a question the rules missed, when it's allowed to", async () => {
+    settings.set("decisionModel", "judge/judge-1");
+    const { project: p, panel } = project();
+    const lead = sprockets.coordinatorOf(p.id)!;
+    answer = asks(0.95);
+    faux.setResponses([fauxAssistantMessage("It wants your take on the new name.")]);
+    vi.useFakeTimers();
+    receive(panel.id, "claude", "Stop", { last_assistant_message: "I renamed the helper. Curious what you make of the new name." });
+    await vi.waitFor(() => expect(decisionLog().entries.find((e) => e.panelId === panel.id)?.answer).toBeDefined());
+    vi.advanceTimersByTime(GRACE_MS);
+    vi.useRealTimers();
+    await vi.waitFor(() => expect(listMessages(lead.id).length).toBeGreaterThan(0));
+    await idle();
+    const [event, reply] = listMessages(lead.id);
+    expect(event.event).toMatchObject({ what: "turn_end", byModel: true });
+    expect(reply.text).toBe("It wants your take on the new name.");
+    const entry = decisionLog().entries.find((e) => e.panelId === panel.id)!;
+    expect(entry).toMatchObject({ rails: "doesn't ask", acted: true, outcome: "told you" });
+    expect(decisionLog().summary.acted).toBeGreaterThanOrEqual(1);
+  });
+
+  it("only judges in shadow (RAILS_DECISIONS=shadow, a developer setting)", async () => {
+    settings.set("decisionModel", "judge/judge-1");
+    process.env.RAILS_DECISIONS = "shadow";
+    expect((await modelSettings()).decisionsInShadow).toBe(true);
+    const { project: p, panel } = project();
+    answer = asks(0.99);
+    vi.useFakeTimers();
+    receive(panel.id, "claude", "Stop", { last_assistant_message: "Curious what you make of the new name." });
+    await vi.waitFor(() => expect(decisionLog().entries.find((e) => e.panelId === panel.id)?.answer).toBeDefined());
+    vi.advanceTimersByTime(GRACE_MS);
+    vi.useRealTimers();
+    expect(listMessages(sprockets.coordinatorOf(p.id)!.id)).toEqual([]);
+  });
+
+  it("doesn't act on a judgment the session has moved on from", async () => {
+    settings.set("decisionModel", "judge/judge-1");
+    const { project: p, panel } = project();
+    let release!: () => void;
+    gate = new Promise((r) => (release = r));
+    answer = asks(0.99);
+    vi.useFakeTimers();
+    receive(panel.id, "claude", "Stop", { last_assistant_message: "Curious what you make of the new name." });
+    receive(panel.id, "claude", "UserPromptSubmit", { prompt: "I like it, carry on" }); // the user answered while the model thought
+    release();
+    await vi.waitFor(() => expect(decisionLog().entries.find((e) => e.panelId === panel.id)?.answer).toBeDefined());
+    vi.advanceTimersByTime(GRACE_MS);
+    vi.useRealTimers();
+    expect(listMessages(sprockets.coordinatorOf(p.id)!.id)).toEqual([]);
+    expect(decisionLog().entries.find((e) => e.panelId === panel.id)!.acted).toBeUndefined();
+  });
+
+  it("wakes it for a dialog it's sure is a question, and tells the Coordinator it can't answer that one", async () => {
+    settings.set("decisionModel", "judge/judge-1");
+    const { project: p, panel } = project();
+    const lead = sprockets.coordinatorOf(p.id)!;
+    answer = () => ({ answers: { dialog_kind: { type: "choice", choice: "question", probabilities: { question: 0.97, approval: 0.02, other: 0.01 }, confidence: 0.95 } } });
+    let prompt = "";
+    faux.setResponses([
+      (context) => {
+        prompt = JSON.stringify(context.messages.at(-1)?.content);
+        return fauxAssistantMessage("It asks which environment to deploy to.");
+      },
+    ]);
+    vi.useFakeTimers();
+    receive(panel.id, "pi", "ui_prompt_start", { title: "Which environment should I deploy to?", kind: "select" });
+    await vi.waitFor(() => expect(decisionLog().entries.find((e) => e.panelId === panel.id)?.answer).toBeDefined());
+    vi.advanceTimersByTime(GRACE_MS);
+    vi.useRealTimers();
+    await vi.waitFor(() => expect(listMessages(lead.id).length).toBeGreaterThan(0));
+    await idle();
+    expect(listMessages(lead.id)[0].event).toMatchObject({ what: "question", byModel: true });
+    expect(prompt).toContain("You can't suggest answers to dialogs Rails doesn't know");
   });
 });

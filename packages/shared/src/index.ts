@@ -193,6 +193,8 @@ export interface SprocketEvent {
   questions?: SessionQuestion[];
   /** The Coordinator looked and decided the user needn't hear about it. */
   quiet?: boolean;
+  /** Rails' rules didn't wake for this; the decision model did (ADR 0013). */
+  byModel?: boolean;
 }
 
 /** One message in a Sprocket's chat. */
@@ -312,6 +314,11 @@ export interface ModelSettings {
   classifiers: ModelChoice[];
   /** The one that judges in shadow, if any (off by default: it sends session text to its provider). */
   decisionModel?: string;
+  /**
+   * Set (by the developer setting `RAILS_DECISIONS=shadow`) when the decision model only judges. Otherwise it may
+   * wake the Coordinator where it's sure and Rails' rules weren't (ADR 0013).
+   */
+  decisionsInShadow: boolean;
 }
 
 /**
@@ -335,6 +342,8 @@ export interface DecisionEntry {
   answer?: { label: string; probability: number };
   /** For a turn end that woke the Coordinator: whether it found something for the user. */
   outcome?: "told you" | "nothing needed";
+  /** The model's answer woke the Coordinator where Rails' rules didn't (ADR 0013). */
+  acted?: boolean;
   /** The model as the service reported it (versions matter: pin what you calibrate). */
   model?: string;
   latencyMs?: number;
@@ -355,6 +364,8 @@ export interface DecisionLog {
     /** Rails woke the Coordinator; the model says it doesn't ask. `quiet`: of those, the Coordinator agreed. */
     extra: number;
     quiet: number;
+    /** Wakes the model added (it may wake the Coordinator). */
+    acted: number;
   };
 }
 

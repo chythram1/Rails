@@ -15,6 +15,7 @@ import { xaiProvider } from "@earendil-works/pi-ai/providers/xai";
 import type { ModelChoice, ModelProvider, ModelSettings, SignIn } from "@rails/shared";
 import { fileCredentialStore } from "./credentials.ts";
 import { settings } from "./db.ts";
+import { decisionsInShadow } from "./config.ts";
 import { ServiceError } from "./errors.ts";
 import { signInWithChatGPT, signInWithOpenRouter, type PendingSignIn } from "./signin.ts";
 import { listeners } from "./util.ts";
@@ -110,7 +111,7 @@ export async function modelSettings(): Promise<ModelSettings> {
   await chatgptPlanModels();
   const available = (await models.getAvailable().catch(() => [])).filter(usable);
   const choices: ModelChoice[] = available.map((m) => ({ ref: refOf(m), provider: m.provider, name: m.name }));
-  return { providers, models: choices, defaultModel: settings.get("defaultModel"), classifiers: await classifierChoices(), decisionModel: settings.get("decisionModel") };
+  return { providers, models: choices, defaultModel: settings.get("defaultModel"), classifiers: await classifierChoices(), decisionModel: settings.get("decisionModel"), decisionsInShadow: decisionsInShadow() };
 }
 
 // ---- Checking a key before it's saved: a request that costs nothing (listing models, or the key's own info),

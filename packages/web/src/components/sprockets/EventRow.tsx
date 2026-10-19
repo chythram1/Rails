@@ -35,6 +35,7 @@ export function EventRow({ message, projectId, name }: { message: SprocketMessag
       ) : (
         <blockquote className="sp-event-quote">{message.text}</blockquote>
       )}
+      {e.byModel && <p className="sp-event-note">Rails' rules didn't catch this; its decision model did.</p>}
       {e.quiet && <p className="sp-event-note">{name} looked: nothing needed from you.</p>}
     </div>
   );

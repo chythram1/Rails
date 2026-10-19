@@ -15,6 +15,11 @@ if (process.env.VITEST && !process.env.RAILS_HOME) {
 export const RAILS_HOME = process.env.RAILS_HOME ?? join(home, ".rails");
 export const HOST = process.env.RAILS_HOST ?? "127.0.0.1";
 export const PORT = Number(process.env.RAILS_PORT ?? 4317);
+/**
+ * `RAILS_DECISIONS=shadow`: the decision model only judges and logs, and never wakes anyone (ADR 0012, 0013). For
+ * evaluating a model on real sessions; read on each use, so tests can set it.
+ */
+export const decisionsInShadow = () => process.env.RAILS_DECISIONS === "shadow";
 
 export const CLAUDE_HOME = process.env.CLAUDE_HOME ?? join(home, ".claude");
 export const PI_HOME = process.env.PI_HOME ?? join(home, ".pi", "agent");

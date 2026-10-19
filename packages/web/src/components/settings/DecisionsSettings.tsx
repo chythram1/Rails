@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { IconChevronRight as ChevronRight } from "@tabler/icons-react";
 import type { DecisionEntry, DecisionLog, ModelSettings } from "@rails/shared";
 import { api } from "../../api.ts";
 import { timeAgo } from "../../util.ts";
@@ -7,8 +8,10 @@ import { Dropdown } from "../Dropdown.tsx";
 import { PanelIcon } from "../PanelMenu.tsx";
 
 /**
- * Settings → Models → Fast decisions (ADR 0012): the decision model that judges in shadow, off by default, and
- * its log: each judgment next to what Rails decided in code, so the user can see whether it would do better.
+ * Settings → Models → Fast decisions (ADR 0012, 0013): one picker. A decision model, once picked, hears the
+ * questions Rails' rules miss and wakes the Coordinator for them; Off turns it off. What it decided is under a
+ * collapsed "Recent decisions", for when a wake needs explaining. (`RAILS_DECISIONS=shadow`, a developer setting,
+ * keeps it to judging, to evaluate a model.)
  */
 export function DecisionsSettings({ settings }: { settings: ModelSettings }) {
   const [error, setError] = useState("");
@@ -26,19 +29,20 @@ export function DecisionsSettings({ settings }: { settings: ModelSettings }) {
     <section className="set-group" aria-labelledby="decisions-title">
       <h3 id="decisions-title">Fast decisions</h3>
       <p className="set-intro">
-        A small, fast model can judge what Rails decides with simple rules, such as whether a session's last message asks you
-        something. For now it only watches: its answers go in the log below, next to what Rails did. It sees the end of
-        sessions' messages in projects with a Coordinator, which go to its provider.
+        A small, fast model hears questions Rails' rules miss, such as one without a question mark, and wakes the Coordinator
+        for them. It sees the end of sessions' messages in projects with a Coordinator, which go to its provider.
       </p>
       <div className="set-row" id="setting-decision-model" data-settings-row tabIndex={-1}>
         <div className="set-text">
           <label htmlFor="decision-model">Decision model</label>
           <p>
-            {settings.decisionModel
-              ? "Judging in shadow: nothing acts on its answers."
-              : settings.classifiers.length
+            {!settings.decisionModel
+              ? settings.classifiers.length
                 ? "Off until you pick one."
-                : "Set up TypeSafe (for Jev) or OpenAI with an API key (for GPT-6 Luna) under Providers."}
+                : "Set up TypeSafe (for Jev) or OpenAI with an API key (for GPT-6 Luna) under Providers."
+              : settings.decisionsInShadow
+                ? "Judging only (RAILS_DECISIONS=shadow): it doesn't wake anyone."
+                : "Wakes the Coordinator when it's sure: 90% for a reply, 95% for a dialog."}
           </p>
         </div>
         <Dropdown
@@ -50,15 +54,18 @@ export function DecisionsSettings({ settings }: { settings: ModelSettings }) {
         />
       </div>
       {error && <p className="error" role="alert">{error}</p>}
-      {settings.decisionModel && <ShadowLog />}
+      {settings.decisionModel && <RecentDecisions />}
     </section>
   );
 }
 
 const providerName = (settings: ModelSettings, id: string) => settings.providers.find((p) => p.id === id)?.name ?? id;
 
-/** The latest judgments, kept fresh while the page is open. */
-function ShadowLog() {
+/**
+ * The latest judgments, kept fresh while the page is open, in a native disclosure (collapsed): what it decided
+ * next to what Rails' rules did, and which of its answers woke the Coordinator.
+ */
+function RecentDecisions() {
   const [log, setLog] = useState<DecisionLog | null>(null);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
@@ -78,29 +85,33 @@ function ShadowLog() {
 
   if (!log) return error ? <p className="error" role="alert">{error}</p> : null;
   return (
-    <div className="decision-log">
-      <h4 className="set-label">Shadow log</h4>
-      <p className="set-intro" role="status">{summary(log)}</p>
+    <details className="decision-log">
+      <summary className="decision-summary">
+        <ChevronRight size={14} className="decision-chevron" aria-hidden />
+        Recent decisions{log.entries.length ? ` (${log.entries.length})` : ""}
+      </summary>
+      <p className="set-intro">{summary(log)}</p>
       {log.entries.length > 0 && (
-        <ol className="decision-list" aria-label="Judgments, newest first">
+        <ol className="decision-list" aria-label="Decisions, newest first">
           {log.entries.map((e) => (
             <Judgment key={e.id} entry={e} />
           ))}
         </ol>
       )}
-    </div>
+    </details>
   );
 }
 
 function summary({ summary: s, entries }: DecisionLog): string {
   if (!entries.length) return "Nothing judged yet. Judgments show up as sessions in projects with a Coordinator end their turns.";
   if (!s.judged) return "No turn ends judged yet.";
-  const parts = [`Of the last ${s.judged} turn ends, it agreed with Rails on ${s.agreed}.`];
+  const parts = [s.judged === 1 ? `On the one turn end so far, it ${s.agreed ? "agreed" : "disagreed"} with Rails.` : `Of the last ${s.judged} turn ends, it agreed with Rails on ${s.agreed}.`];
   if (s.missed) parts.push(`It heard a question Rails didn't ${s.missed === 1 ? "once" : `${s.missed} times`}.`);
   if (s.extra)
     parts.push(
       `Rails heard one it didn't ${s.extra === 1 ? "once" : `${s.extra} times`}${s.quiet ? `, and the Coordinator found nothing for you in ${s.quiet === s.extra ? (s.extra === 1 ? "that one" : "all of them") : s.quiet}` : ""}.`,
     );
+  if (s.acted) parts.push(`It woke the Coordinator itself ${s.acted === 1 ? "once" : `${s.acted} times`}.`);
   return parts.join(" ");
 }
 
@@ -129,6 +140,7 @@ function Judgment({ entry: e }: { entry: DecisionEntry }) {
           <span className="muted">Model: waiting…</span>
         )}
         {differs && <span className="decision-differs">Differs</span>}
+        {e.acted && <span>Woke the Coordinator</span>}
         {e.outcome && <span>Coordinator: {e.outcome}</span>}
         {(e.model || e.latencyMs !== undefined || e.cost !== undefined) && (
           <span className="muted">

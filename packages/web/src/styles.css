@@ -223,8 +223,13 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .provider-form.column p { margin: 0; }
 .provider-paste { display: flex; flex-direction: column; gap: 6px; }
 /* The decision model's shadow log (DecisionsSettings.tsx): one row per judgment, the two verdicts side by side. */
-.decision-log { display: flex; flex-direction: column; gap: 4px; padding-top: 14px; }
-.decision-log h4 { margin: 0; }
+/* Collapsed by default (a native <details>): what it decided, for when a wake needs explaining. */
+.decision-log { padding-top: 6px; }
+.decision-log[open] { display: flex; flex-direction: column; gap: 4px; }
+.decision-summary { display: flex; align-items: center; gap: 6px; width: fit-content; padding: 8px 0; list-style: none; cursor: pointer; font-size: 14px; font-weight: 500; }
+.decision-summary::-webkit-details-marker { display: none; }
+.decision-chevron { color: var(--muted); }
+.decision-log[open] .decision-chevron { transform: rotate(90deg); }
 .decision-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; max-height: 420px; overflow-y: auto; }
 .decision { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; }
 .decision + .decision { border-top: 1px solid var(--border); }

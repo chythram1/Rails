@@ -8,6 +8,9 @@
 // - A dialog Rails doesn't know (a pi extension's, without questions): "a question, an approval or something
 //   else?" Rails never wakes anyone for those.
 // - Bounded: a short text per question, a deadline per call, a few calls a minute. Failures are logged.
+// - It may also wake the Coordinator where the rules didn't, when it's sure (ADR 0013): a turn end the rules
+//   thought didn't ask (ACT_ASKS), a dialog it calls a question (ACT_QUESTION). It only adds wakes, never cancels
+//   one, and not if the session moved on while it was asked. `RAILS_DECISIONS=shadow` keeps it to judging.
 import type { ClassifierAnswer, ClassifierContext, ClassifierQuestion } from "@earendil-works/pi-ai";
 import type { DecisionEntry, DecisionLog, Panel } from "@rails/shared";
 import { AGENT } from "./bridge/board.ts";
@@ -15,9 +18,10 @@ import { ASKING, type SessionEvent } from "./bridge/events.ts";
 import { onEvents } from "./bridge/index.ts";
 import { decisions, settings, sprockets } from "./db.ts";
 import { ServiceError } from "./errors.ts";
+import { decisionsInShadow } from "./config.ts";
 import { classifierChoices, findClassifier, models, modelsChanged } from "./models.ts";
 import { listeners } from "./util.ts";
-import { looksLikeQuestion, onWake, sessionTitle } from "./watches.ts";
+import { eventPosition, looksLikeQuestion, onWake, sessionTitle, wakeFromModel, type Wake } from "./watches.ts";
 
 /** How much of a message's end the model sees. */
 const TEXT = 1500;
@@ -26,6 +30,16 @@ const DEADLINE_MS = 8000;
 const MAX_PER_MINUTE = 20;
 /** Judgments shown in the log. */
 const SHOWN = 50;
+/**
+ * How sure it has to be to wake the Coordinator itself (ADR 0013). From the first evaluation (scratch/research/
+ * system-one/eval): real questions scored 0.81–0.99, non-questions at most 0.78; dialogs it called questions
+ * scored 0.95 and up, approvals 1.0 as approvals. Missing a wake costs the user's time and a false one only a run,
+ * but trust comes first: high bars, revisited from the shadow log.
+ */
+export const ACT_ASKS = 0.9;
+export const ACT_QUESTION = 0.95;
+/** How much of a message's end an event keeps (as watches.ts). */
+const EVENT_TAIL = 600;
 
 const changes = listeners();
 /** The decision model or the log changed. */
@@ -83,7 +97,7 @@ const inFlight = new Set<Promise<void>>();
  * Ask the model about one moment, and log its answer next to Rails' own. The entry is made at once (a wake
  * may link to it before the answer comes); the session's title as the user sees it follows.
  */
-async function judge(panel: Panel, item: NonNullable<ReturnType<typeof toJudge>>): Promise<void> {
+async function judge(panel: Panel, item: NonNullable<ReturnType<typeof toJudge>>, position: number): Promise<void> {
   const ref = settings.get("decisionModel");
   const model = ref ? findClassifier(ref) : undefined;
   if (!model) return;
@@ -104,12 +118,27 @@ async function judge(panel: Panel, item: NonNullable<ReturnType<typeof toJudge>>
     const result = await models.classify(model, context, { signal: AbortSignal.timeout(DEADLINE_MS) });
     const latencyMs = Date.now() - started;
     if (result.stopReason !== "stop") decisions.finish(id, { model: result.model, latencyMs, error: result.errorMessage ?? result.stopReason });
-    // pi-ai prices a call at its catalog price, which is 0 for models it has no price for (Jev): no cost then, rather than $0.
-    else decisions.finish(id, { answer: readAnswer(item.question, result.answers[key]), model: result.model, latencyMs, cost: result.usage?.cost.total || undefined });
+    else {
+      const answer = readAnswer(item.question, result.answers[key]);
+      // pi-ai prices a call at its catalog price, which is 0 for models it has no price for (Jev): no cost then, rather than $0.
+      decisions.finish(id, { answer, model: result.model, latencyMs, cost: result.usage?.cost.total || undefined });
+      const wake = decisionsInShadow() ? undefined : wakeFor(item, answer, id);
+      if (wake) wakeFromModel(panel.id, position, wake);
+    }
   } catch (e) {
     decisions.finish(id, { latencyMs: Date.now() - started, error: (e as Error).message });
   }
   changes.emit();
+}
+
+/** The wake a judgment calls for when the model may act: only where the rules didn't wake, only when it's sure. */
+export function wakeFor(item: NonNullable<ReturnType<typeof toJudge>>, answer: DecisionEntry["answer"], decisionId: string): Wake | undefined {
+  if (!answer) return undefined;
+  if (item.question === "turn_end" && item.rails !== "asks" && answer.label === "asks" && answer.probability >= ACT_ASKS) {
+    const text = item.text.length > EVENT_TAIL ? "…" + item.text.slice(-EVENT_TAIL) : item.text;
+    return { what: "turn_end", text, decisionId };
+  }
+  if (item.question === "dialog" && answer.label === "question" && answer.probability >= ACT_QUESTION) return { what: "question", text: item.text, decisionId };
 }
 
 /** Resolves once every judgment in flight has its answer (for tests). */
@@ -119,17 +148,20 @@ export async function settled(): Promise<void> {
 
 /** Judge what sessions in projects with a Coordinator report, and follow where the wakes lead. */
 export function startDecisions(): void {
-  // The judgment of the turn end that woke the Coordinator: its outcome shows whether it was worth it.
-  // Only turn-end wakes: a dialog's wake has no turn-end judgment behind it.
-  onWake((panelId, messageId, what) => {
-    if (what === "turn_end") decisions.linkWake(panelId, messageId, new Date(Date.now() - 10 * 60_000).toISOString());
+  // The judgment behind a wake: its outcome shows whether it was worth it. A wake the model asked for names its
+  // judgment; one the rules made links to the turn end's (a dialog's wake has no judgment behind it).
+  onWake((panelId, messageId, wake) => {
+    if (wake.decisionId) decisions.linkActed(wake.decisionId, messageId);
+    else if (wake.what === "turn_end") decisions.linkWake(panelId, messageId, new Date(Date.now() - 10 * 60_000).toISOString());
   });
   onEvents((panel, events) => {
     if (!settings.get("decisionModel") || !sprockets.coordinatorOf(panel.projectId)) return;
+    // Where the panel's events are now (the watches have already seen these): a later event makes the judgment stale.
+    const position = eventPosition(panel.id);
     for (const e of events) {
       const item = toJudge(e);
       if (!item) continue;
-      const p = judge(panel, item)
+      const p = judge(panel, item, position)
         .catch((err) => console.error("decisions:", err))
         .finally(() => inFlight.delete(p));
       inFlight.add(p);
@@ -157,6 +189,7 @@ export function decisionLog(): DecisionLog {
       missed: turnEnds.filter((e) => e.rails !== "asks" && e.answer!.label === "asks").length,
       extra: extra.length,
       quiet: extra.filter((e) => e.outcome === "nothing needed").length,
+      acted: entries.filter((e) => e.acted).length,
     },
   };
 }

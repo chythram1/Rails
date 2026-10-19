@@ -30,6 +30,8 @@ export interface Wake {
   /** The question(s), or the end of the session's last message. */
   text: string;
   questions?: SessionQuestion[];
+  /** Set when the decision model added this wake (ADR 0013): its judgment, to link the outcome to. */
+  decisionId?: string;
 }
 
 // Phrases that ask the user for something even without a question mark. Pleasantries ("let me know if you
@@ -107,11 +109,14 @@ export class Watches {
   private last = new Map<string, number>();
   /** Panels whose current wait already woke the Coordinator (agents may report one wait more than once). */
   private woken = new Set<string>();
+  /** How many events each panel has reported, so a late judgment can tell whether the session moved on. */
+  private seen = new Map<string, number>();
 
   /** `fire` wakes the Coordinator and says whether it did (there may be none). */
   constructor(private fire: (panelId: string, wake: Wake) => boolean) {}
 
   handle(panelId: string, events: SessionEvent[]): void {
+    this.seen.set(panelId, (this.seen.get(panelId) ?? 0) + events.length);
     for (const e of events) {
       const a = admit(e);
       if (a === "over") {
@@ -119,6 +124,22 @@ export class Watches {
         this.woken.delete(panelId);
       } else if (a) this.arm(panelId, a);
     }
+  }
+
+  /** Where a panel's events are up to (see `armIfStill`). */
+  position(panelId: string): number {
+    return this.seen.get(panelId) ?? 0;
+  }
+
+  /**
+   * Arm a wake someone else decided on (the decision model, ADR 0013), unless the session has reported
+   * anything since `position`: then it has moved on and the judgment is stale. The usual grace, cooldown and
+   * one-wake-per-wait rules apply. False when it isn't armed.
+   */
+  armIfStill(panelId: string, position: number, wake: Wake): boolean {
+    if (this.position(panelId) !== position || this.pending.has(panelId) || this.woken.has(panelId)) return false;
+    this.arm(panelId, wake);
+    return true;
   }
 
   private arm(panelId: string, wake: Wake) {
@@ -145,11 +166,12 @@ export class Watches {
     this.cancel(panelId);
     this.last.delete(panelId);
     this.woken.delete(panelId);
+    this.seen.delete(panelId);
   }
 }
 
-const woke = listeners<[panelId: string, eventMessageId: string, what: Wake["what"]]>();
-/** A Coordinator was woken for a session, with this event message and why (decisions.ts links a turn end's judgment). */
+const woke = listeners<[panelId: string, eventMessageId: string, wake: Wake]>();
+/** A Coordinator was woken for a session, with this event message and why (decisions.ts links its judgment). */
 export const onWake = woke.on;
 
 /** A session's title as the user sees it (the tab, the board): its own title when discovery knows it. */
@@ -174,17 +196,32 @@ function wakeCoordinator(panelId: string, wake: Wake): boolean {
       ...(panel.sessionId ? { sessionId: panel.sessionId } : {}),
       what: wake.what,
       ...(wake.questions ? { questions: wake.questions } : {}),
+      ...(wake.decisionId ? { byModel: true } : {}),
     };
     // Still this project's Coordinator (the lookup took a moment)?
     const now = sprockets.get(coordinator.id);
-    if (now?.coordinator && now.projectId === panel.projectId) woke.emit(panelId, postEvent(coordinator.id, event, wake.text).id, wake.what);
+    if (now?.coordinator && now.projectId === panel.projectId) woke.emit(panelId, postEvent(coordinator.id, event, wake.text).id, wake);
   });
   return true;
 }
 
+let watching: Watches | undefined;
+
+/**
+ * The decision model asks for a wake (ADR 0013). `position` is where the panel's events were when it was asked;
+ * nothing wakes if the session has moved on since. False when it isn't armed.
+ */
+export function wakeFromModel(panelId: string, position: number, wake: Wake): boolean {
+  return watching?.armIfStill(panelId, position, wake) ?? false;
+}
+
+/** Where a panel's events are up to, for `wakeFromModel`. */
+export const eventPosition = (panelId: string) => watching?.position(panelId) ?? 0;
+
 /** Follow every session the bridge hears from. */
 export function startWatches(): void {
   const watches = new Watches(wakeCoordinator);
+  watching = watches;
   onEvents((panel, events) => {
     try {
       watches.handle(panel.id, events);

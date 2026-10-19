@@ -118,6 +118,8 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS decisions_by_panel ON decisions (panel_id, at);
 `);
+/** On a judgment: 1 when it woke the Coordinator itself (ADR 0013). */
+addColumn("decisions", "acted", "INTEGER NOT NULL DEFAULT 0");
 
 type Row = { id: string; name: string; path: string; created_at: string };
 const toProject = (r: Row): Project => ({ id: r.id, name: r.name, path: r.path, createdAt: r.created_at });
@@ -484,6 +486,7 @@ type DecisionRow = {
   cost: number | null;
   error: string | null;
   event_message_id: string | null;
+  acted: number;
   quiet: number | null;
 };
 /** Most judgments kept. */
@@ -528,6 +531,10 @@ export const decisions = {
       "UPDATE decisions SET event_message_id = ? WHERE id = (SELECT id FROM decisions WHERE panel_id = ? AND question = 'turn_end' AND rails = 'asks' AND event_message_id IS NULL AND at >= ? ORDER BY at DESC LIMIT 1)",
     ).run(messageId, panelId, since);
   },
+  /** The model's own wake (ADR 0013): this judgment woke the Coordinator, with this event. */
+  linkActed(id: string, messageId: string): void {
+    db.prepare("UPDATE decisions SET event_message_id = ?, acted = 1 WHERE id = ?").run(messageId, id);
+  },
   /** The latest judgments, newest first, with the outcome of the wakes they led to. */
   list(limit: number): DecisionEntry[] {
     const rows = db
@@ -547,6 +554,7 @@ export const decisions = {
       rails: r.rails,
       ...(r.answer ? { answer: JSON.parse(r.answer) } : {}),
       ...(r.quiet === null ? {} : { outcome: r.quiet ? "nothing needed" : "told you" }),
+      ...(r.acted ? { acted: true } : {}),
       ...(r.model ? { model: r.model } : {}),
       ...(r.latency_ms !== null ? { latencyMs: r.latency_ms } : {}),
       ...(r.cost !== null ? { cost: r.cost } : {}),
