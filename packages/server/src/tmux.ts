@@ -47,7 +47,11 @@ const MISSING = "tmux isn't installed on the server. Run `make system-deps` (or 
 
 async function tmux(...args: string[]) {
   try {
-    return await run("tmux", ["-S", SOCKET, "-f", CONF, ...args], { env: cleanEnv() });
+    // From RAILS_HOME, not the server's own folder: the first call starts the tmux server, which keeps that
+    // folder as its working directory for as long as it runs (it outlives Rails). If that folder is deleted
+    // (a removed git worktree), tmux stops honouring `-c` and every new panel starts in a folder that no
+    // longer exists, so agents quit at once.
+    return await run("tmux", ["-S", SOCKET, "-f", CONF, ...args], { env: cleanEnv(), cwd: RAILS_HOME });
   } catch (e: any) {
     if (e?.code === "ENOENT") throw new ServiceError(MISSING, 503);
     throw e;
@@ -108,6 +112,7 @@ export function attach(panelId: string, cols: number, rows: number): IPty {
     name: "xterm-256color",
     cols,
     rows,
+    cwd: RAILS_HOME,
     env: { ...cleanEnv(), TERM: "xterm-256color" },
   });
 }
