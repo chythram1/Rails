@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, onSignedOut, Unauthorized } from "./api.ts";
+import { CustomizePage } from "./components/customize/CustomizePage.tsx";
 import { Home } from "./components/Home.tsx";
 import { Login } from "./components/Login.tsx";
 import { Placeholder } from "./components/Placeholder.tsx";
@@ -105,10 +106,10 @@ function Shell() {
           <button className="icon-btn nav-toggle" aria-label="Open sidebar" onClick={() => setNavOpen(true)}>
             <span aria-hidden>☰</span>
           </button>
-          {route.name === "home" && <Home />}
+          {route.name === "home" && <Home promptId={route.promptId} />}
           {route.name === "workspace" && <Workspace key={route.projectId} projectId={route.projectId} openKey={route.openKey} />}
           {route.name === "sprockets" && <SprocketsPage route={route} />}
-          {route.name === "customize" && <Placeholder title="Customize" body="Agent profiles, prompts, skills and tools will live here." />}
+          {route.name === "customize" && <CustomizePage route={route} />}
           {route.name === "automate" && <Placeholder title="Automate" body="Scheduled and triggered agent runs will live here." />}
         </main>
         {settings && (

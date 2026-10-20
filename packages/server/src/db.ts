@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { DecisionEntry, Handoff, Panel, PanelKind, Project, Sprocket, SprocketAuthor, SprocketEvent, SprocketLook, SprocketMessage, Suggestion } from "@rails/shared";
+import type { AgentProfile, DecisionEntry, Handoff, Panel, PanelKind, Project, Sprocket, SprocketAuthor, SprocketEvent, SprocketLook, SprocketMessage, SavedPrompt, Suggestion } from "@rails/shared";
 import { RAILS_HOME } from "./config.ts";
 
 const db = new DatabaseSync(join(RAILS_HOME, "rails.db"));
@@ -79,6 +79,8 @@ addColumn("sprocket_messages", "steps", "TEXT");
 /** On an event: the SprocketEvent, as JSON. */
 addColumn("sprocket_messages", "event", "TEXT");
 addColumn("panels", "bridge_token", "TEXT");
+/** The agent profile it started with (ADR 0020), as JSON: a snapshot, since the profile may change later. */
+addColumn("panels", "profile", "TEXT");
 db.exec(`
   CREATE TABLE IF NOT EXISTS session_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,6 +138,22 @@ db.exec(`
     event_message_id TEXT
   );
   CREATE INDEX IF NOT EXISTS decisions_by_panel ON decisions (panel_id, at);
+  -- Customize (ADR 0020). A profile's launch options are JSON, checked by the service when read, so options
+  -- for more agents don't need new columns.
+  CREATE TABLE IF NOT EXISTS agent_profiles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    is_default INTEGER NOT NULL DEFAULT 0,
+    options TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS saved_prompts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
 `);
 db.exec(`
   -- Handoffs a Coordinator planned (ADR 0015). Status: pending, done, cancelled or expired.
@@ -206,7 +224,7 @@ export const projects = {
   },
 };
 
-type PanelRow = { id: string; project_id: string; kind: PanelKind; session_id: string | null; title: string; created_at: string };
+type PanelRow = { id: string; project_id: string; kind: PanelKind; session_id: string | null; title: string; created_at: string; profile: string | null };
 const toPanel = (r: PanelRow): Panel => ({
   id: r.id,
   projectId: r.project_id,
@@ -214,6 +232,7 @@ const toPanel = (r: PanelRow): Panel => ({
   sessionId: r.session_id ?? undefined,
   title: r.title,
   createdAt: r.created_at,
+  ...(r.profile ? { profile: JSON.parse(r.profile) } : {}),
 });
 
 export const panels = {
@@ -233,13 +252,14 @@ export const panels = {
   },
   create(p: Omit<Panel, "id" | "createdAt">): Panel {
     const panel: Panel = { ...p, id: randomUUID(), createdAt: new Date().toISOString() };
-    db.prepare("INSERT INTO panels (id, project_id, kind, session_id, title, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(
+    db.prepare("INSERT INTO panels (id, project_id, kind, session_id, title, created_at, profile) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
       panel.id,
       panel.projectId,
       panel.kind,
       panel.sessionId ?? null,
       panel.title,
       panel.createdAt,
+      panel.profile ? JSON.stringify(panel.profile) : null,
     );
     return panel;
   },
@@ -799,5 +819,78 @@ export const usage = {
       cost: number;
     };
     return { runs: Number(r.runs), tokens: Number(r.tokens), cost: Number(r.cost) };
+  },
+};
+
+// Agent profiles (ADR 0020): `options` holds the launch options as JSON, validated by customize.ts.
+type ProfileRow = { id: string; name: string; agent: AgentProfile["agent"]; is_default: number; options: string; created_at: string };
+export type StoredProfile = Pick<AgentProfile, "id" | "name" | "agent" | "isDefault" | "createdAt"> & { options: unknown };
+const toProfile = (r: ProfileRow): StoredProfile => ({
+  id: r.id,
+  name: r.name,
+  agent: r.agent,
+  isDefault: r.is_default === 1,
+  options: JSON.parse(r.options),
+  createdAt: r.created_at,
+});
+
+export const agentProfiles = {
+  list(): StoredProfile[] {
+    return (db.prepare("SELECT * FROM agent_profiles ORDER BY agent, name COLLATE NOCASE").all() as ProfileRow[]).map(toProfile);
+  },
+  get(id: string): StoredProfile | undefined {
+    const r = db.prepare("SELECT * FROM agent_profiles WHERE id = ?").get(id) as ProfileRow | undefined;
+    return r && toProfile(r);
+  },
+  defaultFor(agent: string): StoredProfile | undefined {
+    const r = db.prepare("SELECT * FROM agent_profiles WHERE agent = ? AND is_default = 1").get(agent) as ProfileRow | undefined;
+    return r && toProfile(r);
+  },
+  create(name: string, agent: string, options: unknown): StoredProfile {
+    const id = randomUUID();
+    db.prepare("INSERT INTO agent_profiles (id, name, agent, options, created_at) VALUES (?, ?, ?, ?, ?)").run(id, name, agent, JSON.stringify(options), new Date().toISOString());
+    return this.get(id)!;
+  },
+  update(id: string, name: string, options: unknown): void {
+    db.prepare("UPDATE agent_profiles SET name = ?, options = ? WHERE id = ?").run(name, JSON.stringify(options), id);
+  },
+  /** Make a profile its agent's default, taking over from any other, or stop. */
+  setDefault(id: string, on: boolean): void {
+    db.exec("BEGIN");
+    try {
+      if (on) db.prepare("UPDATE agent_profiles SET is_default = 0 WHERE agent = (SELECT agent FROM agent_profiles WHERE id = ?)").run(id);
+      db.prepare("UPDATE agent_profiles SET is_default = ? WHERE id = ?").run(on ? 1 : 0, id);
+      db.exec("COMMIT");
+    } catch (e) {
+      db.exec("ROLLBACK");
+      throw e;
+    }
+  },
+  remove(id: string): void {
+    db.prepare("DELETE FROM agent_profiles WHERE id = ?").run(id);
+  },
+};
+
+type PromptRow = { id: string; name: string; text: string; created_at: string };
+const toPrompt = (r: PromptRow): SavedPrompt => ({ id: r.id, name: r.name, text: r.text, createdAt: r.created_at });
+
+export const savedPrompts = {
+  list(): SavedPrompt[] {
+    return (db.prepare("SELECT * FROM saved_prompts ORDER BY name COLLATE NOCASE").all() as PromptRow[]).map(toPrompt);
+  },
+  get(id: string): SavedPrompt | undefined {
+    const r = db.prepare("SELECT * FROM saved_prompts WHERE id = ?").get(id) as PromptRow | undefined;
+    return r && toPrompt(r);
+  },
+  create(name: string, text: string): SavedPrompt {
+    const id = randomUUID();
+    db.prepare("INSERT INTO saved_prompts (id, name, text, created_at) VALUES (?, ?, ?, ?)").run(id, name, text, new Date().toISOString());
+    return this.get(id)!;
+  },
+  update(id: string, name: string, text: string): void {
+    db.prepare("UPDATE saved_prompts SET name = ?, text = ? WHERE id = ?").run(name, text, id);
+  },
+  remove(id: string): void {
+    db.prepare("DELETE FROM saved_prompts WHERE id = ?").run(id);
   },
 };

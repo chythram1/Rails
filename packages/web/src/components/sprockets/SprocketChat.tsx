@@ -5,6 +5,8 @@ import { api } from "../../api.ts";
 import { href } from "../../router.ts";
 import { socket } from "../../ws.ts";
 import { Composer } from "../Composer.tsx";
+import { SavedPromptsMenu } from "../customize/SavedPromptsMenu.tsx";
+import { MenuButton } from "../Menu.tsx";
 import { useStore } from "../../store.tsx";
 import { Sprocket } from "./Sprocket.tsx";
 import { PanelToggle } from "./SprocketSettings.tsx";
@@ -46,6 +48,8 @@ export function SprocketChat({ sprocket, panelOpen, embedded = false }: { sprock
   const [reveal, setReveal] = useState<{ text: string; live: boolean; id?: string } | null>(null);
   /** The reply's run log while it's written: the step it's on, and what it has done so far. */
   const [activity, setActivity] = useState<{ step: string | null; summary: string | null }>({ step: null, summary: null });
+  /** A saved prompt to put in the composer (Customize, ADR 0020). */
+  const [fill, setFill] = useState<{ text: string }>();
   /** Messages already shown; null until the first load, whose messages show at once. */
   const seen = useRef<Set<string> | null>(null);
   /** Re-renders once a minute, so "5 minutes ago" under each message stays true. */
@@ -216,7 +220,9 @@ export function SprocketChat({ sprocket, panelOpen, embedded = false }: { sprock
           </button>
         )}
         {error && <p className="error" role="alert">{error}</p>}
-        <Composer placeholder={`Message ${name}`} onSubmit={(text) => void send(text)} autoFocus={!embedded} compact />
+        <Composer placeholder={`Message ${name}`} onSubmit={(text) => void send(text)} autoFocus={!embedded} compact fill={fill}>
+          <SavedPromptsMenu onPick={(text) => setFill({ text })} />
+        </Composer>
       </div>
     </section>
   );

@@ -92,7 +92,22 @@ export interface Panel {
   /** The name the user gave its session in Rails (in a workspace only): browsers show it instead of any title. */
   name?: string;
   createdAt: string;
+  /** The agent profile it started with, as it was then (ADR 0020): editing the profile doesn't change a running panel. */
+  profile?: PanelProfile;
 }
+
+/** A running panel started with an agent profile: where the profile is in use (Customize). */
+export interface ProfileUse {
+  panelId: string;
+  projectId: string;
+  projectName: string;
+  kind: PanelKind;
+  title: string;
+  sessionId?: string;
+}
+
+/** What a panel records of the profile it started with. Sprockets see it on the board. */
+export type PanelProfile = Pick<AgentProfile, "id" | "name" | "model" | "effort" | "permissionMode">;
 
 /** Body of "open a panel" (POST /api/projects/:id/panels). */
 export interface OpenPanel {
@@ -101,7 +116,65 @@ export interface OpenPanel {
   sessionId?: string;
   /** First message for a new agent session. */
   prompt?: string;
+  /** Start the agent with this profile's flags; without one, the agent's default profile (if any) applies. */
+  profileId?: string;
 }
+
+// ---- Customize: agent profiles and saved prompts (ADR 0020). ----
+
+/** Agents that can have profiles so far: their flags are checked against a real install (ADR 0020). */
+export const PROFILE_AGENTS = ["claude"] as const satisfies readonly ProviderId[];
+
+/** Claude Code's `--effort` levels. */
+export const CLAUDE_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+/** Claude Code's `--permission-mode` values. */
+export const CLAUDE_PERMISSION_MODES = ["manual", "acceptEdits", "auto", "plan", "dontAsk", "bypassPermissions"] as const;
+
+export const PROFILE_NAME_MAX_LEN = 40;
+export const PROFILE_INSTRUCTIONS_MAX = 2000;
+/** At most this many allowed (and as many denied) tool patterns, each at most PROFILE_TOOL_MAX characters. */
+export const PROFILE_TOOLS_MAX = 30;
+export const PROFILE_TOOL_MAX = 200;
+
+/**
+ * A named set of launch options for one agent, applied as command-line flags when Rails starts it in a panel.
+ * Empty fields leave the agent's own default. At most one profile per agent is its default.
+ */
+export interface AgentProfile {
+  id: string;
+  name: string;
+  agent: ProviderId;
+  /** Used when a panel for this agent starts without a profile picked (also when resuming a session). */
+  isDefault: boolean;
+  /** `--model`: an alias (`opus`, `sonnet`) or a full model name. */
+  model: string;
+  /** `--effort`, or "" for the agent's default. */
+  effort: (typeof CLAUDE_EFFORTS)[number] | "";
+  /** `--permission-mode`, or "" for the agent's default. */
+  permissionMode: (typeof CLAUDE_PERMISSION_MODES)[number] | "";
+  /** `--append-system-prompt`: added to the agent's own system prompt. */
+  instructions: string;
+  /** `--allowed-tools` / `--disallowed-tools` patterns, e.g. `Bash(git *)`, `Edit`. */
+  allowedTools: string[];
+  disallowedTools: string[];
+  createdAt: string;
+}
+
+/** Body of "create" and "change a profile". Only the fields present change. */
+export type AgentProfileInput = Partial<Omit<AgentProfile, "id" | "createdAt">>;
+
+export const SAVED_PROMPT_NAME_MAX = 60;
+export const SAVED_PROMPT_TEXT_MAX = 4000;
+
+/** A prompt the user keeps to start agents with (Home's composer fills in its text). */
+export interface SavedPrompt {
+  id: string;
+  name: string;
+  text: string;
+  createdAt: string;
+}
+
+export type SavedPromptInput = Partial<Pick<SavedPrompt, "name" | "text">>;
 
 /** A project's panels plus the saved dockview layout (opaque to the server). */
 export interface Workspace {
@@ -528,6 +601,8 @@ export type ServerMsg =
   | { type: "panels.overlaps"; overlaps: PanelOverlap[] }
   /** Sprockets or their messages changed (possibly on another device). */
   | { type: "sprockets.changed" }
+  /** Agent profiles or saved prompts changed (possibly on another device). */
+  | { type: "customize.changed" }
   /** A Sprocket's reply so far, while it's being written; null when it's done. */
   | { type: "sprockets.typing"; sprocketId: string; text: string | null }
   /** While a Sprocket replies: the step it's on ("Reading src/api.ts"), and what it has done so far; null when done. */

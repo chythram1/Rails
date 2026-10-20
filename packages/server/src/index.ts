@@ -17,8 +17,9 @@ import { loadAttention, receive, tokenOk as bridgeTokenOk } from "./bridge/index
 import { panels, projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
 import { listFolder, previewFile } from "./tree.ts";
-import type { OpenPanel, SprocketInput, SprocketSettings } from "@rails/shared";
 import { nameSession } from "./names.ts";
+import type { AgentProfileInput, OpenPanel, SavedPromptInput, SprocketInput, SprocketSettings } from "@rails/shared";
+import { createPrompt, createProfile, deletePrompt, deleteProfile, listPrompts, listProfiles, profileUses, updatePrompt, updateProfile as updateAgentProfile } from "./customize.ts";
 import { closePanel, getWorkspace, openPanel, saveLayout } from "./panels.ts";
 import { ServiceError } from "./errors.ts";
 import { attachPickedFolder, attachProject, detachProject, getProject, listProjectSessions, recentFolders } from "./projects.ts";
@@ -196,6 +197,22 @@ app.put("/api/projects/:id/layout", async (c) => {
 // ---- the file tree (read-only) ----
 app.get("/api/projects/:id/files", async (c) => c.json(await listFolder(getProject(c.req.param("id")).path, c.req.query("dir") ?? "")));
 app.get("/api/projects/:id/files/content", async (c) => c.json(await previewFile(getProject(c.req.param("id")).path, c.req.query("path") ?? "")));
+// ---- Customize: agent profiles and saved prompts (ADR 0020) ----
+app.get("/api/profiles", (c) => c.json(listProfiles()));
+app.post("/api/profiles", async (c) => c.json(createProfile(await c.req.json<AgentProfileInput>()), 201));
+app.put("/api/profiles/:id", async (c) => c.json(updateAgentProfile(c.req.param("id"), await c.req.json<AgentProfileInput>())));
+app.delete("/api/profiles/:id", (c) => {
+  deleteProfile(c.req.param("id"));
+  return c.json({ ok: true });
+});
+app.get("/api/profiles/:id/panels", async (c) => c.json(await profileUses(c.req.param("id"))));
+app.get("/api/prompts", (c) => c.json(listPrompts()));
+app.post("/api/prompts", async (c) => c.json(createPrompt(await c.req.json<SavedPromptInput>()), 201));
+app.put("/api/prompts/:id", async (c) => c.json(updatePrompt(c.req.param("id"), await c.req.json<SavedPromptInput>())));
+app.delete("/api/prompts/:id", (c) => {
+  deletePrompt(c.req.param("id"));
+  return c.json({ ok: true });
+});
 
 // ---- git (read-only) ----
 app.get("/api/projects/:id/git", async (c) => c.json(await gitStatus(getProject(c.req.param("id")).path)));

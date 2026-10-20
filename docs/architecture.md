@@ -19,7 +19,7 @@ packages/
 ## Runtime picture
 
 ```
- browser(s) ──HTTP /api/*──▶ Hono (index.ts) ──▶ services: projects.ts, panels.ts, git.ts
+ browser(s) ──HTTP /api/*──▶ Hono (index.ts) ──▶ services: projects.ts, panels.ts, git.ts, customize.ts
      ▲                                             │          │
      │                                             │          ├─▶ db.ts: projects, panels, layouts (SQLite)
      │                                             │          └─▶ tmux.ts: new-session / kill / running panels
@@ -43,6 +43,7 @@ packages/
   front (`--session-id`), so the panel knows its session immediately. New Codex panels don't know their
   session id. Opening a session that already has a running panel returns that panel.
   `DELETE /api/panels/:id` kills the tmux session.
+  An agent profile adds its flags to the command line (see **Customize** below).
 - **Terminals:** each browser terminal sends `term.attach` with its size and a page-unique `attachId`; the server spawns
   `tmux attach` in a PTY for it and streams bytes both ways. Killing that PTY only detaches. While a
   browser terminal is being resized it refits (and reports `term.resize`) at most every 100ms, plus once at
@@ -78,6 +79,17 @@ packages/
   `suggestions.ts`, ADR 0010), shown under its message; when the user sends it, `bridge/deliver.ts` puts it into
   the session: Claude Code's message socket, the pi extension's long poll (`GET /bridge/<panelId>/pi/inbox`, confirmed with `POST …/pi/delivered`) or
   Codex's `thread/queue/add`. Suggestions expire as soon as their session moves on. A handoff (ADR 0015, `handoffs.ts`, planned by the Coordinator when the user asks) wakes it when its session ends a turn without a question, to draft the message for the other session; handoffs expire after 24 hours and are cancelled when either session ends. Owners (ADR 0016, `owners.ts`), recorded by the Coordinator with `set_owner`, route its requests; an edit to files another session owns wakes it like an overlap. Shell commands' edits count too (`shellEdits.ts`): Rails compares `git status` and file times at a command's start and end. Each run's usage goes in `sprocket_usage`. An overlap also wakes the Coordinator, for the session that changed the files second (batched over 15 s, once per pair and file per 30 minutes); it judges whether they clash and may draft a heads-up with `suggest_message`. A Coordinator's standing rules (ADR 0011) are in its prompt, numbered; a suggestion records the rule it followed. If the user picked a decision model, `decisions.ts` (ADR 0012) asks it about every turn end and unknown dialog in projects with a Coordinator, through pi-ai's `classify()`, and logs its answers next to Rails' own (`decisions` table, `GET /api/decisions`, `decisions.changed`). It may also wake the Coordinator (ADR 0013, `wakeFromModel` in `watches.ts`) for a question the rules missed, unless the session moved on meanwhile; `RAILS_DECISIONS=shadow` keeps it to judging.
+- **Customize** (ADR 0020, `customize.ts`): agent profiles and saved prompts, stored in SQLite (`agent_profiles`,
+  with a profile's options as JSON, checked again when read; `saved_prompts`) and broadcast as `customize.changed`.
+  Routes: `GET/POST /api/profiles`, `PUT/DELETE /api/profiles/:id`, `GET /api/profiles/:id/panels` (the running
+  panels that started with it, "In use"), and the same CRUD under `/api/prompts`. When a panel starts, the profile
+  picked (or else the agent's default; also when a session is resumed) adds its flags after the bridge's
+  (`profileFlags` in `panels.ts`), and the panel keeps a snapshot of it (`panels.profile`): the tab's tooltip names
+  it, and the board and `list_sessions` show it to Sprockets. Every Sprocket can read the saved prompts
+  (`saved_prompts`, `harness/prompts.ts`). The web pages are `#/customize`, `#/customize/profiles/<id>` and
+  `#/customize/prompts/<id>`; a profile's Start opens a panel with it (`POST /api/projects/:id/panels` with
+  `profileId`), and a prompt's "Use on Home" goes to `#/new/<promptId>`, which fills Home's composer. Saved prompts
+  also fill Sprocket chats' composer (`SavedPromptsMenu`).
 - **Persistence:** panels survive browser disconnects and server restarts (`tsx watch` included).
   On a reboot the tmux server is gone; the next workspace read drops panels whose tmux session no
   longer exists. Their transcripts remain, so sessions can be resumed from the sidebar.
@@ -135,6 +147,9 @@ packages/
 | claude | ✅ `~/.claude/projects/*/*.jsonl` | ✅ `claude --session-id <uuid> [-- prompt]` / `claude --resume <id>` |
 | pi | ✅ `~/.pi/agent/sessions/*/*.jsonl` | ✅ `pi --session-id <uuid> [-- prompt]` / `pi --session <id>` |
 | codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl`, names from `~/.codex/session_index.jsonl` (checked with Codex 0.163) | ✅ `codex [-- prompt]` / `codex resume <id>`; a new panel learns its session id from Codex's daemon (ADR 0007) |
+
+Agent profiles (ADR 0020) exist for claude only so far: pi's and Codex's flags still have to be checked on a
+real install, and any `-c`, `--enable`, `--disable` or `--search` flag makes Codex leave its daemon (ADR 0007).
 
 Every provider panel reports to the bridge (ADR 0007): Claude Code through hooks, pi through the Rails
 extension, Codex through its app-server daemon. Edits count for overlaps (ADR 0014) once they worked: Claude

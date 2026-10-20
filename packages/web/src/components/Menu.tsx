@@ -147,7 +147,7 @@ export function MenuButton({ label, title, icon, className, plain, align = "left
               <div key={i} className="menu-sep" role="separator" />
             ) : (
               <button
-                key={item.label}
+                key={`${i}:${item.label}`}
                 role={item.checked === undefined ? "menuitem" : "menuitemradio"}
                 aria-checked={item.checked}
                 className={item.danger ? "danger" : undefined}

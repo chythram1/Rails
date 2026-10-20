@@ -43,6 +43,9 @@ Status:
   wait for one to finish, and draft messages for them, which you read and send
 - Session names (ADR 0019): rename a session from its menu in the sidebar or by double-clicking its tab, and
   Rails, the Coordinator and the agents call it by that name
+- Customize (ADR 0020): agent profiles that start Claude Code with your model, effort, permission mode,
+  instructions and tools (start one in a project from Customize, and see where it's in use), and saved prompts
+  for Home's and Sprocket chats' composer. Sprockets see which profile each session started with.
 
 Docs: [architecture](docs/architecture.md) · [glossary](docs/CONTEXT.md) · [decisions](docs/adr) · [provider formats](docs/providers.md) · [roadmap](docs/roadmap.md)
 

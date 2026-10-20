@@ -1,6 +1,6 @@
 // The project board (ADR 0007): what each session in a project is doing, folded from its SessionEvents.
 // It's what a Sprocket reads instead of whole transcripts. Pure functions, so they're easy to test.
-import type { AttentionReason, PanelKind } from "@rails/shared";
+import type { AttentionReason, PanelKind, PanelProfile } from "@rails/shared";
 import type { SessionEvent } from "./events.ts";
 
 interface StoredEvent {
@@ -30,6 +30,14 @@ export interface SessionCard {
   inbox?: string;
   /** The latest exchange in its transcript, for sessions the bridge saw little of (resumed ones). */
   transcript?: { asked?: string; askedAt?: string; replied?: string; repliedAt?: string };
+  /** The agent profile it started with (ADR 0020). */
+  profile?: PanelProfile;
+}
+
+/** A profile in a few words for a Sprocket: "Planner (sonnet, plan mode, high effort)". */
+export function profileText(p: PanelProfile): string {
+  const opts = [p.model, p.permissionMode && `${p.permissionMode} permission mode`, p.effort && `${p.effort} effort`].filter(Boolean);
+  return opts.length ? `${p.name} (${opts.join(", ")})` : p.name;
 }
 
 /** As many as a panel's stored events could hold (EVENTS_PER_PANEL in db.ts), so a busy session's recent edits aren't dropped. */
@@ -39,8 +47,9 @@ const SHOWN_FILES = 8;
 /** How close together two sessions' changes to a file must be to overlap (ADR 0014): both within this of now. */
 export const OVERLAP_MS = 30 * 60_000;
 
-export function foldCard(panel: { id: string; kind: PanelKind; title: string; sessionId?: string }, events: StoredEvent[]): SessionCard {
+export function foldCard(panel: { id: string; kind: PanelKind; title: string; sessionId?: string; profile?: PanelProfile }, events: StoredEvent[]): SessionCard {
   const c: SessionCard = { panelId: panel.id, kind: panel.kind, title: panel.title, sessionId: panel.sessionId, status: "unknown", edits: [] };
+  if (panel.profile) c.profile = panel.profile;
   for (const { at, sessionId, event: e } of events) {
     c.lastActivity = at;
     if (sessionId) c.sessionId ??= sessionId;
@@ -136,6 +145,7 @@ export function boardText(project: { name: string; path: string }, cards: Sessio
       if (c.lastOutcome) lines.push(`  last reply: ${short(c.lastOutcome.replace(/\s+/g, " "), 400)}`);
       return lines.join("\n");
     }
+    if (c.profile) lines.push(`  profile: ${profileText(c.profile)}`);
     if (c.intent) lines.push(`  asked: ${short(c.intent.replace(/\s+/g, " "), 300)}`);
     else if (t?.asked) lines.push(`  asked (latest in its transcript, ${ago(t.askedAt, now)}): ${short(t.asked.replace(/\s+/g, " "), 300)}`);
     if (c.edits.length) lines.push(`  changed: ${c.edits.slice(0, SHOWN_FILES).map((e) => rel(project.path, e.file)).join(", ")}`);

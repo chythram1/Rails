@@ -1138,6 +1138,23 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
   .settings-field a:hover, .sp-event-open:hover, button.link:hover { text-decoration-thickness: 2px; }
 }
 
+/* ---- Customize (ADR 0020): the Sprockets page's list and layout (.sprockets, .sp-*), with an editor of
+   Settings rows (.set-group, .set-row, .settings-field) on the right. ---- */
+.cz-row { padding-left: 10px; min-height: 52px; }
+.cz-row > .provider-icon, .cz-row-icon { flex-shrink: 0; color: var(--muted); }
+.cz-editor { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.cz-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 40px; padding: 30px 32px 48px; }
+.cz-body > * { width: 100%; max-width: 720px; margin: 0 auto; }
+.cz-agent { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-2); }
+.cz-fields { display: flex; flex-direction: column; gap: 22px; }
+.cz-uses { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.cz-uses a { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 0; font-size: 13px; color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; }
+.cz-intro { max-width: 460px; }
+.cz-intro p { margin: 0; text-wrap: pretty; }
+.cz-intro-title { font-size: 18px; font-weight: 500; }
+.cz-strong { color: var(--text); font-weight: 500; }
+.cz-intro-actions { display: flex; gap: 8px; margin-top: 4px; }
+
 /* ---- small screens: sidebar becomes a drawer ---- */
 @media (max-width: 860px) {
   /* The drawer is always full width: !important overrides the desktop width set inline (and the rail). */
@@ -1159,6 +1176,7 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
   .sp-panel-back { display: inline-grid; }
   .sp-panel .sp-panel-toggle { display: none; }
   .sp-panel-head { padding-left: 52px; } /* room for the sidebar toggle, as in the chat header */
+  .cz-body { padding: 20px 16px 32px; gap: 32px; }
   .main:has(> .sprockets) > .nav-toggle { top: 14px; } /* on the Sprockets header's centre line */
   .page { padding: 64px 16px 32px; }
   .home { padding-top: 72px; }

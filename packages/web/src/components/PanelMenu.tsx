@@ -16,13 +16,23 @@ export function PanelIcon({ kind }: { kind: PanelKind }) {
   return kind === "shell" ? <SquareTerminal size={15} className="shell-icon" aria-label="Shell" /> : <ProviderIcon provider={kind} />;
 }
 
-/** The "+" that starts a new agent or shell. */
-export function PanelMenu({ onPick }: { onPick(kind: PanelKind): void }) {
-  const { providers } = useStore();
+/**
+ * The "+" that starts a new agent or shell. An agent starts with its default profile, if it has one; its other
+ * profiles (ADR 0020) are listed under it.
+ */
+export function PanelMenu({ onPick }: { onPick(kind: PanelKind, profileId?: string): void }) {
+  const { providers, agentProfiles } = useStore();
   const items: MenuItem[] = [
-    ...AGENTS.map(({ id, key }) => {
+    ...AGENTS.flatMap(({ id, key }) => {
       const ok = providers.find((p) => p.id === id)?.installed ?? false;
-      return { label: providerLabel[id], icon: <PanelIcon kind={id} />, shortcut: key, disabled: !ok, note: ok ? undefined : "not installed", onSelect: () => onPick(id) };
+      const profiles = (agentProfiles ?? []).filter((p) => p.agent === id);
+      const byDefault = profiles.find((p) => p.isDefault);
+      return [
+        { label: providerLabel[id], icon: <PanelIcon kind={id} />, shortcut: key, disabled: !ok, note: ok ? byDefault?.name : "not installed", onSelect: () => onPick(id) },
+        ...profiles
+          .filter((p) => !p.isDefault)
+          .map((p) => ({ label: p.name, icon: <PanelIcon kind={id} />, disabled: !ok, note: providerLabel[id], onSelect: () => onPick(id, p.id) })),
+      ];
     }),
     "separator",
     { label: "Shell", icon: <PanelIcon kind="shell" />, shortcut: "s", onSelect: () => onPick("shell") },

@@ -20,14 +20,15 @@ Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
 - Adding projects from another device: Recent works anywhere, but "Open folder…" opens on the server's screen (ADR 0004)
 - Git actions: stage/commit, branch, and a worktree per session
 - Session search across projects
-- Show the session's model in the composer and let the user pick it
+- Show the session's model in the composer and let the user change it (an agent profile picks it at start, ADR 0020)
 
 ## Later
 - **Desktop app:** ship the server and UI as one desktop app. Electron is the likely shell, since it keeps
   the Node server (node-pty, `node:sqlite`, tmux) as it is; the native folder picker (ADR 0004) fits a desktop
   app well. An earlier idea, a Rust port with Tauri, is dropped unless a real need appears. Write an ADR
   when this starts.
-- **Customize:** agent profiles (model, system prompt, tools, permission mode), prompts, skills
+- **Customize, next parts:** agent profiles and saved prompts are built (ADR 0020). Next: profiles for pi and Codex
+  (once their flags are checked on a real install), and Tools (MCP servers, skills), passed as flags too
 - **Automate:** saved prompts on a schedule or trigger (PR opened, Slack mention), with run history
   (see the "Pinned automations" cards in `ref/style.png`)
 - **Custom harness:** Rails' own agent loop as an additional provider

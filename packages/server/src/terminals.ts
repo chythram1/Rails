@@ -2,6 +2,7 @@ import type { IPty } from "node-pty";
 import type WebSocket from "ws";
 import type { ClientMsg, ServerMsg } from "@rails/shared";
 import { watchBusy } from "./activity.ts";
+import { onCustomizeChanged } from "./customize.ts";
 import { panels } from "./db.ts";
 import { onPanelsChanged, panelEnded } from "./panels.ts";
 import { attentionList, onAttention } from "./bridge/index.ts";
@@ -30,6 +31,7 @@ export class TerminalHub {
     onSprocketsChanged(() => this.broadcast({ type: "sprockets.changed" }));
     onHandoffsChanged(() => this.broadcast({ type: "sprockets.changed" })); // they show in the Coordinator's panel
     onOwnersChanged(() => this.broadcast({ type: "sprockets.changed" })); // so do owners
+    onCustomizeChanged(() => this.broadcast({ type: "customize.changed" }));
     onTyping((sprocketId, text) => this.broadcast({ type: "sprockets.typing", sprocketId, text }));
     onActivity((sprocketId, step, summary) => this.broadcast({ type: "sprockets.activity", sprocketId, step, summary }));
     onModelsChanged(() => this.broadcast({ type: "models.changed" }));
