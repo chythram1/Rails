@@ -35,8 +35,9 @@ picks another). Each run keeps its state, log, server logs and report in `.test-
 - `decisionModel`: a classifier ref, `null` to turn it off, or left out to keep the home's setting.
 - `sprocket`: the project's one Sprocket (its Coordinator): name, model, description, rules.
 - `agents`: each with a `name` (for `prompt`), its `kind`, and optionally its `model`, as the agent's `/model`
-  picker labels it ("Sonnet 5.5", "gpt-6-luna"). Picking a model is for that session only: your defaults stay.
-  Codex runs on its default model.
+  picker labels it ("Sonnet 5.5", "gpt-6-luna"; for pi, "openai-codex/gpt-6.1-sol" when the same id is under more
+  than one provider). Picking a model is for that session only: your defaults stay. Codex runs on its default
+  model.
 
 ## What setup does to each agent
 

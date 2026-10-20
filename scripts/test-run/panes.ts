@@ -74,8 +74,9 @@ export class Panes {
         done.push("trusted the folder");
       }
     }
-    // Codex shows its main screen for a moment before asking to trust a new folder: wait for the question itself.
-    if (agent.kind === "codex" && (await this.waitFor(panelId, /Trust this folder\?/, 12_000))) {
+    // Codex shows its main screen for a while (12 s wasn't always enough) before asking to trust a new folder: wait
+    // for the question itself. In a folder it already trusts, this waits out the 30 s.
+    if (agent.kind === "codex" && (await this.waitFor(panelId, /Trust this folder\?/, 30_000))) {
       this.keys(panelId, "Enter");
       done.push("trusted the folder");
     }
@@ -94,14 +95,20 @@ export class Panes {
         this.keys(panelId, "s"); // this session only: the user's default stays
         if (!(await this.waitFor(panelId, new RegExp(`Set model to ${escape(agent.model)}`)))) throw new Error(`Claude Code didn't confirm ${agent.model}.`);
       } else if (agent.kind === "pi") {
+        // "provider/id" when the id is under more than one provider: the picker shows "id [provider]", the status
+        // line "(provider) id".
+        const [provider, id] = agent.model.includes("/") ? agent.model.split("/", 2) : [undefined, agent.model];
+        const by = provider ? escape(provider) : "[\\w-]+";
         await this.type(panelId, "/model");
         if (!(await this.waitFor(panelId, /Enter to select/))) throw new Error("pi's model picker didn't open.");
-        if (!(await this.select(panelId, /^\s*→/, new RegExp(`→\\s+(✓\\s+)?${escape(agent.model)}\\s`)))) {
+        this.tmux("send-keys", "-t", `p-${panelId}`, "-l", id); // its search: the list can be long with many providers
+        await sleep(500);
+        if (!(await this.select(panelId, /^\s*→/, new RegExp(`→\\s+(✓\\s+)?${escape(id)}\\s+\\[${by}\\]`)))) {
           this.keys(panelId, "Escape");
           throw new Error(`pi has no model labelled "${agent.model}".`);
         }
         this.keys(panelId, "Enter"); // this session only (Ctrl+S would make it pi's default)
-        if (!(await this.waitFor(panelId, new RegExp(`\\) ${escape(agent.model)} `)))) throw new Error(`pi didn't switch to ${agent.model}.`);
+        if (!(await this.waitFor(panelId, new RegExp(`\\(${by}\\) ${escape(id)} `)))) throw new Error(`pi didn't switch to ${agent.model}.`);
       } else if (!new RegExp(escape(agent.model), "i").test(this.screen(panelId))) {
         throw new Error(`Picking Codex's model isn't supported yet: leave "model" out to use its default.`);
       }
