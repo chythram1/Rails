@@ -59,13 +59,17 @@ const panelChanges = listeners<[projectId: string]>();
 export const onPanelsChanged = panelChanges.on;
 const changed = panelChanges.emit;
 
-// Codex picks a new session's id itself; the bridge learns it from Codex's daemon (bridge/codex.ts).
-onCodexSession((panelId, threadId) => {
+/**
+ * Codex picks a new session's id itself; the bridge learns it from Codex's daemon (bridge/codex.ts). It may move a
+ * new panel on to another thread, the one Codex really uses (CodexWatcher.started); resumed panels never get here.
+ */
+export function linkCodexThread(panelId: string, threadId: string): void {
   const panel = panels.get(panelId);
-  if (!panel || panel.sessionId || panels.bySession(threadId)) return;
+  if (!panel || panels.bySession(threadId)) return;
   panels.setSession(panelId, threadId);
   changed(panel.projectId);
-});
+}
+onCodexSession(linkCodexThread);
 
 /** Stop a panel's tmux session (if still there), drop the panel and tell every browser. */
 async function removePanel(panel: Panel): Promise<void> {

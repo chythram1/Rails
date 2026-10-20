@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { panels, projects } from "../db.ts";
+import { linkCodexThread } from "../panels.ts";
 import { boardText, foldCard, sharedFiles } from "./board.ts";
 import { CodexWatcher } from "./codex.ts";
 import { bridgeFlags } from "./wiring.ts";
@@ -200,6 +201,56 @@ describe("Codex watcher", () => {
     w.expect(p.id, project.path);
     w.handle({ method: "thread/started", params: { thread: { id: "t-old", cwd: project.path, createdAt: Date.now() / 1000 - 3600 } } });
     expect(assigned).toEqual([]);
+  });
+});
+
+describe("Codex watcher, threads it never uses", () => {
+  /** A Codex thread id: a UUIDv7, its first 48 bits the time it started (ms). */
+  const v7 = (ms: number) => {
+    const t = ms.toString(16).padStart(12, "0");
+    return `${t.slice(0, 8)}-${t.slice(8)}-7abc-8def-${Math.random().toString(16).slice(2, 14).padEnd(12, "0")}`;
+  };
+  const setup = () => {
+    const project = projects.create("app", `/tmp/codex-unused-${Math.random()}`);
+    const assigned: [string, string][] = [];
+    // The server's own handler, which records the panel's session (and must let the watcher move it).
+    const w = new CodexWatcher(() => {}, (panelId, threadId) => (assigned.push([panelId, threadId]), linkCodexThread(panelId, threadId)));
+    const p = panels.create({ projectId: project.id, kind: "codex", title: "Codex" });
+    return { project, assigned, w, p };
+  };
+
+  it("goes by the time in a thread's id: a looked-up thread reports createdAt as now", () => {
+    const { project, assigned, w, p } = setup();
+    w.expect(p.id, project.path);
+    // A thread left over from a panel closed 8 s ago, found when Rails reconnects to the daemon.
+    w.handle({ method: "thread/started", params: { thread: { id: v7(Date.now() - 8400), cwd: project.path, createdAt: Date.now() / 1000 } } });
+    expect(assigned).toEqual([]);
+  });
+
+  it("moves a panel to a newer thread in its folder while its thread hasn't had a turn", () => {
+    const { project, assigned, w, p } = setup();
+    w.expect(p.id, project.path);
+    const before = v7(Date.now() + 500); // started at launch, before the trust prompt
+    const real = v7(Date.now() + 9000); // started after it, and used
+    w.handle({ method: "thread/started", params: { thread: { id: before, cwd: project.path, createdAt: Date.now() / 1000 } } });
+    w.handle({ method: "thread/started", params: { thread: { id: real, cwd: project.path, createdAt: Date.now() / 1000 } } });
+    expect(assigned).toEqual([
+      [p.id, before],
+      [p.id, real],
+    ]);
+    w.handle({ method: "turn/completed", params: { threadId: real, turn: { status: "completed", items: [{ type: "agentMessage", text: "ok" }] } } });
+    expect(panels.get(p.id)!.sessionId).toBe(real);
+    expect(cardOf(panels.get(p.id)!)).toMatchObject({ lastOutcome: "ok", sessionId: real });
+  });
+
+  it("keeps a panel's thread once it has had a turn (a newer one is the user's own)", () => {
+    const { project, assigned, w, p } = setup();
+    w.expect(p.id, project.path);
+    const used = v7(Date.now() + 500);
+    w.handle({ method: "thread/started", params: { thread: { id: used, cwd: project.path, createdAt: Date.now() / 1000 } } });
+    w.handle({ method: "thread/status/changed", params: { threadId: used, status: { type: "active", activeFlags: [] } } });
+    w.handle({ method: "thread/started", params: { thread: { id: v7(Date.now() + 9000), cwd: project.path, createdAt: Date.now() / 1000 } } });
+    expect(assigned).toEqual([[p.id, used]]);
   });
 });
 
