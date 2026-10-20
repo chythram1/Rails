@@ -68,9 +68,12 @@ export class Panes {
     const done: string[] = [];
     if (agent.kind === "claude" && (await this.waitFor(panelId, /Yes, I trust this folder|❯\s*$|auto mode|for shortcuts/))) {
       if (/Yes, I trust this folder/.test(this.screen(panelId))) {
-        this.keys(panelId, "Down");
-        await sleep(200);
+        // Move to "Yes" by what's selected on screen, then confirm: "No, exit" comes first (2.1.304), and a key sent
+        // before the menu takes input is lost, so a blind Down + Enter can pick "No" and close the panel.
+        await sleep(500);
+        if (!(await this.select(panelId, /❯/, /❯\s*(\d+\.\s*)?Yes, I trust this folder/))) throw new Error("Couldn't select \"Yes, I trust this folder\" in Claude Code.");
         this.keys(panelId, "Enter");
+        if (!(await this.waitFor(panelId, /auto mode|for shortcuts/, 15_000))) throw new Error(`Claude Code didn't open after trusting the folder. Its screen:\n${this.screen(panelId)}`);
         done.push("trusted the folder");
       }
     }
