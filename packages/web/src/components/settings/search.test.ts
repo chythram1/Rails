@@ -20,6 +20,7 @@ describe("settings search", () => {
     expect(find("claude")).toEqual(["provider-anthropic"]);
     expect(find("token")).toContain("sign-out-everywhere");
     expect(find("profile picture")).toEqual(["avatar"]);
+    expect(find("dark mode")).toEqual(["appearance"]);
   });
 
   it("puts label matches before synonym matches", () => {

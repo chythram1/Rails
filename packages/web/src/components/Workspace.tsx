@@ -192,7 +192,7 @@ function Dock({ projectId, targetGroup, focusId, onFocused }: DockProps) {
   return (
     <div className="dock">
       <DockviewReact
-        theme={themeDark}
+        theme={themeDark} // only for its class: styles.css maps its variables to the tokens of either theme
         components={{ terminal: TerminalPanel }}
         tabComponents={{ tab: PanelTab }}
         leftHeaderActionsComponent={HeaderAdd}

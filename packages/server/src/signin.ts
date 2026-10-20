@@ -264,13 +264,15 @@ function page(res: ServerResponse, status: number, title: string, body: string) 
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(title)} · Rails</title>
 <style>
-  html { color-scheme: dark; }
+  /* The app's canvas, ink and muted colours (styles.css), light or dark like the device. */
+  html { color-scheme: light dark; --bg: #ffffff; --text: #171717; --muted: #6b6b6b; }
+  @media (prefers-color-scheme: dark) { html { --bg: #1d1d1d; --text: #f8f8f3; --muted: #a6a6a1; } }
   body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box;
-    background: #121212; color: #ececec; font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; text-align: center; }
+    background: var(--bg); color: var(--text); font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; text-align: center; }
   main { max-width: 420px; }
-  svg { width: 56px; height: 56px; margin-bottom: 20px; }
-  h1 { font-size: 22px; font-weight: 600; margin: 0 0 8px; }
-  p { margin: 0; color: #9a9a9a; }
+  svg { width: 132px; height: auto; margin-bottom: 4px; }
+  h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 8px; }
+  p { margin: 0; color: var(--muted); }
 </style></head>
 <body><main>${logo}<h1>${escape(title)}</h1><p>${escape(body)}</p></main></body></html>`);
 }

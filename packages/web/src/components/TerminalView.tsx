@@ -11,11 +11,12 @@ const RESIZE_THROTTLE_MS = 100;
 /** Ids for term.attach, unique across every terminal in this page (see `attach` below). */
 let lastAttachId = 0;
 
+/** Dark in both app themes (the agents pick colors meant for dark backgrounds): `--term-bg` in styles.css. */
 const THEME = {
-  background: "#121212",
-  foreground: "#ececec",
-  cursor: "#ececec",
-  selectionBackground: "#3a3a3a",
+  background: "#1d1d1d",
+  foreground: "#f8f8f3",
+  cursor: "#f8f8f3",
+  selectionBackground: "#4d4d4d",
 };
 
 interface Props {

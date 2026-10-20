@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { IconFilter as Filter, IconPlus as Plus, IconSearch as Search } from "@tabler/icons-react";
+import { IconChevronDown as ChevronDown, IconFilter as Filter, IconPlus as Plus, IconSearch as Search } from "@tabler/icons-react";
 import type { Project, Sprocket as SprocketData } from "@rails/shared";
 import { href, navigate, type Route } from "../../router.ts";
 import { useStore } from "../../store.tsx";
 import { timeAgo } from "../../util.ts";
 import { MenuButton } from "../Menu.tsx";
-import { Sprocket } from "./Sprocket.tsx";
+import { Sprocket, VIEW } from "./Sprocket.tsx";
 import { SprocketChat } from "./SprocketChat.tsx";
 import { SprocketCreator } from "./SprocketCreator.tsx";
 import { SprocketSettings } from "./SprocketSettings.tsx";
@@ -58,9 +58,10 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
 }
 
 /**
- * The list column. Its header is a search field (as in Telegram, Lindy or ref chat.png) and, when there's more
- * than one group, a filter menu: All, each project with Sprockets, General. Rows are grouped by project under
- * small headings. New Sprockets are made from the gallery (and, on phones, a row at the end of the list).
+ * The list column. Its header is a search field; under it, always there so
+ * nothing shifts when a group appears, a filter menu named after what it shows: All Sprockets, each project with
+ * Sprockets, General. Rows are grouped by project under small headings. New Sprockets are made from the gallery
+ * (and, on phones, a row at the end of the list).
  */
 function SprocketList(props: { list: SprocketData[]; projects: Project[]; filter: string; onFilter(key: string): void; activeId?: string }) {
   const { list, projects, filter, onFilter, activeId } = props;
@@ -80,20 +81,26 @@ function SprocketList(props: { list: SprocketData[]; projects: Project[]; filter
           <Search size={15} aria-hidden />
           <input type="search" placeholder="Search" aria-label="Search Sprockets" value={query} onChange={(e) => setQuery(e.target.value)} />
         </label>
-        {all.length > 1 && (
-          <MenuButton
-            label={`Show: ${shownName}`}
-            title={filter === "all" ? "Filter by project" : `Showing ${shownName}`}
-            className={filter === "all" ? undefined : "active"}
-            icon={<Filter size={16} />}
-            align="right"
-            items={[
-              { label: "All Sprockets", checked: filter === "all", onSelect: () => onFilter("all") },
-              "separator",
-              ...all.map((g) => ({ label: g.title, checked: filter === g.key, onSelect: () => onFilter(g.key) })),
-            ]}
-          />
-        )}
+      </div>
+      <div className="sp-filter">
+        <MenuButton
+          plain
+          label={`Show: ${shownName}`}
+          title="Filter by project"
+          className={"sp-filter-btn" + (filter === "all" ? "" : " on")}
+          icon={
+            <>
+              <Filter size={14} aria-hidden />
+              <span className="truncate">{shownName}</span>
+              <ChevronDown size={14} aria-hidden />
+            </>
+          }
+          items={[
+            { label: "All Sprockets", checked: filter === "all", onSelect: () => onFilter("all") },
+            ...(all.length ? ["separator" as const] : []),
+            ...all.map((g) => ({ label: g.title, checked: filter === g.key, onSelect: () => onFilter(g.key) })),
+          ]}
+        />
       </div>
       {list.length === 0 ? (
         <p className="muted small pad">Your first one will show up here.</p>
@@ -147,9 +154,8 @@ function SprocketRow({ sprocket: s, active }: { sprocket: SprocketData; active: 
 
 /**
  * The page with no Sprocket open (desktop): every Sprocket as a card with its character idling, like a
- * cast line-up (ref core-characters.png, Grok's companions), and a card that makes a new one. One grid in the
- * order they were made, so cards never move around (ref/sprockets/stage2/gallery.png was the busier, grouped
- * version); the list beside it groups them by project.
+ * cast line-up, and a card that makes a new one. One grid in the
+ * order they were made, so cards never move around; the list beside it groups them by project.
  */
 function Gallery({ list }: { list: SprocketData[] }) {
   return (
@@ -167,14 +173,29 @@ function Gallery({ list }: { list: SprocketData[] }) {
         ))}
         <li>
           <a className="sp-card sp-card-new" href={href.newSprocket()}>
-            <span className="sp-card-plus" aria-hidden>
-              <Plus size={28} />
-            </span>
-            <span className="sp-card-name">New</span>
+            <NewArt />
+            <span className="sp-card-name">New Sprocket</span>
+            <span className="muted small truncate">Pick a look and a name</span>
           </a>
         </li>
       </ul>
     </div>
+  );
+}
+
+/**
+ * The New card's picture, in a character's frame (the same box and ground shadow, Sprocket.tsx), so its name lines
+ * up with theirs: a round-ended plus standing where a body would.
+ */
+function NewArt() {
+  return (
+    <svg className="sprocket sp-new-art" viewBox={`${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`} style={{ width: 84, height: (84 * VIEW.h) / VIEW.w }} aria-hidden>
+      <ellipse className="s-shadow" cx={100} cy={203} rx={44} ry={6} />
+      <g className="sp-new-plus">
+        <rect x={94} y={106} width={12} height={74} rx={6} />
+        <rect x={63} y={137} width={74} height={12} rx={6} />
+      </g>
+    </svg>
   );
 }
 

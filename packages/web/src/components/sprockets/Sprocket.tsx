@@ -17,7 +17,7 @@ function idleFor(size: number) {
   return { bob: 6, sway: 3.5, speed: 1 };
 }
 /** The drawn area of the shared 200×215 coordinate system (hats, ear cups and the shadow included). */
-const VIEW = { x: 14, y: 24, w: 172, h: 190 };
+export const VIEW = { x: 14, y: 24, w: 172, h: 190 };
 
 interface Props {
   look: SprocketLook;

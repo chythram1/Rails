@@ -3,11 +3,11 @@ import { IconPackages as Boxes, IconGauge as CircleGauge, IconSettings as Cog, I
 import type { AttentionReason, PanelKind, Project, SessionSummary } from "@rails/shared";
 import { api } from "../api.ts";
 import { href, navigate, type Route } from "../router.ts";
-import logo from "../assets/logo.svg";
 import { useStore } from "../store.tsx";
 import { timeAgo } from "../util.ts";
 import { Avatar } from "./Avatar.tsx";
 import { FolderMenu } from "./FolderMenu.tsx";
+import { Logo } from "./Logo.tsx";
 import { MenuButton } from "./Menu.tsx";
 import { PanelMenu } from "./PanelMenu.tsx";
 import { ProviderIcon } from "./ProviderIcon.tsx";
@@ -115,16 +115,18 @@ export function Sidebar({ route }: { route: Route }) {
   return (
     <aside ref={aside} className={"sidebar" + (rail ? " rail" : "") + (dragging ? " dragging" : "")} style={rail ? undefined : { width }}>
       <div className="brand">
-        <img className="brand-logo" src={logo} alt="Rails" width={24} height={24} />
+        <span className="brand-mark">
+          <Logo />
+          <span className="wordmark">Rails</span>
+        </span>
         <button
           className="icon-btn"
           aria-label={rail ? "Expand sidebar" : "Collapse sidebar"}
           title={rail ? "Expand sidebar" : "Collapse sidebar"}
           onClick={() => setSize((s) => ({ ...s, rail: !s.rail }))}
         >
-          {/* In the icon rail this button shows the logo, and the panel icon on hover/focus. */}
-          <img className="toggle-logo" src={logo} alt="" width={24} height={24} />
-          <PanelLeft size={16} className="toggle-icon" />
+          {/* In the icon rail this button lies over the curled-up logo, and shows its icon on hover/focus. */}
+          <PanelLeft size={16} />
         </button>
       </div>
       <nav className="nav">
@@ -199,7 +201,7 @@ export function Sidebar({ route }: { route: Route }) {
 }
 
 /**
- * The account row at the foot of the sidebar (ref/sprockets/stage2/footer.png): the profile's avatar and
+ * The account row at the foot of the sidebar: the profile's avatar and
  * name (this computer's until it's changed in Settings → Account), opening a menu with Settings and Sign
  * out. While the connection is down it says so, with a dot on the avatar; in the icon rail only the avatar
  * shows.

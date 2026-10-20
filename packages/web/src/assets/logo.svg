@@ -1,3 +1,87 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" fill="none">
-  <path fill="#ffffff" fill-rule="evenodd" d="M 1130.38 624.80 C 1130.38 716.92 1077.66 751.28 1057.91 803.29 C 1041.57 846.32 1047.81 911.62 977.92 975.72 C 913.25 1035.04 855.79 1022.51 802.99 1049.67 C 761.35 1071.09 719.27 1120.50 627.00 1120.50 C 534.73 1120.50 492.65 1071.09 451.01 1049.67 C 398.21 1022.51 340.75 1035.04 276.08 975.72 C 206.19 911.62 212.43 846.32 196.09 803.29 C 176.34 751.28 123.62 716.92 123.62 624.80 C 123.62 531.48 176.53 483.53 194.65 445.72 C 218.03 396.92 205.23 338.52 273.50 271.30 C 340.77 205.07 402.62 213.21 449.40 196.05 C 502.17 176.69 538.11 127.75 627.00 127.75 C 715.89 127.75 751.83 176.69 804.60 196.05 C 851.38 213.21 913.23 205.07 980.50 271.30 C 1048.77 338.52 1035.97 396.92 1059.35 445.72 C 1077.47 483.53 1130.38 531.48 1130.38 624.80 Z M 1067.09 624.80 C 1066.85 699.78 1021.00 724.04 999.82 779.23 C 984.84 818.28 989.10 887.40 933.62 931.42 C 871.10 981.03 838.31 963.56 779.80 993.70 C 731.59 1018.54 695.23 1061.85 627.00 1061.85 C 558.77 1061.85 522.41 1018.54 474.20 993.70 C 415.69 963.56 382.90 981.03 320.38 931.42 C 264.90 887.40 269.16 818.28 254.18 779.23 C 233.00 724.04 187.15 699.78 186.91 624.80 C 186.66 548.87 230.22 516.81 252.13 469.53 C 277.83 414.07 265.31 369.93 318.69 316.49 C 371.26 263.86 417.99 273.37 472.48 251.76 C 530.27 228.84 560.43 188.34 627.00 188.34 C 693.57 188.34 723.73 228.84 781.52 251.76 C 836.01 273.37 882.74 263.86 935.31 316.49 C 988.69 369.93 976.17 414.07 1001.87 469.53 C 1023.78 516.81 1067.34 548.87 1067.09 624.80 Z M 987.89 624.80 C 988.51 691.75 962.53 711.81 934.81 752.30 C 914.60 781.82 924.22 829.99 877.80 875.60 C 833.05 919.57 789.97 910.47 751.92 926.37 C 716.25 941.28 691.86 976.66 627.00 976.66 C 562.14 976.66 537.75 941.28 502.08 926.37 C 464.03 910.47 420.95 919.57 376.20 875.60 C 329.78 829.99 339.40 781.82 319.19 752.30 C 291.47 711.81 265.49 691.75 266.11 624.80 C 266.67 565.23 284.63 547.93 320.39 497.80 C 342.62 466.63 331.56 420.13 376.75 374.55 C 420.71 330.21 462.82 339.69 502.34 323.86 C 540.01 308.77 564.06 272.80 627.00 272.80 C 689.94 272.80 713.99 308.77 751.66 323.86 C 791.18 339.69 833.29 330.21 877.25 374.55 C 922.44 420.13 911.38 466.63 933.61 497.80 C 969.37 547.93 987.33 565.23 987.89 624.80 Z M 933.73 624.80 C 934.13 673.97 910.63 687.62 883.70 731.13 C 867.70 756.98 871.16 800.37 837.00 834.80 C 803.34 868.72 768.19 861.96 731.45 876.97 C 692.76 892.78 674.52 921.06 627.00 921.06 C 579.48 921.06 561.24 892.78 522.55 876.97 C 485.81 861.96 450.66 868.72 417.00 834.80 C 382.84 800.37 386.30 756.98 370.30 731.13 C 343.37 687.62 319.87 673.97 320.27 624.80 C 320.69 572.40 353.93 552.29 371.81 519.10 C 391.85 481.90 386.35 449.25 417.93 415.73 C 449.21 382.52 484.76 388.74 523.08 373.91 C 563.54 358.26 581.38 331.90 627.00 331.90 C 672.62 331.90 690.46 358.26 730.92 373.91 C 769.24 388.74 804.79 382.52 836.07 415.73 C 867.65 449.25 862.15 481.90 882.19 519.10 C 900.07 552.29 933.31 572.40 933.73 624.80 Z M 864.90 624.80 C 865.78 668.05 843.63 687.60 831.53 709.52 C 819.84 730.70 822.13 758.81 789.03 786.83 C 757.52 813.50 737.25 808.85 710.04 825.28 C 683.59 841.25 668.69 854.85 627.00 854.85 C 585.31 854.85 570.41 841.25 543.96 825.28 C 516.75 808.85 496.48 813.50 464.97 786.83 C 431.87 758.81 434.16 730.70 422.47 709.52 C 410.37 687.60 388.22 668.05 389.10 624.80 C 389.97 582.45 415.95 561.00 425.64 541.40 C 436.95 518.52 436.02 492.32 466.90 464.70 C 496.25 438.45 529.11 438.20 545.24 427.41 C 575.12 407.42 592.65 398.31 627.00 398.31 C 661.35 398.31 678.88 407.42 708.76 427.41 C 724.89 438.20 757.75 438.45 787.10 464.70 C 817.98 492.32 817.05 518.52 828.36 541.40 C 838.05 561.00 864.03 582.45 864.90 624.80 Z M 809.03 624.80 C 808.33 657.52 796.15 661.53 782.66 689.28 C 771.07 713.13 773.87 729.31 751.29 749.09 C 732.15 765.86 712.88 765.82 690.31 777.65 C 668.34 789.17 655.34 803.45 627.00 803.45 C 598.66 803.45 585.66 789.17 563.69 777.65 C 541.12 765.82 521.85 765.86 502.71 749.09 C 480.13 729.31 482.93 713.13 471.34 689.28 C 457.85 661.53 445.67 657.52 444.97 624.80 C 444.45 600.56 463.59 583.97 474.15 561.49 C 484.38 539.73 483.82 522.17 504.89 502.69 C 522.85 486.09 543.47 485.81 564.90 474.88 C 587.01 463.61 599.49 450.27 627.00 450.27 C 654.51 450.27 666.99 463.61 689.10 474.88 C 710.53 485.81 731.15 486.09 749.11 502.69 C 770.18 522.17 769.62 539.73 779.85 561.49 C 790.41 583.97 809.55 600.56 809.03 624.80 Z"/>
+<svg class="logo-armadillo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 110" width="180" height="110" role="img" aria-labelledby="armadillo-title armadillo-desc">
+  <title id="armadillo-title">Armadillo</title>
+  <desc id="armadillo-desc">A right-facing armadillo made of rounded bars: a low domed shell, pointed nose, upright ear and long segmented tail. Hover or hold it down to see it walk in place.</desc>
+  <style>
+    .logo-armadillo { --ink: currentColor; --detail: #898989; }
+    .logo-armadillo .armadillo-ink { fill: var(--ink); }
+    .logo-armadillo .armadillo-foot { fill: var(--detail); }
+    .logo-armadillo .armadillo-motion { animation-duration: 1.4s; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+    .logo-armadillo .armadillo-tail { transform-box: fill-box; transform-origin: center; animation-name: var(--armadillo-wave, none); animation-delay: var(--lag); }
+    .logo-armadillo .armadillo-band { transform-box: fill-box; transform-origin: center bottom; animation-name: var(--armadillo-ripple, none); animation-delay: var(--lag); }
+    .logo-armadillo .armadillo-head { animation-name: var(--armadillo-bob, none); }
+    .logo-armadillo .armadillo-foot-a { animation-name: var(--armadillo-step-a, none); }
+    .logo-armadillo .armadillo-foot-b { animation-name: var(--armadillo-step-b, none); }
+    .logo-armadillo:active { --armadillo-wave: armadillo-tail-wave; --armadillo-ripple: armadillo-shell-ripple; --armadillo-bob: armadillo-head-bob; --armadillo-step-a: armadillo-step-front; --armadillo-step-b: armadillo-step-back; }
+    @media (hover: hover) {
+      .logo-armadillo:hover { --armadillo-wave: armadillo-tail-wave; --armadillo-ripple: armadillo-shell-ripple; --armadillo-bob: armadillo-head-bob; --armadillo-step-a: armadillo-step-front; --armadillo-step-b: armadillo-step-back; }
+    }
+    @keyframes armadillo-tail-wave {
+      0%, 100% { transform: translateY(0) scaleY(1); }
+      30% { transform: translateY(var(--lift)) scaleY(1.3); }
+      72% { transform: translateY(var(--drop)) scaleY(.94); }
+    }
+    @keyframes armadillo-shell-ripple {
+      0%, 100% { transform: translateY(0) scaleY(1); }
+      30% { transform: translateY(1px) scaleY(.985); }
+      72% { transform: translateY(-1px) scaleY(1.015); }
+    }
+    @keyframes armadillo-head-bob {
+      0%, 50%, 100% { transform: translateY(0); }
+      25%, 75% { transform: translateY(-1.5px); }
+    }
+    @keyframes armadillo-step-front {
+      0%, 50%, 100% { transform: translate(0, 0); }
+      12% { transform: translate(2px, -2px); }
+      25% { transform: translate(3.5px, -4.5px); }
+      40% { transform: translate(-2px, -1px); }
+      75% { transform: translate(-2px, 0); }
+    }
+    @keyframes armadillo-step-back {
+      0%, 50%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-2px, 0); }
+      62% { transform: translate(2px, -2px); }
+      75% { transform: translate(3.5px, -4.5px); }
+      90% { transform: translate(-2px, -1px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .logo-armadillo .armadillo-motion { animation: none; }
+    }
+  </style>
+  <!-- The hit area stays still while individual bars move. -->
+  <rect width="180" height="110" fill="transparent" pointer-events="all"/>
+  <!-- Drawn facing left, mirrored around its centre (x = 95) to face right. -->
+  <g transform="matrix(-1 0 0 1 190 0)">
+  <g class="armadillo-ink">
+    <rect class="armadillo-motion armadillo-tail" x="126" y="65" width="5" height="15" rx="2.5" style="--lift:-1.5px;--drop:1px;--lag:0s"/>
+    <rect class="armadillo-motion armadillo-tail" x="134" y="70" width="5" height="13" rx="2.5" style="--lift:-3px;--drop:1.5px;--lag:.06s"/>
+    <rect class="armadillo-motion armadillo-tail" x="142" y="74" width="5" height="11" rx="2.5" style="--lift:-4px;--drop:2px;--lag:.12s"/>
+    <rect class="armadillo-motion armadillo-tail" x="150" y="77" width="5" height="9" rx="2.5" style="--lift:-5px;--drop:2px;--lag:.18s"/>
+    <rect class="armadillo-motion armadillo-tail" x="158" y="79" width="5" height="7" rx="2.5" style="--lift:-6px;--drop:2.5px;--lag:.24s"/>
+    <rect class="armadillo-motion armadillo-tail" x="166" y="80" width="5" height="5" rx="2.5" style="--lift:-7px;--drop:2.5px;--lag:.3s"/>
+  </g>
+  <g class="armadillo-feet">
+    <rect class="armadillo-motion armadillo-foot armadillo-foot-a" x="59" y="78" width="5" height="13" rx="2.5"/>
+    <rect class="armadillo-motion armadillo-foot armadillo-foot-b" x="69" y="79" width="5" height="12" rx="2.5"/>
+    <rect class="armadillo-motion armadillo-foot armadillo-foot-b" x="104" y="79" width="5" height="12" rx="2.5"/>
+    <rect class="armadillo-motion armadillo-foot armadillo-foot-a" x="114" y="78" width="5" height="13" rx="2.5"/>
+  </g>
+  <g class="armadillo-ink">
+    <g class="armadillo-motion armadillo-head">
+      <rect x="19" y="65" width="5" height="5" rx="2.5"/>
+      <rect x="27" y="61" width="5" height="12" rx="2.5"/>
+      <rect x="35" y="61" width="5" height="14" rx="2.5"/>
+      <rect x="43" y="53" width="5" height="23" rx="2.5"/>
+      <rect x="43" y="39" width="5" height="11" rx="2.5"/>
+      <circle cx="36.5" cy="56" r="1.8"/>
+    </g>
+    <rect class="armadillo-motion armadillo-band" x="52" y="48" width="5" height="29" rx="2.5" style="--lag:0s"/>
+    <rect class="armadillo-motion armadillo-band" x="61" y="40" width="5" height="38" rx="2.5" style="--lag:.025s"/>
+    <rect class="armadillo-motion armadillo-band" x="70" y="35" width="5" height="43" rx="2.5" style="--lag:.05s"/>
+    <rect class="armadillo-motion armadillo-band" x="79" y="33" width="5" height="45" rx="2.5" style="--lag:.075s"/>
+    <rect class="armadillo-motion armadillo-band" x="88" y="33" width="5" height="45" rx="2.5" style="--lag:.1s"/>
+    <rect class="armadillo-motion armadillo-band" x="97" y="36" width="5" height="42" rx="2.5" style="--lag:.125s"/>
+    <rect class="armadillo-motion armadillo-band" x="106" y="42" width="5" height="36" rx="2.5" style="--lag:.15s"/>
+    <rect class="armadillo-motion armadillo-band" x="115" y="51" width="5" height="25" rx="2.5" style="--lag:.175s"/>
+  </g>
+  </g>
 </svg>

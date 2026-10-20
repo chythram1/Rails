@@ -84,7 +84,7 @@ for these three, not into adding providers.
 4. `DESIGN.md` is the visual design system: colors, type, layout, shapes, components and the rules. Read it before any UI work.
 
 Read these when relevant: `docs/providers.md` before touching a parser or adapter, and `docs/roadmap.md`
-for future ideas, which aren't commitments. `ref/style.png` (overall look) and `ref/panels.png` (workspace panels) are the visual references (`ref/` is gitignored, so they may be missing in a fresh clone).
+for future ideas, which aren't commitments. Reference screenshots for the look are in `scratch/visual-overhaul/` (gitignored, so they may be missing in a fresh clone).
 
 ## Code map
 | Path | What lives there |
@@ -123,15 +123,15 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 | `packages/server/src/signin.ts` | Rails' own "Continue with ChatGPT" and OpenRouter sign-in flows (so every page says Rails); they store credentials in pi-ai's shape (ADR 0006). |
 | `packages/web/src/components/sprockets/` | The Sprockets page (`SprocketsPage`, `SprocketCreator`, `SprocketChat`, `SprocketSettings`) and the character renderer (`Sprocket.tsx`: `characters.ts` data, `parts.tsx` accessories, `motion.ts` blinks/look-at/one-shots; idle loops in `styles.css`). |
 | `packages/web/src/components/TerminalView.tsx` | One xterm.js terminal attached to a panel over the shared socket; re-attaches on reconnect, reports resizes. |
-| `packages/web/src/` | React SPA. `store.tsx` holds global state, `ws.ts` the shared socket with reconnect, `router.ts` hash routing, `api.ts` the REST client, `styles.css` all CSS (tokens at the top), `components/` the UI. |
+| `packages/web/src/` | React SPA. `store.tsx` holds global state, `ws.ts` the shared socket with reconnect, `router.ts` hash routing, `api.ts` the REST client, `theme.ts` the appearance (Light, Dark or System, per browser; ADR 0017, applied before the first paint by `index.html`), `styles.css` all CSS (tokens and both palettes at the top), `components/` the UI. |
 
 ## Where to change what
 - **New WebSocket message:** add the type in `shared`, handle it in `TerminalHub.handle`, then handle it in the web listener (usually `TerminalView.tsx`, `useWorkspace.ts` or `store.tsx`).
 - **New REST endpoint:** put the logic in a service module, add a thin route in `server/src/index.ts`, then add the client method in `web/src/api.ts`.
 - **How an agent is launched:** `command()` in `panels.ts` (flags for new vs resumed sessions). tmux behaviour (mouse, keys, sizing) lives in the config written by `tmux.ts`.
 - **Transcript parsing:** edit `providers/<id>.ts`, and update `docs/providers.md` with anything you learn about the format.
-- **App settings** go in the Settings modal (`components/settings/`): sections of groups (a heading, then rows of label, description and control), as in `ref/settings.png`. Give each row `id="setting-<rowId>"`, `data-settings-row` and `tabIndex={-1}`, and add it to `SETTINGS` in `search.ts` (label plus synonyms) so search finds it. Customize is for agent profiles, prompts and tools, not app settings.
-- **UI:** follow `DESIGN.md`. Reuse the tokens in `styles.css` (never a new hex), use `@tabler/icons-react` for icons (MIT), `var(--font)` / `var(--mono)` for text (Geist and Geist Mono, bundled via `@fontsource-variable`; no CDN fonts, and terminals keep the system monospace on purpose for glyph coverage), `ProviderIcon` for agent logos and `MenuButton` (`components/Menu.tsx`) for dropdown menus (style: `ref/project-menu.png`) and `Dropdown` (`components/Dropdown.tsx`) instead of a native `<select>`. The `better-*` skills in `.agents/skills/` cover UI review work.
+- **App settings** go in the Settings modal (`components/settings/`): sections of groups (a heading on a rule, then rows of label, description and control), as in DESIGN.md's Dialogs. Give each row `id="setting-<rowId>"`, `data-settings-row` and `tabIndex={-1}`, and add it to `SETTINGS` in `search.ts` (label plus synonyms) so search finds it. Customize is for agent profiles, prompts and tools, not app settings.
+- **UI:** follow `DESIGN.md`. Reuse the tokens in `styles.css` (never a new hex; a new token gets a value in both the dark and the light palette) and check both themes, use `@tabler/icons-react` for icons (MIT), `var(--font)` / `var(--grotesk)` / `var(--mono)` for text (Inter, Space Grotesk and Space Mono, bundled via `@fontsource`; no CDN fonts, and terminals keep the system monospace on purpose for glyph coverage), `ProviderIcon` for agent logos and `MenuButton` (`components/Menu.tsx`) for dropdown menus and `Dropdown` (`components/Dropdown.tsx`) instead of a native `<select>`. The `better-*` skills in `.agents/skills/` cover UI review work.
 
 ## Commands and verification
 - `make` lists the targets, which wrap the npm scripts. `make dev`/`start`/`install` first run `make system-deps`, which installs tmux (required) if it's missing. `make dev` runs the server on :4317 and Vite on :5173. Open the printed `?token=` URL.
@@ -167,7 +167,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - The server needs tmux >= 3.2 (`make system-deps` or `nix develop`). Every Rails home has its own tmux server (`$RAILS_HOME/tmux.sock`); panels survive server restarts but not a reboot.
 - node-pty's `spawn-helper` must be executable; the root `postinstall` fixes it. "posix_spawnp failed" means it didn't run.
 - xterm.js puts the class `terminal` on its own root, so don't use that class name for wrappers.
-- Pane gutters (`styles.css`) restyle dockview internals: its `.dv-view` / `.dv-sash` classes and its hard-coded 4px sash, which is widened and shifted 2px. `dockview-react` is pinned to `~8.5.1`; after upgrading it, re-check gutter alignment and dragging.
+- The dock's look (`styles.css`) maps dockview's `.dockview-theme-dark` variables to the tokens (so it follows either theme) and styles its tab strips through dockview's own classes (`.dv-tab`, `.dv-active-tab`, `.dv-active-group`, `.dv-tabs-and-actions-container`). Panes share dockview's 1px separator and 4px sash. `dockview-react` is pinned to `~8.5.1`; after upgrading it, re-check the tab underlines and dragging.
 - Terminals render with WebGL (`@xterm/addon-webgl`). xterm's DOM renderer lets rows drift wider than the grid (fallback glyphs like `─` and `•`), which clips the right edge. Keep padding off `.term-host`: the fit addon sizes from that element's CSS width.
 - Agent TUIs hard-wrap their output, so lines printed before a pane was narrowed stay clipped. That's normal terminal behaviour.
 - Imports use explicit `.ts` / `.tsx` extensions (`allowImportingTsExtensions`). The server runs TypeScript directly through `tsx` and has no build step.
@@ -188,4 +188,5 @@ Update the docs in the same change as the code:
 - New or changed foundations get a new numbered ADR. Never quietly break an existing one.
 - Remove finished items from `roadmap.md`.
 - Visual changes (tokens, type, shapes, components, rules) go in `DESIGN.md`. Its color front matter mirrors `styles.css`, and `design.test.ts` fails if they differ.
+- Describe designs in their own terms: no other products as references ("like X's") in docs, comments or commit messages.
 - Keep this file short: a map and rules. Detail belongs in `docs/`.

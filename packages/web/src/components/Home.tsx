@@ -38,7 +38,8 @@ export function Home() {
   };
 
   return (
-    <div className="page">
+    <div className="page home">
+      <p className="eyebrow">New chat</p>
       <h1 className="hero">Let's start building</h1>
       <Composer
         placeholder="What do you want to build?"

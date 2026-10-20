@@ -1,4 +1,4 @@
-// Settings search, modelled on claude.ai's: a registry of every searchable setting row (its section, label
+// Settings search: a registry of every searchable setting row (its section, label
 // and synonyms), searched by words, and each row in the page marked with `data-settings-row` and the id
 // `setting-<rowId>` so a result can open its section, scroll to the row and focus the row's control.
 import type { ModelProvider } from "@rails/shared";
@@ -11,12 +11,13 @@ export interface SettingEntry {
   section: SettingsSection;
   rowId: string;
   label: string;
-  /** Other words people might search for (claude.ai calls them search phrases). */
+  /** Other words people might search for. */
   phrases?: string[];
 }
 
 /** The rows of each section, in page order. A new setting row gets an entry here and the matching id. */
 export const SETTINGS: SettingEntry[] = [
+  { section: "general", rowId: "appearance", label: "Theme", phrases: ["appearance", "dark mode", "light mode", "system", "colors", "night"] },
   { section: "general", rowId: "reachable", label: "Reachable from", phrases: ["network", "LAN", "Tailscale", "other devices", "remote", "phone", "RAILS_HOST", "listen"] },
   { section: "general", rowId: "browser-address", label: "This browser uses", phrases: ["address", "URL", "host", "port"] },
   { section: "general", rowId: "version", label: "Version", phrases: ["commit", "build", "update"] },

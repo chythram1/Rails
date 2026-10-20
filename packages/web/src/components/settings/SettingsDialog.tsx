@@ -23,8 +23,8 @@ const SECTIONS: { id: SettingsSection; icon: ReactNode; body: () => ReactNode }[
 ];
 
 /**
- * Settings, as a modal over the current page (ref/settings.png, Claude's settings): a search field and the
- * sections on the left, the chosen section's groups of rows on the right. A native <dialog> traps focus,
+ * Settings, as a modal over the current page: the close button, a search field and
+ * the sections on the left, the chosen section's title and groups of rows on the right. A native <dialog> traps focus,
  * makes the page behind it inert and closes on Escape. Typing in the search field swaps the sections for
  * matching settings (search.ts); picking one opens its section and takes focus to that row. On small
  * screens the dialog fills the screen and the sections become a row of tabs.
@@ -40,7 +40,8 @@ export function SettingsDialog({ section, onSection, onClose }: { section: Setti
 
   useLayoutEffect(() => {
     const d = dialog.current!;
-    d.showModal(); // focuses the search field, the first control
+    d.showModal();
+    document.getElementById("settings-search")?.focus(); // the close button comes first, but search is what's wanted
     return () => d.close();
   }, []);
 
@@ -124,6 +125,12 @@ export function SettingsDialog({ section, onSection, onClose }: { section: Setti
       onClick={(e) => e.target === dialog.current && onClose()}
     >
       <nav className="settings-nav">
+        <div className="settings-head">
+          <button className="icon-btn settings-close" aria-label="Close settings" title="Close (Esc)" onClick={onClose}>
+            <X size={16} />
+          </button>
+          <p id="settings-nav-title" className="eyebrow">Settings</p>
+        </div>
         <label className="settings-search">
           <Search size={16} aria-hidden />
           <input
@@ -159,7 +166,6 @@ export function SettingsDialog({ section, onSection, onClose }: { section: Setti
           ))}
         {/* Kept in the page while searching (hidden), since the panel is labelled by its tab. */}
         <div className="settings-sections" hidden={searching}>
-          <p id="settings-nav-title" className="settings-nav-title">Settings</p>
           <div ref={tabs} role="tablist" aria-orientation="vertical" aria-labelledby="settings-nav-title" onKeyDown={onTabKey}>
             {SECTIONS.map((s) => (
               <button
@@ -180,10 +186,8 @@ export function SettingsDialog({ section, onSection, onClose }: { section: Setti
         </div>
       </nav>
       <div id="settings-panel" className="settings-panel" role="tabpanel" aria-labelledby={`settings-tab-${section}`}>
-        <button className="icon-btn settings-close" aria-label="Close settings" title="Close (Esc)" onClick={onClose}>
-          <X size={18} />
-        </button>
         <div className="settings-panel-body" key={section}>
+          <h2 className="settings-title">{SECTION_LABELS[section]}</h2>
           {current.body()}
         </div>
       </div>
