@@ -62,7 +62,12 @@ export default function railsBridge(pi: any) {
     post("session_start", {});
     void poll(ctx);
   });
+  // A failed response pi retries by itself (a dropped connection, a rate limit) isn't a failed turn: a failure counts
+  // only if it's still how the run ended once pi settles, after its retries. A later agent_end clears it.
+  let failure: string | undefined;
   pi.on("agent_settled", (e: any, ctx: any) => {
+    if (failure && !e.aborted) post("agent_end", { error: failure });
+    failure = undefined;
     if (e.aborted) {
       const editor: string = ctx.ui?.getEditorText?.() ?? "";
       for (const text of queued) if (editor.includes(text)) post("returned", { text });
@@ -89,7 +94,9 @@ export default function railsBridge(pi: any) {
 
   pi.on("tool_call", (e: any) => {
     if (mayAsk(e.input)) asking.set(e.toolCallId, e.input);
-    if (e.parentToolCallId) return;
+    // Calls another tool made (codemode's, through ctx.executeTool) count only when they may change files: edits and
+    // shell commands. Their reads and the like would only crowd the board.
+    if (e.parentToolCallId && !EDITS.has(e.toolName) && e.toolName !== "bash") return;
     post("tool", { tool: e.toolName, input: e.input, started: true, id: e.toolCallId });
     if (EDITS.has(e.toolName)) editing.set(e.toolCallId, { tool: e.toolName, input: e.input });
     if (e.toolName === "bash") shells.add(e.toolCallId);
@@ -111,10 +118,11 @@ export default function railsBridge(pi: any) {
     editing.clear();
     shells.clear();
     const last = [...(e.messages ?? [])].reverse().find((m: any) => m.role === "assistant");
-    const failed = last?.stopReason === "error";
+    if (last?.stopReason === "error") return void (failure = last?.errorMessage ?? "the turn failed"); // reported once pi settles
+    failure = undefined;
     // Escape aborts the run: it stopped, it didn't finish.
     if (last?.stopReason === "aborted") post("agent_end", { aborted: true });
-    else post("agent_end", failed ? { error: last?.errorMessage ?? "the turn failed" } : { text: textOf(last) });
+    else post("agent_end", { text: textOf(last) });
   });
   pi.on("session_shutdown", () => {
     stopped = true;
