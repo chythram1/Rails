@@ -9,10 +9,11 @@
     "dev": "concurrently -k -n server,web -c blue,magenta \"npm:dev -w @rails/server\" \"npm:dev -w @rails/web\"",
     "build": "npm run build -w @rails/web",
     "start": "NODE_ENV=production npm run start -w @rails/server",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p scripts/test-run",
     "postinstall": "chmod +x node_modules/node-pty/prebuilds/*/spawn-helper 2>/dev/null || true",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test-run": "tsx scripts/test-run/cli.ts"
   },
   "devDependencies": {
     "concurrently": "^9.2.0",

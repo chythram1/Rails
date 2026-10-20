@@ -112,6 +112,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 | `packages/server/src/handoffs.ts` | Handoffs (ADR 0015): plan, carry out, cancel and expire them (the capabilities are in `harness/reply.ts`; `watches.ts` wakes the Coordinator when a handoff's session finishes a turn). |
 | `packages/server/src/owners.ts` | Owners (ADR 0016): which files a session owns, set by the Coordinator's `set_owner`; used for routing and owned-file events in `overlaps.ts`. |
 | `packages/server/src/shellEdits.ts` | Edits made by shell commands (ADR 0016): `git status` and file times at a command's start and end, recorded as that session's edits. |
+| `scripts/test-run/` | The test-run harness: setup, watch, act as the user, report, cleanup (README there). Typechecked with the rest. |
 | `packages/server/src/suggestions.ts` | Suggested replies (ADR 0010): what a Coordinator may suggest, sending (with every check again), dismissing, expiry. The capability is `harness/reply.ts`; delivery into Claude Code, pi and Codex is `bridge/deliver.ts`. |
 | `packages/server/src/decisions.ts` | The decision model (ADR 0012, 0013): typed questions about turn ends and unknown dialogs, the guards, the shadow log, and the wakes it may add. |
 | `packages/server/src/bridge/` | The bridge (ADR 0007): how agents report (`wiring.ts` flags, `pi/rails.ts` extension, `codex.ts` daemon client), the event shape (`events.ts`), the board and attention (`board.ts`, `index.ts`). |
@@ -140,6 +141,7 @@ for future ideas, which aren't commitments. `ref/style.png` (overall look) and `
 - Use throwaway state with `make dev-tmp` (LAN-reachable, `/tmp/rails-dev`, token `t`) or `RAILS_HOME=/tmp/x RAILS_TOKEN=t`. For `curl`, log in first with `POST /api/auth/login {"token":…}` and keep the cookie.
 - Browser checks: start dev with `make dev-tmp` (or `make dev-lan`) and open the printed `?token=` URL. A browser on another device reaches it through the host's LAN or Tailscale address.
 - Panel tests run real agents with your logins. Use a scratch directory, then delete the transcripts they leave (`~/.claude/projects/-private-tmp-…`, `~/.pi/agent/sessions/--private-tmp-…--`, Codex threads with `codex delete --force <id>`, plus the `[projects."<scratch dir>"]` entry Codex adds to `~/.codex/config.toml` when you trust the folder) and kill the throwaway tmux server (`tmux -S $RAILS_HOME/tmux.sock kill-server`).
+- Whole test runs (real agents on a brief, a Sprocket coordinating, you as the user): `npm run test-run -- …` (`scripts/test-run/README.md`). It sets up, watches, logs your decisions, reports and cleans up after itself.
 - Never resume or open the user's real sessions in tests: `claude --resume` appends lines to the transcript even if you type nothing. Create scratch sessions instead.
 - Never kill tmux servers or Rails processes you didn't start: the user's own `make dev` may be running on :4317/:5173, so test on other ports (`RAILS_PORT=4319`, `npx vite --port 5180`).
 

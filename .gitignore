@@ -6,3 +6,4 @@ dist/
 
 ref/
 scratch/
+.test-runs/
