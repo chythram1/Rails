@@ -71,6 +71,16 @@ describe("events", () => {
 });
 
 describe("wiring", () => {
+  it("gives Claude Code the agent tools as an MCP server, behind the panel's token (ADR 0018)", () => {
+    const flags = bridgeFlags("claude", "p1");
+    const at = flags.indexOf("--mcp-config");
+    const server = JSON.parse(flags[at + 1]).mcpServers.rails;
+    expect(server).toMatchObject({ type: "http", headers: { Authorization: "Bearer ${RAILS_PANEL_TOKEN}" } });
+    expect(server.url).toMatch(/\/bridge\/p1\/mcp$/);
+    // --mcp-config takes several values: a flag must follow it, or it would swallow the session id or the prompt.
+    expect(flags[at + 2]).toMatch(/^--/);
+  });
+
   it("hooks Claude Code's shell commands with a short wait, so a stuck Rails barely slows them", () => {
     const flags = bridgeFlags("claude", "p1");
     const settings = JSON.parse(flags[flags.indexOf("--settings") + 1]);

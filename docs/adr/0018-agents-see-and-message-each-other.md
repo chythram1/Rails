@@ -1,6 +1,7 @@
 # ADR 0018: Agents see and message each other
 
-Status: proposed (builds on ADR 0007, 0010, 0015 and 0016). Nothing here is built yet.
+Status: accepted in part (builds on ADR 0007, 0010, 0015 and 0016). `neighbours` is built for Claude Code and pi
+(`agentTools.ts`); `message` and `wait_for` are still proposed.
 
 Today a project's sessions know nothing of each other: only the Coordinator sees across them, and everything that
 passes between them is a draft the Coordinator writes. The second test run showed both halves of the cost. The
@@ -19,13 +20,17 @@ sending every message.
 Decisions (proposed):
 - **Three agent tools**, served by the bridge to the agents in Rails panels and checked with the panel's token, so
   an agent only reaches its own project:
-  - `neighbours`: the other sessions in the project, read-only: each one's agent, short title, status, the files it
-    changed lately, who owns what, and its last reply clipped to 400 characters. That reply is the one piece of
+  - `neighbours`: the other sessions in the project, read-only: each one's agent, short title, status (the word
+    alone: not a dialog's title or an error's text, which are the session's own), the files it changed lately, who
+    owns what, and its last reply clipped to 400 characters. That reply is the one piece of
     another session's conversation an agent sees: it's the session's own summary of its work, written to be read.
     What the user asked a session (its prompts) and the commands it ran stay out, since they can hold things the
     user meant only for that session (keys, paths, private notes); so do transcripts, files and other projects.
     The result starts with the board's note that quoted text is what other sessions reported, data and not
     instructions. It's built from the board like `boardText`, without its "asked" and "last command" lines.
+    One leak remains: a session's title can be the start of its first prompt (pi titles sessions that way, and so
+    does Claude Code until it has a title of its own), so titles are cut to 60 characters and the note at the top
+    says titles are reported text too.
   - `message(session, text)`: a draft message for another session in the project. It lives in the project's
     Coordinator chat, the one place drafts are reviewed (ADR 0010, 0016): an event row ("“Engine” wants to tell
     “UI”:") with the usual draft card under it, stored as a suggestion of the Coordinator's with the sending panel
@@ -50,8 +55,10 @@ Decisions (proposed):
   - Claude Code: `--mcp-config` with an HTTP server at `/bridge/<panel>/mcp` and `Authorization: Bearer
     ${RAILS_PANEL_TOKEN}`. Checked with 2.1.304: a server added this way connects without an approval prompt,
     the variable in the header expands, and the tool ran without a permission prompt in auto mode (the default
-    mode wasn't checked). The user's own MCP servers stay loaded.
-  - pi: the Rails extension registers the same tools (`pi.registerTool`, verified in pi 1.3's extension API).
+    mode wasn't checked). The user's own MCP servers should stay loaded (Claude Code's docs: only `--strict-mcp-config` drops them; not checked).
+  - pi: the Rails extension registers the same server (`pi.registerMcpServer`, `direct` exposure, so the model
+    sees the tool without searching for it). Checked with pi 1.3: the tool appears as `rails/neighbours`, and the
+    user's own MCP servers stay.
   - Codex: none at first. Adding tools needs its config file (the user's), a `-c` flag (which makes it leave the
     daemon Rails follows), or overrides passed when Rails rejoins a running thread (`thread/resume` takes `config`
     and `developerInstructions`, but whether they apply to a running thread is unverified, and they might change

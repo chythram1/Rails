@@ -1,5 +1,8 @@
 import type { ProviderId } from "@rails/shared";
 
+// Shared with the server, which titles sessions for agents (agentTools.ts).
+export { shortTitle } from "@rails/shared";
+
 export function timeAgo(iso: string): string {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
   if (s < 60) return "just now";
@@ -47,15 +50,3 @@ export function copyText(text: string): boolean {
 
 export const providerLabel: Record<ProviderId, string> = { claude: "Claude Code", codex: "Codex", pi: "pi" };
 
-/**
- * A session's title short enough to sit beside other text: agents title a session with its whole first prompt
- * ("Without using any tools, say hello, then end your reply…"), so cut it at a word near `max` characters.
- * Show the full title where there's room or as a tooltip.
- */
-export function shortTitle(title: string, max = 40): string {
-  const t = title.replace(/\s+/g, " ").trim().replace(/…$/, "");
-  if (t.length <= max) return t === title.trim() ? t : `${t}…`;
-  const cut = t.slice(0, max + 1);
-  const space = cut.lastIndexOf(" ");
-  return `${(space > max / 2 ? cut.slice(0, space) : t.slice(0, max)).replace(/[\s,;:.-]+$/, "")}…`;
-}

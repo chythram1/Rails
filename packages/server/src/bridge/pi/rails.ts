@@ -1,7 +1,8 @@
 // The Rails extension for pi (ADR 0007). Rails loads it with `pi --extension` in panels it starts; it
 // reports what the session does to Rails' bridge, using RAILS_BRIDGE and RAILS_PANEL_TOKEN from the
 // panel's environment, and long-polls Rails for replies the user sends from a Sprocket's chat (ADR 0010),
-// which it hands to pi as the user's next message when pi is idle (and tells Rails whether it did). pi loads this file directly (TypeScript through jiti),
+// which it hands to pi as the user's next message when pi is idle (and tells Rails whether it did), and connects
+// the agent tools' MCP server (ADR 0018). pi loads this file directly (TypeScript through jiti),
 // so it imports nothing: the types are loose on purpose. It never blocks pi: reports that fail are dropped.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -11,6 +12,19 @@ export default function railsBridge(pi: any) {
   if (!base || !token) return; // not started by Rails
   let cwd = "";
   let sessionId = "";
+
+  // The agent tools (ADR 0018), an MCP server the bridge serves; pi connects it when the session starts. `direct`,
+  // so the model sees them without searching. Older pi has no registerMcpServer, and a name clash throws: skip then.
+  try {
+    pi.registerMcpServer?.("rails", {
+      url: `${base}/mcp`,
+      headers: { Authorization: `Bearer ${token}` },
+      exposure: "direct",
+      description: "Rails: the other coding sessions in this project",
+    });
+  } catch {
+    // no agent tools
+  }
 
   const post = (event: string, data: Record<string, unknown>) =>
     void fetch(`${base}/pi/${event}`, {

@@ -9,6 +9,7 @@ import { bodyLimit } from "hono/body-limit";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { WebSocketServer } from "ws";
 import { serverInfo, onSignedOutEverywhere, signOutEverywhere } from "./account.ts";
+import { mcpRequest } from "./agentTools.ts";
 import { accessToken, HOST, PORT } from "./config.ts";
 import { watchCodex } from "./bridge/codex.ts";
 import { piInbox } from "./bridge/deliver.ts";
@@ -84,6 +85,15 @@ const BRIDGE_BODY_LIMIT = 4 * 1024 * 1024;
 /** Whether a bridge request comes from the panel itself: over loopback, with its token. */
 const fromPanel = (c: Context, panelId: string) =>
   LOOPBACK.has(getConnInfo(c).remote.address ?? "") && bridgeTokenOk(panelId, c.req.header("authorization")?.replace(/^Bearer\s+/i, ""));
+// Agent tools (ADR 0018): an MCP server for the agent in the panel (Streamable HTTP with plain JSON replies; no
+// event stream, so GET is refused, as the transport allows).
+app.post("/bridge/:panelId/mcp", bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({}, 413) }), async (c) => {
+  const panelId = c.req.param("panelId");
+  if (!fromPanel(c, panelId)) return c.json({ error: "Unauthorized" }, 401);
+  const reply = await mcpRequest(panelId, await c.req.json().catch(() => null));
+  return reply ? c.json(reply) : c.body(null, 202);
+});
+app.get("/bridge/:panelId/mcp", (c) => c.body(null, 405));
 // The pi extension's long poll for replies the user sends (ADR 0010).
 app.get("/bridge/:panelId/pi/inbox", async (c) => {
   const panelId = c.req.param("panelId");

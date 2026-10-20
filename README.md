@@ -39,6 +39,7 @@ Status:
   in the project is doing (ADR 0007)
 - A red dot when an agent needs you (a permission, a question) or its turn failed, and an amber mark when
   two sessions change the same files (ADR 0014)
+- Agent tools (ADR 0018): Claude Code and pi sessions can see what the other sessions in their project are doing
 
 Docs: [architecture](docs/architecture.md) · [glossary](docs/CONTEXT.md) · [decisions](docs/adr) · [provider formats](docs/providers.md) · [roadmap](docs/roadmap.md)
 

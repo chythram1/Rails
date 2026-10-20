@@ -136,7 +136,12 @@ packages/
 Every provider panel reports to the bridge (ADR 0007): Claude Code through hooks, pi through the Rails
 extension, Codex through its app-server daemon. Edits count for overlaps (ADR 0014) once they worked: Claude
 Code's PostToolUse, pi's tool end without an error, Codex's completed file changes (checked live with all
-three). Files changed by shell commands aren't seen.
+three). Files changed by shell commands count too (ADR 0016).
+
+Agent tools (ADR 0018): Claude Code and pi panels get Rails' MCP server at `/bridge/<panel>/mcp`, behind the
+panel's token (`agentTools.ts`): Claude Code from `--mcp-config`, pi from the Rails extension. Its one tool so far,
+`neighbours`, shows an agent the other sessions in its project. Codex panels get none (it would need the user's
+config or a `-c` flag).
 
 A provider is only offered when its CLI is on the server's `PATH` (`ProviderInfo.installed`).
 Transcript format notes are in [providers.md](./providers.md).

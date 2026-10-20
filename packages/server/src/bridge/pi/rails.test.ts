@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import railsBridge from "./rails.ts";
 
 /** The extension with a fake pi and fetch: its handlers by event, and what it posted to Rails. */
-function load() {
+function load({ mcp = true } = {}) {
   vi.stubEnv("RAILS_BRIDGE", "http://rails.test/bridge/p1");
   vi.stubEnv("RAILS_PANEL_TOKEN", "tok");
   const posted: { event: string; body: any }[] = [];
@@ -11,9 +11,13 @@ function load() {
     return Promise.resolve(new Response("{}"));
   });
   const handlers = new Map<string, (e: any, ctx?: any) => void>();
-  railsBridge({ on: (event: string, fn: (e: any, ctx?: any) => void) => handlers.set(event, fn) });
+  const servers: [string, any][] = [];
+  railsBridge({
+    on: (event: string, fn: (e: any, ctx?: any) => void) => handlers.set(event, fn),
+    ...(mcp ? { registerMcpServer: (name: string, config: unknown) => servers.push([name, config]) } : {}),
+  });
   const fire = (event: string, e: any) => handlers.get(event)!(e, { ui: {} });
-  return { posted, fire };
+  return { posted, fire, servers };
 }
 
 afterEach(() => {
@@ -22,6 +26,15 @@ afterEach(() => {
 });
 
 describe("the pi extension", () => {
+  it("connects the agent tools' MCP server with the panel's token (ADR 0018)", () => {
+    const { servers } = load();
+    expect(servers).toEqual([["rails", expect.objectContaining({ url: "http://rails.test/bridge/p1/mcp", headers: { Authorization: "Bearer tok" }, exposure: "direct" })]]);
+  });
+
+  it("still loads in a pi without registerMcpServer", () => {
+    expect(() => load({ mcp: false })).not.toThrow();
+  });
+
   it("reports edits and shell commands another tool made (codemode's), but not its reads", () => {
     const { posted, fire } = load();
     fire("tool_call", { toolCallId: "c1", toolName: "codemode", input: { code: "…" } });

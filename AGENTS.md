@@ -112,6 +112,7 @@ for future ideas, which aren't commitments. Reference screenshots for the look a
 | `packages/server/src/handoffs.ts` | Handoffs (ADR 0015): plan, carry out, cancel and expire them (the capabilities are in `harness/reply.ts`; `watches.ts` wakes the Coordinator when a handoff's session finishes a turn). |
 | `packages/server/src/owners.ts` | Owners (ADR 0016): which files a session owns, set by the Coordinator's `set_owner`; used for routing and owned-file events in `overlaps.ts`. |
 | `packages/server/src/shellEdits.ts` | Edits made by shell commands (ADR 0016): `git status` and file times at a command's start and end, recorded as that session's edits. |
+| `packages/server/src/agentTools.ts` | Agent tools (ADR 0018): the MCP server agents in panels reach at `/bridge/<panel>/mcp` (Claude Code via `--mcp-config`, pi via the extension), with `neighbours` (the other sessions, without their prompts or commands). |
 | `scripts/test-run/` | The test-run harness: setup, watch, act as the user, report, cleanup (README there). Typechecked with the rest. |
 | `packages/server/src/suggestions.ts` | Suggested replies (ADR 0010): what a Coordinator may suggest, sending (with every check again), dismissing, expiry. The capability is `harness/reply.ts`; delivery into Claude Code, pi and Codex is `bridge/deliver.ts`. |
 | `packages/server/src/decisions.ts` | The decision model (ADR 0012, 0013): typed questions about turn ends and unknown dialogs, the guards, the shadow log, and the wakes it may add. |

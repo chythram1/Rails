@@ -1,9 +1,11 @@
 // How each agent is wired to the bridge when a panel starts it (ADR 0007). Only command-line flags, so
 // the user's own agent settings files are never touched:
-// - Claude Code: `--settings` with HTTP hooks to /bridge/<panelId>/claude/<Hook>. SessionStart has to be
+// - Claude Code: `--mcp-config` with the agent tools' MCP server (ADR 0018, agentTools.ts) and `--settings` with
+//   HTTP hooks to /bridge/<panelId>/claude/<Hook>. SessionStart has to be
 //   a command hook (an HTTP SessionStart hook doesn't fire), which curls the same endpoint and adds the
 //   session's message socket. Hooks never block: if Rails is down, the agent carries on.
-// - pi: `--extension` with pi/rails.ts (pi lists it as rails.ts), which posts its events the same way.
+// - pi: `--extension` with pi/rails.ts (pi lists it as rails.ts), which posts its events the same way and
+//   registers the agent tools' MCP server.
 // - Codex: nothing. Its interactive sessions run on a shared app-server daemon that Rails listens to
 //   (codex.ts), and any `-c` flag would make Codex run without that daemon.
 import { dirname, join } from "node:path";
@@ -49,11 +51,22 @@ function claudeSettings(panelId: string): string {
   return JSON.stringify({ hooks });
 }
 
+/**
+ * The agent tools' MCP server for Claude Code (ADR 0018), at /bridge/<panelId>/mcp with the panel's token. Claude
+ * Code expands `${RAILS_PANEL_TOKEN}` in the header from the panel's environment (verified with 2.1.304), and a
+ * server passed this way connects without asking; the user's own MCP servers stay.
+ */
+function claudeMcp(panelId: string): string {
+  const url = `http://127.0.0.1:${PORT}/bridge/${panelId}/mcp`;
+  return JSON.stringify({ mcpServers: { rails: { type: "http", url, headers: { Authorization: "Bearer ${RAILS_PANEL_TOKEN}" } } } });
+}
+
 /** Flags that wire an agent to the bridge, inserted right after its program name. */
 export function bridgeFlags(kind: PanelKind, panelId: string): string[] {
   switch (kind) {
     case "claude":
-      return ["--settings", claudeSettings(panelId)];
+      // --mcp-config takes several values, so a flag has to follow it (else it would take the session id or prompt).
+      return ["--mcp-config", claudeMcp(panelId), "--settings", claudeSettings(panelId)];
     case "pi":
       return ["--extension", PI_EXTENSION];
     default:

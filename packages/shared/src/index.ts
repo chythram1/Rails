@@ -34,6 +34,19 @@ export function parseSessionKey(key: SessionKey): { provider: ProviderId; id: st
   return { provider: key.slice(0, i) as ProviderId, id: key.slice(i + 1) };
 }
 
+/**
+ * A session's title short enough to sit beside other text: agents title a session with its whole first prompt
+ * ("Without using any tools, say hello, then end your reply…"), so cut it at a word near `max` characters.
+ * Show the full title where there's room or as a tooltip.
+ */
+export function shortTitle(title: string, max = 40): string {
+  const t = title.replace(/\s+/g, " ").trim().replace(/…$/, "");
+  if (t.length <= max) return t === title.trim() ? t : `${t}…`;
+  const cut = t.slice(0, max + 1);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max / 2 ? cut.slice(0, space) : t.slice(0, max)).replace(/[\s,;:.-]+$/, "")}…`;
+}
+
 export interface SessionSummary {
   key: SessionKey;
   provider: ProviderId;
