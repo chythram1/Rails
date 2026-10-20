@@ -171,6 +171,8 @@ db.exec(`
 `);
 /** On a judgment: 1 when it woke the Coordinator itself (ADR 0013). */
 addColumn("decisions", "acted", "INTEGER NOT NULL DEFAULT 0");
+addColumn("handoffs", "from_session_id", "TEXT");
+addColumn("handoffs", "to_session_id", "TEXT");
 
 type Row = { id: string; name: string; path: string; created_at: string };
 const toProject = (r: Row): Project => ({ id: r.id, name: r.name, path: r.path, createdAt: r.created_at });
@@ -645,6 +647,8 @@ type HandoffRow = {
   to_panel_id: string;
   to_kind: PanelKind;
   to_title: string;
+  from_session_id: string | null;
+  to_session_id: string | null;
   note: string;
   status: string;
   created_at: string;
@@ -653,8 +657,8 @@ export type StoredHandoff = Handoff & { sprocketId: string };
 const toHandoff = (r: HandoffRow): StoredHandoff => ({
   id: r.id,
   sprocketId: r.sprocket_id,
-  from: { panelId: r.from_panel_id, kind: r.from_kind, title: r.from_title },
-  to: { panelId: r.to_panel_id, kind: r.to_kind, title: r.to_title },
+  from: { panelId: r.from_panel_id, kind: r.from_kind, title: r.from_title, ...(r.from_session_id ? { sessionId: r.from_session_id } : {}) },
+  to: { panelId: r.to_panel_id, kind: r.to_kind, title: r.to_title, ...(r.to_session_id ? { sessionId: r.to_session_id } : {}) },
   note: r.note,
   createdAt: r.created_at,
 });
@@ -664,8 +668,8 @@ export const handoffs = {
     const id = randomUUID();
     const now = new Date().toISOString();
     db.prepare(
-      "INSERT INTO handoffs (id, sprocket_id, from_panel_id, from_kind, from_title, to_panel_id, to_kind, to_title, note, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
-    ).run(id, sprocketId, h.from.panelId, h.from.kind, h.from.title, h.to.panelId, h.to.kind, h.to.title, h.note, now, now);
+      "INSERT INTO handoffs (id, sprocket_id, from_panel_id, from_kind, from_title, from_session_id, to_panel_id, to_kind, to_title, to_session_id, note, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+    ).run(id, sprocketId, h.from.panelId, h.from.kind, h.from.title, h.from.sessionId ?? null, h.to.panelId, h.to.kind, h.to.title, h.to.sessionId ?? null, h.note, now, now);
     return { id, sprocketId, ...h, createdAt: now };
   },
   /** Pending ones, oldest first: a Sprocket's, or all of them. */
@@ -685,6 +689,10 @@ export const handoffs = {
     const a = db.prepare("UPDATE handoffs SET from_title = ?, updated_at = ? WHERE status = 'pending' AND from_panel_id = ? AND from_title != ?").run(title, now, panelId, title).changes;
     const b = db.prepare("UPDATE handoffs SET to_title = ?, updated_at = ? WHERE status = 'pending' AND to_panel_id = ? AND to_title != ?").run(title, now, panelId, title).changes;
     return Number(a) + Number(b) > 0;
+  },
+  /** A pending one's side now follows another session (handoffs.ts, followSessions). */
+  setSession(id: string, side: "from" | "to", sessionId: string): void {
+    db.prepare(`UPDATE handoffs SET ${side}_session_id = ?, updated_at = ? WHERE id = ? AND status = 'pending'`).run(sessionId, new Date().toISOString(), id);
   },
   /** End a pending one. False when it wasn't pending (someone else ended it first). */
   end(id: string, status: "done" | "cancelled" | "expired"): boolean {

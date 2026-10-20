@@ -15,7 +15,7 @@ import type { Panel, SessionQuestion, SprocketEvent } from "@rails/shared";
 import { ASKING, type SessionEvent } from "./bridge/events.ts";
 import { onEvents, onPanelForgotten } from "./bridge/index.ts";
 import { handoffs, panels, sprockets, type StoredHandoff } from "./db.ts";
-import { end as endHandoff } from "./handoffs.ts";
+import { end as endHandoff, followSessions } from "./handoffs.ts";
 import { postEvent } from "./sprockets.ts";
 import { sessionTitle } from "./titles.ts";
 import { listeners } from "./util.ts";
@@ -246,7 +246,7 @@ export function startWatches(): void {
       // A turn that ends asking the user something, or fails, isn't finished.
       for (const e of events)
         if (e.kind === "turn_end" && !looksLikeQuestion(e.text))
-          for (const h of handoffs.pendingAt(panel.id)) if (h.from.panelId === panel.id) void wakeForHandoff(h, panel, e.text).catch((err) => console.error("handoffs:", err));
+          for (const h of followSessions(panel)) if (h.from.panelId === panel.id) void wakeForHandoff(h, panel, e.text).catch((err) => console.error("handoffs:", err));
     } catch (e) {
       console.error("watches:", e);
     }

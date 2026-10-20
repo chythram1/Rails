@@ -3,13 +3,14 @@
 // (plan_handoff); the watches (watches.ts) wake it each time that session ends a turn without asking the user
 // anything, and it checks the work is done and drafts the message for the other session (suggest_message),
 // which the user sends. If it isn't done, the Coordinator replies (quiet) and waits for the next turn end.
-// A handoff is cancelled when either session ends or its panel closes, and expires after HANDOFF_TTL_MS, so a
-// forgotten one doesn't fire days later. Each of those leaves a line in the Coordinator's chat.
+// A handoff is cancelled when either session ends, moves on to another session in its panel, or its panel closes,
+// and expires after HANDOFF_TTL_MS, so a forgotten one doesn't fire days later. Each of those leaves a line in the
+// Coordinator's chat.
 // Its sessions' titles are kept current: a handoff is often planned before a session has a title of its own.
 // (The capabilities use this module, so it doesn't import sprockets.ts, which imports the runs.)
 import { HANDOFF_NOTE_MAX, type Panel } from "@rails/shared";
 import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
-import { handoffs, panels, sprocketMessages, sprockets, type StoredHandoff } from "./db.ts";
+import { handoffs, panels, sessionEvents, sprocketMessages, sprockets, type StoredHandoff } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { sessionTitle } from "./titles.ts";
 import { listeners } from "./util.ts";
@@ -25,6 +26,39 @@ export const onHandoffsChanged = changes.on;
 
 type Side = { panel: Panel; title: string };
 
+/** The session a panel shows now (its latest start), if Rails knows it. */
+const sessionNow = (panel: Panel) => cardOf(panel).sessionId ?? panel.sessionId;
+
+/** Whether a session has had a turn in its panel (among the events Rails keeps for it). */
+const TURN = new Set(["prompt", "tool", "waiting", "turn_end", "stopped", "failed"]);
+const hadTurn = (panelId: string, sessionId: string) => sessionEvents.list(panelId).some((r) => r.sessionId === sessionId && TURN.has(r.event?.kind));
+
+/**
+ * Keep a panel's pending handoffs on the sessions they were planned for (herdr pins its waits to the agent in a pane
+ * the same way): a new session in the panel (`/clear`, resuming another) isn't the one the user meant. A side planned
+ * before its session was known takes the first one it shows, and so does a side whose session never had a turn (Codex
+ * can start a thread it never uses, bridge/codex.ts); a side whose session was in use and moved on ends the handoff.
+ * Returns the handoffs still pending at the panel.
+ */
+export function followSessions(panel: Panel): StoredHandoff[] {
+  const now = sessionNow(panel);
+  const still: StoredHandoff[] = [];
+  for (const h of handoffs.pendingAt(panel.id)) {
+    const which = h.from.panelId === panel.id ? "from" : "to";
+    const side = h[which];
+    if (now && side.sessionId !== now) {
+      if (side.sessionId && hadTurn(panel.id, side.sessionId)) {
+        end(h, "cancelled", `\u201c${side.title}\u201d moved on to another session.`);
+        continue;
+      }
+      handoffs.setSession(h.id, which, now);
+      side.sessionId = now;
+    }
+    still.push(h);
+  }
+  return still;
+}
+
 /** A Coordinator plans a handoff from one open session to another. */
 export function planHandoff(sprocketId: string, from: Side, to: Side, raw: string): StoredHandoff {
   const note = raw.replace(/\s+/g, " ").trim();
@@ -33,7 +67,10 @@ export function planHandoff(sprocketId: string, from: Side, to: Side, raw: strin
   if (from.panel.id === to.panel.id) throw new Error("A handoff goes from one session to another.");
   for (const s of [from, to]) if (cardOf(s.panel).status === "ended") throw new Error(`"${s.title}" has ended.`);
   if (handoffs.pending(sprocketId).length >= MAX_HANDOFFS) throw new Error(`You have ${MAX_HANDOFFS} handoffs waiting, the most there can be. Cancel one first.`);
-  const side = ({ panel, title }: Side) => ({ panelId: panel.id, kind: panel.kind, title });
+  const side = ({ panel, title }: Side) => {
+    const sessionId = sessionNow(panel);
+    return { panelId: panel.id, kind: panel.kind, title, ...(sessionId ? { sessionId } : {}) };
+  };
   const h = handoffs.create(sprocketId, { from: side(from), to: side(to), note });
   changes.emit();
   return h;
@@ -93,6 +130,7 @@ export function startHandoffs(): void {
   setInterval(expireHandoffs, 60_000).unref?.();
   onEvents((panel, events) => {
     try {
+      followSessions(panel);
       // A prompt or a finished turn may give the session a title (its first prompt, Claude Code's own title).
       if (events.some((e) => e.kind === "prompt" || e.kind === "turn_end") && handoffs.pendingAt(panel.id).length)
         void sessionTitle(panel)

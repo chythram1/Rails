@@ -176,6 +176,8 @@ export interface HandoffSession {
   panelId: string;
   kind: PanelKind;
   title: string;
+  /** The session it was planned for, once known: a handoff follows that session, not just its panel. */
+  sessionId?: string;
 }
 
 /**

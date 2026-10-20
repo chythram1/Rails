@@ -24,6 +24,11 @@ Decisions:
   or deleted). Each of those leaves a line in the chat, except when the Sprocket moved or was deleted (its chat
   is gone). A handoff cancelled while the Coordinator is drafting its message gets no draft. At most 10 wait
   per Coordinator.
+- **A handoff follows its sessions, not just their panels** (added after the second test run, after herdr's waits,
+  which are pinned to the agent in a pane): it records each side's session when planned, and is cancelled when a
+  session that was in use moves on to another in its panel (`/clear`, resuming another), since the new one isn't
+  what the user meant. A side planned before its session was known takes the first one it shows, and so does one
+  whose session never had a turn (Codex can start a thread it never uses; `followSessions` in `handoffs.ts`).
 - **Pending handoffs show on the Coordinator's job page**, under its rules, each with Cancel
   (`POST /api/handoffs/:id/cancel`). They're also in its instructions, with their ids, so it can list or cancel
   them (`cancel_handoff`).
