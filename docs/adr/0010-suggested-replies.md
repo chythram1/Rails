@@ -13,6 +13,11 @@ Decisions:
   run saves; a run that saves no reply drops its suggestions. Nothing reaches a session until the user sends
   it, so a Sprocket never acts in a session on its own yet. When the user asks a Coordinator to "tell it …",
   it drafts a **message** instead (`suggest_message`, below).
+- **A draft stands on its own.** The session sees only the draft (and a handoff's attachment), so it starts
+  with what happened, which session did it and in which files, then says what to do. It keeps the user's own
+  limits and numbers, and never asks a session to coordinate with or tell another one: sessions can't talk to
+  each other, so each gets its own message. These are instructions to the model, measured with
+  `scripts/coordinator-check` (test run 2's mistakes, replayed).
 - **Two kinds, by the session's state when it's suggested** (`suggestions.ts`):
   - **reply**: the session's turn ended (or failed): the user can edit the text, then Send or Dismiss;
   - **answer**: the session waits on a question in a dialog (Claude Code's AskUserQuestion, a pi question

@@ -60,14 +60,16 @@ export function replyCapabilities(rules: string[], made: (id: string) => void): 
         const rule = args.rule === undefined ? undefined : rules[args.rule - 1];
         if (args.rule !== undefined && !rule) throw new Error(`There's no rule ${args.rule}: you have ${rules.length}. Leave \`rule\` out if none fits.`);
         const { s, title } = await draft(ctx, "suggest_reply", args.session, args.reply, { rule, purpose: "answer" });
+        // The rule's words right after the answer: a last look that it fits and was followed.
+        const check = rule ? ` It cites rule ${args.rule}: ${JSON.stringify(rule)} If that rule doesn't fit the question, or your answer doesn't do what it says, suggest again (it replaces this one).` : "";
         return s.mode === "reply"
-          ? `Suggested. Your user sees it under your message and decides whether to send it to "${title}". Don't repeat the reply in your message.`
-          : `Suggested. "${title}" is waiting on a dialog, so your user answers it in its panel; they see your suggestion with a button to open it. Don't repeat it in your message.`;
+          ? `Suggested. Your user sees it under your message and decides whether to send it to "${title}". Don't repeat the reply in your message.${check}`
+          : `Suggested. "${title}" is waiting on a dialog, so your user answers it in its panel; they see your suggestion with a button to open it. Don't repeat it in your message.${check}`;
       },
     },
     {
       name: "suggest_message",
-      description: `Draft a message for a session in your project: something your user asked you to pass on ("tell it to stop and summarize"), or a heads-up when Rails tells you two sessions changed the same files. Your user sees it under your message and sends it, edits it or dismisses it: nothing reaches the session until they do. A session that's busy or waiting on a question gets it after its current turn, in its own queue. Write it as your user would, in the first person (at most ${SUGGESTION_MAX} characters). For answering a question a session asked, use suggest_reply. With \`handoff\`, it carries out that handoff and goes to the session the handoff is for, and Rails attaches what the finished session said last, word for word: don't repeat or summarize it, say what to do with it. Messages don't replace each other: one session can have up to ${MAX_PENDING_MESSAGES} of yours waiting, so draft a new one only for something new. Resolves to what happens next.`,
+      description: `Draft a message for a session in your project: something your user asked you to pass on ("tell it to stop and summarize"), or a heads-up when Rails tells you two sessions changed the same files. Your user sees it under your message and sends it, edits it or dismisses it: nothing reaches the session until they do. A session that's busy or waiting on a question gets it after its current turn, in its own queue. Write it as your user would, in the first person (at most ${SUGGESTION_MAX} characters), so it stands on its own: the session sees nothing else (no chat, no other sessions), and can't talk to other sessions. For answering a question a session asked, use suggest_reply. With \`handoff\`, it carries out that handoff and goes to the session the handoff is for, and Rails attaches what the finished session said last, word for word: don't repeat or summarize it, say what to do with it. Messages don't replace each other: one session can have up to ${MAX_PENDING_MESSAGES} of yours waiting, so draft a new one only for something new. Resolves to what happens next.`,
       params: Type.Object({
         session,
         message: Type.String({ description: "The message, as your user would write it." }),

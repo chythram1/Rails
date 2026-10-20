@@ -32,7 +32,8 @@ Decisions:
   dialog's questions and options, or the end of its last message) and a link to its panel. The model reads
   them as `[Rails event, not from your user]`, with the session's text quoted as data. The Coordinator's run
   replies as usual: which session, what it's asking, what it would answer and why. If the wait doesn't need
-  the user after all, it replies `(quiet)`: nothing is saved but a "nothing needed" mark on the event.
+  the user after all, it replies `(quiet)` (or ends its reply with it): nothing is saved but a "nothing needed"
+  mark on the event.
 - **The bridge keeps the end of final messages** (the first 500 and the last 1,500 characters), since a
   closing question is what says a session waits.
 - **Not yet:** suggested answers the user sends with one tap (done in ADR 0010), automatic answers for rules the user trusts (through the hooks: Claude Code's PreToolUse

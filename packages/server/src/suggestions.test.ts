@@ -229,13 +229,18 @@ describe("standing rules", () => {
     const { lead, panel } = setup();
     updateSettings(lead.id, { rules: ["Never agree to delete files.", "If it asks whether to update tests, say yes."] });
     let prompt = "";
+    let result = "";
     const code = `return await tools.suggest_reply({ session: ${JSON.stringify(panel.id.slice(0, 8))}, reply: "Yes, update them.", rule: 2 })`;
     faux.setResponses([
       (context) => {
         prompt = JSON.stringify(context.messages.filter((m) => (m.role as string) === "system"));
         return fauxAssistantMessage([fauxToolCall("codemode", { code })], { stopReason: "toolUse" });
       },
-      fauxAssistantMessage("Your rule says yes."),
+      (context) => {
+        const last = context.messages.at(-1);
+        result = last?.role === "toolResult" ? (last.content[0] as { text: string }).text : "";
+        return fauxAssistantMessage("Your rule says yes.");
+      },
     ]);
     // Rules change while it runs: the number still means the rule it read.
     sendMessage(lead.id, "what should I tell it?");
@@ -243,6 +248,8 @@ describe("standing rules", () => {
     await idle();
     expect(prompt).toContain("<rules>\\n1. Never agree to delete files.\\n2. If it asks whether to update tests, say yes.\\n</rules>");
     expect(listMessages(lead.id).at(-1)!.suggestions![0].rule).toBe("If it asks whether to update tests, say yes.");
+    // Its words come back with the result, for a last look that the rule fits and was followed.
+    expect(result).toContain('It cites rule 2: "If it asks whether to update tests, say yes." If that rule doesn\'t fit');
   });
 
   it("tells the model when the rule it cites doesn't exist", async () => {

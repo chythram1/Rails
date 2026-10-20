@@ -22,7 +22,7 @@ Decisions:
 - **The Coordinator judges it.** In a project with a Coordinator, an overlap wakes it for the session that changed
   the file second, the one stepping on the other's work, with an event naming the other sessions and the files.
   It looks at both sessions and their changes, replies (quiet) when it's harmless (they changed unrelated parts,
-  or one builds on the other's finished work), and otherwise tells the user what clashes and drafts a heads-up for
+  one builds on the other's finished work, or the user asked for both), without even a reminder, and otherwise tells the user what clashes and drafts a heads-up for
   that session with `suggest_message`. The user sends it (ADR 0010): warn only, nothing is blocked.
 - **Few wakes:** a session's edits within 15 s go in one event (`BATCH_MS`), and a pair of sessions wakes the
   Coordinator once per file per window, whichever of them changed it last.
