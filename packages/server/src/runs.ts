@@ -20,6 +20,7 @@ import { findModel, models } from "./models.ts";
 import { projectOwners } from "./owners.ts";
 import { sessionTitle } from "./titles.ts";
 import { listeners } from "./util.ts";
+import { resendWhenSilent } from "./resend.ts";
 
 /** Model calls in one run (each round of tool calls is one). */
 const MAX_STEPS = 12;
@@ -43,6 +44,11 @@ const TYPING_MS = 120;
  * 5 minutes for Node's own limit.
  */
 export const REQUEST_TIMEOUT_MS = 90_000;
+/**
+ * How long a provider gets to start answering before the request is sent again (resend.ts): it answers in a few
+ * seconds, but now and then a request hears nothing at all.
+ */
+export const FIRST_ANSWER_MS = 20_000;
 /**
  * The wait before trying the model again after a provider failure that may pass (pi-ai tells which). The run keeps
  * its place among the MAX_ACTIVE meanwhile, so it's short.
@@ -258,7 +264,7 @@ async function run(chat: StoredChat, id: string): Promise<SprocketMessage | unde
       tools: [code],
       messages: context,
     },
-    streamFn: (m, c, options) => models.streamSimple(m, c, { ...options, timeoutMs: REQUEST_TIMEOUT_MS }),
+    streamFn: resendWhenSilent((m, c, options) => models.streamSimple(m, c, { ...options, timeoutMs: REQUEST_TIMEOUT_MS }), FIRST_ANSWER_MS),
     sessionId: chatId,
   });
 

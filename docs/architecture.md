@@ -107,7 +107,7 @@ packages/
   for, else the lead; a reply's mentions (or questions by name) pass the turn on, and a round stops after 10 turns. Replies show a
   bubble per paragraph, one after another (`bubbles.ts`). A user message (or, for a Coordinator, an event) starts a run in that chat (`runs.ts`), one chat at a time per Sprocket: a
   pi-agent-core loop on the Sprocket's model, streamed to browsers as `sprockets.typing`, capped at 12 model
-  calls, 30 runs per Sprocket per hour and 2 runs at once. Its one tool is codemode (ADR 0008,
+  calls (a request that hears nothing for 20 s is sent again, `resend.ts`), 30 runs per Sprocket per hour and 2 runs at once. Its one tool is codemode (ADR 0008,
   `harness/codemode.ts`): scripts run in pi's QuickJS sandbox and call the Sprocket's capabilities (`harness/`:
   memory; and for attached Sprockets the board, sessions, git and read-only files, `files.ts`). Each call's step goes
   to browsers as `sprockets.activity`, and the run's summary is saved on the reply (the run log). `models.ts` holds the model providers (pi-ai),

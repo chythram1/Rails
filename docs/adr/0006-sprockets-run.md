@@ -47,7 +47,10 @@ Decisions:
   cost nothing. Messages sent during a run get their own run afterwards. Replies stream to every device
   (`sprockets.typing`), and Rails' own notices (no model, model errors, guard stops) show in the chat.
 - **A failure that may pass is tried once more.** A provider gets 90 s to start answering, not to finish (unset,
-  a hung request waited 5 minutes for Node's own limit). When a call fails in a way pi-ai calls transient (a dropped
+  a hung request waited 5 minutes for Node's own limit). A request that hears nothing back at all for 20 s is
+  dropped and sent again, twice at most (`resend.ts`): replies start in a few seconds, but in testing about one in
+  fifteen team replies took 70 to 110 s, as a request that heard nothing until the 90 s limit and then waited
+  the 15 s retry would, holding the team's round with it. When a call fails in a way pi-ai calls transient (a dropped
   connection, a busy provider, a timeout), the run waits 15 s and goes on from where it was, without the failed
   call, so work it already did isn't repeated. Once only, and never for a usage limit, which won't pass in
   seconds; the notice shows then. Test run 3 lost five Coordinator replies to such failures, unanswered until
