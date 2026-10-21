@@ -235,9 +235,10 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 }
 .project-name.active { color: var(--text); font-weight: 500; }
 .row-actions { display: flex; align-items: center; }
-/* Secondary row actions appear on hover or keyboard focus; always visible on touch screens. */
+/* Secondary row actions appear on hover or keyboard focus (not the focus a click leaves on the row's own button);
+   always visible on touch screens. */
 .project-row .reveal { opacity: 0; }
-.project-row:hover .reveal, .project-row:focus-within .reveal, .reveal[aria-expanded="true"] { opacity: 1; }
+.project-row:hover .reveal, .project-row:has(:focus-visible) .reveal, .reveal[aria-expanded="true"] { opacity: 1; }
 .icon-btn[aria-expanded="true"] { background: var(--surface-2); color: var(--text); }
 @media (hover: none) { .project-row .reveal { opacity: 1; } }
 /* A session's menu button sits over its time and takes its place on hover or focus; touch screens give it room. */
@@ -246,8 +247,8 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 .session-item .row-actions { position: absolute; top: 0; bottom: 0; right: 4px; }
 @media (hover: hover) {
   .session-item .reveal { opacity: 0; }
-  .session-item:is(:hover, :focus-within) .reveal, .session-item .reveal[aria-expanded="true"] { opacity: 1; }
-  .session-item:is(:hover, :focus-within, :has(.reveal[aria-expanded="true"])) .session-time { opacity: 0; }
+  .session-item:is(:hover, :has(:focus-visible)) .reveal, .session-item .reveal[aria-expanded="true"] { opacity: 1; }
+  .session-item:is(:hover, :has(:focus-visible), :has(.reveal[aria-expanded="true"])) .session-time { opacity: 0; }
 }
 @media (hover: none) { .session-item .session-row { padding-right: 40px; } }
 .session-row {
