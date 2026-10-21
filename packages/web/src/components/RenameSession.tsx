@@ -59,7 +59,7 @@ export function RenameSession({ renaming, onClose, returnFocus }: { renaming: Re
     >
       <form onSubmit={(e) => (e.preventDefault(), void save())}>
         <h2 id="rename-title">Rename session</h2>
-        <p id="rename-desc" className="small-dialog-desc">Shown instead of the agent’s title, to you, the Coordinator and the other sessions. Leave it empty to use the agent’s title.</p>
+        <p id="rename-desc" className="small-dialog-desc">Shown instead of the agent’s title, to you, the Coordinator and the other sessions.</p>
         <input
           ref={input}
           className="input"
