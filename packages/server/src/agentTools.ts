@@ -40,11 +40,15 @@ const TOOLS = [
       "The other coding sessions in this project (run by Rails): what each is doing, the files it changed lately, its last reply, and who owns which files. Read-only. Check it before you change files another session may be working on or owns.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     annotations: { title: "Other sessions in this project", readOnlyHint: true },
+    // Claude Code defers MCP tools behind its tool search (the agent sees only their names) unless a tool asks to
+    // be loaded up front (verified with 2.1.305). `_meta` is MCP's place for such keys: pi's client skips it.
+    _meta: { "anthropic/alwaysLoad": true },
   },
 ];
 
+/** The agent puts these in its prompt (Claude Code under "MCP Server Instructions"): when to call, not only what. */
 const INSTRUCTIONS =
-  "Rails runs this session alongside other coding sessions in the same project. The neighbours tool shows what they're doing and which files they changed or own.";
+  "Rails runs this session alongside other coding sessions in the same project, which may be changing the same code. Call the neighbours tool when you start a task and before you change files outside what you were asked to work on: it shows what the other sessions are doing, the files they changed lately and who owns which files.";
 
 type Rpc = { jsonrpc: "2.0"; id: string | number; result?: unknown; error?: { code: number; message: string } };
 

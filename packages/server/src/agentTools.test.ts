@@ -81,6 +81,17 @@ describe("the agent tools' MCP endpoint", () => {
     expect(list.result.tools.map((t: any) => [t.name, t.annotations?.readOnlyHint])).toEqual([["neighbours", true]]);
   });
 
+  it("asks Claude Code to load neighbours up front, and says when to use it", async () => {
+    const { ui } = setup();
+    // Claude Code defers MCP tools behind its tool search, so an agent sees only the name; this one it loads.
+    const list = (await call(ui.id, "tools/list")) as any;
+    expect(list.result.tools[0]._meta).toEqual({ "anthropic/alwaysLoad": true });
+    // Its instructions go into the agent's prompt: when to call it, not only what it is.
+    const init = (await call(ui.id, "initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "x", version: "1" } })) as any;
+    expect(init.result.instructions).toMatch(/when you start a task/i);
+    expect(init.result.instructions).toMatch(/before you change files/i);
+  });
+
   it("runs neighbours for the panel that asks", async () => {
     const { ui } = setup();
     const r = (await call(ui.id, "tools/call", { name: "neighbours", arguments: {} })) as any;

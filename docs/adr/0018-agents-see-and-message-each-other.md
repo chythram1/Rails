@@ -56,6 +56,12 @@ Decisions (proposed):
     ${RAILS_PANEL_TOKEN}`. Checked with 2.1.304: a server added this way connects without an approval prompt,
     the variable in the header expands, and the tool ran without a permission prompt in auto mode (the default
     mode wasn't checked). The user's own MCP servers should stay loaded (Claude Code's docs: only `--strict-mcp-config` drops them; not checked).
+    Claude Code defers MCP tools behind its tool search, so in test run 3 Claude saw only the name and never
+    called it. The tool now asks to be loaded up front (`_meta` `anthropic/alwaysLoad` in `tools/list`, which
+    loads that tool alone), and the server's instructions, which Claude Code puts in its prompt, say when to call
+    it: when a task starts and before changing files outside it. Checked with 2.1.305: two sessions each called it
+    at the start of their first task, and one changed its plan from what it saw; neither called it again for a
+    second task in the same file (the overlap wake covers that).
   - pi: the Rails extension registers the same server (`pi.registerMcpServer`, `direct` exposure, so the model
     sees the tool without searching for it). Checked with pi 1.3: the tool appears as `rails/neighbours`, and the
     user's own MCP servers stay.
