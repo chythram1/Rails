@@ -17,7 +17,7 @@ vi.mock("./providers/index.ts", () => ({
   }),
 }));
 
-const { openPanel } = await import("./panels.ts");
+const { getWorkspace, openPanel, panelEnded } = await import("./panels.ts");
 const { panels, projects } = await import("./db.ts");
 
 describe("openPanel", () => {
@@ -47,5 +47,25 @@ describe("openPanel", () => {
     await expect(openPanel(projectId, { kind: "pi", sessionId: "s-fail" })).rejects.toThrow("tmux failed");
     const panel = await openPanel(projectId, { kind: "pi", sessionId: "s-fail" });
     expect(panel.sessionId).toBe("s-fail");
+  });
+
+  it("keeps a panel that's still starting when the workspace is read meanwhile", async () => {
+    // A session clicked on another page: the workspace loads its panels while the session's panel starts.
+    const { startSession } = await import("./tmux.ts");
+    let started = () => {};
+    vi.mocked(startSession).mockImplementationOnce(async (id: string) => {
+      await new Promise<void>((r) => (started = r));
+      running.add(id);
+    });
+    const opening = openPanel(projectId, { kind: "pi", sessionId: "s-starting" });
+    await new Promise((r) => setTimeout(r, 50)); // past the session lookup: the panel exists, its process doesn't yet
+    const [starting] = panels.list(projectId);
+    expect(starting.sessionId).toBe("s-starting");
+    expect((await getWorkspace(projectId)).panels).toEqual([]); // not shown before it runs (nothing to attach to)
+    await panelEnded(starting.id); // a browser's tmux client giving up early doesn't end it either
+    started();
+    const panel = await opening;
+    expect(panels.get(panel.id)).toBeDefined();
+    expect((await getWorkspace(projectId)).panels.map((p) => p.id)).toEqual([panel.id]);
   });
 });

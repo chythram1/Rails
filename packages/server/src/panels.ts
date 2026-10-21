@@ -83,10 +83,17 @@ async function removePanel(panel: Panel): Promise<void> {
   changed(panel.projectId);
 }
 
+/**
+ * Panels whose process is starting: they're in the database, not yet in tmux. Not running isn't ended for them, so
+ * they're neither shown nor removed until they run. (Opening a session from another page loads the workspace while
+ * its panel starts; the load used to take it for ended and remove it.)
+ */
+const starting = new Set<string>();
+
 /** Called when a browser's tmux client exits on its own: if the panel's process ended, remove the panel. */
 export async function panelEnded(id: string): Promise<void> {
   const panel = panels.get(id);
-  if (panel && !(await tmux.runningPanels()).has(id)) await removePanel(panel);
+  if (panel && !starting.has(id) && !(await tmux.runningPanels()).has(id)) await removePanel(panel);
 }
 
 /** A project's panels and saved layout. Panels whose process ended while nobody was watching are dropped. */
@@ -95,6 +102,7 @@ export async function getWorkspace(projectId: string): Promise<Workspace> {
   const running = await tmux.runningPanels();
   const list: Panel[] = [];
   for (const p of panels.list(projectId)) {
+    if (starting.has(p.id)) continue; // shown once it runs (panels.changed)
     if (running.has(p.id)) {
       const name = sessionName(p);
       list.push(name ? { ...p, name } : p);
@@ -146,6 +154,7 @@ async function openSession(projectId: string, kind: ProviderId, sessionId: strin
 
 async function start(projectId: string, kind: PanelKind, sessionId: string | undefined, title: string, cwd: string, argv: string[]) {
   const panel = panels.create({ projectId, kind, sessionId, title });
+  starting.add(panel.id);
   try {
     // Agents report to the bridge (ADR 0007): their flags go after the program name, the token in the env.
     const [program, ...rest] = argv;
@@ -154,6 +163,8 @@ async function start(projectId: string, kind: PanelKind, sessionId: string | und
   } catch (e) {
     panels.remove(panel.id);
     throw e;
+  } finally {
+    starting.delete(panel.id);
   }
   if (kind === "codex") watchCodex(panels.all(), sessionId ? undefined : { panelId: panel.id, cwd });
   changed(projectId);
