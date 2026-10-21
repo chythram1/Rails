@@ -74,17 +74,29 @@ export function report(state: RunState): string {
     line(`Chat: ${talk.map((t) => `${t.n} ${t.author}`).join(", ") || "nothing"}.`);
     line();
 
-    const drafts = all<{ id: string; mode: string; status: string; rule: string | null; attachment: string | null }>(db, "SELECT id, mode, status, rule, attachment FROM suggestions WHERE sprocket_id = ?", sid);
+    const drafts = all<{ id: string; mode: string; status: string; rule: string | null; attachment: string | null; sender: string | null }>(
+      db,
+      "SELECT id, mode, status, rule, attachment, sender FROM suggestions WHERE sprocket_id = ?",
+      sid,
+    );
     const sent = entries.filter((e) => e.type === "send") as { draft: string; edited: boolean }[];
     const edited = new Set(sent.filter((e) => e.edited).map((e) => e.draft));
     line("### Drafts");
     line();
     table(
       ["Kind", "Total", "Sent unedited", "Sent edited", "Dismissed", "Not sent (expired)", "Replaced", "Pending", "Followed a rule", "With the agent's words"],
-      ["reply", "answer", "message"].map((mode) => {
-        const d = drafts.filter((x) => x.mode === mode);
+      // An agent's message (ADR 0018) is stored as the Coordinator's, with the session that wrote it.
+      (
+        [
+          ["reply", (x) => x.mode === "reply"],
+          ["answer", (x) => x.mode === "answer"],
+          ["message", (x) => x.mode === "message" && !x.sender],
+          ["an agent's message", (x) => x.mode === "message" && !!x.sender],
+        ] as [string, (x: (typeof drafts)[number]) => boolean][]
+      ).map(([kind, is]) => {
+        const d = drafts.filter(is);
         const st = (s: string) => d.filter((x) => x.status === s).length;
-        return [mode, d.length, d.filter((x) => x.status === "sent" && !edited.has(x.id)).length, d.filter((x) => x.status === "sent" && edited.has(x.id)).length, st("dismissed"), st("expired"), st("replaced"), st("pending"), d.filter((x) => x.rule).length, d.filter((x) => x.attachment).length];
+        return [kind, d.length, d.filter((x) => x.status === "sent" && !edited.has(x.id)).length, d.filter((x) => x.status === "sent" && edited.has(x.id)).length, st("dismissed"), st("expired"), st("replaced"), st("pending"), d.filter((x) => x.rule).length, d.filter((x) => x.attachment).length];
       }),
     );
     const dismissed = entries.filter((e) => e.type === "dismiss") as { draft: string; why: string }[];

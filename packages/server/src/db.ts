@@ -114,6 +114,8 @@ addColumn("suggestions", "rule", "TEXT");
 addColumn("suggestions", "queued", "INTEGER NOT NULL DEFAULT 0");
 /** On a handoff's message: what the finished session said last, as JSON {title, text} (ADR 0015). */
 addColumn("suggestions", "attachment", "TEXT");
+/** On an agent's message: the session that drafted it, as JSON {panelId, kind, title} (ADR 0018). */
+addColumn("suggestions", "sender", "TEXT");
 db.exec(`
   -- Shadow judgments of the fast decision model (ADR 0012). Kept to the latest few hundred.
   CREATE TABLE IF NOT EXISTS decisions (
@@ -443,6 +445,7 @@ type SuggestionRow = {
   text: string;
   rule: string | null;
   attachment: string | null;
+  sender: string | null;
   queued: number;
   status: Suggestion["status"];
   error: string | null;
@@ -461,6 +464,7 @@ const toSuggestion = (r: SuggestionRow): Suggestion & { sprocketId: string; mess
   text: r.text,
   ...(r.rule ? { rule: r.rule } : {}),
   ...(r.attachment ? { attachment: JSON.parse(r.attachment) as NonNullable<Suggestion["attachment"]> } : {}),
+  ...(r.sender ? { from: JSON.parse(r.sender) as NonNullable<Suggestion["from"]> } : {}),
   status: r.status,
   ...(r.error ? { error: r.error } : {}),
   ...(r.queued ? { queued: true } : {}),
@@ -479,12 +483,27 @@ export const suggestions = {
     text: string;
     rule?: string;
     attachment?: Suggestion["attachment"];
+    from?: Suggestion["from"];
   }) {
     const id = randomUUID();
     const now = new Date().toISOString();
     db.prepare(
-      "INSERT INTO suggestions (id, sprocket_id, panel_id, kind, title, session_id, mode, text, rule, attachment, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
-    ).run(id, s.sprocketId, s.panelId, s.kind, s.title, s.sessionId ?? null, s.mode, s.text, s.rule ?? null, s.attachment ? JSON.stringify(s.attachment) : null, now, now);
+      "INSERT INTO suggestions (id, sprocket_id, panel_id, kind, title, session_id, mode, text, rule, attachment, sender, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+    ).run(
+      id,
+      s.sprocketId,
+      s.panelId,
+      s.kind,
+      s.title,
+      s.sessionId ?? null,
+      s.mode,
+      s.text,
+      s.rule ?? null,
+      s.attachment ? JSON.stringify(s.attachment) : null,
+      s.from ? JSON.stringify(s.from) : null,
+      now,
+      now,
+    );
     return this.get(id)!;
   },
   get(id: string) {
@@ -505,6 +524,11 @@ export const suggestions = {
   pendingPanels(sprocketId: string): string[] {
     const rows = db.prepare("SELECT DISTINCT panel_id FROM suggestions WHERE sprocket_id = ? AND status = 'pending' AND message_id IS NOT NULL").all(sprocketId) as { panel_id: string }[];
     return rows.map((r) => r.panel_id);
+  },
+  /** How many of the messages a session drafted for others wait for the user (ADR 0018). */
+  pendingFrom(panelId: string): number {
+    const r = db.prepare("SELECT count(*) AS n FROM suggestions WHERE status = 'pending' AND json_extract(sender, '$.panelId') = ?").get(panelId) as { n: number };
+    return Number(r.n);
   },
   /** Pending ones for a panel (from any Sprocket). */
   pendingFor(panelId: string) {

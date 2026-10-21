@@ -249,9 +249,10 @@ export interface SprocketEvent {
   sessionId?: string;
   /**
    * It asked in a dialog (or a form), it ended its turn with what looks like a question, it changed files
-   * other sessions changed shortly before (ADR 0014), or it finished a turn a handoff waits for (ADR 0015).
+   * other sessions changed shortly before (ADR 0014), it finished a turn a handoff waits for (ADR 0015), or it
+   * drafted a message for another session (ADR 0018), shown under the event, with the text as the event's.
    */
-  what: "question" | "turn_end" | "overlap" | "handoff";
+  what: "question" | "turn_end" | "overlap" | "handoff" | "message";
   questions?: SessionQuestion[];
   /** The Coordinator looked and decided the user needn't hear about it. */
   quiet?: boolean;
@@ -264,6 +265,8 @@ export interface SprocketEvent {
   overlaps?: { panelId: string; kind: PanelKind; title: string; sessionId?: string; files: string[]; owns?: boolean }[];
   /** For a handoff: which one, the session it's for and what to pass on. */
   handoff?: { id: string; to: HandoffSession & { sessionId?: string }; note: string };
+  /** For a message: the session it's for. */
+  to?: HandoffSession;
 }
 
 /** One message in a Sprocket's chat. */
@@ -306,6 +309,8 @@ export interface Suggestion {
    * text, so nothing it said gets lost in the Coordinator's summary.
    */
   attachment?: { title: string; text: string };
+  /** A message an agent drafted for this session (ADR 0018): the session it came from. */
+  from?: { panelId: string; kind: PanelKind; title: string };
   /** "replaced": a newer answer for the same session took its place (it isn't shown). Messages aren't replaced. */
   status: "pending" | "sending" | "sent" | "failed" | "dismissed" | "expired" | "replaced";
   /** Why it failed, or why it can't be sent anymore. */

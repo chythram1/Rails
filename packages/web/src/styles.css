@@ -856,7 +856,8 @@ ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
 }
 .sp-suggestion-text:focus-visible { outline: none; } /* the card's border shows focus */
 .sp-suggestion-text:disabled { color: var(--text-2); }
-.sp-suggestion-rule { margin-top: 8px; margin-bottom: 0; color: var(--muted); font-size: 13px; text-wrap: pretty; }
+.sp-suggestion-rule,
+.sp-suggestion-from { margin-top: 8px; margin-bottom: 0; color: var(--muted); font-size: 13px; text-wrap: pretty; }
 /* A handoff's attached words (ADR 0015): collapsed under the text, a quote when open, scrolling past 12 lines. */
 .sp-attachment { margin-top: 8px; }
 .sp-attachment-summary { display: flex; align-items: center; gap: 6px; width: fit-content; max-width: 100%; list-style: none; cursor: pointer; color: var(--muted); font-size: 13px; }

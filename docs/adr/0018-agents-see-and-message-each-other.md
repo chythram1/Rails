@@ -1,7 +1,7 @@
 # ADR 0018: Agents see and message each other
 
-Status: accepted in part (builds on ADR 0007, 0010, 0015 and 0016). `neighbours` is built for Claude Code and pi
-(`agentTools.ts`); `message` and `wait_for` are still proposed.
+Status: accepted in part (builds on ADR 0007, 0010, 0015 and 0016). `neighbours` and `message` are built for
+Claude Code and pi (`agentTools.ts`); `wait_for` is still proposed.
 
 Today a project's sessions know nothing of each other: only the Coordinator sees across them, and everything that
 passes between them is a draft the Coordinator writes. The second test run showed both halves of the cost. The
@@ -41,6 +41,15 @@ Decisions (proposed):
     session's drafts wait at a time, and a receiving session has at most 3 messages waiting for it in all
     (`MAX_PENDING_MESSAGES`, shared with the Coordinator's own, since agents' drafts are stored as its
     suggestions); the text has the suggestions' length limit (`SUGGESTION_MAX`).
+    As built: the session is found by its id (at least 6 characters) or its title as `neighbours` shows it. The
+    event row reads "“UI” wants to tell", with no quote: the card under it is headed "Message for “Engine”" and
+    holds the text, with a muted line under it, "Written by the session “UI”. Send it only if you'd say it
+    yourself." The delivered text starts "A message from the session "UI" (pi, id …) in this project; your user
+    read it and sent it on:", with the title and id as `neighbours` shows them, so the receiver can answer.
+    Checked with Claude Code 2.1.305 and pi 1.3: pi drafted one through the tool when its HUD needed a change in a
+    file it didn't own, and Claude when asked to have the UI session change something; Claude's ran without a
+    permission prompt in auto mode. Once sent, each acted on the other's message, and Claude said it came from
+    another session. Neither drafted one unasked while its own work didn't need the other's files.
   - `wait_for(session)`: what that session is doing once it's no longer working. It sends nothing. It returns:
     - at once, if the session isn't working: idle (with its last reply), waiting for the user, failed, or stopped;
     - at once, if Rails has no reports for it (opened before Rails could see it): "Rails can't follow this one";

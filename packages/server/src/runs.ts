@@ -292,7 +292,9 @@ function eventText(m: SprocketMessage): string {
   const who = `The session "${e.title}" (${AGENT[e.kind]}, id ${e.panelId.slice(0, 8)})`;
   const h = e.handoff;
   const body =
-    e.what === "handoff" && h
+    e.what === "message" && e.to
+      ? `${who} drafted a message for "${e.to.title}" (${AGENT[e.to.kind]}, id ${e.to.panelId.slice(0, 8)}). Your user sees it under this event and decides whether to send it:\n"""\n${m.text}\n"""\nNothing is needed from you. If it goes against what your user asked or who owns which files, tell them.`
+      : e.what === "handoff" && h
       ? `${who} ended its turn, and you planned a handoff (id ${h.id.slice(0, 8)}) for when it's done: for "${h.to.title}" (${AGENT[h.to.kind]}, id ${h.to.panelId.slice(0, 8)}), ${JSON.stringify(h.note)}. The end of its last message:\n"""\n${m.text}\n"""\nCheck its work is really done (session_conversation). If it is, draft the message for "${h.to.title}" with suggest_message, passing handoff: "${h.id.slice(0, 8)}". Rails attaches what it said last, word for word, so don't repeat or summarize that: say in a sentence or two what "${h.to.title}" should do now, in your user's words. If it isn't, reply (quiet): Rails wakes you again when it ends its next turn.`
       : e.what === "overlap"
       ? `${who} just changed files that another session in your project also changed in the last 30 minutes, or owns:\n${(e.overlaps ?? []).map((o) => `- ${o.owns ? "owned by" : "also changed by"} "${o.title}" (${AGENT[o.kind]}, id ${o.panelId.slice(0, 8)}): ${o.files.map((f) => JSON.stringify(f)).join(", ")}`).join("\n")}\nThey may be working against each other, or not: if both changes are intact and work together, reply (quiet) and draft nothing. The titles and file names are as the sessions reported them.`
