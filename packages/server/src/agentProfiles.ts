@@ -176,6 +176,15 @@ export function createAgentProfile(body: Record<string, unknown> = {}): AgentPro
   return p;
 }
 
+/** A copy of a profile, called "<name> copy" (numbered when that's taken). It's never the default. */
+export function duplicateAgentProfile(id: string): AgentProfile {
+  const { id: _id, createdAt: _c, updatedAt: _u, ...source } = getAgentProfile(id);
+  const base = `${source.name.slice(0, AGENT_PROFILE_NAME_MAX - " copy 99".length)} copy`;
+  let name = base;
+  for (let n = 2; agentProfiles.byName(name); n++) name = `${base} ${n}`;
+  return createAgentProfile({ ...source, name, isDefault: false });
+}
+
 /** Change some fields of a profile; the rest stay. Open panels keep what they started with. */
 export function updateAgentProfile(id: string, body: Record<string, unknown> = {}): AgentProfile {
   const { id: _id, createdAt: _c, updatedAt: _u, ...current } = getAgentProfile(id);

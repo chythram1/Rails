@@ -9,7 +9,7 @@ import { bodyLimit } from "hono/body-limit";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { WebSocketServer } from "ws";
 import { serverInfo, onSignedOutEverywhere, signOutEverywhere } from "./account.ts";
-import { createAgentProfile, deleteAgentProfile, listAgentProfiles, profileUses, updateAgentProfile } from "./agentProfiles.ts";
+import { createAgentProfile, deleteAgentProfile, duplicateAgentProfile, listAgentProfiles, profileUses, updateAgentProfile } from "./agentProfiles.ts";
 import { mcpRequest } from "./agentTools.ts";
 import { accessToken, HOST, PORT } from "./config.ts";
 import { watchCodex } from "./bridge/codex.ts";
@@ -253,6 +253,8 @@ app.delete("/api/agent-profiles/:id", (c) => {
   deleteAgentProfile(c.req.param("id"));
   return c.json({ ok: true });
 });
+
+app.post("/api/agent-profiles/:id/duplicate", (c) => c.json(duplicateAgentProfile(c.req.param("id")), 201));
 
 // The running panels that started with it.
 app.get("/api/agent-profiles/:id/panels", async (c) => c.json(await profileUses(c.req.param("id"))));

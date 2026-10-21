@@ -111,6 +111,8 @@ export const api = {
   updateAgentProfile: (id: string, body: Partial<AgentProfileInput>) =>
     req<AgentProfile>("/api/agent-profiles/" + enc(id), { method: "PUT", body: JSON.stringify(body) }),
   deleteAgentProfile: (id: string) => req("/api/agent-profiles/" + enc(id), { method: "DELETE" }),
+  /** A copy called "<name> copy". */
+  duplicateAgentProfile: (id: string) => req<AgentProfile>(`/api/agent-profiles/${enc(id)}/duplicate`, { method: "POST" }),
   /** The running panels that started with this profile. */
   profileUses: (id: string) => req<ProfileUse[]>(`/api/agent-profiles/${enc(id)}/panels`),
   prompts: () => req<SavedPrompt[]>("/api/prompts"),

@@ -58,7 +58,7 @@ const skillKey = (r: SkillRef) => `${r.source}:${r.name}`;
  * moment. Open panels keep the settings they started with.
  */
 export function AgentProfileEditor({ profile }: { profile: AgentProfile }) {
-  const { providers } = useStore();
+  const { providers, refreshCustomize } = useStore();
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(0);
   const [skills, setSkills] = useState<SkillInfo[] | null>(null);
@@ -89,6 +89,16 @@ export function AgentProfileEditor({ profile }: { profile: AgentProfile }) {
     }
   };
 
+  const duplicate = async () => {
+    try {
+      const copy = await api.duplicateAgentProfile(profile.id);
+      await refreshCustomize(); // so the editor finds it when the page changes
+      navigate(href.agentProfile(copy.id));
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
   const remove = async () => {
     if (!confirm(`Delete the agent profile ${profile.name}?\n\nOpen panels keep running. Sessions it started resume with the default profile, if there is one.`)) return;
     try {
@@ -114,7 +124,7 @@ export function AgentProfileEditor({ profile }: { profile: AgentProfile }) {
         <h2 className="truncate" title={profile.name}>{profile.name}</h2>
         <span className="grow" />
         <span className="muted small" role="status">{saved ? "Saved" : ""}</span>
-        <StartMenu profile={profile} onError={setError} />
+        <StartMenu profile={profile} skills={skills} onError={setError} />
       </header>
       {error && (
         <p className="error cz-error" role="alert">
@@ -270,9 +280,12 @@ export function AgentProfileEditor({ profile }: { profile: AgentProfile }) {
             </div>
           </section>
 
-          <section className="set-group cz-end" aria-label="Delete">
+          <section className="set-group cz-end" aria-label="Duplicate or delete">
             <p className="set-intro">Open panels keep the settings they started with. Reopen them to pick up changes.</p>
             <div className="cz-actions">
+              <button type="button" className="btn small" onClick={() => void duplicate()}>
+                Duplicate
+              </button>
               <button type="button" className="btn small danger" onClick={() => void remove()}>
                 Delete {profile.name}
               </button>
@@ -288,7 +301,7 @@ export function AgentProfileEditor({ profile }: { profile: AgentProfile }) {
  * "Start": open a panel with this profile in a project the user picks, then go there. Greyed out while the agent
  * isn't installed on the server.
  */
-function StartMenu({ profile, onError }: { profile: AgentProfile; onError(message: string): void }) {
+function StartMenu({ profile, skills, onError }: { profile: AgentProfile; skills: SkillInfo[] | null; onError(message: string): void }) {
   const { projects, providers } = useStore();
   const agent = providerLabel[profile.provider];
   const installed = providers.find((p) => p.id === profile.provider)?.installed ?? false;
@@ -310,9 +323,27 @@ function StartMenu({ profile, onError }: { profile: AgentProfile; onError(messag
       title="Start a panel with this profile"
       icon="Start"
       align="right"
-      items={projects.length ? projects.map((p) => ({ label: p.name, onSelect: () => void start(p.id) })) : [{ label: "Add a project first", disabled: true, onSelect: () => {} }]}
+      items={
+        projects.length
+          ? projects.map((p) => {
+              const missing = skills ? missingSkills(profile.skills, skills, p.id) : 0;
+              return { label: p.name, note: missing ? `${missing} ${missing === 1 ? "skill won't" : "skills won't"} load here` : undefined, onSelect: () => void start(p.id) };
+            })
+          : [{ label: "Add a project first", disabled: true, onSelect: () => {} }]
+      }
     />
   );
+}
+
+/**
+ * How many of a profile's skills would be left out in a project: another project's skills (they load only where
+ * they are), and ones that can't be found at all.
+ */
+function missingSkills(refs: SkillRef[], skills: SkillInfo[], projectId: string): number {
+  return refs.filter((ref) => {
+    const info = skills.find((s) => skillKey(s.ref) === skillKey(ref));
+    return !info || (ref.source === "project" && !info.projectIds?.includes(projectId));
+  }).length;
 }
 
 /** Where the profile is in use: the running panels that started with it, each a link that opens it. */
@@ -514,6 +545,7 @@ function PatternList({ id, label, help, values, placeholder, onSave }: { id: str
               label={label}
               placeholder={placeholder}
               last={values.length + 1 >= AGENT_PROFILE_TOOLS_MAX}
+              taken={values}
               onAdd={(v) => onSave([...values, v])}
               onDone={stopAdding}
             />
@@ -554,49 +586,71 @@ function PatternRow({ n, label, value, onSave, onRemove }: { n: number; label: s
   );
 }
 
+/** Claude Code's built-in tools people allow or deny most, and two patterns (tool names checked with 2.1.306). */
+const TOOL_SUGGESTIONS = ["Bash", "Edit", "Write", "Read", "NotebookEdit", "WebFetch", "WebSearch", "Task", "Skill", "Bash(git *)", "Bash(npm test:*)"];
+
 /**
  * The row "Add" opens, at the end of the list. Enter adds its pattern and empties it for the next (unless that made
- * the last one there's room for); leaving it adds what's typed and closes it; Escape closes it without adding.
+ * the last one there's room for); leaving the row adds what's typed and closes it; Escape closes it without adding.
+ * Under the field, tool names that start with what's typed (and aren't in the list yet) add with one click.
  */
-function NewPattern(props: { n: number; label: string; placeholder: string; last: boolean; onAdd(v: string): Promise<boolean>; onDone(refocus: boolean): void }) {
-  const { n, label, placeholder, last, onAdd, onDone } = props;
+function NewPattern(props: { n: number; label: string; placeholder: string; last: boolean; taken: string[]; onAdd(v: string): Promise<boolean>; onDone(refocus: boolean): void }) {
+  const { n, label, placeholder, last, taken, onAdd, onDone } = props;
   const [text, setText] = useState("");
   const ref = useRef<HTMLInputElement>(null);
   const closing = useRef(false);
   useEffect(() => ref.current?.focus(), []);
-  const add = async (then: "next" | "close") => {
-    const v = text.trim();
+  const add = async (then: "next" | "close", value = text) => {
+    const v = value.trim();
     if (!v) return onDone(then === "next");
     if (!(await onAdd(v))) return;
     setText("");
     if (then === "close" || last) onDone(then === "next");
+    else ref.current?.focus();
   };
+  const typed = text.trim().toLowerCase();
+  const suggestions = TOOL_SUGGESTIONS.filter((t) => !taken.includes(t) && t.toLowerCase().startsWith(typed) && t.toLowerCase() !== typed);
   return (
-    <li className="sp-rule editing">
+    <li
+      className="sp-rule editing"
+      onBlur={(e) => {
+        // Moving between the field and its suggestions keeps the row open.
+        if (closing.current || e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        void add("close");
+      }}
+    >
       <span className="sp-rule-n" aria-hidden>{n}</span>
-      <input
-        ref={ref}
-        className="sp-rule-text mono"
-        aria-label={`New pattern for ${label}`}
-        maxLength={TOOL_PATTERN_MAX}
-        placeholder={placeholder}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => {
-          if (closing.current) return;
-          void add("close");
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            void add("next");
-          }
-          if (e.key === "Escape") {
-            closing.current = true;
-            onDone(true);
-          }
-        }}
-      />
+      <div className="cz-new-pattern">
+        <input
+          ref={ref}
+          className="sp-rule-text mono"
+          aria-label={`New pattern for ${label}`}
+          maxLength={TOOL_PATTERN_MAX}
+          placeholder={placeholder}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void add("next");
+            }
+            if (e.key === "Escape") {
+              closing.current = true;
+              onDone(true);
+            }
+          }}
+        />
+        {suggestions.length > 0 && (
+          <div className="cz-suggest" role="group" aria-label="Suggested tools">
+            {suggestions.map((t) => (
+              // Keep focus in the field on mouse down: some browsers (Safari) don't focus a clicked button.
+              <button key={t} type="button" className="btn small" onMouseDown={(e) => e.preventDefault()} onClick={() => void add("next", t)}>
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </li>
   );
 }

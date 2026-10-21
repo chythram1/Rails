@@ -92,7 +92,7 @@ packages/
   copies a skill into the library through the native folder picker. Saved prompts (`savedPrompts.ts`,
   `saved_prompts`) fill Home's composer and Sprocket chats, and Sprockets read them with `saved_prompts`. Changes
   to either are broadcast as `customize.changed`. Routes: `GET/POST /api/agent-profiles`,
-  `PUT/DELETE /api/agent-profiles/:id`, `GET /api/agent-profiles/:id/panels` (where it's in use),
+  `PUT/DELETE /api/agent-profiles/:id`, `POST /api/agent-profiles/:id/duplicate`, `GET /api/agent-profiles/:id/panels` (where it's in use),
   `GET/POST /api/prompts`, `PUT/DELETE /api/prompts/:id`, `GET /api/skills`, `POST /api/skills/import`. The web
   pages are `#/customize`, `#/customize/profiles/<id>` and `#/customize/prompts/<id>`; a profile's Start opens a
   panel with it, and a prompt's "Use on Home" goes to `#/new/<promptId>`, which fills Home's composer.

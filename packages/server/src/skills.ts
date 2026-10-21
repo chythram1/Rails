@@ -93,14 +93,14 @@ async function scanSource(source: SkillSource, projectPath?: string): Promise<Sk
  * Every skill a profile can pick: the library's, the user's, and each project's. A project skill found in several
  * projects is listed once, with their names.
  */
-export async function listSkills(projects: { name: string; path: string }[] = []): Promise<SkillInfo[]> {
+export async function listSkills(projects: { id: string; name: string; path: string }[] = []): Promise<SkillInfo[]> {
   const [library, user, ...perProject] = await Promise.all([scanSource("library"), scanSource("user"), ...projects.map((p) => scanSource("project", p.path))]);
-  const shared = new Map<string, SkillInfo & { projects: string[] }>();
+  const shared = new Map<string, SkillInfo & { projects: string[]; projectIds: string[] }>();
   perProject.forEach((list, i) => {
     for (const skill of list) {
       const seen = shared.get(skill.ref.name);
-      if (seen) seen.projects.push(projects[i].name);
-      else shared.set(skill.ref.name, { ...skill, projects: [projects[i].name] });
+      if (seen) seen.projects.push(projects[i].name), seen.projectIds.push(projects[i].id);
+      else shared.set(skill.ref.name, { ...skill, projects: [projects[i].name], projectIds: [projects[i].id] });
     }
   });
   return [...library, ...user, ...shared.values()];

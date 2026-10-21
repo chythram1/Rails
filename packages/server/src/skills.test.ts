@@ -31,13 +31,14 @@ describe("listSkills", () => {
   skill(join(project, ".agents", "skills"), "proj-only", "---\ndescription: Only here.\n---\n");
 
   it("finds each source, skips folders without front matter, and prefers ~/.claude over ~/.agents", async () => {
-    const all = await listSkills([{ name: "app", path: project }, { name: "copy", path: project }]);
+    const all = await listSkills([{ id: "p1", name: "app", path: project }, { id: "p2", name: "copy", path: project }]);
     const by = (source: string, name: string) => all.find((s) => s.ref.source === source && s.ref.name === name);
     expect(by("library", "lib-one")?.description).toBe("From the library.");
     expect(by("user", "shared")?.description).toBe("Claude's copy.");
     expect(all.filter((s) => s.ref.name === "shared")).toHaveLength(1);
     expect(by("user", "broken")).toBeUndefined();
     expect(by("project", "proj-only")?.projects).toEqual(["app", "copy"]);
+    expect(by("project", "proj-only")?.projectIds).toEqual(["p1", "p2"]);
   });
 
   it("resolves a project skill only in its project", async () => {

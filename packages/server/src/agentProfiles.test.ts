@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createAgentProfile, deleteAgentProfile, getAgentProfile, launchProfile, listAgentProfiles, profileFlags, updateAgentProfile } from "./agentProfiles.ts";
+import { createAgentProfile, deleteAgentProfile, duplicateAgentProfile, getAgentProfile, launchProfile, listAgentProfiles, profileFlags, updateAgentProfile } from "./agentProfiles.ts";
 
 describe("agent profiles", () => {
   it("creates one with defaults, numbering the default name", () => {
@@ -58,6 +58,17 @@ describe("agent profiles", () => {
     expect(launchProfile("pi", undefined)).toBeUndefined();
     deleteAgentProfile(b.id);
     expect(launchProfile("claude", undefined)).toBeUndefined();
+  });
+
+  it("duplicates a profile under a free name, never as the default", () => {
+    const p = createAgentProfile({ name: "Frontend work", model: "opus", allowedTools: ["Edit"], skills: [{ source: "user", name: "a" }], isDefault: true });
+    const copy = duplicateAgentProfile(p.id);
+    expect(copy).toMatchObject({ name: "Frontend work copy", model: "opus", allowedTools: ["Edit"], skills: [{ source: "user", name: "a" }], isDefault: false });
+    expect(copy.id).not.toBe(p.id);
+    expect(duplicateAgentProfile(p.id).name).toBe("Frontend work copy 2");
+    expect(getAgentProfile(p.id).isDefault).toBe(true); // the source stays the default
+    expect(duplicateAgentProfile(createAgentProfile({ name: "x".repeat(40) }).id).name.length).toBeLessThanOrEqual(40);
+    deleteAgentProfile(p.id); // a default changes how later panels start
   });
 
   it("deletes", () => {

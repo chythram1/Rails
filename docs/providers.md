@@ -33,6 +33,8 @@ only reads transcripts for discovery (cwd, title, dates); the agents' TUIs rende
   needs only `.claude-plugin/plugin.json` (`{"name": …}`) and `skills/<name>/SKILL.md`; symlinked skill folders load,
   named `<plugin>:<name>`. On `--resume`, the model, permission mode, tools, MCP servers and plugins follow the new
   flags, but **the session keeps its original system prompt**: a new `--append-system-prompt` is ignored.
+  Built-in tool names (from `--output-format stream-json`'s init event, 2.1.306): Bash, Edit, Write, Read,
+  NotebookEdit, WebFetch, WebSearch, Task, Skill, ToolSearch and others; there's no Glob or Grep tool any more.
 - Each session binds a message socket (`$CLAUDE_CODE_MESSAGING_SOCKET`, e.g. `/tmp/cc-socks/<pid>.sock`); a line `{"type":"user","message":{"role":"user","content":…}}` written to it reaches the session (undocumented, used from step 3).
 
 ## pi — `~/.pi/agent/sessions/--<cwd with / → ->--/<iso>_<sessionId>.jsonl`

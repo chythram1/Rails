@@ -548,6 +548,8 @@ export interface SkillInfo {
   manual: boolean;
   /** For a project skill: the names of the projects that have it (it loads only in those). */
   projects?: string[];
+  /** The same projects' ids, in the same order. */
+  projectIds?: string[];
 }
 
 /** Claude Code's `--permission-mode` choices (checked with 2.1.304). */
