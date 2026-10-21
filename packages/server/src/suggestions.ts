@@ -51,7 +51,8 @@ export type Purpose = "answer" | "message";
  * A Coordinator suggests an answer to a session (following one of its rules, by its text, or its own
  * judgment) or a message for it. A session's question has one answer, so a new answer replaces the
  * Coordinator's earlier pending one. Messages are separate things to pass on (a handoff, a heads-up), so they
- * don't replace anything, up to MAX_PENDING_MESSAGES.
+ * don't replace anything, up to MAX_PENDING_MESSAGES; except that an agent's message (`from`, ADR 0018) replaces
+ * the same agent's earlier one for that session while it still waits, so the user sees its latest word once.
  */
 export function suggest(
   sprocketId: string,
@@ -66,8 +67,10 @@ export function suggest(
   const mode = modeFor(cardOf(panel), title, purpose);
   const mine = suggestions.pendingFor(panel.id).filter((s) => s.sprocketId === sprocketId);
   if (mode === "message") {
-    if (mine.filter((s) => s.mode === "message").length >= MAX_PENDING_MESSAGES)
+    const replaced = from ? mine.filter((s) => s.mode === "message" && s.from?.panelId === from.panelId) : [];
+    if (mine.filter((s) => s.mode === "message").length - replaced.length >= MAX_PENDING_MESSAGES)
       throw new Error(`${MAX_PENDING_MESSAGES} of your messages for "${title}" already wait for your user. Say what you'd add in your reply instead.`);
+    for (const old of replaced) suggestions.setStatus(old.id, ["pending"], "replaced");
   } else
     for (const old of mine.filter((s) => s.mode !== "message")) {
       if (old.messageId) suggestions.setStatus(old.id, ["pending"], "replaced");
@@ -119,7 +122,7 @@ export async function sendSuggestion(id: string, rawText: unknown): Promise<Sugg
     if (suggestions.setStatus(id, ["pending", "failed"], "expired", { error: why })) changes.emit();
     throw new ServiceError(why, 409);
   }
-  if (!suggestions.setStatus(id, ["pending", "failed"], "sending", { text })) throw new ServiceError("It's already being sent.", 409);
+  if (!suggestions.setStatus(id, ["pending", "failed"], "sending", { text, edited: text !== s.text })) throw new ServiceError("It's already being sent.", 409);
   changes.emit();
   try {
     const { queued } = await deliver(panel!, card!, deliveredText(text, s.attachment, s.from), { queue: s.mode === "message" });

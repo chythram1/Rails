@@ -38,7 +38,7 @@ Decisions (proposed):
     from. Posting it runs no model: the Coordinator sees it in its chat the next time it runs. In a project without
     a Coordinator the tool refuses ("Nobody here shows drafts to the user: say it in your reply instead"). An
     agent can't message itself, a shell, a session in another project, or answer a dialog. Limits: at most 3 of a
-    session's drafts wait at a time, and a receiving session has at most 3 messages waiting for it in all
+    session's drafts wait at a time, one per session it's for (a newer one replaces it), and a receiving session has at most 3 messages waiting for it in all
     (`MAX_PENDING_MESSAGES`, shared with the Coordinator's own, since agents' drafts are stored as its
     suggestions); the text has the suggestions' length limit (`SUGGESTION_MAX`).
     As built: the session is found by its id (at least 6 characters) or its title as `neighbours` shows it. The
@@ -50,6 +50,21 @@ Decisions (proposed):
     file it didn't own, and Claude when asked to have the UI session change something; Claude's ran without a
     permission prompt in auto mode. Once sent, each acted on the other's message, and Claude said it came from
     another session. Neither drafted one unasked while its own work didn't need the other's files.
+    In test run 4 (pi on gpt-6.1-sol) pi drafted 18, mostly unasked, and 11 were dismissed: status reports, plans,
+    work still in progress, repeats, and requests for what its task said it would be told. So the tool now says
+    what a message is for (something the other session has to act on) and what it isn't for (status, plans, work
+    in progress, asking for what you were told you'd get, which is `wait_for`'s job). That alone changed little in
+    a replay of run 4's first phase: pi asked the engine four times for the same change, never learning that its
+    user had cut it from one draft and dismissed the others. So an agent hears back now: `neighbours` lists its
+    messages of the last hour and what its user did with each (waiting, sent as written, sent edited with what the
+    other session got, in full since the cut is often at the end, dismissed, not sent), and `message` does too for
+    the session it drafts for. A new draft for
+    a session replaces the agent's own earlier one while that still waits (its card keeps one line, "Replaced by a
+    newer message"), and doesn't count against the limits. A later draft can be the weaker one, which is why ADR
+    0010 stopped the Coordinator's messages replacing each other, so the result quotes the draft it replaced.
+    Replayed again with this: in phase 1 pi drafted 5 (3 sent edited or as written, 1 dismissed, 1 it replaced
+    itself, dropping the request its user had cut four times), in phase 2 none (run 4: about 10), and the
+    messages that went out were all ones the other session acted on.
   - `wait_for(session)`: what that session is doing once it's no longer working. It sends nothing. It returns:
     - at once, if the session isn't working: idle (with its last reply), waiting for the user, failed, or stopped;
     - at once, if Rails has no reports for it (opened before Rails could see it): "Rails can't follow this one";

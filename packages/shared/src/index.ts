@@ -344,8 +344,13 @@ export interface Suggestion {
   attachment?: { title: string; text: string };
   /** A message an agent drafted for this session (ADR 0018): the session it came from. */
   from?: { panelId: string; kind: PanelKind; title: string };
-  /** "replaced": a newer answer for the same session took its place (it isn't shown). Messages aren't replaced. */
+  /**
+   * "replaced": a newer answer for the same session took its place (it isn't shown), or, for an agent's message,
+   * the same agent's newer message for that session (ADR 0018). The Coordinator's messages aren't replaced.
+   */
   status: "pending" | "sending" | "sent" | "failed" | "dismissed" | "expired" | "replaced";
+  /** The user changed the text before sending it. */
+  edited?: boolean;
   /** Why it failed, or why it can't be sent anymore. */
   error?: string;
   /** Sent while the session was busy: it's in the session's own queue, for after its current turn. */

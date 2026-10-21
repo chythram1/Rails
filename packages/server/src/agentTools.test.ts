@@ -6,12 +6,12 @@ import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { mcpRequest, messageFromAgent, neighboursText, waitForSession } from "./agentTools.ts";
 import { forgetPanel, receive } from "./bridge/index.ts";
-import { panels, projects, settings } from "./db.ts";
+import { panels, projects, settings, suggestions } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { setOwner } from "./owners.ts";
 import { idle } from "./runs.ts";
 import { createSprocket, listMessages, sendMessage, updateSettings } from "./sprockets.ts";
-import { sendSuggestion, suggest, SUGGESTION_MAX } from "./suggestions.ts";
+import { dismissSuggestion, sendSuggestion, suggest, SUGGESTION_MAX } from "./suggestions.ts";
 
 const faux = fauxProvider();
 models.setProvider(faux.provider);
@@ -121,6 +121,20 @@ describe("the agent tools' MCP endpoint", () => {
     expect(init.result.instructions).toMatch(/message/);
   });
 
+  it("keeps messages for what the other session has to act on, and points waiting at wait_for", async () => {
+    const { ui } = setup();
+    // Test run 4: pi drafted 18 messages and 11 were dismissed: status reports, plans, work in progress, and asks
+    // for what its task said it would be told. The tool's description is what pi reads (direct exposure).
+    const list = (await call(ui.id, "tools/list")) as any;
+    const message = list.result.tools.find((t: any) => t.name === "message").description;
+    expect(message).toMatch(/has to act on/);
+    expect(message).toMatch(/not for status updates/i);
+    expect(message).toMatch(/call wait_for/);
+    expect(message).toMatch(/can't answer you before/);
+    const init = (await call(ui.id, "initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "x", version: "1" } })) as any;
+    expect(init.result.instructions).toMatch(/don't message just to report progress/i);
+  });
+
   it("runs neighbours for the panel that asks", async () => {
     const { ui } = setup();
     const r = (await call(ui.id, "tools/call", { name: "neighbours", arguments: {} })) as any;
@@ -214,14 +228,55 @@ describe("message (ADR 0018)", () => {
   });
 
   it("keeps to the limits: 3 drafts from a session, 3 messages for a session (with the Coordinator's), the length", async () => {
-    const { lead, engine, ui, game } = team();
+    const { project, lead, engine, ui, game } = team();
+    panels.create({ projectId: project.id, kind: "claude", title: "Docs" });
+    panels.create({ projectId: project.id, kind: "claude", title: "Tests" });
     await messageFromAgent(ui.id, "Engine", "1");
-    await messageFromAgent(ui.id, "Engine", "2");
-    await messageFromAgent(ui.id, "Gameplay", "3");
-    await expect(messageFromAgent(ui.id, "Gameplay", "4")).rejects.toThrow("3 of your messages wait for your user");
+    await messageFromAgent(ui.id, "Gameplay", "2");
+    await messageFromAgent(ui.id, "Docs", "3");
+    await expect(messageFromAgent(ui.id, "Tests", "4")).rejects.toThrow("3 of your messages wait for your user");
+    await expect(messageFromAgent(ui.id, "Engine", "1, again")).resolves.toMatch(/replaces/); // not one more
     suggest(lead.id, engine, "Engine", "From Lead.", { purpose: "message" }); // the Coordinator's own count too
+    suggest(lead.id, engine, "Engine", "From Lead, too.", { purpose: "message" });
     await expect(messageFromAgent(game.id, "Engine", "5")).rejects.toThrow('3 messages already wait for "Engine"');
+    await expect(messageFromAgent(ui.id, "Engine", "1, once more")).resolves.toMatch(/replaces/); // not one more for Engine either
     await expect(messageFromAgent(game.id, "UI", "x".repeat(SUGGESTION_MAX + 1))).rejects.toThrow(`at most ${SUGGESTION_MAX} characters`);
+  });
+
+  it("replaces the agent's own draft for that session while it waits, and says so", async () => {
+    const { lead, engine, ui, game } = team();
+    await messageFromAgent(ui.id, "Engine", "First.");
+    suggest(lead.id, engine, "Engine", "From Lead.", { purpose: "message" });
+    await messageFromAgent(game.id, "Engine", "From Codex.");
+    expect(await messageFromAgent(ui.id, "Engine", "Second, with everything.")).toMatch(/replaces your earlier draft for "Engine".*everything it needs in this one\. The earlier draft: "First\."$/s);
+    const drafts = () => listMessages(lead.id).flatMap((m) => m.suggestions ?? []).map((s) => [s.text, s.status]);
+    // Only its own, and only while it waits: the Coordinator's and other sessions' stay.
+    expect(drafts()).toEqual([["First.", "replaced"], ["From Codex.", "pending"], ["Second, with everything.", "pending"]]);
+    expect(suggestions.pendingFor(engine.id).map((s) => s.text).sort()).toEqual(["From Codex.", "From Lead.", "Second, with everything."]);
+    const second = listMessages(lead.id).at(-1)!.suggestions![0];
+    await sendSuggestion(second.id, undefined);
+    expect(await messageFromAgent(ui.id, "Engine", "Third.")).not.toMatch(/replaces/); // a sent one stays sent
+    expect(drafts().at(-2)).toEqual(["Second, with everything.", "sent"]);
+  });
+
+  it("tells the agent what its user did with its drafts: in neighbours, and when it drafts for that session again", async () => {
+    const { lead, engine, ui } = team();
+    await messageFromAgent(ui.id, "Gameplay", "Make the canvas 768 high.");
+    dismissSuggestion(listMessages(lead.id).at(-1)!.suggestions![0].id);
+    await messageFromAgent(ui.id, "Engine", "Emit tower:shot. And make the map bigger.");
+    // Quoted in full, not cut short like the others: the change can be anywhere, often a cut at the end.
+    const edited = `Emit tower:shot. ${"Keep the canvas at the brief's 960x576. ".repeat(8)}`.trim();
+    await sendSuggestion(listMessages(lead.id).at(-1)!.suggestions![0].id, edited);
+    await messageFromAgent(ui.id, "Engine", "The HUD reads state.lives now.");
+    await sendSuggestion(listMessages(lead.id).at(-1)!.suggestions![0].id, undefined);
+    const text = await neighboursText(ui.id);
+    expect(text).toMatch(/Your messages in the last hour/);
+    expect(text).toMatch(/for "Gameplay", just now: dismissed by your user\. You wrote: "Make the canvas 768 high\."/);
+    expect(text).toContain(`for "Engine", just now: sent with your user's edits, so see what they changed. It got: "${edited}"`);
+    expect(text).toMatch(/for "Engine", just now: sent as you wrote it\. You wrote: "The HUD reads state\.lives now\."/);
+    expect(text).toMatch(/don't draft it again unless something changed/);
+    expect(await neighboursText(engine.id)).not.toMatch(/Your messages/); // only the sender sees them
+    expect(await messageFromAgent(ui.id, "Gameplay", "Make the canvas 768 high, please.")).toMatch(/Drafted\.[^]*for "Gameplay", just now: dismissed by your user/);
   });
 
   it("is in the Coordinator's chat the next time it runs, as an agent's words", async () => {

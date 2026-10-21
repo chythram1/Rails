@@ -61,8 +61,9 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
         {s.attachment && <Attachment attachment={s.attachment} />}
       </div>
     );
-  // A newer suggestion for the same session sits further down: this one would only be noise.
-  if (s.status === "replaced") return null;
+  // A newer suggestion for the same session sits further down: this one would only be noise. An agent's message
+  // keeps a line, since its event row says who wanted to tell whom.
+  if (s.status === "replaced") return s.from ? <p className="sp-suggestion-line">Replaced by a newer message.</p> : null;
   if (s.status === "dismissed") return <p className="sp-suggestion-line">Dismissed.</p>;
   if (s.status === "expired") return <p className="sp-suggestion-line">Not sent: {lower(s.error ?? "The session moved on.")}</p>;
 

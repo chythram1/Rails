@@ -113,7 +113,7 @@ export function sharedFiles(cards: SessionCard[], now: number): { file: string; 
 export const AGENT: Record<PanelKind, string> = { claude: "Claude Code", codex: "Codex", pi: "pi", shell: "shell" };
 export const rel = (root: string, f: string) => (f.startsWith(root + "/") ? f.slice(root.length + 1) : f);
 const short = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "…" : s);
-const ago = (iso: string | undefined, now: number) => {
+export const ago = (iso: string | undefined, now: number) => {
   if (!iso) return "no activity yet";
   const m = Math.round((now - Date.parse(iso)) / 60_000);
   return m < 1 ? "just now" : m < 60 ? `${m}m ago` : `${Math.round(m / 60)}h ago`;

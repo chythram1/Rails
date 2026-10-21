@@ -36,7 +36,7 @@ Decisions:
     session had a question open, and dropped it as soon as the session moved on.
 - **Suggestions go stale.** One answer per session per Coordinator (a newer one replaces the older).
   Messages don't replace each other (changed 2026-10-19, after a weak later draft replaced a useful one): up to
-  three can wait for one session. Anything the
+  three can wait for one session. An agent's own messages do (ADR 0018). Anything the
   session does (a prompt, a tool, the dialog answered, the session ending, the panel closing) expires its
   pending suggestions. Sending checks everything again: the panel is open and in the Coordinator's project,
   and the session isn't working, waiting on something else or gone; a failed send can be retried.

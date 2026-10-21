@@ -5,7 +5,7 @@
 // session that waits in the Coordinator's chat until the user sends it, and wait_for, which waits for another
 // session to finish what it's doing.
 import { shortTitle } from "@rails/shared";
-import { AGENT, boardText, rel, type SessionCard } from "./bridge/board.ts";
+import { AGENT, ago, boardText, rel, type SessionCard } from "./bridge/board.ts";
 import type { SessionEvent } from "./bridge/events.ts";
 import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
 import { panels, projects, sprockets, suggestions } from "./db.ts";
@@ -35,7 +35,44 @@ export async function neighboursText(panelId: string): Promise<string> {
     lines.push(
       ["Who owns which files (the user set this):", ...owners.map((o) => `- ${o.panelId === me.id ? "you" : `"${titles.get(o.panelId) ?? o.title}"`}: ${o.paths.join(", ")}`)].join("\n"),
     );
+  const drafts = draftLines(me.id);
+  if (drafts.length)
+    lines.push(
+      ["Your messages in the last hour (your user decides on each; if they dismissed one, don't draft it again unless something changed):", ...drafts].join("\n"),
+    );
   return lines.join("\n\n");
+}
+
+/** How far back an agent hears what its user did with its messages. */
+const DRAFTS_SHOWN_MS = 3_600_000;
+
+/**
+ * What the user did with the messages a session drafted lately (ADR 0018), newest first, one line each: waiting,
+ * sent (as written, or edited, with what the other session got), dismissed or not sent. Its own drafts only, and
+ * not those its newer ones replaced. Without this an agent never learns that a draft was dismissed or cut, and
+ * drafts it again.
+ */
+function draftLines(panelId: string, { to, except }: { to?: string; except?: string } = {}): string[] {
+  const now = Date.now();
+  // An edited one in full (up to a bound): what the user changed can be anywhere, often a cut at the end.
+  const quote = (t: string, max = 200) => `"${t.replace(/\s+/g, " ").slice(0, max)}${t.length > max ? "…" : ""}"`;
+  return suggestions
+    .byAgent(panelId, new Date(now - DRAFTS_SHOWN_MS).toISOString())
+    .filter((s) => (!to || s.panelId === to) && s.id !== except)
+    .slice(0, 6)
+    .map((s) => {
+      const what =
+        s.status === "sent"
+          ? s.edited
+            ? `sent with your user's edits, so see what they changed. It got: ${quote(s.text, 1500)}`
+            : `sent as you wrote it. You wrote: ${quote(s.text)}`
+          : s.status === "dismissed"
+            ? `dismissed by your user. You wrote: ${quote(s.text)}`
+            : s.status === "expired"
+              ? `not sent (${(s.error ?? "the session moved on").replace(/^\w/, (c) => c.toLowerCase()).replace(/\.$/, "")}). You wrote: ${quote(s.text)}`
+              : `waits for your user. You wrote: ${quote(s.text)}`;
+      return `- for "${shortTitle(s.title, TITLE_MAX)}", ${ago(s.createdAt, now)}: ${what}`;
+    });
 }
 
 /**
@@ -156,9 +193,12 @@ export async function messageFromAgent(panelId: string, session: unknown, text: 
   if (!coordinator) throw new Error("Nobody here shows drafts to the user: this project has no Coordinator. Say it in your reply instead.");
   const { to, titles } = await otherSession(panelId, session);
   const toTitle = titles.get(to.id)!;
-  if (suggestions.pendingFrom(me.id) >= MAX_DRAFTS_FROM_AGENT)
+  const waiting = suggestions.pendingFor(to.id).filter((s) => s.sprocketId === coordinator.id && s.mode === "message");
+  // Its own draft for that session that still waits: this one replaces it (suggest), so it isn't one more.
+  const replaced = waiting.filter((s) => s.from?.panelId === me.id);
+  if (suggestions.pendingFrom(me.id) - replaced.length >= MAX_DRAFTS_FROM_AGENT)
     throw new Error(`${MAX_DRAFTS_FROM_AGENT} of your messages wait for your user already: draft another once they've sent or dismissed one.`);
-  if (suggestions.pendingFor(to.id).filter((s) => s.sprocketId === coordinator.id && s.mode === "message").length >= MAX_PENDING_MESSAGES)
+  if (waiting.length - replaced.length >= MAX_PENDING_MESSAGES)
     throw new Error(`${MAX_PENDING_MESSAGES} messages already wait for "${toTitle}". Say it in your reply instead, or try later.`);
   const from = { panelId: me.id, kind: me.kind, title: titles.get(me.id)! };
   const draft = suggest(coordinator.id, to, toTitle, text, { purpose: "message", from });
@@ -169,7 +209,16 @@ export async function messageFromAgent(panelId: string, session: unknown, text: 
     { wake: false },
   );
   suggestions.attach([draft.id], event.id);
-  return `Drafted. Your user sees it in ${coordinator.name}'s chat and decides whether to send it to "${toTitle}", which then gets it from them. Nothing reaches it before that, so don't wait for an answer: carry on with your work.`;
+  const name = shortTitle(toTitle, TITLE_MAX);
+  // A later draft can be the weaker one (ADR 0010 stopped the Coordinator's messages replacing each other for
+  // that): the agent sees what it replaced, to draft again if this one left something out.
+  const was = replaced.map((s) => `"${s.text.replace(/\s+/g, " ").slice(0, 400)}${s.text.length > 400 ? "…" : ""}"`).join(", ");
+  const earlier = draftLines(me.id, { to: to.id, except: draft.id });
+  return [
+    `Drafted. Your user sees it in ${coordinator.name}'s chat and decides whether to send it to "${name}", which then gets it from them. Nothing reaches it before that, so don't wait for an answer: carry on with your work.`,
+    ...(replaced.length ? [`It replaces your earlier draft for "${name}", which still waited for your user: put everything it needs in this one. The earlier draft: ${was}`] : []),
+    ...(earlier.length ? [`What your user did with your other drafts for "${name}" in the last hour:`, ...earlier] : []),
+  ].join("\n");
 }
 
 const TOOLS = [
@@ -186,7 +235,7 @@ const TOOLS = [
   {
     name: "message",
     description:
-      "Draft a message for another coding session in this project: something it needs to know or do, such as a change you made that its code depends on, or a fix in files it owns. Your user reads the draft and decides whether to send it (edited or not), so it may reach the session later or not at all. It isn't for questions to your user: ask them in your reply.",
+      "Draft a message for another coding session in this project, about something it has to act on: a fix in files it owns, or a change it must make because of work you've finished (a new export, a changed layout, one of its tests you broke). Not for status updates, plans, or work still in progress, yours or its: a test failing in files it's changing right now is likely its work in progress. Not to ask for what your task or the brief already settles, or for something you were told you'd hear about: to use another session's work once it's ready, call wait_for. Your user reads the draft and decides whether to send it (edited or not), so it may reach the session later or not at all, and it can't answer you before then (a Codex session answers only in its own reply, which neighbours shows). A new draft for the same session replaces your earlier one while that still waits, so put everything in one; neighbours shows what your user did with your drafts. It isn't for questions to your user: ask them in your reply.",
     inputSchema: {
       type: "object",
       properties: {
@@ -219,7 +268,7 @@ const TOOLS = [
 
 /** The agent puts these in its prompt (Claude Code under "MCP Server Instructions"): when to call, not only what. */
 const INSTRUCTIONS =
-  "Rails runs this session alongside other coding sessions in the same project, which may be changing the same code. Call the neighbours tool when you start a task and before you change files outside what you were asked to work on: it shows what the other sessions are doing, the files they changed lately and who owns which files. When another session needs to know something or do something (a change its code depends on, a fix in files it owns), draft it with the message tool instead of changing its files; your user decides whether to send it. When your next step needs another session to finish first, call wait_for instead of checking again and again.";
+  "Rails runs this session alongside other coding sessions in the same project, which may be changing the same code. Call the neighbours tool when you start a task and before you change files outside what you were asked to work on: it shows what the other sessions are doing, the files they changed lately and who owns which files. When another session has to act on something (a fix in files it owns, a change it must make because of work you finished), draft it with the message tool instead of changing its files; your user decides whether to send it. Don't message just to report progress or plans, or to ask for something you were told you'd get. When your next step needs another session to finish first, call wait_for instead of messaging it or checking again and again.";
 
 type Rpc = { jsonrpc: "2.0"; id: string | number; result?: unknown; error?: { code: number; message: string } };
 

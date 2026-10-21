@@ -116,6 +116,7 @@ addColumn("suggestions", "queued", "INTEGER NOT NULL DEFAULT 0");
 addColumn("suggestions", "attachment", "TEXT");
 /** On an agent's message: the session that drafted it, as JSON {panelId, kind, title} (ADR 0018). */
 addColumn("suggestions", "sender", "TEXT");
+addColumn("suggestions", "edited", "INTEGER NOT NULL DEFAULT 0");
 db.exec(`
   -- Shadow judgments of the fast decision model (ADR 0012). Kept to the latest few hundred.
   CREATE TABLE IF NOT EXISTS decisions (
@@ -455,6 +456,7 @@ type SuggestionRow = {
   attachment: string | null;
   sender: string | null;
   queued: number;
+  edited: number;
   status: Suggestion["status"];
   error: string | null;
   created_at: string;
@@ -476,6 +478,7 @@ const toSuggestion = (r: SuggestionRow): Suggestion & { sprocketId: string; mess
   status: r.status,
   ...(r.error ? { error: r.error } : {}),
   ...(r.queued ? { queued: true } : {}),
+  ...(r.edited ? { edited: true } : {}),
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -538,6 +541,14 @@ export const suggestions = {
     const r = db.prepare("SELECT count(*) AS n FROM suggestions WHERE status = 'pending' AND json_extract(sender, '$.panelId') = ?").get(panelId) as { n: number };
     return Number(r.n);
   },
+  /** The messages a session drafted for others since `since` (ADR 0018), newest first, without replaced ones. */
+  byAgent(panelId: string, since: string) {
+    return (
+      db
+        .prepare("SELECT * FROM suggestions WHERE json_extract(sender, '$.panelId') = ? AND created_at >= ? AND status != 'replaced' ORDER BY created_at DESC, rowid DESC")
+        .all(panelId, since) as SuggestionRow[]
+    ).map(toSuggestion);
+  },
   /** Pending ones for a panel (from any Sprocket). */
   pendingFor(panelId: string) {
     return (db.prepare("SELECT * FROM suggestions WHERE panel_id = ? AND status = 'pending'").all(panelId) as SuggestionRow[]).map(toSuggestion);
@@ -557,12 +568,12 @@ export const suggestions = {
   drop(ids: string[]): void {
     for (const id of ids) db.prepare("DELETE FROM suggestions WHERE id = ? AND message_id IS NULL").run(id);
   },
-  /** Change the status if it's one of `from`. False when it wasn't (someone else changed it first). */
-  setStatus(id: string, from: Suggestion["status"][], to: Suggestion["status"], extra: { error?: string; text?: string; queued?: boolean } = {}): boolean {
+  /** Change the status if it's one of `from`. False when it wasn't (someone else changed it first). Once edited, it stays edited. */
+  setStatus(id: string, from: Suggestion["status"][], to: Suggestion["status"], extra: { error?: string; text?: string; queued?: boolean; edited?: boolean } = {}): boolean {
     const marks = from.map(() => "?").join(", ");
     const r = db
-      .prepare(`UPDATE suggestions SET status = ?, error = ?, text = COALESCE(?, text), queued = ?, updated_at = ? WHERE id = ? AND status IN (${marks})`)
-      .run(to, extra.error ?? null, extra.text ?? null, extra.queued ? 1 : 0, new Date().toISOString(), id, ...from);
+      .prepare(`UPDATE suggestions SET status = ?, error = ?, text = COALESCE(?, text), queued = ?, edited = MAX(edited, ?), updated_at = ? WHERE id = ? AND status IN (${marks})`)
+      .run(to, extra.error ?? null, extra.text ?? null, extra.queued ? 1 : 0, extra.edited ? 1 : 0, new Date().toISOString(), id, ...from);
     return r.changes > 0;
   },
 };
