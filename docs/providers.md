@@ -34,8 +34,9 @@ only reads transcripts for discovery (cwd, title, dates); the agents' TUIs rende
   - `toolResult`: `{toolCallId, toolName, content:[{type:'text',text}], isError}`
   - `system`: ignored
 - Other lines (ignored for now): `model_change`, `thinking_level_change`, `usage`, `custom`, `custom_message`.
-- Title: the scanner reads `session_info.name` if it exists, otherwise the first user message. **Unverified**:
-  no local transcript contains a `session_info` line yet, so check pi's source before relying on it.
+- Title: the user's `/name <name>` appends `{type:'session_info', name}`; the latest one counts, and an empty name
+  clears it (pi 1.3's `getSessionName`; checked live). Otherwise the title is the first user message. Discovery reads only the head and
+  tail, so a name set in the middle of a long session is missed.
 - User text can begin with a `<skill name="…">…</skill>` wrapper. Titles render it as `/<skill> rest`.
 - Entries form a tree through `id` / `parentId`. v1 renders them in file order.
 - CLI (verified): `pi --session-id <uuid> [-- prompt]` creates a session with that id; `pi --session <id>` reopens one. pi warns when tmux `extended-keys` is off, so Rails turns it on.
@@ -53,6 +54,12 @@ the first thread exists. The line format still comes from the public docs and is
 - `{type:'response_item', payload:{type:'function_call', name, arguments, call_id}}` and `function_call_output`.
 - CLI: `codex [-- prompt]` starts a session (id unknown until its rollout file appears); `codex resume <id>` reopens one,
   but fails ("no rollout found") for a thread that has no turns yet. `codex delete --force <id>` deletes a thread.
+- Title: Codex names a thread itself after its first turn ("Build gear object"), and the user's `/rename` changes it
+  (it opens a field with a suggestion). Neither touches the rollout: Codex appends `{id, thread_name, updated_at}` to
+  `~/.codex/session_index.jsonl`, and the latest non-empty name for an id counts (checked live with 0.163;
+  `rollout/src/session_index.rs`). `codex delete` removes a thread's lines.
+  Discovery reads that file whole (one short line per rename), cached by mtime and size. Otherwise the title is the
+  first user message.
 - Codex 0.16x also keeps thread metadata in `~/.codex/state_<n>.sqlite` (`threads`: id, cwd, title, rollout_path, …)
   and runs interactive sessions on a shared local **app-server daemon** (`codex app-server daemon version` prints
   its socket). Clients speak JSON-RPC over a WebSocket on that Unix socket: `thread/list` filters by `cwd`, and
