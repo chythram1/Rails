@@ -6,6 +6,7 @@ import {
   AGENT_PROFILE_DESCRIPTION_MAX,
   AGENT_PROFILE_INSTRUCTIONS_MAX,
   AGENT_PROFILE_NAME_MAX,
+  AGENT_PROFILE_TOOLS_MAX,
   EFFORTS,
   PERMISSION_MODES,
   TOOL_PATTERN_MAX,
@@ -24,7 +25,6 @@ import { runningPanels } from "./tmux.ts";
 import { listeners } from "./util.ts";
 
 const MAX_SKILLS = 50;
-const MAX_TOOLS = 50;
 const MAX_SERVERS = 20;
 const NEW_NAME = "New agent profile";
 
@@ -56,7 +56,7 @@ function parseTools(raw: unknown): string[] {
     // It goes on the command line on its own: a leading dash would read as a flag.
     if (t.startsWith("-") || /[\x00-\x1f]/.test(t)) throw bad(`"${t}" isn't a tool pattern. Use a tool name, like Bash(npm test:*).`);
   }
-  if (out.length > MAX_TOOLS) throw bad(`A list can have at most ${MAX_TOOLS} tool patterns.`);
+  if (out.length > AGENT_PROFILE_TOOLS_MAX) throw bad(`A list can have at most ${AGENT_PROFILE_TOOLS_MAX} tool patterns.`);
   return out;
 }
 

@@ -1037,8 +1037,6 @@ textarea.input.cz-prompt-text { min-height: 200px; }
 textarea.input.cz-instructions { width: 100%; min-height: 96px; max-height: 480px; overflow-y: auto; resize: none; line-height: 1.5; }
 .cz-warn, .set-text p.cz-warn { margin: 0; color: var(--red); font-size: 13px; }
 .cz-actions { display: flex; gap: 8px; margin-top: 12px; }
-/* Tool patterns: the Sprocket rules' rows, then a field to add one. */
-.cz-field > .sp-rule-add { display: flex; flex-direction: column; gap: 6px; }
 .cz-end { gap: 0; }
 .cz-end > .set-intro { margin-top: 0; }
 /* Skills and MCP servers: ruled rows, the name and where it's from on top, then what it is. */

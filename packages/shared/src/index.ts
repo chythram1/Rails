@@ -573,6 +573,8 @@ export const AGENT_PROFILE_NAME_MAX = 40;
 export const AGENT_PROFILE_DESCRIPTION_MAX = 200;
 export const AGENT_PROFILE_INSTRUCTIONS_MAX = 4000;
 export const TOOL_PATTERN_MAX = 200;
+/** At most this many patterns in each of a profile's tool lists. */
+export const AGENT_PROFILE_TOOLS_MAX = 50;
 
 /** The editable part of an agent profile. */
 export interface AgentProfileInput {

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { IconChevronLeft as ChevronLeft, IconPencil as Pencil, IconX as X } from "@tabler/icons-react";
+import { IconChevronLeft as ChevronLeft, IconPencil as Pencil, IconPlus as Plus, IconX as X } from "@tabler/icons-react";
 import {
   AGENT_PROFILE_DESCRIPTION_MAX,
   AGENT_PROFILE_INSTRUCTIONS_MAX,
   AGENT_PROFILE_NAME_MAX,
+  AGENT_PROFILE_TOOLS_MAX,
   EFFORTS,
   TOOL_PATTERN_MAX,
   sessionKey,
@@ -45,7 +46,8 @@ const PERMISSION_HELP: Record<PermissionMode | "", string> = {
   auto: "Claude Code decides what's safe to run without asking.",
   plan: "Plans first and asks before changing anything.",
   dontAsk: "Never asks: tools not under Always allow are refused.",
-  bypassPermissions: "Runs every tool without asking, shell commands included.",
+  // A warning in words, not in red: red is for what needs you now (DESIGN.md, The Three Hues Rule).
+  bypassPermissions: "Runs every tool without asking, shell commands included. Use it only for folders you can afford to lose.",
 };
 
 const skillKey = (r: SkillRef) => `${r.source}:${r.name}`;
@@ -203,9 +205,7 @@ export function AgentProfileEditor({ profile }: { profile: AgentProfile }) {
             <div className="set-row">
               <div className="set-text">
                 <label htmlFor="cz-permissions">Permission mode</label>
-                <p id="cz-permissions-help" className={profile.permissionMode === "bypassPermissions" ? "cz-warn" : undefined}>
-                  {PERMISSION_HELP[profile.permissionMode]}
-                </p>
+                <p id="cz-permissions-help">{PERMISSION_HELP[profile.permissionMode]}</p>
               </div>
               <Dropdown
                 id="cz-permissions"
@@ -254,8 +254,8 @@ export function AgentProfileEditor({ profile }: { profile: AgentProfile }) {
           <section className="set-group" aria-labelledby="cz-tools">
             <h3 id="cz-tools">Tools</h3>
             <p className="set-intro">Tool names or patterns, like Read, WebFetch or Bash(npm test:*).</p>
-            <PatternList id="cz-allow" label="Always allow" help="Runs without asking." values={profile.allowedTools} placeholder="e.g. Bash(npm test:*)" onSave={(allowedTools) => save({ allowedTools })} />
-            <PatternList id="cz-deny" label="Never allow" help="Taken away from the agent." values={profile.disallowedTools} placeholder="e.g. WebFetch" onSave={(disallowedTools) => save({ disallowedTools })} />
+            <PatternList id="cz-allow" label="Always allow" help="Runs without asking." values={profile.allowedTools} placeholder="Bash(npm test:*)" onSave={(allowedTools) => save({ allowedTools })} />
+            <PatternList id="cz-deny" label="Never allow" help="Taken away from the agent." values={profile.disallowedTools} placeholder="WebFetch" onSave={(disallowedTools) => save({ disallowedTools })} />
           </section>
 
           <section className="set-group" aria-labelledby="cz-mcp">
@@ -455,18 +455,48 @@ function SkillRow({ skillRef, info, loaded, onRemove }: { skillRef: SkillRef; in
   );
 }
 
-/** A short list of tool patterns, numbered, each editable in place, with a field to add one. */
+/**
+ * A list of tool patterns in the Sprocket rules' pattern: one ruled, numbered list, each row editable in place and
+ * saved when it loses focus (or on Enter). "Add" in the heading opens a new row at the end: Enter adds the pattern
+ * and leaves a fresh row for the next one, Escape closes it. Removing a pattern saves at once.
+ */
 function PatternList({ id, label, help, values, placeholder, onSave }: { id: string; label: string; help: string; values: string[]; placeholder: string; onSave(next: string[]): Promise<boolean> }) {
-  const [draft, setDraft] = useState("");
-  const add = async () => {
-    const v = draft.trim();
-    if (v && (await onSave([...values, v]))) setDraft("");
+  const [adding, setAdding] = useState(false);
+  const addButton = useRef<HTMLButtonElement>(null);
+  const refocus = useRef(false);
+  const full = values.length >= AGENT_PROFILE_TOOLS_MAX;
+  const stopAdding = (back: boolean) => {
+    refocus.current = back;
+    setAdding(false);
   };
+  // Back to "Add" once it's enabled again (it's disabled while the new row is open).
+  useEffect(() => {
+    if (adding || !refocus.current) return;
+    refocus.current = false;
+    addButton.current?.focus();
+  }, [adding]);
   return (
     <div className="settings-field cz-field" role="group" aria-labelledby={`${id}-label`} aria-describedby={`${id}-help`}>
-      <p id={`${id}-label`} className="set-label">{label}</p>
-      <p id={`${id}-help`} className="muted small">{help}</p>
-      {values.length > 0 && (
+      <div className="sp-field-head">
+        <p id={`${id}-label`} className="set-label">{label}</p>
+        <button
+          ref={addButton}
+          type="button"
+          className="btn small"
+          aria-label={`Add to ${label}`}
+          disabled={full || adding}
+          title={full ? `That's ${AGENT_PROFILE_TOOLS_MAX} patterns, the most a list can have.` : undefined}
+          onClick={() => setAdding(true)}
+        >
+          <Plus size={14} aria-hidden />
+          Add
+        </button>
+      </div>
+      <p id={`${id}-help`} className="muted small">
+        {help}
+        {values.length || adding ? "" : ` None yet, e.g. ${placeholder}.`}
+      </p>
+      {(values.length > 0 || adding) && (
         <ol className="sp-rules-list">
           {values.map((v, i) => (
             <PatternRow
@@ -478,28 +508,24 @@ function PatternList({ id, label, help, values, placeholder, onSave }: { id: str
               onRemove={() => void onSave(values.filter((_, j) => j !== i))}
             />
           ))}
+          {adding && !full && (
+            <NewPattern
+              n={values.length + 1}
+              label={label}
+              placeholder={placeholder}
+              last={values.length + 1 >= AGENT_PROFILE_TOOLS_MAX}
+              onAdd={(v) => onSave([...values, v])}
+              onDone={stopAdding}
+            />
+          )}
         </ol>
       )}
-      <form
-        className="sp-rule-add"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void add();
-        }}
-      >
-        <input className="input mono" aria-label={`Add to ${label}`} maxLength={TOOL_PATTERN_MAX} placeholder={placeholder} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setDraft("")} />
-        {draft.trim() && (
-          <div className="sp-field-foot">
-            <span className="grow" />
-            <button type="button" className="btn small" onClick={() => setDraft("")}>Cancel</button>
-            <button className="btn small primary">Add</button>
-          </div>
-        )}
-      </form>
+      {full && <p className="muted small">That's {AGENT_PROFILE_TOOLS_MAX} patterns, the most a list can have.</p>}
     </div>
   );
 }
 
+/** One pattern, editable in place. Emptying it removes it; Escape puts it back. */
 function PatternRow({ n, label, value, onSave, onRemove }: { n: number; label: string; value: string; onSave(next: string): Promise<boolean>; onRemove(): void }) {
   const [text, setText] = useState(value);
   const commit = () => {
@@ -521,9 +547,56 @@ function PatternRow({ n, label, value, onSave, onRemove }: { n: number; label: s
           if (e.key === "Escape") setText(value);
         }}
       />
-      <button type="button" className="icon-btn sp-rule-remove" aria-label={`Remove ${text || value} from ${label}`} title="Remove" onClick={onRemove}>
+      <button type="button" className="icon-btn sp-rule-remove" aria-label={`Remove ${value} from ${label}`} title="Remove" onClick={onRemove}>
         <X size={14} />
       </button>
+    </li>
+  );
+}
+
+/**
+ * The row "Add" opens, at the end of the list. Enter adds its pattern and empties it for the next (unless that made
+ * the last one there's room for); leaving it adds what's typed and closes it; Escape closes it without adding.
+ */
+function NewPattern(props: { n: number; label: string; placeholder: string; last: boolean; onAdd(v: string): Promise<boolean>; onDone(refocus: boolean): void }) {
+  const { n, label, placeholder, last, onAdd, onDone } = props;
+  const [text, setText] = useState("");
+  const ref = useRef<HTMLInputElement>(null);
+  const closing = useRef(false);
+  useEffect(() => ref.current?.focus(), []);
+  const add = async (then: "next" | "close") => {
+    const v = text.trim();
+    if (!v) return onDone(then === "next");
+    if (!(await onAdd(v))) return;
+    setText("");
+    if (then === "close" || last) onDone(then === "next");
+  };
+  return (
+    <li className="sp-rule editing">
+      <span className="sp-rule-n" aria-hidden>{n}</span>
+      <input
+        ref={ref}
+        className="sp-rule-text mono"
+        aria-label={`New pattern for ${label}`}
+        maxLength={TOOL_PATTERN_MAX}
+        placeholder={placeholder}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => {
+          if (closing.current) return;
+          void add("close");
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            void add("next");
+          }
+          if (e.key === "Escape") {
+            closing.current = true;
+            onDone(true);
+          }
+        }}
+      />
     </li>
   );
 }
@@ -539,7 +612,7 @@ function McpServers({ servers, onSave }: { servers: McpServer[]; onSave(next: Mc
   return (
     <>
       <p className="set-intro">
-        {servers.length ? "What this profile adds." : "None yet."} Values are stored in Rails, so write secrets as {"${VAR}"}: Claude Code reads them from the environment.
+        {servers.length ? "What this profile adds." : "None yet. Add one to give the agent more tools."} Values are stored in Rails, so write secrets as {"${VAR}"}: Claude Code reads them from the environment.
       </p>
       {servers.length > 0 && (
         <ul className="cz-list">

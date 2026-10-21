@@ -96,7 +96,7 @@ function CustomizeList(props: { profiles: AgentProfile[]; prompts: SavedPrompt[]
       <div className="sp-groups">
         <h2 className="sp-group-title">Agent profiles</h2>
         {list.length === 0 ? (
-          <p className="muted small cz-list-note">None yet.</p>
+          <p className="muted small cz-list-note">None yet. Make one for each kind of work, like research or frontend.</p>
         ) : shown.length === 0 ? (
           <p className="muted small cz-list-note">No agent profiles match “{query.trim()}”.</p>
         ) : (
@@ -128,7 +128,7 @@ function CustomizeList(props: { profiles: AgentProfile[]; prompts: SavedPrompt[]
 
         <h2 className="sp-group-title cz-group-gap">Saved prompts</h2>
         {prompts.length === 0 ? (
-          <p className="muted small cz-list-note">None yet.</p>
+          <p className="muted small cz-list-note">None yet. Save a message you often start agents with.</p>
         ) : shownPrompts.length === 0 ? (
           <p className="muted small cz-list-note">No prompts match “{query.trim()}”.</p>
         ) : (
