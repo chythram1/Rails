@@ -166,7 +166,7 @@ export class World {
     const messages = listMessages(projectChat(this.coordinator.id));
     const lastUser = messages.findLastIndex((m) => m.author === "user" || m.author === "event");
     const after = messages.slice(lastUser + 1);
-    const drafts = [...suggestions.byMessage(this.coordinator.id).values()].flat().map((s) => ({
+    const drafts = [...suggestions.byMessage(projectChat(this.coordinator.id)).values()].flat().map((s) => ({
       to: s.panelId,
       title: s.title,
       mode: s.mode,
