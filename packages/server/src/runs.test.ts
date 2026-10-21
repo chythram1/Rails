@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projects, settings, sprockets } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { CORE_MEMORY_MAX, editMemory } from "./harness/memory.ts";
-import { idle, isRunning, onActivity, onTyping, readableError, REQUEST_TIMEOUT_MS, RETRY_MS } from "./runs.ts";
+import { idle, isRunning, onActivity, onTyping, readableError, REQUEST_TIMEOUT_MS, RETRY_MS, textOf } from "./runs.ts";
 import { sprocketMessages } from "./db.ts";
 import { createSprocket, deleteSprocket, detachFromProject, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
 
@@ -95,6 +95,29 @@ describe("runs", () => {
     // The faux model gets the system prompt as a message of its own.
     // The last one is Rails' reminder of how to write (not saved).
     expect(seen).toEqual(["system", "user", "assistant", "toolResult: the board says: all idle", "assistant", "user", "user"]);
+  });
+
+  it("shows everything a run writes outside a project chat, and only its last text in one", async () => {
+    const look = (code: string) => fauxAssistantMessage([fauxText("Let me look."), fauxToolCall("codemode", { code })], { stopReason: "toolUse" });
+    const s = sprocket();
+    faux.setResponses([look('text("idle")'), fauxAssistantMessage("All idle.")]);
+    sendMessage(directChat(s.id), "what's going on?");
+    await idle();
+    expect(authors(s.id).at(-1)).toBe("sprocket: Let me look.\n\nAll idle.");
+
+    const p = projects.create("app", "/work/reply-" + s.id);
+    updateSettings(s.id, { projectId: p.id });
+    faux.setResponses([look('text("idle")'), fauxAssistantMessage("All idle.")]);
+    sendMessage(projectChat(s.id), "what's going on?");
+    await idle();
+    expect(listMessages(projectChat(s.id)).at(-1)?.text).toBe("All idle.");
+  });
+
+  it("drops a message's commentary when it has a final answer, as its draft", () => {
+    const block = (text: string, phase?: string) => ({ type: "text" as const, text, ...(phase ? { textSignature: JSON.stringify({ v: 1, id: "m", phase }) } : {}) });
+    expect(textOf({ content: [block("Draft answer.", "commentary"), block("Answer.", "final_answer")] })).toBe("Answer.");
+    expect(textOf({ content: [block("On it.", "commentary")] })).toBe("On it.");
+    expect(textOf({ content: [block("One."), block("Two.")] })).toBe("One.\n\nTwo.");
   });
 
   it("doesn't let a run put back the store of a project the Sprocket left while it ran", async () => {

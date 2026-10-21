@@ -366,6 +366,26 @@ export function findMentions(text: string, names: string[]): MentionSpan[] {
   return found;
 }
 
+/**
+ * The members a reply asks something by name without an @, as people do in a chat: a question that starts or ends
+ * with the name ("Pixel, what would you ship?", "Agreed, Scout?"). Models often write that rather than @Pixel.
+ */
+export function askedByName(text: string, members: { id: string; name: string }[]): string[] {
+  const found: { at: number; id: string }[] = [];
+  for (const sentence of text.matchAll(/[^.!?\n]+[.!?]*/g)) {
+    const q = sentence[0].trim();
+    if (!q.endsWith("?")) continue;
+    for (const m of members) {
+      const n = m.name.toLowerCase();
+      const lower = q.toLowerCase();
+      const opens = lower.startsWith(n) && /^[,:]/.test(q.slice(n.length));
+      const closes = lower.endsWith(`, ${n}?`);
+      if ((opens || closes) && !found.some((f) => f.id === m.id)) found.push({ at: sentence.index!, id: m.id });
+    }
+  }
+  return found.sort((a, b) => a.at - b.at).map((f) => f.id);
+}
+
 /** A session in a project and the files or folders it owns (relative to the project, ADR 0016). */
 export interface ProjectOwner {
   panelId: string;

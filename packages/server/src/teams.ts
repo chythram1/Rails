@@ -4,7 +4,7 @@
 // TEAM_TURNS_MAX turns, so Sprockets can't keep replying to each other. Runs themselves are runs.ts's: this decides
 // whose turn it is.
 import type { ClassifierQuestion } from "@earendil-works/pi-ai";
-import { TEAM_MEMBERS_MAX, TEAM_MEMBERS_MIN, TEAM_TURNS_MAX, findMentions, type SprocketTeam, type SprocketTeamInput, type SprocketMessage } from "@rails/shared";
+import { TEAM_MEMBERS_MAX, TEAM_MEMBERS_MIN, TEAM_TURNS_MAX, askedByName, findMentions, type SprocketTeam, type SprocketTeamInput, type SprocketMessage } from "@rails/shared";
 import { settings, sprocketChats, sprocketMessages, sprockets, suggestions, type StoredChat } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { findClassifier, models } from "./models.ts";
@@ -264,7 +264,7 @@ function namedAt(text: string, name: string): number {
 
 /**
  * Who a message without @ is for, by Rails' rules (no decision model, or it failed): the members it names, everyone
- * when it says so, the member who asked the user something in the last reply, else the lead.
+ * when it says so, the member who asked the user something in the last reply (not a teammate), else the lead.
  */
 export function byRules(chatId: string, text: string, members: Member[], messageId?: string): string[] {
   const named = members.filter((m) => namedAt(text, m.name) >= 0);
@@ -273,7 +273,9 @@ export function byRules(chatId: string, text: string, members: Member[], message
   const list = sprocketMessages.list(chatId).filter((m) => m.author === "user" || m.author === "sprocket");
   const end = messageId ? list.findIndex((m) => m.id === messageId) : -1;
   const last = (end >= 0 ? list.slice(0, end) : list.slice(0, -1)).at(-1);
-  if (last?.author === "sprocket" && /\?\s*$/.test(last.text) && members.some((m) => m.id === last.sprocketId)) return [last.sprocketId];
+  // A question in the last reply that isn't to a teammate was to the user, so the answer is for whoever asked.
+  const asker = last?.author === "sprocket" ? members.find((m) => m.id === last.sprocketId) : undefined;
+  if (asker && last!.text.includes("?") && !mentioned(last!.text, members.filter((m) => m !== asker)).length) return [asker.id];
   return members[0] ? [members[0].id] : [];
 }
 
@@ -303,26 +305,6 @@ function next(chatId: string): void {
   round.turns++;
   active.set(chatId, { sprocketId: who, round });
   requestReply(chatId, who);
-}
-
-/**
- * The members a reply asks something by name without an @, as people do in a chat: a question that starts or ends
- * with the name ("Pixel, what would you ship?", "Agreed, Scout?"). Models often write that rather than @Pixel.
- */
-export function askedByName(text: string, members: { id: string; name: string }[]): string[] {
-  const found: { at: number; id: string }[] = [];
-  for (const sentence of text.matchAll(/[^.!?\n]+[.!?]*/g)) {
-    const q = sentence[0].trim();
-    if (!q.endsWith("?")) continue;
-    for (const m of members) {
-      const n = m.name.toLowerCase();
-      const lower = q.toLowerCase();
-      const opens = lower.startsWith(n) && /^[,:]/.test(q.slice(n.length));
-      const closes = lower.endsWith(`, ${n}?`);
-      if ((opens || closes) && !found.some((f) => f.id === m.id)) found.push({ at: sentence.index!, id: m.id });
-    }
-  }
-  return found.sort((a, b) => a.at - b.at).map((f) => f.id);
 }
 
 // A member's turn ended: the members its reply @mentions or asks by name get theirs (unless the user wrote

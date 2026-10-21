@@ -21,7 +21,7 @@ Decisions:
     …"). The user's message is in the team's chat at once; Rails says it's `routing` while the model judges
     (at most 6 s);
   - with no decision model, or when it fails: Rails' rules. The members it names, everyone when it says so
-    ("everyone", "all of you"), the member whose last reply asked the user something, or else the lead.
+    ("everyone", "all of you"), the member whose last reply asked the user something (a question not @mentioning a teammate), or else the lead.
   The user wanted the lead to read every message and decide; the decision model does that job in a tenth of a
   second, where a run of the lead would take seconds and cost one more reply each time.
 - **Passing the turn.** A reply that @mentions other members, or asks one a question by name ("Pixel, what would
@@ -46,10 +46,17 @@ Decisions:
   models copy it, has it taken off). Only its own tool steps are replayed (ADR 0008). Its instructions name the
   team and its members (the lead marked, the start of each one's description), say how Rails picks who answers,
   to talk as one person in a group chat (its own role, not repeating the others), that only an @mention hands a
-  teammate the turn (and when to use one: asking, handing over work, a discussion the user asked for, not thanks
-  or relaying what the user already asked), and that Rails stops after 10 turns. The lead is told it takes what's
+  teammate the turn (and when to use one: asking, handing over work, a hello that expects one back, the whole
+  team by each name, a discussion the user asked for; not thanks or relaying what the user already asked), and that Rails stops after 10 turns. The lead is told it takes what's
   for the team in general and hands on what fits another member better. A Sprocket answers one chat at a time (ADR 0021), so a member
   busy elsewhere takes its turn when it's done.
+- **A reply is everything a run writes** (here and in direct chats; a project chat keeps only the text of the run's
+  last model message). Models write text between tool calls for the user to see (OpenAI's "commentary"),
+  and some call a tool with nothing in it just to start another message; showing only the last text cut replies
+  in half ("A good flow should *also* …") and lost the question that passed the turn. Each block is a paragraph,
+  so a bubble. A message that has a final answer drops its own commentary, which models write as a draft of it.
+  In a team, a reply ends with the message that hands a teammate the turn: text after that (past a tool call)
+  was the model playing out the teammate's answer, which the teammate then gives itself.
 - **Tools** are those of the member's direct chat (ADR 0021): its project's board, files and git, `project_chat`,
   its memory and, for a Coordinator, drafts for its own project's sessions, shown under its message.
 - **Where they show.** The Sprockets page lists teams first, under a "Teams" heading: the members' characters

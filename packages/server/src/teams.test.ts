@@ -1,11 +1,11 @@
 // Team chats (ADR 0022): the user and two to four Sprockets. The user's message goes to those it @mentions, else to
 // those it's for (the decision model, or Rails' rules), else the lead; a reply passes the turn on by mentioning, and
 // a round stops after TEAM_TURNS_MAX turns.
-import { fauxAssistantMessage, fauxProvider, type ClassifierContext, type ClassifierResult, type Provider, type TranscriptContext } from "@earendil-works/pi-ai";
+import { fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall, type ClassifierContext, type ClassifierResult, type Provider, type TranscriptContext } from "@earendil-works/pi-ai";
 import { beforeEach, describe, expect, it } from "vitest";
-import { TEAM_TURNS_MAX } from "@rails/shared";
+import { TEAM_TURNS_MAX, askedByName } from "@rails/shared";
 import { projects, settings, sprockets } from "./db.ts";
-import { askedByName, createTeam, deleteTeam, listTeams, mentioned, updateTeam } from "./teams.ts";
+import { createTeam, deleteTeam, listTeams, mentioned, updateTeam } from "./teams.ts";
 import { models, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
 import { clearChat, createSprocket, deleteSprocket, listMessages, sendMessage, updateSettings } from "./sprockets.ts";
@@ -142,6 +142,16 @@ describe("team chats", () => {
     expect(said(team.id).slice(-2)).toEqual(["Bo: Yes.", "Cy: Also yes."]);
   });
 
+  it("without a decision model, gives the answer to a question to the member who asked it", async () => {
+    const { team } = crew(["Ada", "Bo", "Cy"]);
+    faux.setResponses([reply("What does the app do? Any colours you like."), reply("Got it.")]);
+    sendMessage(team.id, "@Bo I need an icon idea. Ask me first.");
+    await settled();
+    sendMessage(team.id, "A habit tracker, calm colours.");
+    await settled();
+    expect(said(team.id).at(-1)).toBe("Bo: Got it.");
+  });
+
   it("passes the turn to a member a reply asks by name, as with an @mention", async () => {
     const { team } = crew();
     faux.setResponses([reply("Light first. Bo, what would you ship?"), reply("Both, small. Agreed, Ada?"), reply("Agreed.")]);
@@ -169,6 +179,18 @@ describe("team chats", () => {
     sendMessage(team.id, "Fred, try again");
     await settled();
     expect(said(team.id).slice(-3)).toEqual(["Fred: Hi @Pam and @Bobi!", "Pam: Welcome, Fred!", "Bobi: Hi Fred!"]);
+  });
+
+  it("ends a reply where it hands a teammate the turn, not where the model played out the teammate's answer", async () => {
+    const { team } = crew(["Ada", "Bo"]);
+    faux.setResponses([
+      fauxAssistantMessage([fauxText("Plan A. Bo, what do you think?"), fauxToolCall("codemode", { code: 'text("")' })], { stopReason: "toolUse" }),
+      reply("I agree, Plan A it is."),
+      reply("Plan A works for me."),
+    ]);
+    sendMessage(team.id, "Ada, talk it over with Bo.");
+    await settled();
+    expect(said(team.id).slice(1)).toEqual(["Ada: Plan A. Bo, what do you think?", "Bo: Plan A works for me."]);
   });
 
   it("drops a member's own name from the front of its reply", async () => {
