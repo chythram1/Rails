@@ -11,16 +11,17 @@ Decisions:
 - **A team** has a name and two to four Sprockets, attached to a project or not. The first is its **lead** (★).
   A Sprocket can be in any number of teams, and teams belong to no project. There can be any number of teams.
 - **Who answers.** The user's message goes to the members it's for, in the order it names them:
-  - those it @mentions ("@Doc Keeper", or the start of just one member's name, "@Doc");
-  - without a mention, those the **decision model** (ADR 0012, Settings → Models) says it's for: one yes-or-no
+  - those it names: @mentions ("@Doc Keeper", or the start of just one member's name, "@Doc") and whole names
+    without an @ ("Pixel, what colour?"). A name always counts, with a decision model or without, so naming
+    someone works the same either way (a name in passing, "what did Pixel mean?", picks Pixel too);
+  - naming no one, those the **decision model** (ADR 0012, Settings → Models) says it's for: one yes-or-no
     question per member, with the team, the last 8 messages and the new one (it's for them if it names them,
     speaks to everyone, follows up on what they said last, or asks about their role). Those at 0.6 or more
-    answer when the message asks several (names them, or everyone); otherwise only the likeliest, so two members
+    answer when the message speaks to everyone; otherwise only the likeliest, so two members
     whose roles both fit don't say the same thing. If none reach 0.6, the likeliest. A first evaluation on Jev got 14 of 16 test messages right in about 0.1 s.
-    With a mention, the model may still add members the message clearly names without one ("@Doc and Scout,
-    …"). The user's message is in the team's chat at once; Rails says it's `routing` while the model judges
+    The user's message is in the team's chat at once; Rails says it's `routing` while the model judges
     (at most 6 s);
-  - with no decision model, or when it fails: Rails' rules. The members it names, everyone when it says so
+  - with no decision model, or when it fails: Rails' rules. Everyone when it says so
     ("everyone", "all of you"), the member whose last reply asked the user something (a question not @mentioning a teammate), or else the lead.
   The user wanted the lead to read every message and decide; the decision model does that job in a tenth of a
   second, where a run of the lead would take seconds and cost one more reply each time.

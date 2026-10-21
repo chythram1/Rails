@@ -103,7 +103,7 @@ packages/
   description, whether it's its project's Coordinator; core memory stays internal) in SQLite and broadcasts `sprockets.changed`.
   Each has its direct chat, and an attached one its project's chat, where events land (ADR 0021, `sprocket_chats`;
   `GET`/`POST /api/chats/:id/messages`, `DELETE` to clear). Team chats (ADR 0022, `teams.ts`, `/api/teams`) hold two to four
-  Sprockets: the user's message goes to the members it @mentions, else to those the decision model (or Rails' rules) says it's
+  Sprockets: the user's message goes to the members it names (with an @ or without), else to those the decision model (or Rails' rules) says it's
   for, else the lead; a reply's mentions (or questions by name) pass the turn on, and a round stops after 10 turns. Replies show a
   bubble per paragraph, one after another (`bubbles.ts`). A user message (or, for a Coordinator, an event) starts a run in that chat (`runs.ts`), one chat at a time per Sprocket: a
   pi-agent-core loop on the Sprocket's model, streamed to browsers as `sprockets.typing`, capped at 12 model

@@ -134,12 +134,14 @@ describe("team chats", () => {
     sendMessage(team.id, "And the tests?");
     await settled();
     expect(said(team.id)).toEqual(["user: Can someone check the docs?", "Bo: On it.", "user: And the tests?", "Ada: Here."]);
-    // With an @mention, the mentioned answer first, and the model may add others the message is clearly for.
-    judged = () => ({ answers: { member_0: { type: "bool", probability: 0.1 }, member_1: { type: "bool", probability: 0.9 }, member_2: { type: "bool", probability: 0.8 } } });
+    // Members it names answer, with an @ or without, whatever the model would say; it isn't asked.
+    let more = 0;
+    judged = () => (more++, { answers: { member_0: { type: "bool", probability: 0.9 }, member_1: { type: "bool", probability: 0.1 }, member_2: { type: "bool", probability: 0.1 } } });
     faux.setResponses([reply("Yes."), reply("Also yes.")]);
-    sendMessage(team.id, "@Bo and Cy: ready?");
+    sendMessage(team.id, "Cy and @Bo: ready?");
     await settled();
-    expect(said(team.id).slice(-2)).toEqual(["Bo: Yes.", "Cy: Also yes."]);
+    expect(said(team.id).slice(-2)).toEqual(["Cy: Yes.", "Bo: Also yes."]);
+    expect(more).toBe(0);
   });
 
   it("without a decision model, gives the answer to a question to the member who asked it", async () => {
@@ -171,7 +173,7 @@ describe("team chats", () => {
     sendMessage(team.id, "Fred, say hello to your new team");
     await settled();
     expect(said(team.id).slice(1)).toEqual(["Fred: Hi Pam and Bobi!"]);
-    expect(asked).toBe(1); // the user's message only
+    expect(asked).toBe(0); // the user named Fred, and replies never ask it
     expect(note).toMatch(/latest message: "Fred, say hello to your new team"\. Replies since it: 0; yours is reply 1/);
     expect(note).toMatch(/Write @Name for every teammate you want an answer from/);
 

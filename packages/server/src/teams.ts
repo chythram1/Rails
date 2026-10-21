@@ -1,6 +1,6 @@
 // Team chats (ADR 0022): the user and two to four Sprockets, the first the lead. The user's message goes to the
-// members it @mentions; without a mention, to those it's for (the decision model judges, or Rails' rules), else the
-// lead. A reply that @mentions others passes the turn to them. Only the user starts a round, and a round stops after
+// members it names (with an @ or without); naming no one, to those it's for (the decision model judges, or Rails'
+// rules), else the lead. A reply that @mentions others passes the turn to them. Only the user starts a round, and a round stops after
 // TEAM_TURNS_MAX turns, so Sprockets can't keep replying to each other. Runs themselves are runs.ts's: this decides
 // whose turn it is.
 import type { ClassifierQuestion } from "@earendil-works/pi-ai";
@@ -134,7 +134,7 @@ const membersOf = (chatId: string): Member[] =>
   });
 
 /**
- * The user wrote in a team: a new round, for the members the message is for (`addressees`). Turns still waiting
+ * The user wrote in a team: a new round, for the members the message is for. Turns still waiting
  * from the last round are dropped at once; a turn going now finishes first. When the decision model is asked who
  * answers, the round starts once it says (`routing` meanwhile).
  */
@@ -147,24 +147,34 @@ export function startRound(chatId: string, text: string, messageId?: string): vo
     changed();
   };
   rounds.delete(chatId);
-  const picked = mentioned(text, members);
-  const model = routingModel();
+  // The members it names, with an @ or without, answer: the same with a decision model or without one.
+  const picked = named(text, members);
+  const model = picked.length ? undefined : routingModel();
   if (!model) {
     routing.delete(chatId);
     return begin(picked.length ? picked : byRules(chatId, text, members, messageId));
   }
-  // Those it @mentions answer; the model may add others it's clearly for too ("@Doc and Scout, …").
   const n = ++routes;
   routing.set(chatId, n);
   changed();
-  void byModel(model, chatId, text, members, messageId, !picked.length)
+  void byModel(model, chatId, text, members, messageId)
     .catch((e) => (console.error("teams: routing:", e), undefined))
     .then((judged) => {
       if (routing.get(chatId) !== n) return; // the user wrote again, or the chat was cleared
       routing.delete(chatId);
-      if (picked.length) begin([...new Set([...picked, ...byNaming(text, members.filter((m) => judged?.includes(m.id) && !picked.includes(m.id)))])]);
-      else begin(judged ?? byRules(chatId, text, members, messageId));
+      begin(judged ?? byRules(chatId, text, members, messageId));
     });
+}
+
+/** The members `text` names, by @mention ("@Doc") or by their whole name ("Doc Keeper, …"), in the order it does. */
+export function named(text: string, members: { id: string; name: string }[]): string[] {
+  const at = new Map<string, number>();
+  for (const f of findMentions(text, members.map((m) => m.name))) if (!at.has(members[f.member].id)) at.set(members[f.member].id, f.start);
+  for (const m of members) {
+    const i = namedAt(text, m.name);
+    if (i >= 0 && !(at.get(m.id)! <= i)) at.set(m.id, i);
+  }
+  return [...at].sort((a, b) => a[1] - b[1]).map(([id]) => id);
 }
 
 /** The decision model, if the user picked one (Settings → Models): it says who a message without @ is for. */
@@ -200,7 +210,7 @@ const ROUTE_BAR = 0.6;
 
 /**
  * Who the decision model says the message is for: each member is a yes-or-no question, and those it's sure enough
- * of answer (in the order the message names them, else the team's); if none, the likeliest (with `likeliest`).
+ * of answer (in the team's order); if none, the likeliest. For a message that names no one.
  * Undefined when it fails or is slow.
  */
 export async function byModel(
@@ -209,7 +219,6 @@ export async function byModel(
   text: string,
   members: Member[],
   messageId: string | undefined,
-  likeliest = true,
 ): Promise<string[] | undefined> {
   const questions: Record<string, ClassifierQuestion> = {};
   members.forEach((m, i) => {
@@ -235,21 +244,12 @@ export async function byModel(
     return { id: m.id, name: m.name, p: a?.type === "bool" ? a.probability : 0 };
   });
   const yes = p.filter((x) => x.p >= ROUTE_BAR).sort((a, b) => b.p - a.p);
-  if (!yes.length) return !likeliest ? [] : p.some((x) => x.p > 0) ? [p.reduce((a, b) => (b.p > a.p ? b : a)).id] : undefined;
-  // Several answer only when the message asks several: it names them, or speaks to everyone. Otherwise two members
-  // whose roles both fit ("what's one risk?") would say the same thing: the likeliest answers.
-  const several = members.filter((m) => namedAt(text, m.name) >= 0).length > 1 || EVERYONE.test(text) || yes.length === members.length;
-  // In the order the message names them, else the team's (the lead first).
-  return byNaming(text, several ? members.filter((m) => yes.some((y) => y.id === m.id)) : yes.slice(0, 1));
-}
-
-/** `picked` in the order `text` names them (those it doesn't name keep theirs, after). */
-function byNaming(text: string, picked: { id: string; name: string }[]): string[] {
-  const at = (name: string) => {
-    const i = namedAt(text, name);
-    return i < 0 ? Infinity : i;
-  };
-  return [...picked].sort((a, b) => at(a.name) - at(b.name)).map((m) => m.id);
+  if (!yes.length) return p.some((x) => x.p > 0) ? [p.reduce((a, b) => (b.p > a.p ? b : a)).id] : undefined;
+  // Several answer only when the message speaks to everyone. Otherwise two members whose roles both fit ("what's
+  // one risk?") would say the same thing: the likeliest answers.
+  const several = EVERYONE.test(text) || yes.length === members.length;
+  // In the team's order, the lead first.
+  return several ? members.filter((m) => yes.some((y) => y.id === m.id)).map((m) => m.id) : [yes[0].id];
 }
 
 /** Where `text` names `name` as a whole word (any case), or -1. */
@@ -263,12 +263,10 @@ function namedAt(text: string, name: string): number {
 }
 
 /**
- * Who a message without @ is for, by Rails' rules (no decision model, or it failed): the members it names, everyone
- * when it says so, the member who asked the user something in the last reply (not a teammate), else the lead.
+ * Who a message that names no one is for, by Rails' rules (no decision model, or it failed): everyone when it says
+ * so, the member who asked the user something in the last reply (not a teammate), else the lead.
  */
 export function byRules(chatId: string, text: string, members: Member[], messageId?: string): string[] {
-  const named = members.filter((m) => namedAt(text, m.name) >= 0);
-  if (named.length) return byNaming(text, named);
   if (EVERYONE.test(text)) return members.map((m) => m.id);
   const list = sprocketMessages.list(chatId).filter((m) => m.author === "user" || m.author === "sprocket");
   const end = messageId ? list.findIndex((m) => m.id === messageId) : -1;
