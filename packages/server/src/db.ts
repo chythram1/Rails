@@ -253,7 +253,6 @@ const toPanel = (r: PanelRow): Panel => ({
   title: r.title,
   ...(r.profile ? { profile: JSON.parse(r.profile) as PanelProfile } : {}),
   createdAt: r.created_at,
-  ...(r.profile ? { profile: JSON.parse(r.profile) } : {}),
 });
 
 export const panels = {

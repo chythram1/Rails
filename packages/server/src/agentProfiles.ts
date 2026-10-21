@@ -37,6 +37,9 @@ const bad = (message: string) => new ServiceError(message, 400);
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
+/** A model name: no spaces, and never something that reads as another flag. */
+const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:@/[\]-]{0,99}$/;
+
 function parseSkills(raw: unknown): SkillRef[] {
   if (!Array.isArray(raw)) return [];
   const out: SkillRef[] = [];
@@ -118,7 +121,7 @@ function parseInput(body: Record<string, unknown>, selfId?: string): AgentProfil
   if ((body.provider ?? "claude") !== "claude") throw bad("Agent profiles are for Claude Code for now.");
   const model = str(body.model).trim();
   // No spaces, and never something that reads as another flag.
-  if (model && !/^[A-Za-z0-9][A-Za-z0-9._:@/[\]-]{0,99}$/.test(model)) throw bad("That doesn't look like a model name, like opus or claude-sonnet-5-5.");
+  if (model && !MODEL.test(model)) throw bad("That doesn't look like a model name, like opus or claude-sonnet-5-5.");
   const effort = str(body.effort);
   if (effort && !(EFFORTS as readonly string[]).includes(effort)) throw bad("Unknown effort level.");
   const permissionMode = str(body.permissionMode);
@@ -153,14 +156,42 @@ function keepOneDefault(p: AgentProfile): void {
   }
 }
 
+/**
+ * A stored profile with anything that no longer passes the checks dropped (a row saved by an older version, or
+ * moved over from the earlier local shape), so a bad value never reaches Claude Code's command line.
+ */
+function checked(p: AgentProfile): AgentProfile {
+  const ok = <T>(parse: () => T): T | undefined => {
+    try {
+      return parse();
+    } catch {
+      return undefined;
+    }
+  };
+  const tools = (list: unknown) => (Array.isArray(list) ? list.filter((t) => ok(() => parseTools([t]))?.length === 1) : []);
+  const servers = (Array.isArray(p.mcpServers) ? p.mcpServers : []).flatMap((s) => ok(() => parseServers([s])) ?? []);
+  return {
+    ...p,
+    model: typeof p.model === "string" && (!p.model || MODEL.test(p.model)) ? p.model : "",
+    effort: (EFFORTS as readonly string[]).includes(p.effort) ? p.effort : "",
+    permissionMode: (PERMISSION_MODES as readonly string[]).includes(p.permissionMode) ? p.permissionMode : "",
+    instructions: str(p.instructions).slice(0, AGENT_PROFILE_INSTRUCTIONS_MAX),
+    skills: (Array.isArray(p.skills) ? p.skills : []).flatMap((s) => ok(() => parseSkills([s])) ?? []),
+    allowedTools: tools(p.allowedTools),
+    disallowedTools: tools(p.disallowedTools),
+    mcpServers: servers.filter((s, i) => servers.findIndex((o) => o.name === s.name) === i),
+    mcpOnly: p.mcpOnly === true,
+  };
+}
+
 export function listAgentProfiles(): AgentProfile[] {
-  return agentProfiles.list();
+  return agentProfiles.list().map(checked);
 }
 
 export function getAgentProfile(id: string): AgentProfile {
   const p = agentProfiles.get(id);
   if (!p) throw new ServiceError("Agent profile not found", 404);
-  return p;
+  return checked(p);
 }
 
 /** A new profile. Without a name it's called "New agent profile" (numbered when that's taken). */
@@ -237,8 +268,8 @@ export function launchProfile(kind: PanelKind, profileId: string | undefined, se
   }
   const started = sessionId && agentProfiles.forSession(sessionId);
   const p = started ? agentProfiles.get(started) : undefined;
-  if (p?.provider === kind) return p;
-  return agentProfiles.list().find((d) => d.provider === kind && d.isDefault);
+  if (p?.provider === kind) return checked(p);
+  return listAgentProfiles().find((d) => d.provider === kind && d.isDefault);
 }
 
 const pluginDir = (panelId: string) => join(PANEL_PLUGINS_DIR, panelId);
@@ -261,7 +292,14 @@ export async function profileFlags(profile: AgentProfile, panelId: string, proje
   // Each pattern is its own argument (patterns can have spaces); the next flag ends the list.
   if (profile.allowedTools.length) argv.push("--allowedTools", ...profile.allowedTools);
   if (profile.disallowedTools.length) argv.push("--disallowedTools", ...profile.disallowedTools);
-  if (profile.mcpServers.length || profile.mcpOnly) argv.push("--mcp-config", mcpConfig(profile.mcpServers));
+  if (profile.mcpServers.length || profile.mcpOnly) {
+    // In a file only the user can read, not on the command line: its env and headers may hold secrets, and a
+    // command line shows in `ps` and in tmux. The panel's folder goes when the panel closes.
+    const file = join(pluginDir(panelId), "mcp.json");
+    await mkdir(pluginDir(panelId), { recursive: true });
+    await writeFile(file, mcpConfig(profile.mcpServers), { mode: 0o600 });
+    argv.push("--mcp-config", file);
+  }
   if (profile.mcpOnly) argv.push("--strict-mcp-config");
 
   const missingSkills: SkillRef[] = [];

@@ -10,8 +10,10 @@ starts with; a saved prompt is a message the user starts agents with.
 Decisions:
 - **Flags only.** A profile becomes command-line flags when Rails starts the agent, after the bridge's own
   (ADR 0007), each value its own argv entry, so nothing is shell-quoted. Rails never writes the user's or the
-  project's agent settings. For Claude Code: `--model`, `--effort`, `--permission-mode`, `--append-system-prompt`, `--allowedTools` / `--disallowedTools`, `--mcp-config <json>`
-  (with `--strict-mcp-config` for "Only these servers") and `--plugin-dir` for skills. The bridge keeps `--settings`
+  project's agent settings. For Claude Code: `--model`, `--effort`, `--permission-mode`, `--append-system-prompt`, `--allowedTools` / `--disallowedTools`, `--mcp-config <file>`
+  (with `--strict-mcp-config` for "Only these servers") and `--plugin-dir` for skills. The MCP config is written to
+  `mcp.json` (mode 0600) in the panel's own folder rather than passed inline: its env and headers may hold secrets,
+  and a command line shows in `ps` and in tmux. The bridge keeps `--settings`
   to itself, so nothing is merged.
 - **Skills come from a plugin folder per panel.** At start, Rails writes `RAILS_HOME/panel-plugins/<panelId>/`: a
   `.claude-plugin/plugin.json` and `skills/<name>` links to each chosen skill's folder. Claude Code lists them as

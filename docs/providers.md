@@ -28,7 +28,7 @@ only reads transcripts for discovery (cwd, title, dates); the agents' TUIs rende
 - Agent profile flags (checked with 2.1.304, ADR 0020): `--model`, `--effort` (`low`, `medium`, `high`, `xhigh`,
   `max`; checked with 2.1.306), `--permission-mode`, `--append-system-prompt`,
   `--allowedTools` / `--disallowedTools` (one argument per pattern; the next flag ends the list), `--mcp-config '<json>'`
-  (inline JSON works; its servers show as `source: "dynamic"`; `--strict-mcp-config` leaves out every other server,
+  (inline JSON works, and so does a file path, which Rails uses for profiles to keep secrets off the command line; its servers show as `source: "dynamic"`; `--strict-mcp-config` leaves out every other server,
   claude.ai connectors included) and `--plugin-dir <dir>` all combine with the bridge's `--mcp-config` and `--settings`; a second `--mcp-config` adds its servers to the first one's (checked with 2.1.306), and `--strict-mcp-config` keeps both. A plugin folder
   needs only `.claude-plugin/plugin.json` (`{"name": …}`) and `skills/<name>/SKILL.md`; symlinked skill folders load,
   named `<plugin>:<name>`. On `--resume`, the model, permission mode, tools, MCP servers and plugins follow the new

@@ -82,7 +82,7 @@ packages/
 - **Agent profiles** (ADR 0020, `agentProfiles.ts`): saved ways to start Claude Code, made in Customize and
   stored in SQLite (`agent_profiles`). `openPanel` adds the profile's flags after the bridge's (the one in
   `agentProfileId`, else the session's own, else the agent's default; `launchProfile()`): `--model`, `--effort`, `--permission-mode`, `--append-system-prompt`, `--allowedTools` / `--disallowedTools`,
-  `--mcp-config <json>` (`--strict-mcp-config` for "Only these servers") and `--plugin-dir` for skills. The
+  `--mcp-config <file>` (a 0600 `mcp.json` in the panel's folder; `--strict-mcp-config` for "Only these servers") and `--plugin-dir` for skills. The
   plugin folder is made per panel (`RAILS_HOME/panel-plugins/<panelId>`: a `plugin.json` and links to each
   skill's folder, `rails:<name>` in Claude Code) and deleted with the panel. `session_profiles` remembers which
   profile started a session, so resuming it reapplies that profile. A panel keeps a copy of its profile's name,

@@ -1,4 +1,6 @@
+import { readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { agentProfiles } from "./db.ts";
 import { createAgentProfile, deleteAgentProfile, duplicateAgentProfile, getAgentProfile, launchProfile, listAgentProfiles, profileFlags, updateAgentProfile } from "./agentProfiles.ts";
 
 describe("agent profiles", () => {
@@ -88,9 +90,26 @@ describe("agent profiles", () => {
       ],
     });
     const { argv } = await profileFlags(p, "panel-1", "/work/x");
-    const config = JSON.parse(argv[argv.indexOf("--mcp-config") + 1]);
+    // The config is a file only the user can read: env and headers may hold secrets, and argv shows in ps and tmux.
+    const file = argv[argv.indexOf("--mcp-config") + 1];
+    expect(file).toMatch(/panel-1\/mcp\.json$/);
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+    expect(argv.join(" ")).not.toContain("Bearer x");
+    const config = JSON.parse(readFileSync(file, "utf8"));
     expect(config.mcpServers.files).toEqual({ type: "stdio", command: "npx", args: ["server"], env: { TOKEN: "${TOKEN}" } });
     expect(config.mcpServers.docs).toEqual({ type: "http", url: "https://example.com/mcp", headers: { Authorization: "Bearer x" } });
     expect(argv).toContain("--strict-mcp-config");
+  });
+
+  it("drops stored values that no longer pass the checks, so they never reach the command line", async () => {
+    const p = createAgentProfile({ name: "Old row", model: "opus", allowedTools: ["Edit"] });
+    // A row as an older version (or the earlier local shape) may have left it, written past the service's checks.
+    const { id, createdAt: _c, updatedAt: _u, ...rest } = p;
+    agentProfiles.update(id, { ...rest, model: "--dangerously-skip-permissions", effort: "huge" as any, allowedTools: ["Edit", "-x", "Bash(git *)"], mcpServers: [{ name: "bad name!", type: "stdio", command: "x" }] });
+    const read = getAgentProfile(id);
+    expect(read).toMatchObject({ model: "", effort: "", allowedTools: ["Edit", "Bash(git *)"], mcpServers: [] });
+    expect(listAgentProfiles().find((x) => x.id === id)?.model).toBe("");
+    const { argv } = await profileFlags(read, "panel-old", "/work/x");
+    expect(argv).not.toContain("--dangerously-skip-permissions");
   });
 });
