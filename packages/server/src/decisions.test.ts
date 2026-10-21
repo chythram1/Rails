@@ -2,7 +2,7 @@ import { fauxAssistantMessage, fauxProvider, type ClassifierContext, type Classi
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { receive } from "./bridge/index.ts";
 import { panels, projects, settings, sprockets } from "./db.ts";
-import { ACT_ASKS, ACT_QUESTION, decisionLog, settled, setDecisionModel, startDecisions, toJudge, wakeFor } from "./decisions.ts";
+import { ACT_ASKS, ACT_QUESTION, decisionLog, settled, setDecisionModel, setDecisionThreshold, startDecisions, toJudge, wakeFor } from "./decisions.ts";
 import { models, modelSettings, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
 import { createSprocket, listMessages, updateSettings } from "./sprockets.ts";
@@ -170,6 +170,24 @@ describe("the decision model waking the Coordinator (ADR 0013)", () => {
     expect(wakeFor(dialog("Pick a deploy target"), { label: "question", probability: ACT_QUESTION }, "d2")).toEqual({ what: "question", text: "Pick a deploy target", decisionId: "d2" });
     expect(wakeFor(dialog("Approve write to a.txt?"), { label: "approval", probability: 1 }, "d2")).toBeUndefined();
     expect(wakeFor(dialog("Pick a deploy target"), { label: "question", probability: 0.9 }, "d2")).toBeUndefined();
+  });
+
+  it("acts at the threshold the user set, a dialog 5 points higher", async () => {
+    const missed = turnEnd("Curious what you make of the new name.");
+    try {
+      setDecisionThreshold(0.8);
+      expect(wakeFor(missed, { label: "asks", probability: 0.8 }, "d1")).toBeDefined();
+      expect(wakeFor(missed, { label: "asks", probability: 0.79 }, "d1")).toBeUndefined();
+      expect(wakeFor(dialog("Pick a deploy target"), { label: "question", probability: 0.85 }, "d2")).toBeDefined();
+      expect(wakeFor(dialog("Pick a deploy target"), { label: "question", probability: 0.84 }, "d2")).toBeUndefined();
+      setDecisionThreshold(0.97); // a dialog's bar stops at 0.99
+      expect(wakeFor(dialog("Pick a deploy target"), { label: "question", probability: 0.99 }, "d2")).toBeDefined();
+      expect((await modelSettings()).decisionThreshold).toBe(0.97);
+      for (const bad of [0.4, 1, "0.9", NaN, null]) expect(() => setDecisionThreshold(bad)).toThrow(/from 0\.5 to 0\.99/);
+    } finally {
+      settings.set("decisionThreshold", null);
+    }
+    expect((await modelSettings()).decisionThreshold).toBe(ACT_ASKS); // the default
   });
 
   it("wakes the Coordinator for a question the rules missed, when it's allowed to", async () => {

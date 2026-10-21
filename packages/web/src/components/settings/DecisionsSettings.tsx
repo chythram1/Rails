@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { IconChevronRight as ChevronRight } from "@tabler/icons-react";
-import type { DecisionEntry, DecisionLog, ModelSettings } from "@rails/shared";
+import { DECISION_THRESHOLD, type DecisionEntry, type DecisionLog, type ModelSettings } from "@rails/shared";
 import { api } from "../../api.ts";
 import { timeAgo } from "../../util.ts";
 import { socket } from "../../ws.ts";
@@ -9,9 +9,10 @@ import { PanelIcon } from "../PanelMenu.tsx";
 import { useOpenSettings } from "./context.ts";
 
 /**
- * Settings → Models → Fast decisions (ADR 0012, 0013): one picker. A decision model, once picked, hears the
- * questions Rails' rules miss and wakes the Coordinator for them; Off turns it off. What it decided is under a
- * collapsed "Recent decisions", for when a wake needs explaining. (`RAILS_DECISIONS=shadow`, a developer setting,
+ * Settings → Models → Fast decisions (ADR 0012, 0013): a picker and a threshold. A decision model, once picked, hears
+ * the questions Rails' rules miss and wakes the Coordinator for them when it's at least as sure as the threshold;
+ * Off turns it off (the threshold stays, greyed out). What it decided is under a collapsed "Recent decisions", for
+ * when a wake needs explaining. (`RAILS_DECISIONS=shadow`, a developer setting,
  * keeps it to judging, to evaluate a model.)
  */
 export function DecisionsSettings({ settings }: { settings: ModelSettings }) {
@@ -51,7 +52,7 @@ export function DecisionsSettings({ settings }: { settings: ModelSettings }) {
                 )
               : settings.decisionsInShadow
                 ? "Judging only (RAILS_DECISIONS=shadow): it doesn't wake anyone."
-                : "Wakes the Coordinator when it's sure: 90% for a reply, 95% for a dialog."}
+                : "Wakes the Coordinator when it's at least as sure as the threshold below."}
           </p>
         </div>
         <Dropdown
@@ -62,9 +63,68 @@ export function DecisionsSettings({ settings }: { settings: ModelSettings }) {
           onChange={(v) => void pick(v)}
         />
       </div>
+      <ThresholdRow value={settings.decisionThreshold} disabled={!settings.decisionModel} onError={setError} />
       {error && <p className="error" role="alert">{error}</p>}
       {settings.decisionModel && <RecentDecisions />}
     </section>
+  );
+}
+
+/** How risky a threshold is, from the model's evaluation: below `caution` it starts waking for messages that ask nothing. */
+export const thresholdRisk = (t: number): "safe" | "caution" | "danger" =>
+  t < DECISION_THRESHOLD.danger ? "danger" : t < DECISION_THRESHOLD.caution ? "caution" : "safe";
+
+/**
+ * How sure the decision model must be to wake the Coordinator (ADR 0013): a slider in percent, its track and thumb
+ * green while it's safe, amber when it gets low and red when it's low enough to wake the Coordinator often for
+ * nothing (screen readers hear that in the value). A small tick marks the default. Saved a moment after it stops
+ * moving. With the decision model off it stays, disabled.
+ */
+function ThresholdRow({ value, disabled, onError }: { value: number; disabled: boolean; onError(e: string): void }) {
+  const { min, max, dialogMargin } = DECISION_THRESHOLD;
+  const [pct, setPct] = useState(Math.round(value * 100));
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const moving = useRef(false);
+  useEffect(() => {
+    if (!moving.current) setPct(Math.round(value * 100));
+  }, [value]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const change = (next: number) => {
+    setPct(next);
+    moving.current = true;
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      moving.current = false;
+      api.setDecisionThreshold(next / 100).then(() => onError(""), (e: Error) => onError(e.message));
+    }, 400);
+  };
+  const risk = thresholdRisk(pct / 100);
+  const at = (p: number) => (p - min * 100) / ((max - min) * 100);
+  const spoken = `${pct}%${risk === "danger" ? ", low: it will often wake the Coordinator for messages that ask nothing" : risk === "caution" ? ", getting low: it may wake the Coordinator for messages that ask nothing" : ""}`;
+  return (
+    <div className="set-row" id="setting-decision-threshold" data-settings-row tabIndex={-1}>
+      <div className="set-text">
+        <label htmlFor="decision-threshold">Wake threshold</label>
+        <p>How sure it must be to wake the Coordinator for a reply. A dialog needs {Math.round(dialogMargin * 100)} points more.</p>
+      </div>
+      <div className={`threshold ${disabled ? "off" : risk}`} style={{ "--at": at(pct), "--default": at(DECISION_THRESHOLD.default * 100) } as CSSProperties}>
+        <span className="threshold-track">
+          <span className="threshold-default" aria-hidden />
+          <input
+            id="decision-threshold"
+            type="range"
+            min={min * 100}
+            max={max * 100}
+            step={1}
+            value={pct}
+            disabled={disabled}
+            aria-valuetext={spoken}
+            onChange={(e) => change(Number(e.target.value))}
+          />
+        </span>
+        <output htmlFor="decision-threshold" className="threshold-value" aria-hidden>{pct}%</output>
+      </div>
+    </div>
   );
 }
 

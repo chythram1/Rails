@@ -19,6 +19,9 @@ Decisions:
   costs the user's time, a needless wake one run that ends "nothing needed".
 - **High bars on purpose.** On the evaluation, 0.9 would have caught three of the four questions the rules missed
   (the fourth scored 0.81) with no false wake; the bars come down only if the shadow log shows they can.
+  Changed 2026-10-21: the user can move the reply's bar themselves (Settings → Models, "Wake threshold", a slider
+  from 50% to 99%, default 90%); a dialog's bar stays 5 points above it, at most 99%. The slider turns amber below
+  85% and red below 80%, since messages that asked nothing scored up to 0.78.
 - **The usual watch rules apply:** the grace period, the cooldown, one wake per wait. A judgment the session has
   moved on from (it reported anything since) wakes nothing.
 - **It shows.** The event says the decision model caught it, and the Coordinator is told to check it ("if it

@@ -32,7 +32,7 @@ import { cancelHandoff, startHandoffs } from "./handoffs.ts";
 import { clearOwner, startOwners } from "./owners.ts";
 import { startShellEdits } from "./shellEdits.ts";
 import { dismissSuggestion, sendSuggestion, startSuggestions } from "./suggestions.ts";
-import { decisionLog, setDecisionModel, startDecisions } from "./decisions.ts";
+import { decisionLog, setDecisionModel, setDecisionThreshold, startDecisions } from "./decisions.ts";
 import { version as tmuxVersion } from "./tmux.ts";
 import { sameSecret } from "./util.ts";
 
@@ -203,6 +203,10 @@ app.get("/api/projects/:id/git/diff", async (c) =>
 app.get("/api/models", async (c) => c.json(await modelSettings()));
 app.put("/api/models/decisions", async (c) => {
   await setDecisionModel((await c.req.json<{ model?: unknown }>()).model ?? null);
+  return c.json({ ok: true });
+});
+app.put("/api/models/decisions/threshold", async (c) => {
+  setDecisionThreshold((await c.req.json<{ threshold?: unknown }>()).threshold);
   return c.json({ ok: true });
 });
 app.get("/api/decisions", (c) => c.json(decisionLog()));

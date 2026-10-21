@@ -406,7 +406,16 @@ export interface ModelSettings {
    * wake the Coordinator where it's sure and Rails' rules weren't (ADR 0013).
    */
   decisionsInShadow: boolean;
+  /** How sure the decision model must be to wake the Coordinator for a reply (ADR 0013); a dialog takes DECISION_THRESHOLD.dialogMargin more. */
+  decisionThreshold: number;
 }
+
+/**
+ * The decision model's threshold (ADR 0013), which the user sets in Settings → Models. From its evaluation:
+ * messages that asked nothing scored up to 0.78, so below `caution` it starts waking the Coordinator for them,
+ * and below `danger` it will often.
+ */
+export const DECISION_THRESHOLD = { min: 0.5, max: 0.99, default: 0.9, dialogMargin: 0.05, caution: 0.85, danger: 0.8 } as const;
 
 /**
  * One shadow judgment (ADR 0012): what Rails decided in code about a session's moment, and what the fast

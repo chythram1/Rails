@@ -12,14 +12,14 @@
 //   thought didn't ask (ACT_ASKS), a dialog it calls a question (ACT_QUESTION). It only adds wakes, never cancels
 //   one, and not if the session moved on while it was asked. `RAILS_DECISIONS=shadow` keeps it to judging.
 import type { ClassifierAnswer, ClassifierContext, ClassifierQuestion } from "@earendil-works/pi-ai";
-import type { DecisionEntry, DecisionLog, Panel } from "@rails/shared";
+import { DECISION_THRESHOLD, type DecisionEntry, type DecisionLog, type Panel } from "@rails/shared";
 import { AGENT } from "./bridge/board.ts";
 import { ASKING, type SessionEvent } from "./bridge/events.ts";
 import { onEvents } from "./bridge/index.ts";
 import { decisions, settings, sprockets } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { decisionsInShadow } from "./config.ts";
-import { classifierChoices, findClassifier, models, modelsChanged } from "./models.ts";
+import { classifierChoices, decisionThreshold, findClassifier, models, modelsChanged } from "./models.ts";
 import { listeners } from "./util.ts";
 import { sessionTitle } from "./titles.ts";
 import { eventPosition, looksLikeQuestion, onWake, wakeFromModel, type Wake } from "./watches.ts";
@@ -32,13 +32,20 @@ const MAX_PER_MINUTE = 20;
 /** Judgments shown in the log. */
 const SHOWN = 50;
 /**
- * How sure it has to be to wake the Coordinator itself (ADR 0013). From the first evaluation (scratch/research/
+ * How sure it has to be to wake the Coordinator itself (ADR 0013), by default. From the first evaluation (scratch/research/
  * system-one/eval): real questions scored 0.81–0.99, non-questions at most 0.78; dialogs it called questions
  * scored 0.95 and up, approvals 1.0 as approvals. Missing a wake costs the user's time and a false one only a run,
- * but trust comes first: high bars, revisited from the shadow log.
+ * but trust comes first: high bars, revisited from the shadow log. The user can move the reply's bar (Settings →
+ * Models, `decisionThreshold`); a dialog's stays DECISION_THRESHOLD.dialogMargin above it.
  */
-export const ACT_ASKS = 0.9;
-export const ACT_QUESTION = 0.95;
+export const ACT_ASKS = DECISION_THRESHOLD.default;
+export const ACT_QUESTION = Math.round((DECISION_THRESHOLD.default + DECISION_THRESHOLD.dialogMargin) * 100) / 100;
+
+/** The bars now: the user's threshold for a reply, and a dialog's above it (at most the threshold's maximum). */
+function bars(): { asks: number; question: number } {
+  const asks = decisionThreshold();
+  return { asks, question: Math.min(DECISION_THRESHOLD.max, Math.round((asks + DECISION_THRESHOLD.dialogMargin) * 100) / 100) };
+}
 /** How much of a message's end an event keeps (as watches.ts). */
 const EVENT_TAIL = 600;
 
@@ -135,11 +142,12 @@ async function judge(panel: Panel, item: NonNullable<ReturnType<typeof toJudge>>
 /** The wake a judgment calls for when the model may act: only where the rules didn't wake, only when it's sure. */
 export function wakeFor(item: NonNullable<ReturnType<typeof toJudge>>, answer: DecisionEntry["answer"], decisionId: string): Wake | undefined {
   if (!answer) return undefined;
-  if (item.question === "turn_end" && item.rails !== "asks" && answer.label === "asks" && answer.probability >= ACT_ASKS) {
+  const bar = bars();
+  if (item.question === "turn_end" && item.rails !== "asks" && answer.label === "asks" && answer.probability >= bar.asks) {
     const text = item.text.length > EVENT_TAIL ? "…" + item.text.slice(-EVENT_TAIL) : item.text;
     return { what: "turn_end", text, decisionId };
   }
-  if (item.question === "dialog" && answer.label === "question" && answer.probability >= ACT_QUESTION) return { what: "question", text: item.text, decisionId };
+  if (item.question === "dialog" && answer.label === "question" && answer.probability >= bar.question) return { what: "question", text: item.text, decisionId };
 }
 
 /** Resolves once every judgment in flight has its answer (for tests). */
@@ -174,6 +182,15 @@ export function startDecisions(): void {
 export async function setDecisionModel(raw: unknown): Promise<void> {
   if (raw !== null && (typeof raw !== "string" || !(await classifierChoices()).some((c) => c.ref === raw))) throw new ServiceError("Unknown decision model", 400);
   settings.set("decisionModel", raw);
+  modelsChanged();
+  changes.emit();
+}
+
+/** Set how sure the decision model must be to wake the Coordinator for a reply (from 0.5 to 0.99, to the hundredth). */
+export function setDecisionThreshold(raw: unknown): void {
+  const { min, max } = DECISION_THRESHOLD;
+  if (typeof raw !== "number" || !(raw >= min && raw <= max)) throw new ServiceError(`The threshold is a number from ${min} to ${max}.`, 400);
+  settings.set("decisionThreshold", String(Math.round(raw * 100) / 100));
   modelsChanged();
   changes.emit();
 }

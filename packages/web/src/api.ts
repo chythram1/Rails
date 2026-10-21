@@ -100,6 +100,7 @@ export const api = {
   models: () => req<ModelSettings>("/api/models"),
   setDefaultModel: (model: string | null) => req("/api/models/default", { method: "PUT", body: JSON.stringify({ model }) }),
   setDecisionModel: (model: string | null) => req("/api/models/decisions", { method: "PUT", body: JSON.stringify({ model }) }),
+  setDecisionThreshold: (threshold: number) => req("/api/models/decisions/threshold", { method: "PUT", body: JSON.stringify({ threshold }) }),
   decisions: () => req<DecisionLog>("/api/decisions"),
   /** Saves a key the provider accepted; `note` when it couldn't be checked. Refused keys come back as errors. */
   setProviderKey: (id: string, key: string) => req<{ note?: string }>(`/api/models/providers/${enc(id)}/key`, { method: "PUT", body: JSON.stringify({ key }) }),

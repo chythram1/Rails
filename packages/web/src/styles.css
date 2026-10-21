@@ -442,6 +442,34 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .set-text p { margin: 0; color: var(--muted); font-size: 13px; text-wrap: pretty; }
 .set-row > :is(.dropdown, .input) { width: min(300px, 50%); flex-shrink: 0; }
 .set-row > .btn { flex-shrink: 0; }
+/* The decision model's threshold (DecisionsSettings.tsx): a 4px track filled up to a square thumb, in the state colour
+   of how risky the value is (green, amber, red), a tick at the default, and the value in percent. Greyed out while
+   the decision model is off. --at and --default are 0–1 along the track. */
+.threshold { --tone: var(--green); display: flex; align-items: center; gap: 12px; width: min(300px, 50%); flex-shrink: 0; }
+.threshold.caution { --tone: var(--amber); }
+.threshold.danger { --tone: var(--red); }
+.threshold.off { --tone: var(--idle); }
+.threshold-track { position: relative; flex: 1; display: flex; align-items: center; height: 24px; }
+.threshold input[type="range"] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 24px; margin: 0; background: none; cursor: pointer;
+}
+.threshold input[type="range"]:disabled { cursor: not-allowed; }
+.threshold input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px; background: linear-gradient(to right, var(--tone) calc(7px + (100% - 14px) * var(--at)), var(--border-strong) 0);
+}
+.threshold input[type="range"]::-moz-range-track { height: 4px; background: var(--border-strong); }
+.threshold input[type="range"]::-moz-range-progress { height: 4px; background: var(--tone); }
+.threshold input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 14px; height: 14px; margin-top: -5px;
+  border: 2px solid var(--tone); background: var(--surface); box-sizing: border-box;
+}
+.threshold input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border: 2px solid var(--tone); border-radius: 0; background: var(--surface); box-sizing: border-box; }
+.threshold input[type="range"]:focus-visible { outline: none; }
+.threshold input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.threshold input[type="range"]:focus-visible::-moz-range-thumb { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.threshold-default { position: absolute; top: 4px; bottom: 4px; width: 1px; left: calc(7px + (100% - 14px) * var(--default)); background: var(--muted); pointer-events: none; }
+.threshold-value { min-width: 4ch; text-align: right; font: 13px var(--mono); font-variant-numeric: tabular-nums; color: var(--text-2); }
+.threshold.off .threshold-value { color: var(--muted); }
 .set-facts { margin: 0; }
 .set-facts dt { font-size: 14px; }
 .set-facts dd { margin: 0; font-size: 14px; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
@@ -1110,7 +1138,7 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
   .settings-panel-body { padding: 20px 16px 24px; gap: 32px; }
   .settings-title { font-size: 24px; }
   .set-row { flex-wrap: wrap; gap: 10px 24px; }
-  .set-row > :is(.dropdown, .input) { width: 100%; }
+  .set-row > :is(.dropdown, .input, .threshold) { width: 100%; }
   .avatar-grid { grid-template-columns: repeat(4, 52px); }
 }
 @media (prefers-reduced-motion: reduce) {
