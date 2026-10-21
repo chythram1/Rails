@@ -29,6 +29,9 @@ describe("agent profiles", () => {
     expect(() => createAgentProfile({ name: "P2", permissionMode: "yolo" })).toThrow("Unknown permission mode");
     expect(() => createAgentProfile({ name: "P2b", effort: "huge" })).toThrow("Unknown effort level");
     expect(() => createAgentProfile({ name: "P3", model: "opus; rm -rf" })).toThrow("model name");
+    expect(() => createAgentProfile({ name: "P3b", model: "--dangerously-skip-permissions" })).toThrow("model name");
+    expect(createAgentProfile({ name: "P3c", model: "us.anthropic.claude-sonnet-5-5@v1/x" }).model).toBe("us.anthropic.claude-sonnet-5-5@v1/x");
+    expect(() => createAgentProfile({ name: "P4b", allowedTools: ["Edit\n--resume"] })).toThrow("isn't a tool pattern");
     expect(() => createAgentProfile({ name: "P4", allowedTools: ["--dangerously-skip-permissions"] })).toThrow("isn't a tool pattern");
     expect(() => createAgentProfile({ name: "P5", skills: [{ source: "library", name: "../etc" }] })).toThrow("Unknown skill");
     expect(() => createAgentProfile({ name: "P6", mcpServers: [{ name: "a", type: "stdio" }] })).toThrow("needs a command");

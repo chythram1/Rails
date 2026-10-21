@@ -54,7 +54,7 @@ function parseTools(raw: unknown): string[] {
   for (const t of out) {
     if (t.length > TOOL_PATTERN_MAX) throw bad(`Tool patterns can be at most ${TOOL_PATTERN_MAX} characters.`);
     // It goes on the command line on its own: a leading dash would read as a flag.
-    if (t.startsWith("-")) throw bad(`"${t}" isn't a tool pattern. Use a tool name, like Bash(npm test:*).`);
+    if (t.startsWith("-") || /[\x00-\x1f]/.test(t)) throw bad(`"${t}" isn't a tool pattern. Use a tool name, like Bash(npm test:*).`);
   }
   if (out.length > MAX_TOOLS) throw bad(`A list can have at most ${MAX_TOOLS} tool patterns.`);
   return out;
@@ -117,7 +117,8 @@ function parseInput(body: Record<string, unknown>, selfId?: string): AgentProfil
   // Codex and pi aren't mapped yet (ADR 0020).
   if ((body.provider ?? "claude") !== "claude") throw bad("Agent profiles are for Claude Code for now.");
   const model = str(body.model).trim();
-  if (model.length > 100 || !/^[A-Za-z0-9._:\[\]-]*$/.test(model)) throw bad("That doesn't look like a model name, like opus or claude-sonnet-5-5.");
+  // No spaces, and never something that reads as another flag.
+  if (model && !/^[A-Za-z0-9][A-Za-z0-9._:@/[\]-]{0,99}$/.test(model)) throw bad("That doesn't look like a model name, like opus or claude-sonnet-5-5.");
   const effort = str(body.effort);
   if (effort && !(EFFORTS as readonly string[]).includes(effort)) throw bad("Unknown effort level.");
   const permissionMode = str(body.permissionMode);
