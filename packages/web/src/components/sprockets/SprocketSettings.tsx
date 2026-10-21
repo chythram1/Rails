@@ -263,7 +263,6 @@ function NameField({ sprocket, onDone }: { sprocket: SprocketData; onDone(ok: bo
  */
 function RulesField({ sprocket, onSave }: { sprocket: SprocketData; onSave(rules: string[]): Promise<boolean> }) {
   const [draft, setDraft] = useState("");
-  const draftRef = useAutoGrow(draft);
   const full = sprocket.rules.length >= SPROCKET_RULES_MAX;
   const add = async () => {
     const rule = draft.trim();
@@ -297,9 +296,8 @@ function RulesField({ sprocket, onSave }: { sprocket: SprocketData; onSave(rules
           }}
         >
           <textarea
-            ref={draftRef}
-            className="input"
-            rows={1}
+            className="input sp-fixed"
+            rows={3}
             aria-label="New rule"
             maxLength={SPROCKET_RULE_MAX}
             placeholder={sprocket.rules.length ? "Add a rule" : "e.g. “If it asks whether to continue with its plan, say yes.”"}
@@ -478,7 +476,6 @@ function DescriptionField({ sprocket, onSave }: { sprocket: SprocketData; onSave
   const [text, setText] = useState(sprocket.description);
   const [editing, setEditing] = useState(false);
   const reverting = useRef(false);
-  const ref = useAutoGrow(text);
   useEffect(() => {
     if (!editing) setText(sprocket.description);
   }, [sprocket.description, editing]);
@@ -491,10 +488,9 @@ function DescriptionField({ sprocket, onSave }: { sprocket: SprocketData; onSave
     <div className="settings-field">
       <label htmlFor="sp-description">Description</label>
       <textarea
-        ref={ref}
         id="sp-description"
-        className="input sp-grow"
-        rows={2}
+        className="input sp-fixed"
+        rows={6}
         maxLength={SPROCKET_DESCRIPTION_MAX}
         placeholder="What it's for and how it should work, e.g. “Keep an eye on the PRs in this project and tell me what looks risky.”"
         value={text}

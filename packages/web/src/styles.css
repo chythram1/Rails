@@ -913,7 +913,8 @@ ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
 .sp-panel-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 16px 16px 24px; display: flex; flex-direction: column; gap: 28px; }
 /* A page's fields, 16px apart; Delete sits 28px below them (twice the gap inside). */
 .sp-section { display: flex; flex-direction: column; gap: 16px; }
-textarea.input.sp-grow { resize: none; overflow: hidden; }
+/* The description and a new rule: a fixed height that scrolls, so the panel doesn't shift as lines come and go. */
+textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .sp-danger-zone { display: flex; }
 .sp-panel .settings-field > :is(.input, .dropdown) { width: 100%; }
 .sp-field-foot { display: flex; align-items: center; gap: 8px; }
@@ -943,7 +944,7 @@ textarea.input.sp-grow { resize: none; overflow: hidden; }
 .sp-handoff-arrow { flex: none; color: var(--muted); }
 .sp-handoff-note { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .sp-owner-paths { margin: 0; font-family: var(--mono); font-size: 11.5px; line-height: 1.6; color: var(--text-2); overflow-wrap: anywhere; }
-.sp-rule-add textarea.input { width: 100%; resize: none; overflow: hidden; }
+.sp-rule-add textarea.input { width: 100%; }
 /* On/off switch (Switch.tsx): a pill, green when on, the one round control besides dots and avatars. */
 .switch {
   flex: none; display: inline-flex; align-items: center; width: 36px; height: 20px; padding: 2px;
