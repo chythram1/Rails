@@ -23,6 +23,11 @@ export interface Capability {
   /** "act" capabilities change something (a message, the Sprocket's memory); a run may do only so many. */
   effect: "read" | "act";
   run(args: any, ctx: RunContext): Promise<unknown>;
+  /**
+   * Its result reaches the model even when the script doesn't print it: for a call whose effect is on the user's
+   * screen (a message or a card posted), so the model knows it's there and doesn't write it out again.
+   */
+  echo?: boolean;
   /** For the run log: the step while a call runs ("Reading src/api.ts"), and what this run's calls did ("read src/api.ts"). */
   log?: { doing(args: any): string; done(calls: any[]): string };
 }

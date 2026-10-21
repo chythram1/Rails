@@ -7,7 +7,7 @@
 // once more.
 import { Agent } from "@earendil-works/pi-agent-core";
 import { isRetryableAssistantError, type Api, type AssistantMessage, type Message, type Model } from "@earendil-works/pi-ai";
-import { TEAM_TURNS_MAX, type Handoff, type SprocketMessage } from "@rails/shared";
+import { TEAM_TURNS_MAX, cardText, type Handoff, type SprocketCard, type SprocketMessage } from "@rails/shared";
 import { AGENT } from "./bridge/board.ts";
 import {
   handoffs,
@@ -32,6 +32,7 @@ import { CORE_MEMORY_MAX, memoryCapability } from "./harness/memory.ts";
 import { projectCapabilities } from "./harness/project.ts";
 import { promptsCapability } from "./harness/prompts.ts";
 import { replyCapabilities } from "./harness/reply.ts";
+import { showCardCapability } from "./harness/cards.ts";
 import { askUserCapability, passTurnCapability, sendMessageCapability, type TurnEnd } from "./harness/turns.ts";
 import { findModel, models } from "./models.ts";
 import { projectOwners } from "./owners.ts";
@@ -322,7 +323,7 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
     // In its direct chat and its teams, the project chat's events are a call away rather than in every run (ADR 0021).
     ...(project && chat.kind !== "project" ? [projectChatCapability] : []),
     ...(project && s.coordinator ? replyCapabilities(s.rules, (sid) => made.push(sid)) : []),
-    ...(chat.kind !== "project" ? [askUserCapability(endWith, ended), sendMessageCapability((text) => post(text))] : []),
+    ...(chat.kind !== "project" ? [askUserCapability(endWith, ended), sendMessageCapability((text) => post(text)), showCardCapability((card) => show(card))] : []),
     ...(team ? [passTurnCapability(team.members.filter((m) => m.id !== id), { hop: r.hop, queued: () => queuedIn(chatId), said: () => posted.size > 0 || sent.length > 0 }, endWith, ended)] : []),
   ];
   // The run log: every call's outcome, and the ones going now (scripts can run several at once).
@@ -370,13 +371,18 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   const live = chat.kind !== "project";
   const posted = new Map<AssistantMessage, SprocketMessage>();
   const clean = (text: string) => (team ? withoutName(text, s.name) : text);
-  /** Messages it posted with send_message, as it went. */
+  /** Messages it posted with send_message and the cards it showed (show_card), as it went. */
   const sent: SprocketMessage[] = [];
   /** Text it already posted this run, said again (models repeat their message after a refused pass): not posted twice. */
   const repeats = (text: string) => [...posted.values(), ...sent].some((m) => alike(m.text, clean(text)));
   const post = (text: string) => {
     if (stale() || repeats(text)) return;
     sent.push(sprocketMessages.create(chatId, "sprocket", clean(text), postTime(chatId), { sprocketId: id, runId: r.id }));
+    changed();
+  };
+  const show = (card: SprocketCard) => {
+    if (stale()) return;
+    sent.push(sprocketMessages.create(chatId, "sprocket", cardText(card), postTime(chatId), { sprocketId: id, runId: r.id, card }));
     changed();
   };
 
@@ -608,6 +614,11 @@ function toLlm(m: SprocketMessage, model: Model<Api>, self: string, team: TeamIn
   // A pass line (ADR 0023) is Rails' note, whoever passed.
   if (author === "pass")
     return { role: "user", content: `[Rails] ${m.sprocketId === self ? "You" : nameOf(m.sprocketId)} gave ${m.passTo === self ? "you" : nameOf(m.passTo ?? "")} the turn${text ? `: ${JSON.stringify(text)}` : ""}.`, timestamp };
+  // A card (ADR 0024) as Rails' note of what it showed, so a model doesn't take up writing cards out as text.
+  if (m.card) {
+    const who = m.sprocketId === self ? "You" : nameOf(m.sprocketId);
+    return { role: "user", content: `[Rails] ${who} showed a card (show_card):\n${text}`, timestamp };
+  }
   // A question with options shows them, and the answer once there is one.
   const said = m.ask?.options.length ? `${text}\n(options: ${m.ask.options.join(" | ")}${m.ask.answer ? `; your user answered ${JSON.stringify(m.ask.answer)}` : ""})` : text;
   if (team && m.sprocketId !== self) return { role: "user", content: `[${nameOf(m.sprocketId)}] ${said}`, timestamp };
@@ -714,7 +725,8 @@ const TEXTING = [
   "- Everything you write is shown, in order: text you write before a tool call is sent as a message of its own right away, then your reply after it. What a script prints (text()) is for you alone: your user never sees it. Each paragraph shows as its own chat bubble, so a long reply reads as several short messages: separate your thoughts with blank lines, and keep each paragraph to one or two sentences (40 words at most). Don't call a tool just to start a new message, and don't repeat what you already wrote.",
   "- When you can't go on without something only your user knows (their choice, a fact about their project), ask with ask_user instead of writing the question (with two to four options to tap when a few short answers are likely, none for an open question): their answer comes back to you. When you can give a useful answer already, give it (say what you assumed) rather than asking first.",
   "- Most replies are one to three bubbles. Something long (a plan, a checklist) is more of them, one step or part per bubble, rather than one big block.",
-  "- No headings, no bold, no tables. A short list of a few items is fine inside one bubble. Use Markdown only for code.",
+  "- No headings, no bold, no Markdown tables. A short list of a few items is fine inside one bubble. Use Markdown only for code.",
+  "- When structure helps (comparing options, figures, a checklist of steps, code or a diff), show a card with show_card instead of writing it out, with a sentence around it if useful. Most replies are plain text.",
 ].join("\n");
 
 /** The reminder after the chat (not saved, not from the user). */

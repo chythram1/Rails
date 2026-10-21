@@ -18,6 +18,7 @@ import { MessageActions } from "./MessageActions.tsx";
 import { COLORS } from "./characters.ts";
 import { useThreadScroll } from "./threadScroll.ts";
 import { bubbles, typingTime } from "./bubbles.ts";
+import { Card } from "./Card.tsx";
 
 /** A new time label when a message comes over an hour after the previous one (or on a new day). */
 const GAP_MS = 60 * 60 * 1000;
@@ -115,7 +116,7 @@ export function SprocketChat({
     const newest = fresh.at(-1);
     const later = reveal && messages.findIndex((m) => m.id === reveal.id) < messages.length - 1;
     if (newest) {
-      const parts = bubbles(newest.text);
+      const parts = newest.card ? [newest.text] : bubbles(newest.text);
       const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
       setReveal(parts.length > 1 && !still ? { id: newest.id, by: newest.sprocketId, parts, shown: 1 } : null);
     } else if (later) setReveal(null);
@@ -270,7 +271,7 @@ export function SprocketChat({
               const last = !same(next) || newGroup(m.createdAt, next!.createdAt);
               const pop = m.author === "sprocket" && !!initial.current && !initial.current.has(m.id);
               // A reply shows a bubble per paragraph; one coming in shows those it has reached.
-              const parts = m.author === "sprocket" ? (reveal?.id === m.id ? reveal.parts.slice(0, reveal.shown) : bubbles(m.text)) : [m.text];
+              const parts = m.author === "sprocket" && !m.card ? (reveal?.id === m.id ? reveal.parts.slice(0, reveal.shown) : bubbles(m.text)) : [m.text];
               const coming = reveal?.id === m.id && reveal.shown < reveal.parts.length;
               // A member gave a teammate the turn (ADR 0023): a line, not a bubble.
               if (m.author === "pass") {
@@ -301,7 +302,13 @@ export function SprocketChat({
                     <div className="sp-said">
                       {team && m.author === "sprocket" && <span className="sp-avatar" aria-hidden>{last && !coming && by && <Sprocket look={by.look} size={26} seed={by.id} still />}</span>}
                       <div className="sp-bubbles">
-                        {parts.map((part, j) => (
+                        {m.card && (
+                          <>
+                            <span className="sr-only">{by?.name ?? "A deleted Sprocket"} showed a card:</span>
+                            <Card card={m.card} />
+                          </>
+                        )}
+                        {!m.card && parts.map((part, j) => (
                           <p key={j} className="sp-bubble">
                             {m.author === "sprocket" && j === 0 && <span className="sr-only">{by?.name ?? "A deleted Sprocket"}: </span>}
                             {m.author === "notice" ? part : text(part)}

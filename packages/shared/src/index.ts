@@ -438,6 +438,62 @@ export interface SprocketAsk {
 export const ASK_OPTIONS_MIN = 2;
 export const ASK_OPTIONS_MAX = 4;
 
+/**
+ * A card a Sprocket shows in a chat (ADR 0024, show_card): a title and a few blocks, drawn by Rails from its own
+ * components rather than written out as text.
+ */
+export interface SprocketCard {
+  title?: string;
+  blocks: CardBlock[];
+}
+export type CardBlock =
+  | { type: "text"; text: string }
+  | { type: "table"; columns: string[]; rows: string[][] }
+  | { type: "facts"; items: { label: string; value: string }[] }
+  | { type: "list"; items: string[]; numbered?: boolean }
+  | { type: "checklist"; items: { text: string; state: CheckState }[] }
+  | { type: "code"; code: string; language?: string }
+  | { type: "diff"; diff: string; file?: string };
+export type CheckState = "done" | "doing" | "todo";
+export const CARD_LIMITS = {
+  title: 80,
+  blocks: 6,
+  text: 1200,
+  columns: 6,
+  rows: 30,
+  cell: 200,
+  items: 20,
+  item: 200,
+  code: 6000,
+} as const;
+
+/**
+ * A card as plain text: what copying it gives, what a chat's preview shows, and how its Sprocket remembers it.
+ * A table is a Markdown table; the rest reads as written.
+ */
+export function cardText(card: SprocketCard): string {
+  const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
+  const parts = card.blocks.map((b) => {
+    switch (b.type) {
+      case "text":
+        return b.text;
+      case "table":
+        return [b.columns, b.columns.map(() => "---"), ...b.rows].map((r) => `| ${r.map(cell).join(" | ")} |`).join("\n");
+      case "facts":
+        return b.items.map((i) => `${i.label}: ${i.value}`).join("\n");
+      case "list":
+        return b.items.map((i, n) => `${b.numbered ? `${n + 1}.` : "-"} ${i}`).join("\n");
+      case "checklist":
+        return b.items.map((i) => `[${i.state === "done" ? "x" : i.state === "doing" ? "~" : " "}] ${i.text}`).join("\n");
+      case "code":
+        return "```" + (b.language ?? "") + "\n" + b.code + "\n```";
+      case "diff":
+        return "```diff\n" + (b.file ? `${b.file}\n` : "") + b.diff + "\n```";
+    }
+  });
+  return [card.title, ...parts].filter(Boolean).join("\n\n");
+}
+
 /** A question a session asked the user in a dialog (Claude Code's AskUserQuestion, a pi question tool). */
 export interface SessionQuestion {
   question: string;
@@ -492,6 +548,8 @@ export interface SprocketMessage {
   passTo?: string;
   /** On a Sprocket's question to the user (ADR 0023): its options, and the answer once there is one. */
   ask?: SprocketAsk;
+  /** On a card a Sprocket showed (ADR 0024); `text` is the card as plain text (cardText). */
+  card?: SprocketCard;
 }
 
 /**

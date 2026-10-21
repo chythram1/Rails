@@ -89,12 +89,13 @@ export function sendMessageCapability(post: (text: string) => void): Capability 
     description: `Post a message in this chat right away, as its own message, and keep going: for a quick heads-up before you look something up, or several messages in a row. Your reply after your last tool call is posted too, so don't repeat it here. At most ${SENDS_MAX} per turn.`,
     params: Type.Object({ text: Type.String({ minLength: 1, maxLength: 2000 }) }),
     effect: "act",
+    echo: true,
     log: { doing: () => "Writing", done: (calls) => `sent ${calls.length === 1 ? "a message" : `${calls.length} messages`}` },
     run: async ({ text }: { text: string }) => {
       if (!text.trim()) throw new Error("The message is empty.");
       if (++sent > SENDS_MAX) throw new Error(`You've sent ${SENDS_MAX} messages this turn: put the rest in your reply.`);
       post(text.trim());
-      return "Sent.";
+      return "Sent: it's in the chat now, so don't write it again.";
     },
   };
 }

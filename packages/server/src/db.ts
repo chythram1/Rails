@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { AgentProfile, DecisionEntry, Handoff, Panel, PanelKind, Project, Sprocket, SprocketAsk, SprocketAuthor, SprocketChatKind, SprocketEvent, SprocketLook, SprocketMessage, SavedPrompt, Suggestion } from "@rails/shared";
+import type { AgentProfile, DecisionEntry, Handoff, Panel, PanelKind, Project, Sprocket, SprocketAsk, SprocketAuthor, SprocketCard, SprocketChatKind, SprocketEvent, SprocketLook, SprocketMessage, SavedPrompt, Suggestion } from "@rails/shared";
 import { RAILS_HOME } from "./config.ts";
 
 const db = new DatabaseSync(join(RAILS_HOME, "rails.db"));
@@ -132,6 +132,8 @@ addColumn("sprocket_messages", "run_id", "TEXT");
 addColumn("sprocket_messages", "pass_to", "TEXT");
 /** On a question with options (ADR 0023): the SprocketAsk, as JSON. */
 addColumn("sprocket_messages", "ask", "TEXT");
+/** On a card a Sprocket showed (ADR 0024): the SprocketCard, as JSON. */
+addColumn("sprocket_messages", "card", "TEXT");
 
 /**
  * Every Sprocket has its direct chat and an attached one its project chat; messages from before chats go in one:
@@ -586,6 +588,7 @@ type MessageRow = {
   event: string | null;
   pass_to: string | null;
   ask: string | null;
+  card: string | null;
 };
 const toMessage = (r: MessageRow): SprocketMessage => ({
   id: r.id,
@@ -598,6 +601,7 @@ const toMessage = (r: MessageRow): SprocketMessage => ({
   ...(r.event ? { event: JSON.parse(r.event) } : {}),
   ...(r.pass_to ? { passTo: r.pass_to } : {}),
   ...(r.ask ? { ask: JSON.parse(r.ask) } : {}),
+  ...(r.card ? { card: JSON.parse(r.card) } : {}),
 });
 
 export const sprocketMessages = {
@@ -628,7 +632,8 @@ export const sprocketMessages = {
       runId,
       passTo,
       ask,
-    }: { activity?: string; steps?: unknown[]; event?: SprocketEvent; sprocketId?: string; runId?: string; passTo?: string; ask?: SprocketAsk } = {},
+      card,
+    }: { activity?: string; steps?: unknown[]; event?: SprocketEvent; sprocketId?: string; runId?: string; passTo?: string; ask?: SprocketAsk; card?: SprocketCard } = {},
   ): SprocketMessage {
     const chat = sprocketChats.get(chatId);
     if (!chat) throw new Error(`No chat ${chatId}`);
@@ -644,9 +649,10 @@ export const sprocketMessages = {
       ...(event ? { event } : {}),
       ...(passTo ? { passTo } : {}),
       ...(ask ? { ask } : {}),
+      ...(card ? { card } : {}),
     };
     db.prepare(
-      "INSERT INTO sprocket_messages (id, sprocket_id, chat_id, author, text, created_at, activity, steps, event, run_id, pass_to, ask) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO sprocket_messages (id, sprocket_id, chat_id, author, text, created_at, activity, steps, event, run_id, pass_to, ask, card) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     ).run(
       m.id,
       m.sprocketId,
@@ -660,6 +666,7 @@ export const sprocketMessages = {
       runId ?? null,
       passTo ?? null,
       ask ? JSON.stringify(ask) : null,
+      card ? JSON.stringify(card) : null,
     );
     return m;
   },

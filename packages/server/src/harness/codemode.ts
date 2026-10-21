@@ -89,6 +89,8 @@ export function codemodeTool(capabilities: Capability[], ctx: Omit<RunContext, "
       const startedAt = performance.now();
       const { code, options } = parseCodemodeSource(input.code);
       const calls: CallRecord[] = [];
+      /** What echo capabilities returned, as "name: result". */
+      const echoes: string[] = [];
       const tools = capabilities.map((capability) => ({
         ...declaration(capability),
         description: renderToolSample(declaration(capability)),
@@ -105,6 +107,7 @@ export function codemodeTool(capabilities: Capability[], ctx: Omit<RunContext, "
             hooks.onCallStart?.(capability, checked);
             const value = await capability.run(checked, { ...ctx, signal: callSignal });
             record.status = "ok";
+            if (capability.echo) echoes.push(`${capability.name}: ${String(value ?? "")}`);
             return capability.output ? value : String(value ?? "");
           } catch (e) {
             record.status = callSignal.aborted ? "cancelled" : "error";
@@ -142,6 +145,9 @@ export function codemodeTool(capabilities: Capability[], ctx: Omit<RunContext, "
         if (result.value !== undefined) output.push({ type: "text", text: valueText(result.value) }); // like pi: a returned value is added like text()
       }
       const items = formatOutput(output);
+      // What echo capabilities did, when the script didn't print it.
+      const printed = items.join("\n");
+      for (const line of [...new Set(echoes)]) if (!printed.includes(line.slice(line.indexOf(": ") + 2))) items.push(line);
       if (!result.ok) items.push(`Script error:\n${formatError(result, calls)}`);
       const text = trim(joinText(items), options.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS);
       const wallTime = ((performance.now() - startedAt) / 1000).toFixed(1);
