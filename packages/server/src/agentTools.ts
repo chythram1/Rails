@@ -98,6 +98,8 @@ export async function waitForSession(
   if (signal?.aborted) return `You stopped waiting for ${name}.`;
 
   const started = Date.now();
+  // The edits it had already made (by entry, not time: one can share the wait's first millisecond).
+  const before = new Set(card.edits.map((e) => `${e.at} ${e.file}`));
   const sessionAt = card.sessionId ?? to.sessionId;
   const mine = waits.get(me.id) ?? new Set<string>();
   waits.set(me.id, mine.add(to.id));
@@ -129,7 +131,7 @@ export async function waitForSession(
   if (end === "moved") return `${name}'s panel moved on to another session while you waited: the session you waited for won't report again.`;
   if (end === "aborted") return `You stopped waiting for ${name}.`;
   const now = cardOf(to);
-  const changed = now.edits.filter((e) => Date.parse(e.at) >= started).map((e) => rel(project.path, e.file));
+  const changed = now.edits.filter((e) => !before.has(`${e.at} ${e.file}`)).map((e) => rel(project.path, e.file));
   const files = changed.length ? `\nFiles it changed while you waited: ${changed.slice(0, 8).join(", ")}${changed.length > 8 ? ` and ${changed.length - 8} more` : ""}` : "\nIt changed no files while you waited.";
   const what =
     end === "turn_end" ? `finished its turn after ${secs}.` : end === "stopped" ? `was stopped after ${secs}.` : end === "waiting" ? `is now waiting for its user (after ${secs}).` : end === "failed" ? `failed its turn after ${secs}.` : `ended after ${secs}.`;
