@@ -29,6 +29,7 @@ import { cancelSignIn, modelSettings, removeCredential, setApiKey, setDefaultMod
 import { createTeam, deleteTeam, listTeams, updateTeam } from "./teams.ts";
 import { clearChat, createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets.ts";
 import { TerminalHub } from "./terminals.ts";
+import { resumeRuns } from "./runs.ts";
 import { startWatches } from "./watches.ts";
 import { startOverlaps } from "./overlaps.ts";
 import { cancelHandoff, startHandoffs } from "./handoffs.ts";
@@ -326,6 +327,7 @@ startOwners(); // owners go with their panels
 startShellEdits(); // files shell commands change count as edits too
 startSuggestions(); // suggested replies expire as their sessions move on
 startDecisions(); // the fast decision model judges in shadow, if the user picked one
+resumeRuns(); // Sprocket runs cut off by the last shutdown say so; queued ones start (ADR 0023)
 watchCodex(panels.all()); // Codex panels that survived a restart
 
 void tmuxVersion().then((v) => {

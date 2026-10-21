@@ -1,6 +1,7 @@
 # ADR 0022: Team chats
 
-Status: accepted (builds on ADR 0021's chats).
+Status: accepted (builds on ADR 0021's chats). ADR 0023 replaces who answers the user, how a member passes the turn,
+what ends a round, and what a reply is; the rest stands.
 
 ADR 0021 gave every Sprocket its direct chat and a project its project chat, and left team chats for later: the
 user and several Sprockets in one conversation, so Sprockets that look after different things (two projects, a

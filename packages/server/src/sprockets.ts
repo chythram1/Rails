@@ -24,7 +24,7 @@ import { endRound, nameClash, onTeamsChanged, startRound } from "./teams.ts";
 import { settleHandoffs } from "./handoffs.ts";
 import { projectOwners } from "./owners.ts";
 import { findModel } from "./models.ts";
-import { isRunning, onRunsChanged, requestReply, runningChat, userMessageTime } from "./runs.ts";
+import { answerWaiting, isRunning, onRunsChanged, requestReply, runningChat, userMessageTime } from "./runs.ts";
 import { expireInChat, onSuggestionsChanged } from "./suggestions.ts";
 import { listeners } from "./util.ts";
 
@@ -157,7 +157,10 @@ export function sendMessage(chatId: string, rawText: unknown): SprocketMessage {
   const message = sprocketMessages.create(chatId, "user", text, userMessageTime(chatId));
   changed();
   if (chat.kind === "team") startRound(chatId, text, message.id);
-  else requestReply(chatId);
+  else {
+    answerWaiting(chatId, text); // a question with options it asked here (ADR 0023)
+    requestReply(chatId, undefined, { trigger: "user", sourceId: message.id });
+  }
   return message;
 }
 
@@ -182,7 +185,7 @@ export function postEvent(sprocketId: string, event: SprocketEvent, text: string
   const chatId = projectChat(sprocketId);
   const message = sprocketMessages.create(chatId, "event", text, userMessageTime(chatId), { event });
   changed();
-  if (wake) requestReply(chatId);
+  if (wake) requestReply(chatId, undefined, { trigger: "event", sourceId: message.id });
   return message;
 }
 

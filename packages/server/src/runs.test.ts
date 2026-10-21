@@ -1,10 +1,10 @@
 import { fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall } from "@earendil-works/pi-ai";
 import { SPROCKET_DESCRIPTION_MAX } from "@rails/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { projects, settings, sprockets } from "./db.ts";
+import { projects, settings, sprocketRuns, sprockets } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { CORE_MEMORY_MAX, editMemory } from "./harness/memory.ts";
-import { idle, isRunning, onActivity, onTyping, readableError, REQUEST_TIMEOUT_MS, RETRY_MS, textOf } from "./runs.ts";
+import { askedTeammates, idle, isRunning, onActivity, onTyping, readableError, REQUEST_TIMEOUT_MS, resumeRuns, RETRY_MS, textOf } from "./runs.ts";
 import { sprocketMessages } from "./db.ts";
 import { createSprocket, deleteSprocket, detachFromProject, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
 
@@ -97,13 +97,25 @@ describe("runs", () => {
     expect(seen).toEqual(["system", "user", "assistant", "toolResult: the board says: all idle", "assistant", "user", "user"]);
   });
 
-  it("shows everything a run writes outside a project chat, and only its last text in one", async () => {
+  it("posts each text a run writes as its own message outside a project chat, and only its last text in one", async () => {
     const look = (code: string) => fauxAssistantMessage([fauxText("Let me look."), fauxToolCall("codemode", { code })], { stopReason: "toolUse" });
     const s = sprocket();
-    faux.setResponses([look('text("idle")'), fauxAssistantMessage("All idle.")]);
+    let posted: string[] = [];
+    faux.setResponses([
+      (c) => {
+        posted = []; // nothing posted before the run's first model call ends
+        return look('text("idle")');
+      },
+      () => {
+        // The first text is in the chat while the run goes on.
+        posted = authors(s.id);
+        return fauxAssistantMessage("All idle.");
+      },
+    ]);
     sendMessage(directChat(s.id), "what's going on?");
     await idle();
-    expect(authors(s.id).at(-1)).toBe("sprocket: Let me look.\n\nAll idle.");
+    expect(posted.at(-1)).toBe("sprocket: Let me look.");
+    expect(authors(s.id).slice(-2)).toEqual(["sprocket: Let me look.", "sprocket: All idle."]);
 
     const p = projects.create("app", "/work/reply-" + s.id);
     updateSettings(s.id, { projectId: p.id });
@@ -265,13 +277,79 @@ describe("runs", () => {
     expect(sprocketMessages.list(chat)).toEqual([]);
   });
 
+  it("asks with options, waits, and takes the answer as the user's next message (ADR 0023)", async () => {
+    const s = sprocket();
+    faux.setResponses([
+      fauxAssistantMessage([fauxText("Two ways to go."), fauxToolCall("codemode", { code: 'await tools.ask_user({ question: "Which?", options: ["Fast", "Safe"] })' })], {
+        stopReason: "toolUse",
+      }),
+      fauxAssistantMessage("Not reached: the run ends with the question."),
+    ]);
+    sendMessage(directChat(s.id), "help me pick");
+    await idle();
+    const asked = listMessages(directChat(s.id)).at(-1)!;
+    expect(authors(s.id)).toEqual(["user: help me pick", "sprocket: Two ways to go.", "sprocket: Which?"]);
+    expect(asked.ask).toEqual({ question: "Which?", options: ["Fast", "Safe"] });
+    expect(sprocketRuns.list(["waiting"], directChat(s.id))).toHaveLength(1);
+
+    let seen = "";
+    faux.setResponses([(c) => ((seen = JSON.stringify(c.messages)), fauxAssistantMessage("Safe it is."))]);
+    sendMessage(directChat(s.id), "Safe");
+    await idle();
+    expect(listMessages(directChat(s.id)).find((m) => m.id === asked.id)?.ask?.answer).toBe("Safe");
+    expect(seen).toContain("options: Fast | Safe");
+    expect(authors(s.id).at(-1)).toBe("sprocket: Safe it is.");
+    expect(sprocketRuns.list(["waiting"], directChat(s.id))).toHaveLength(0);
+  });
+
+  it("posts messages it sends with send_message right away, and its reply after them", async () => {
+    const s = sprocket();
+    faux.setResponses([
+      fauxAssistantMessage([fauxToolCall("codemode", { code: 'await tools.send_message({ text: "One." }); await tools.send_message({ text: "Two." })' })], { stopReason: "toolUse" }),
+      fauxAssistantMessage("And that's all."),
+    ]);
+    sendMessage(directChat(s.id), "send me two messages");
+    await idle();
+    expect(authors(s.id)).toEqual(["user: send me two messages", "sprocket: One.", "sprocket: Two.", "sprocket: And that's all."]);
+  });
+
+  it("says when a restart cut a run off, and starts the runs still queued", async () => {
+    const s = sprocket();
+    const chat = directChat(s.id);
+    sprocketMessages.create(chat, "user", "are you there?");
+    const cut = sprocketRuns.create({ chatId: chat, sprocketId: s.id, trigger: "user" });
+    sprocketRuns.setStatus(cut.id, "running"); // as the last server left it
+    sprocketRuns.create({ chatId: chat, sprocketId: s.id, trigger: "user" }); // and one it had queued
+    faux.setResponses([fauxAssistantMessage("Back.")]);
+    resumeRuns();
+    await idle();
+    expect(sprocketRuns.get(cut.id)?.status).toBe("failed");
+    expect(authors(s.id)).toEqual(["user: are you there?", "notice: Helper was cut off: Rails restarted while it was replying.", "sprocket: Back."]);
+  });
+
   it("answers messages that arrive while it's replying", async () => {
     const s = sprocket();
     faux.setResponses([fauxAssistantMessage("first"), fauxAssistantMessage("second")]);
     sendMessage(directChat(s.id), "one");
     sendMessage(directChat(s.id), "two");
     await idle();
-    expect(authors(s.id)).toEqual(["user: one", "sprocket: first", "user: two", "sprocket: second"]);
+    // Each message is dated when it's posted: "two" came in while "first" was being written.
+    expect(authors(s.id)).toEqual(["user: one", "user: two", "sprocket: first", "sprocket: second"]);
+  });
+});
+
+describe("askedTeammates", () => {
+  const team = [{ name: "Fred" }, { name: "Doc Keeper" }, { name: "Pam" }];
+  it("finds teammates a message asks something or gives something to do, not ones it only mentions", () => {
+    const asks = (t: string) => askedTeammates(t, team);
+    expect(asks("Fred, what do you think?")).toEqual(["Fred"]);
+    expect(asks("Here's my draft. What do you think, Fred?")).toEqual(["Fred"]);
+    expect(asks("Doc Keeper, draft step 2.")).toEqual(["Doc Keeper"]);
+    expect(asks("**Pam:** your take on the colours")).toEqual(["Pam"]);
+    expect(asks("@Pam can you check it?")).toEqual(["Pam"]);
+    expect(asks("Thanks Fred!")).toEqual([]);
+    expect(asks("I agree with Fred. Nice work.")).toEqual([]);
+    expect(asks("Frederick, are you there?")).toEqual([]);
   });
 });
 

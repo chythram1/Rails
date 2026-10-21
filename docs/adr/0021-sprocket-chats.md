@@ -1,6 +1,7 @@
 # ADR 0021: A direct chat per Sprocket, and a chat per project
 
-Status: accepted (changes the one chat of ADR 0005, 0006 and 0009; team chats are ADR 0022).
+Status: accepted (changes the one chat of ADR 0005, 0006 and 0009; team chats are ADR 0022; ADR 0023 makes runs rows
+that may post several messages outside the project chat).
 
 A Sprocket had one chat. For a Coordinator that chat held everything: what the user asked it, Rails' events
 (sessions that wait, overlaps, handoffs, agents' messages) and the suggestion cards under them. A question like

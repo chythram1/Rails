@@ -299,8 +299,9 @@ export interface SprocketChatInfo {
 }
 
 /**
- * A team chat (ADR 0022): the user and two to four Sprockets. The user's messages go to the lead (the first
- * member) unless they @mention others, and a reply passes the turn on by mentioning someone.
+ * A team chat (ADR 0022): the user and two to four Sprockets. The user's messages go to the members they
+ * @mention, else to whoever asked them something, else to the lead; a member gives a teammate the turn with
+ * pass_turn (ADR 0023).
  */
 export interface SprocketTeam extends SprocketChatInfo {
   kind: "team";
@@ -309,7 +310,7 @@ export interface SprocketTeam extends SprocketChatInfo {
   members: string[];
   /** The member writing a reply there now, if one is. */
   replying?: string;
-  /** Members whose turns are coming in this round, in order (the lead goes first, ADR 0022). */
+  /** Members whose turns are queued, in order (ADR 0023). */
   waiting: string[];
   /** Rails is working out who the user's latest message is for (the decision model is judging it). */
   routing?: boolean;
@@ -325,7 +326,7 @@ export interface SprocketTeamInput {
 
 export const TEAM_MEMBERS_MIN = 2;
 export const TEAM_MEMBERS_MAX = 4;
-/** Replies in a row, after one message from the user, before a team waits for them again (ADR 0022). */
+/** Passes of the turn in a row, after one message from the user, before a team waits for them again (ADR 0023). */
 export const TEAM_TURNS_MAX = 10;
 
 /** An @mention of a team member in a message (ADR 0022): where it is, and the member's index in the names given. */
@@ -364,26 +365,6 @@ export function findMentions(text: string, names: string[]): MentionSpan[] {
     }
   }
   return found;
-}
-
-/**
- * The members a reply asks something by name without an @, as people do in a chat: a question that starts or ends
- * with the name ("Pixel, what would you ship?", "Agreed, Scout?"). Models often write that rather than @Pixel.
- */
-export function askedByName(text: string, members: { id: string; name: string }[]): string[] {
-  const found: { at: number; id: string }[] = [];
-  for (const sentence of text.matchAll(/[^.!?\n]+[.!?]*/g)) {
-    const q = sentence[0].trim();
-    if (!q.endsWith("?")) continue;
-    for (const m of members) {
-      const n = m.name.toLowerCase();
-      const lower = q.toLowerCase();
-      const opens = lower.startsWith(n) && /^[,:]/.test(q.slice(n.length));
-      const closes = lower.endsWith(`, ${n}?`);
-      if ((opens || closes) && !found.some((f) => f.id === m.id)) found.push({ at: sentence.index!, id: m.id });
-    }
-  }
-  return found.sort((a, b) => a.at - b.at).map((f) => f.id);
 }
 
 /** A session in a project and the files or folders it owns (relative to the project, ADR 0016). */
@@ -443,7 +424,19 @@ export interface SprocketInput {
  * Who wrote a chat message: the user, the Sprocket, Rails itself (setup hints and errors), or a session
  * event Rails woke a Coordinator with.
  */
-export type SprocketAuthor = "user" | "sprocket" | "notice" | "event";
+/** `pass`: a team member gave a teammate the turn (ADR 0023), shown as a line, not a bubble. */
+export type SprocketAuthor = "user" | "sprocket" | "notice" | "event" | "pass";
+
+/** A question a Sprocket asked the user (ADR 0023, ask_user). */
+export interface SprocketAsk {
+  question: string;
+  /** Answers to tap: none (an open question), or ASK_OPTIONS_MIN to ASK_OPTIONS_MAX. */
+  options: string[];
+  /** What the user answered (a tapped option, or the message they typed instead). */
+  answer?: string;
+}
+export const ASK_OPTIONS_MIN = 2;
+export const ASK_OPTIONS_MAX = 4;
 
 /** A question a session asked the user in a dialog (Claude Code's AskUserQuestion, a pi question tool). */
 export interface SessionQuestion {
@@ -495,6 +488,10 @@ export interface SprocketMessage {
   event?: SprocketEvent;
   /** On a Coordinator's reply: the replies it suggests sending to sessions. */
   suggestions?: Suggestion[];
+  /** On a pass line (author `pass`): the member given the turn. */
+  passTo?: string;
+  /** On a Sprocket's question to the user (ADR 0023): its options, and the answer once there is one. */
+  ask?: SprocketAsk;
 }
 
 /**

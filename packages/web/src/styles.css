@@ -938,6 +938,15 @@ textarea.input { resize: vertical; line-height: 1.5; }
   background: color-mix(in oklab, var(--who) 16%, var(--surface)); font-weight: 600; font-size: 14px; line-height: 22px;
 }
 .sp-mention .sprocket { flex-shrink: 0; }
+/* A member gave a teammate the turn (ADR 0023): a muted line in the bubbles' column, not a bubble. */
+.sp-message.pass { align-items: flex-start; }
+.sp-pass { display: flex; align-items: center; gap: 5px; max-width: 100%; margin: -2px 0 2px; color: var(--muted); font-size: 13px; line-height: 18px; }
+.sp-messages.in-team .sp-message.pass { padding-left: 34px; }
+.sp-pass-to { color: var(--text-2); font-weight: 500; }
+.sp-pass-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-pass-note::before { content: "· "; }
+/* A question's options to tap (ask_user), under its last bubble. */
+.sp-ask { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .sp-message.notice { align-items: center; }
 .sp-message.notice .sp-bubble { background: none; color: var(--muted); font-size: 13px; text-align: center; padding: 4px 0; max-width: 100%; text-wrap: balance; }
 /* A session waiting for the user, in its Coordinator's chat (EventRow.tsx): a muted line with the agent's

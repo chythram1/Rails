@@ -1,6 +1,7 @@
 # ADR 0006: Sprockets run, on the user's own model providers
 
-Status: accepted (stage 2, part 1: replies, models, projects, description and core memory).
+Status: accepted (stage 2, part 1: replies, models, projects, description and core memory). ADR 0023 keeps runs as
+rows and lets one post several messages outside the project chat.
 
 ADR 0005 gave Sprockets a look and a chat that nobody answered. Sprockets are meant to be project-first:
 each one helps with one project, and later acts as a coordination layer between that project's agent

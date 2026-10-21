@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { IconArrowDown as ArrowDown, IconChevronLeft as ChevronLeft } from "@tabler/icons-react";
+import { IconArrowDown as ArrowDown, IconArrowRight as ArrowRight, IconChevronLeft as ChevronLeft } from "@tabler/icons-react";
 import { TEAM_TURNS_MAX, findMentions, type Sprocket as SprocketData, type SprocketChatInfo, type SprocketTeam, type SprocketMessage } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href } from "../../router.ts";
@@ -46,9 +46,9 @@ function stamp(iso: string): string {
  * of its own.
  *
  * A team chat (ADR 0022) passes `team` (and its lead as `sprocket`): each member's run of replies has its name above
- * (in its colour) and its face at the foot. A member's face pops up at the bottom left once Rails knows it answers
- * (it saw the message and it's for it), in turn order. @mentions of members read as chips, and the composer
- * completes them.
+ * (in its colour) and its face at the foot. One face pops up at the bottom left, of the member whose turn it is.
+ * @mentions of members (and @everyone) read as chips, and the composer completes them. A member giving a teammate
+ * the turn shows as a line, and a question with options as buttons under it until it's answered (ADR 0023).
  */
 export function SprocketChat({
   sprocket,
@@ -235,7 +235,7 @@ export function SprocketChat({
               </ul>
               <p className="sp-intro-title">Say hello to {title}</p>
               <p className="muted small">
-                Name or @mention whoever you're asking; {members[0]?.name} leads and takes the rest. They can pass the turn on, and after {TEAM_TURNS_MAX} replies in a row they wait for you.
+                @mention whoever you're asking, or @everyone; {members[0]?.name} leads and takes the rest. They can pass each other the turn, and after {TEAM_TURNS_MAX} passes in a row they wait for you.
               </p>
             </div>
           ) : (
@@ -272,6 +272,25 @@ export function SprocketChat({
               // A reply shows a bubble per paragraph; one coming in shows those it has reached.
               const parts = m.author === "sprocket" ? (reveal?.id === m.id ? reveal.parts.slice(0, reveal.shown) : bubbles(m.text)) : [m.text];
               const coming = reveal?.id === m.id && reveal.shown < reveal.parts.length;
+              // A member gave a teammate the turn (ADR 0023): a line, not a bubble.
+              if (m.author === "pass") {
+                const from = speaker(m.sprocketId);
+                const to = m.passTo ? speaker(m.passTo) : undefined;
+                return (
+                  <li key={m.id} className={"sp-message pass" + (pop ? " pop" : "")}>
+                    <p className="sp-pass">
+                      <span className="sr-only">{`${from?.name ?? "A deleted Sprocket"} gave the turn to `}</span>
+                      <ArrowRight size={14} aria-hidden />
+                      {to && <Sprocket look={to.look} size={16} seed={to.id} still />}
+                      <span className="sp-pass-to">{to?.name ?? "A deleted Sprocket"}</span>
+                      {m.text && <span className="sp-pass-note">{m.text}</span>}
+                    </p>
+                  </li>
+                );
+              }
+              // A question with options waiting for an answer: the options to tap, under its last bubble. A message
+              // for someone else leaves it waiting, so they stay until it's answered.
+              const options = m.ask && !m.ask.answer && !coming ? m.ask.options : undefined;
               return (
                 <li key={m.id} className={"sp-message " + m.author + (pop ? " pop" : "")} style={by ? ({ "--who": COLORS[by.look.color] } as CSSProperties) : undefined}>
                   {label && <time className="sp-stamp" dateTime={m.createdAt}>{stamp(m.createdAt)}</time>}
@@ -288,6 +307,15 @@ export function SprocketChat({
                             {m.author === "notice" ? part : text(part)}
                           </p>
                         ))}
+                        {!!options?.length && (
+                          <div className="sp-ask" role="group" aria-label="Answers to pick">
+                            {options.map((o) => (
+                              <button key={o} type="button" className="btn small" onClick={() => void send(o)}>
+                                {o}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -351,7 +379,12 @@ export function SprocketChat({
           autoFocus={!embedded}
           compact
           fill={fill}
-          mentions={team && members.map((m, i) => ({ name: m.name, note: i === 0 ? "Lead" : undefined, icon: <Sprocket look={m.look} size={18} seed={m.id} still /> }))}
+          mentions={
+            team && [
+              ...members.map((m, i) => ({ name: m.name, note: i === 0 ? "Lead" : undefined, icon: <Sprocket look={m.look} size={18} seed={m.id} still /> })),
+              { name: "everyone", note: "Every member", icon: <TeamFace looks={members} size={18} /> },
+            ]
+          }
         >
           <SavedPromptsMenu onPick={(text) => setFill({ text })} />
         </Composer>
@@ -368,15 +401,23 @@ function withMentions(text: string, members: SprocketData[]): ReactNode {
   if (!members.length || !text.includes("@")) return text;
   const parts: ReactNode[] = [];
   let at = 0;
-  for (const found of findMentions(text, members.map((m) => m.name))) {
+  // @everyone (ADR 0023) reads as a chip too, after the members.
+  for (const found of findMentions(text, [...members.map((m) => m.name), "everyone"])) {
     const m = members[found.member];
     parts.push(text.slice(at, found.start));
     parts.push(
-      <span key={found.start} className="sp-mention" style={{ "--who": COLORS[m.look.color] } as CSSProperties}>
-        <Sprocket look={m.look} size={14} seed={m.id} still />
-        <span className="sr-only">@</span>
-        {m.name}
-      </span>,
+      m ? (
+        <span key={found.start} className="sp-mention" style={{ "--who": COLORS[m.look.color] } as CSSProperties}>
+          <Sprocket look={m.look} size={14} seed={m.id} still />
+          <span className="sr-only">@</span>
+          {m.name}
+        </span>
+      ) : (
+        <span key={found.start} className="sp-mention" style={{ "--who": "var(--text-2)" } as CSSProperties}>
+          <span className="sr-only">@</span>
+          everyone
+        </span>
+      ),
     );
     at = found.end;
   }

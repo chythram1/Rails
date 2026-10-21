@@ -156,7 +156,7 @@ export function TeamDialog({ all, projects, onSaved, onClose, returnFocus }: Pro
       <form onSubmit={(e) => (e.preventDefault(), void save())}>
         <h2 id="team-title">New team</h2>
         <p id="team-desc" className="small-dialog-desc">
-          Your messages go to whoever you name or @mention, and the lead takes the rest. A reply can pass the turn on by mentioning another member.
+          Your messages go to whoever you @mention (or @everyone), and the lead takes the rest. Members can pass each other the turn.
         </p>
         <label className="sp-field-label" htmlFor="team-name">Name</label>
         <input

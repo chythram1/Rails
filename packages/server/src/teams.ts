@@ -1,14 +1,14 @@
-// Team chats (ADR 0022): the user and two to four Sprockets, the first the lead. The user's message goes to the
-// members it names (with an @ or without); naming no one, to those it's for (the decision model judges, or Rails'
-// rules), else the lead. A reply that @mentions others passes the turn to them. Only the user starts a round, and a round stops after
-// TEAM_TURNS_MAX turns, so Sprockets can't keep replying to each other. Runs themselves are runs.ts's: this decides
-// whose turn it is.
+// Team chats (ADR 0022, 0023): the user and two to four Sprockets, the first the lead. The user's message goes to the
+// members it @mentions (every member for @everyone); else, if it's a tapped option, to whoever asked; else to whom
+// the decision model says it's for, if one is set (an answer to a waiting question goes to its asker that way);
+// else to those whose questions wait for an answer; else the lead. Members pass the turn with pass_turn
+// (harness/turns.ts), which runs.ts carries out. This decides who answers the user.
 import type { ClassifierQuestion } from "@earendil-works/pi-ai";
-import { TEAM_MEMBERS_MAX, TEAM_MEMBERS_MIN, TEAM_TURNS_MAX, askedByName, findMentions, type SprocketTeam, type SprocketTeamInput, type SprocketMessage } from "@rails/shared";
+import { TEAM_MEMBERS_MAX, TEAM_MEMBERS_MIN, findMentions, type SprocketTeam, type SprocketTeamInput } from "@rails/shared";
 import { settings, sprocketChats, sprocketMessages, sprockets, suggestions, type StoredChat } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { findClassifier, models } from "./models.ts";
-import { onTurnEnded, requestReply, runningChat, userMessageTime } from "./runs.ts";
+import { answerWaiting, cancelRuns, chatTurns, requestReply, waitingAsks } from "./runs.ts";
 import { expireInChat } from "./suggestions.ts";
 import { listeners } from "./util.ts";
 
@@ -19,11 +19,6 @@ const teamChanges = listeners();
 export const onTeamsChanged = teamChanges.on;
 const changed = teamChanges.emit;
 
-/** The turns still to come after the user's latest message in a team, and how many were taken. */
-type Round = { queue: string[]; turns: number };
-const rounds = new Map<string, Round>();
-/** The member whose turn is going in each team, and the round it belongs to. */
-const active = new Map<string, { sprocketId: string; round: Round }>();
 /** Teams whose latest user message is with the decision model (who answers it), by a number per message. */
 const routing = new Map<string, number>();
 let routes = 0;
@@ -31,10 +26,9 @@ let routes = 0;
 function toTeam(chat: StoredChat): SprocketTeam {
   const members = sprocketChats.members(chat.id);
   const last = sprocketMessages.last(chat.id);
-  const replying = members.find((m) => runningChat(m) === chat.id);
-  // Whose turns are coming: the member whose turn it is, until its run starts (it may be busy in another chat), then the queue.
-  const turn = active.get(chat.id)?.sprocketId;
-  const waiting = [...(turn && turn !== replying ? [turn] : []), ...(rounds.get(chat.id)?.queue ?? [])].filter((m) => members.includes(m));
+  const turns = chatTurns(chat.id);
+  const replying = turns.replying;
+  const waiting = turns.queued.filter((m) => members.includes(m));
   return {
     id: chat.id,
     kind: "team",
@@ -133,48 +127,57 @@ const membersOf = (chatId: string): Member[] =>
     return s ? [{ id, name: s.name, description: s.description }] : [];
   });
 
+/** `@everyone` asks every member (ADR 0023). */
+const EVERYONE_TAG = /(^|[^\p{L}\p{N}_])@everyone(?![\p{L}\p{N}_])/iu;
+
 /**
- * The user wrote in a team: a new round, for the members the message is for. Turns still waiting
- * from the last round are dropped at once; a turn going now finishes first. When the decision model is asked who
- * answers, the round starts once it says (`routing` meanwhile).
+ * The user wrote in a team: the members it's for get turns, in order. Turns still queued from before are dropped at
+ * once; a turn going now finishes, but doesn't pass the turn on. When the decision model is asked who answers,
+ * the turns are queued once it says (`routing` meanwhile).
  */
 export function startRound(chatId: string, text: string, messageId?: string): void {
   const members = membersOf(chatId);
   const lead = members[0]?.id;
+  cancelRuns(chatId);
+  routing.delete(chatId);
   const begin = (picked: string[]) => {
-    rounds.set(chatId, { queue: leadFirst(picked.length ? picked : lead ? [lead] : [], lead), turns: 0 });
-    if (!active.has(chatId)) next(chatId);
+    for (const who of picked) requestReply(chatId, who, { trigger: "user", sourceId: messageId });
     changed();
   };
-  rounds.delete(chatId);
-  // The members it names, with an @ or without, answer: the same with a decision model or without one.
-  const picked = named(text, members);
-  const model = picked.length ? undefined : routingModel();
-  if (!model) {
-    routing.delete(chatId);
-    return begin(picked.length ? picked : byRules(chatId, text, members, messageId));
+  // Those it @mentions, in the order it does (every member for @everyone). It answers their questions too.
+  const picked = EVERYONE_TAG.test(text) ? members.map((m) => m.id) : mentioned(text, members);
+  if (picked.length) {
+    answerWaiting(chatId, text, picked);
+    return begin(picked);
   }
+  // Questions waiting for an answer: a tapped option goes to whoever asked it.
+  const asks = waitingAsks(chatId).filter((a) => members.some((m) => m.id === a.sprocketId));
+  const said = text.trim().toLowerCase();
+  const tapped = [...new Set(asks.filter((a) => a.options.some((o) => o.trim().toLowerCase() === said)).map((a) => a.sprocketId))];
+  if (tapped.length) {
+    answerWaiting(chatId, text, tapped);
+    return begin(tapped);
+  }
+  // Without the decision model, a typed message answers them all; with it, those it says it's for.
+  const fallback = () => {
+    const askers = answerWaiting(chatId, text).filter((id) => members.some((m) => m.id === id));
+    return askers.length ? askers : lead ? [lead] : [];
+  };
+  const model = routingModel();
+  if (!model) return begin(fallback());
   const n = ++routes;
   routing.set(chatId, n);
   changed();
-  void byModel(model, chatId, text, members, messageId)
+  const open = asks.map((a) => ({ name: members.find((m) => m.id === a.sprocketId)!.name, question: a.question }));
+  void byModel(model, chatId, text, members, messageId, open)
     .catch((e) => (console.error("teams: routing:", e), undefined))
     .then((judged) => {
       if (routing.get(chatId) !== n) return; // the user wrote again, or the chat was cleared
       routing.delete(chatId);
-      begin(judged ?? byRules(chatId, text, members, messageId));
+      if (!judged) return begin(fallback());
+      answerWaiting(chatId, text, judged);
+      begin(judged);
     });
-}
-
-/** The members `text` names, by @mention ("@Doc") or by their whole name ("Doc Keeper, …"), in the order it does. */
-export function named(text: string, members: { id: string; name: string }[]): string[] {
-  const at = new Map<string, number>();
-  for (const f of findMentions(text, members.map((m) => m.name))) if (!at.has(members[f.member].id)) at.set(members[f.member].id, f.start);
-  for (const m of members) {
-    const i = namedAt(text, m.name);
-    if (i >= 0 && !(at.get(m.id)! <= i)) at.set(m.id, i);
-  }
-  return [...at].sort((a, b) => a[1] - b[1]).map(([id]) => id);
 }
 
 /** The decision model, if the user picked one (Settings → Models): it says who a message without @ is for. */
@@ -219,6 +222,7 @@ export async function byModel(
   text: string,
   members: Member[],
   messageId: string | undefined,
+  open: { name: string; question: string }[] = [],
 ): Promise<string[] | undefined> {
   const questions: Record<string, ClassifierQuestion> = {};
   members.forEach((m, i) => {
@@ -227,14 +231,15 @@ export async function byModel(
       type: "bool",
       instructions: `This is a group chat between a user and a team of AI helpers. Should ${m.name}${lead ? " (the team's lead)" : ""} reply to the user's new message?`,
       criteria: {
-        true: `The message names ${m.name} or speaks to everyone; or it answers or follows up on what ${m.name} said last; or it asks about ${m.name}'s area and names no one else${lead ? "; or it's for the team in general and doesn't name anyone (the lead takes those)" : ""}.`,
-        false: `The message is for someone else: it names another helper, or follows up on another helper's last message${lead ? "" : "; or it's for the team in general and doesn't name anyone (the lead takes those)"}.`,
+        true: `The message speaks to everyone; or it speaks to ${m.name} by name ("${m.name}, …", "…, ${m.name}?"), even about another helper's area; or it answers or follows up on what ${m.name} said last (a question of theirs waiting for the user's answer, say); or it asks about ${m.name}'s area${lead ? "; or it's for the team in general (the lead takes those)" : ""}.`,
+        false: `The message speaks to another helper by name; or it follows up on another helper's last message, or asks about another helper's area${lead ? "" : "; or it's for the team in general (the lead takes those)"}.`,
       },
     };
   });
   const state = {
     team: members.map((m, i) => `${m.name}${i === 0 ? " (lead)" : ""}${m.description ? `: ${m.description.split("\n")[0].slice(0, 160)}` : ""}`),
     earlier_messages: before(chatId, members, messageId),
+    ...(open.length ? { questions_waiting_for_the_users_answer: open.map((q) => `${q.name}: ${q.question}`) } : {}),
     new_message_from_user: text.length > ROUTE_CHARS * 2 ? text.slice(0, ROUTE_CHARS * 2) + "…" : text,
   };
   const result = await models.classify(model, { state, questions }, { signal: AbortSignal.timeout(ROUTE_MS) });
@@ -252,71 +257,8 @@ export async function byModel(
   return several ? members.filter((m) => yes.some((y) => y.id === m.id)).map((m) => m.id) : [yes[0].id];
 }
 
-/** Where `text` names `name` as a whole word (any case), or -1. */
-function namedAt(text: string, name: string): number {
-  const lower = text.toLowerCase();
-  const n = name.toLowerCase();
-  for (let i = lower.indexOf(n); i >= 0; i = lower.indexOf(n, i + 1)) {
-    if (!/[\p{L}\p{N}_]/u.test(text[i - 1] ?? "") && !/[\p{L}\p{N}_]/u.test(text[i + n.length] ?? "")) return i;
-  }
-  return -1;
-}
-
-/**
- * Who a message that names no one is for, by Rails' rules (no decision model, or it failed): everyone when it says
- * so, the member who asked the user something in the last reply (not a teammate), else the lead.
- */
-export function byRules(chatId: string, text: string, members: Member[], messageId?: string): string[] {
-  if (EVERYONE.test(text)) return members.map((m) => m.id);
-  const list = sprocketMessages.list(chatId).filter((m) => m.author === "user" || m.author === "sprocket");
-  const end = messageId ? list.findIndex((m) => m.id === messageId) : -1;
-  const last = (end >= 0 ? list.slice(0, end) : list.slice(0, -1)).at(-1);
-  // A question in the last reply that isn't to a teammate was to the user, so the answer is for whoever asked.
-  const asker = last?.author === "sprocket" ? members.find((m) => m.id === last.sprocketId) : undefined;
-  if (asker && last!.text.includes("?") && !mentioned(last!.text, members.filter((m) => m !== asker)).length) return [asker.id];
-  return members[0] ? [members[0].id] : [];
-}
-
-/** The lead goes ahead of everyone waiting (ADR 0022): it answers first when it's mentioned with others. */
-const leadFirst = (queue: string[], lead: string | undefined) => (lead && queue.includes(lead) ? [lead, ...queue.filter((m) => m !== lead)] : queue);
-
-/** Stop a team's round (its chat was cleared): the turn going now ends without passing on. */
+/** Stop a team's turns (its chat was cleared, or it's deleted): queued ones and questions waiting are dropped. */
 export function endRound(chatId: string): void {
-  rounds.delete(chatId);
+  cancelRuns(chatId, { waiting: true });
   routing.delete(chatId);
 }
-
-/** Start the next turn of a team's round, if there's one and the round has turns left. */
-function next(chatId: string): void {
-  const round = rounds.get(chatId);
-  if (!round) return;
-  const members = sprocketChats.members(chatId);
-  round.queue = round.queue.filter((id) => members.includes(id)); // members who left meanwhile
-  const who = round.queue.shift();
-  if (!who) return void rounds.delete(chatId);
-  if (round.turns >= TEAM_TURNS_MAX) {
-    rounds.delete(chatId);
-    sprocketMessages.create(chatId, "notice", `Paused after ${TEAM_TURNS_MAX} replies in a row. Write to the team to go on.`, userMessageTime(chatId));
-    changed();
-    return;
-  }
-  round.turns++;
-  active.set(chatId, { sprocketId: who, round });
-  requestReply(chatId, who);
-}
-
-// A member's turn ended: the members its reply @mentions or asks by name get theirs (unless the user wrote
-// meanwhile), then the next turn. Members are told to @mention whoever they want an answer from, so a reply
-// that names no one ends the round; the decision model isn't asked (it's optional, ADR 0022).
-onTurnEnded((chatId: string, sprocketId: string, reply: SprocketMessage | undefined) => {
-  const turn = active.get(chatId);
-  if (turn?.sprocketId !== sprocketId) return; // its run in another chat, or not a team
-  active.delete(chatId);
-  const { round } = turn;
-  if (reply && rounds.get(chatId) === round) {
-    const others = membersOf(chatId).filter((m) => m.id !== sprocketId);
-    for (const id of [...mentioned(reply.text, others), ...askedByName(reply.text, others)]) if (!round.queue.includes(id)) round.queue.push(id);
-    round.queue = leadFirst(round.queue, sprocketChats.members(chatId)[0]);
-  }
-  next(chatId);
-});

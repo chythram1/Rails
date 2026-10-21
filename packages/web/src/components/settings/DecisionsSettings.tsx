@@ -34,7 +34,7 @@ export function DecisionsSettings({ settings }: { settings: ModelSettings }) {
       <h3 id="decisions-title">Fast decisions</h3>
       <p className="set-intro">
         A small, fast model hears questions Rails' rules miss, such as one without a question mark, and wakes the Coordinator
-        for them. It also tells who in a team a message that names no one is for. It sees the end of sessions' messages in projects with a
+        for them. It also tells who in a team a message without an @mention is for. It sees the end of sessions' messages in projects with a
         Coordinator, and teams' latest messages, which go to its provider.
       </p>
       <div className="set-row" id="setting-decision-model" data-settings-row tabIndex={-1}>
