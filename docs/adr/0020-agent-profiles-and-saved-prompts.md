@@ -1,4 +1,4 @@
-# ADR 0018: Agent profiles and saved prompts
+# ADR 0020: Agent profiles and saved prompts
 
 Status: accepted.
 

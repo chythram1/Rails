@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { IconArrowRight as ArrowRight, IconChevronLeft as ChevronLeft, IconLayoutSidebarRight as PanelRight, IconSettings as Cog, IconX as X } from "@tabler/icons-react";
+import { IconArrowRight as ArrowRight, IconChevronLeft as ChevronLeft, IconLayoutSidebarRight as PanelRight, IconPlus as Plus, IconSettings as Cog, IconX as X } from "@tabler/icons-react";
 import {
   SPROCKET_DESCRIPTION_MAX,
   SPROCKET_RULE_MAX,
@@ -257,73 +257,75 @@ function NameField({ sprocket, onDone }: { sprocket: SprocketData; onDone(ok: bo
 }
 
 /**
- * A Coordinator's standing rules (ADR 0011): one plain sentence each, numbered as the Sprocket reads them.
- * An edited rule is saved when its field loses focus (Enter does that too: rules are one line of thought);
- * a new one is added with Enter or Add, and removing one saves at once.
+ * A Coordinator's standing rules (ADR 0011): one plain sentence each, numbered as the Sprocket reads them, in one
+ * ruled list. A rule turns into a field only while it's edited, and is saved when it loses focus (Enter does that
+ * too: rules are one line of thought). "Add" in the heading opens a new row at the end: Enter adds the rule and
+ * leaves a fresh row for the next one, Escape closes it. Removing a rule saves at once.
  */
 function RulesField({ sprocket, onSave }: { sprocket: SprocketData; onSave(rules: string[]): Promise<boolean> }) {
-  const [draft, setDraft] = useState("");
-  const draftRef = useAutoGrow(draft);
-  const full = sprocket.rules.length >= SPROCKET_RULES_MAX;
-  const add = async () => {
-    const rule = draft.trim();
-    if (rule && !full && (await onSave([...sprocket.rules, rule]))) setDraft("");
+  const [adding, setAdding] = useState(false);
+  const addButton = useRef<HTMLButtonElement>(null);
+  const refocus = useRef(false);
+  const { rules } = sprocket;
+  const full = rules.length >= SPROCKET_RULES_MAX;
+  const stopAdding = (back: boolean) => {
+    refocus.current = back;
+    setAdding(false);
   };
+  // Back to "Add" once it's enabled again (it's disabled while the new row is open).
+  useEffect(() => {
+    if (adding || !refocus.current) return;
+    refocus.current = false;
+    addButton.current?.focus();
+  }, [adding]);
   return (
     <div className="settings-field sp-rules" role="group" aria-labelledby="sp-rules-label">
-      <p id="sp-rules-label" className="sp-field-label">Rules</p>
-      <p className="muted small">How it answers sessions, one sentence each.</p>
-      {sprocket.rules.length > 0 && (
+      <div className="sp-field-head">
+        <p id="sp-rules-label" className="sp-field-label">Rules</p>
+        <button
+          ref={addButton}
+          type="button"
+          className="btn small"
+          disabled={full || adding}
+          title={full ? `That's ${SPROCKET_RULES_MAX} rules, the most a Sprocket can have.` : undefined}
+          onClick={() => setAdding(true)}
+        >
+          <Plus size={14} aria-hidden />
+          Add
+        </button>
+      </div>
+      <p className="muted small">
+        How it answers sessions, one sentence each{rules.length || adding ? "." : ", e.g. “If it asks whether to continue with its plan, say yes.”"}
+      </p>
+      {(rules.length > 0 || adding) && (
         <ol className="sp-rules-list">
-          {sprocket.rules.map((rule, i) => (
+          {rules.map((rule, i) => (
             <RuleRow
               key={`${i}:${rule}`}
               n={i + 1}
               rule={rule}
-              onSave={(next) => onSave(sprocket.rules.map((r, j) => (j === i ? next : r)).filter((r) => r.trim()))}
-              onRemove={() => onSave(sprocket.rules.filter((_, j) => j !== i))}
+              onSave={(next) => onSave(rules.map((r, j) => (j === i ? next : r)).filter((r) => r.trim()))}
+              onRemove={() => onSave(rules.filter((_, j) => j !== i))}
             />
           ))}
+          {adding && !full && (
+            <NewRule
+              n={rules.length + 1}
+              onAdd={(rule) => onSave([...rules, rule])}
+              last={rules.length + 1 >= SPROCKET_RULES_MAX}
+              onDone={stopAdding}
+            />
+          )}
         </ol>
       )}
-      {full ? (
-        <p className="muted small">That's {SPROCKET_RULES_MAX} rules, the most a Sprocket can have.</p>
-      ) : (
-        <form
-          className="sp-rule-add"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void add();
-          }}
-        >
-          <textarea
-            ref={draftRef}
-            className="input"
-            rows={1}
-            aria-label="New rule"
-            maxLength={SPROCKET_RULE_MAX}
-            placeholder={sprocket.rules.length ? "Add a rule" : "e.g. “If it asks whether to continue with its plan, say yes.”"}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value.replace(/\n/g, " "))}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void add();
-              }
-            }}
-          />
-          {draft.trim() && (
-            <div className="sp-field-foot">
-              <span className="muted small">{draft.length} / {SPROCKET_RULE_MAX}</span>
-              <span className="grow" />
-              <button type="button" className="btn small" onClick={() => setDraft("")}>Cancel</button>
-              <button className="btn small primary">Add</button>
-            </div>
-          )}
-        </form>
-      )}
+      {full && <p className="muted small">That's {SPROCKET_RULES_MAX} rules, the most a Sprocket can have.</p>}
     </div>
   );
+}
+
+/** How many characters a rule has, once it nears the limit. */
+function RuleCount({ text }: { text: string }) {
+  return text.length > SPROCKET_RULE_MAX - 40 ? <span className="sp-rule-count muted small">{text.length}/{SPROCKET_RULE_MAX}</span> : null;
 }
 
 /** One rule, editable in place. Emptying it removes it; Escape puts it back. */
@@ -357,9 +359,59 @@ function RuleRow({ n, rule, onSave, onRemove }: { n: number; rule: string; onSav
           }
         }}
       />
+      <RuleCount text={text} />
       <button type="button" className="icon-btn sp-rule-remove" aria-label={`Remove rule ${n}`} title="Remove" onClick={onRemove}>
         <X size={14} />
       </button>
+    </li>
+  );
+}
+
+/**
+ * The row "Add" opens, at the end of the list. Enter adds its rule and empties it for the next (unless that made
+ * the last one there's room for); leaving it adds what's typed and closes it; Escape closes it without adding.
+ */
+function NewRule({ n, last, onAdd, onDone }: { n: number; last: boolean; onAdd(rule: string): Promise<boolean>; onDone(refocus: boolean): void }) {
+  const [text, setText] = useState("");
+  const ref = useAutoGrow(text);
+  const closing = useRef(false);
+  useEffect(() => ref.current?.focus(), [ref]);
+  const add = async (then: "next" | "close") => {
+    const rule = text.trim();
+    if (!rule) return onDone(then === "next");
+    if (!(await onAdd(rule))) return;
+    setText("");
+    if (then === "close" || last) onDone(then === "next");
+  };
+  return (
+    <li className="sp-rule editing">
+      <span className="sp-rule-n" aria-hidden>{n}</span>
+      <textarea
+        ref={ref}
+        className="sp-rule-text"
+        rows={1}
+        aria-label="New rule"
+        maxLength={SPROCKET_RULE_MAX}
+        placeholder={n === 1 ? "e.g. “If it asks whether to continue with its plan, say yes.”" : "A rule in one sentence"}
+        value={text}
+        onChange={(e) => setText(e.target.value.replace(/\n/g, " "))}
+        onBlur={() => {
+          if (closing.current) return;
+          void add("close");
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            void add("next");
+          }
+          if (e.key === "Escape") {
+            e.stopPropagation(); // don't close the panel
+            closing.current = true;
+            onDone(true);
+          }
+        }}
+      />
+      <RuleCount text={text} />
     </li>
   );
 }
@@ -478,7 +530,6 @@ function DescriptionField({ sprocket, onSave }: { sprocket: SprocketData; onSave
   const [text, setText] = useState(sprocket.description);
   const [editing, setEditing] = useState(false);
   const reverting = useRef(false);
-  const ref = useAutoGrow(text);
   useEffect(() => {
     if (!editing) setText(sprocket.description);
   }, [sprocket.description, editing]);
@@ -491,10 +542,9 @@ function DescriptionField({ sprocket, onSave }: { sprocket: SprocketData; onSave
     <div className="settings-field">
       <label htmlFor="sp-description">Description</label>
       <textarea
-        ref={ref}
         id="sp-description"
-        className="input sp-grow"
-        rows={2}
+        className="input sp-fixed"
+        rows={6}
         maxLength={SPROCKET_DESCRIPTION_MAX}
         placeholder="What it's for and how it should work, e.g. “Keep an eye on the PRs in this project and tell me what looks risky.”"
         value={text}

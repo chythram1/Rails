@@ -18,7 +18,9 @@ Decisions:
 - **Rules first, then judgment.** A rule that fits beats the Coordinator's own judgment; without one it
   suggests as before. `suggest_reply` takes the rule's number, which is resolved against the rules the run
   read (the user may edit them meanwhile), and the suggestion keeps the rule's text. The card shows
-  "Following your rule: …"; a suggestion without one is the Coordinator's judgment.
+  "Following your rule: …"; a suggestion without one is the Coordinator's judgment. The tool's result repeats
+  the cited rule's words, so the model checks it fits the question and was followed (in test run 2 it cited
+  "pick the simpler one" for a yes-or-no question, and for picking the more complex option).
 - **Rules can't widen what a Coordinator may do.** No rule lets it suggest approving a permission or a
   command, or send anything without the user (ADR 0010).
 

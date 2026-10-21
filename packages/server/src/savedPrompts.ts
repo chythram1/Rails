@@ -1,4 +1,4 @@
-// Saved prompts (ADR 0018): a name and a text the user starts agents with. Home's composer and Sprocket chats fill
+// Saved prompts (ADR 0020): a name and a text the user starts agents with. Home's composer and Sprocket chats fill
 // one in; any Sprocket can read them (`harness/prompts.ts`).
 import { SAVED_PROMPT_NAME_MAX, SAVED_PROMPT_TEXT_MAX, type SavedPrompt, type SavedPromptInput } from "@rails/shared";
 import { savedPrompts } from "./db.ts";

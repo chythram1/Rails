@@ -14,7 +14,7 @@ import { ProviderIcon } from "./ProviderIcon.tsx";
 export function Home({ promptId }: { promptId?: string }) {
   const { projects, providers, picking, agentProfiles, savedPrompts } = useStore();
   const [selected, setSelected] = useState("");
-  /** An agent's id, or `profile:<id>` for an agent profile (ADR 0018). */
+  /** An agent's id, or `profile:<id>` for an agent profile (ADR 0020). */
   const [agent, setAgent] = useState<string>("claude");
   const [fill, setFill] = useState<{ text: string }>();
   const [error, setError] = useState("");

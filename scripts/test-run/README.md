@@ -34,9 +34,14 @@ picks another). Each run keeps its state, log, server logs and report in `.test-
   installs a scripted model for a repeatable check of the harness itself.
 - `decisionModel`: a classifier ref, `null` to turn it off, or left out to keep the home's setting.
 - `sprocket`: the project's one Sprocket (its Coordinator): name, model, description, rules.
+- `nameSessions`: `true` names each agent's session in Rails after the agent (ADR 0019), so the Coordinator and
+  the agents' tools call them "engine", "ui"… A new Codex panel is named once Rails knows its thread (after its
+  first prompt); `status` and `watch` name any agent whose panel shows no name, so a Codex panel that moves on to
+  another thread is named again.
 - `agents`: each with a `name` (for `prompt`), its `kind`, and optionally its `model`, as the agent's `/model`
-  picker labels it ("Sonnet 5.5", "gpt-6-luna"). Picking a model is for that session only: your defaults stay.
-  Codex runs on its default model.
+  picker labels it ("Sonnet 5.5", "gpt-6-luna"; for pi, "openai-codex/gpt-6.1-sol" when the same id is under more
+  than one provider). Picking a model is for that session only: your defaults stay. Codex runs on its default
+  model.
 
 ## What setup does to each agent
 

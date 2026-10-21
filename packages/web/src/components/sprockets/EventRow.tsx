@@ -8,8 +8,9 @@ import { PanelIcon } from "../PanelMenu.tsx";
  * session, what it asked (the dialog's questions, or the end of its last message), and a link to its
  * panel. Or a session that changed files other sessions changed shortly before (overlaps.ts, ADR 0014):
  * which sessions, and the files. Or a session a handoff waits for that finished a turn (ADR 0015): which
- * session it's for and what to pass on. The Coordinator's take follows as a normal reply; when it found
- * nothing for the user, a line says so.
+ * session it's for and what to pass on. Or an agent's message for another session (ADR 0018): only who wants to
+ * tell, since the draft card under it names the session it's for and holds the text. The Coordinator's take
+ * follows as a normal reply; when it found nothing for the user, a line says so.
  */
 export function EventRow({ message, projectId, name }: { message: SprocketMessage; projectId?: string; name: string }) {
   const e = message.event!;
@@ -19,14 +20,14 @@ export function EventRow({ message, projectId, name }: { message: SprocketMessag
       <p className="sp-event-head">
         <PanelIcon kind={e.kind} />
         <span className="sp-event-title truncate" title={e.title}>{shortTitle(e.title)}</span>
-        <span className="sp-event-what">{e.what === "handoff" ? "finished a turn; hand off to" : e.what === "overlap" ? (e.overlaps?.every((o) => o.owns) ? "changed files owned by" : "changed the same files as") : e.what === "turn_end" ? "is waiting for your reply" : "is asking you"}</span>
+        <span className="sp-event-what">{e.what === "message" ? "wants to tell" : e.what === "handoff" ? "finished a turn; hand off to" : e.what === "overlap" ? (e.overlaps?.every((o) => o.owns) ? "changed files owned by" : "changed the same files as") : e.what === "turn_end" ? "is waiting for your reply" : "is asking you"}</span>
         {open && (
           <a className="sp-event-open" href={open}>
             Open<span className="sr-only"> {e.title}</span>
           </a>
         )}
       </p>
-      {e.what === "handoff" && e.handoff ? (
+      {e.what === "message" ? null : e.what === "handoff" && e.handoff ? (
         <ul className="sp-event-quote">
           <li>
             <span className="sp-event-with">

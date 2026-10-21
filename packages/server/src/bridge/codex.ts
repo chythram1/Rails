@@ -22,6 +22,16 @@ const MAP_WITHIN_MS = 2 * 60_000;
 
 type Send = (msg: object) => void;
 
+/**
+ * When a thread started. Codex's thread ids are UUIDv7s, whose first 48 bits are that time in ms; `createdAt` isn't
+ * reliable: a thread that hasn't saved a turn reports the time it was read.
+ */
+export function threadStarted(thread: { id?: unknown; createdAt?: unknown }): number {
+  const hex = typeof thread.id === "string" ? thread.id.replace(/-/g, "") : "";
+  if (/^[0-9a-f]{12}7[0-9a-f]{19}$/i.test(hex)) return parseInt(hex.slice(0, 12), 16);
+  return typeof thread.createdAt === "number" ? thread.createdAt * 1000 : Date.now();
+}
+
 /** New Codex panels waiting for their thread, oldest first. */
 interface Pending {
   panelId: string;
@@ -35,6 +45,8 @@ interface Pending {
  */
 export class CodexWatcher {
   private pending: Pending[] = [];
+  /** Panels whose thread hasn't had a turn yet: a newer thread in their folder replaces it (see `started`). */
+  private unused = new Map<string, { threadId: string; cwd: string; started: number; at: number }>();
   private subscribed = new Set<string>();
   private nextId = 1;
   private replies = new Map<number, (result: any, error?: unknown) => void>();
@@ -75,6 +87,8 @@ export class CodexWatcher {
     if (!threadId) return;
     const panel = panels.bySession(threadId);
     if (!panel || panel.kind !== "codex") return; // the user's own Codex sessions outside Rails
+    const turn = msg.method.startsWith("turn/") || msg.method.startsWith("item/") || params.status?.type === "active";
+    if (turn && this.unused.get(panel.id)?.threadId === threadId) this.unused.delete(panel.id);
     if (!this.subscribed.has(threadId)) this.subscribe(threadId);
     noteShell(panel.id, "codex", msg.method, params);
     record(panel.id, fromCodex(msg.method, params), threadId);
@@ -86,14 +100,22 @@ export class CodexWatcher {
     if (known) return this.subscribe(thread.id); // a resumed session
     this.pending = this.pending.filter((p) => Date.now() - p.since < MAP_WITHIN_MS && panels.get(p.panelId));
     const cwd = typeof thread.cwd === "string" ? real(thread.cwd) : undefined;
+    if (!cwd) return;
     // Only threads started after the panel: the user may have their own Codex session in the same folder.
-    const created = typeof thread.createdAt === "number" ? thread.createdAt * 1000 : Date.now();
-    const i = this.pending.findIndex((p) => p.cwd === cwd && created >= p.since - 5000);
-    if (i < 0) return;
-    const [p] = this.pending.splice(i, 1);
-    this.assign(p.panelId, thread.id);
-    this.subscribe(thread.id);
-    record(p.panelId, [{ kind: "start", sessionId: thread.id }], thread.id);
+    const started = threadStarted(thread);
+    const i = this.pending.findIndex((p) => p.cwd === cwd && started >= p.since - 5000);
+    if (i >= 0) return this.link(this.pending.splice(i, 1)[0].panelId, cwd, thread.id, started);
+    // Codex can start a thread it never uses: in a folder it hasn't trusted yet, one at launch and the real one after
+    // the trust prompt. A panel whose thread hasn't had a turn moves to a newer one in its folder.
+    for (const [panelId, u] of this.unused)
+      if (u.cwd === cwd && started > u.started && Date.now() - u.at < MAP_WITHIN_MS && panels.get(panelId)) return this.link(panelId, cwd, thread.id, started);
+  }
+
+  private link(panelId: string, cwd: string, threadId: string, started: number) {
+    this.unused.set(panelId, { threadId, cwd, started, at: Date.now() });
+    this.assign(panelId, threadId);
+    this.subscribe(threadId);
+    record(panelId, [{ kind: "start", sessionId: threadId }], threadId);
   }
 
   /**

@@ -127,11 +127,14 @@ export function sendMessage(sprocketId: string, rawText: unknown): SprocketMessa
   return message;
 }
 
-/** A session in a Coordinator's project waits for the user (watches.ts): put it in the chat and wake the Coordinator. */
-export function postEvent(sprocketId: string, event: SprocketEvent, text: string): SprocketMessage {
+/**
+ * A session in a Coordinator's project waits for the user (watches.ts): put it in the chat and wake the Coordinator.
+ * With `wake: false` (an agent's draft, ADR 0018) it only goes in the chat: the Coordinator reads it when it next runs.
+ */
+export function postEvent(sprocketId: string, event: SprocketEvent, text: string, { wake = true } = {}): SprocketMessage {
   const message = sprocketMessages.create(sprocketId, "event", text, userMessageTime(sprocketId), { event });
   changed();
-  requestReply(sprocketId);
+  if (wake) requestReply(sprocketId);
   return message;
 }
 

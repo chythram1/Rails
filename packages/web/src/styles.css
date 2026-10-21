@@ -166,7 +166,7 @@ button.link { padding: 0; border: 0; background: none; color: var(--blue); font-
 
 /* The logo (Logo.tsx): 50 × 23px (its 156 × 72 box at 0.32), the ball 22px. Ink in the text colour, feet in --muted,
    so it follows the theme. The same place in both states: the ball's middle (66 units, 21.15px into the box) on
-   --icon-x, which puts the tip of the tail on the rows' 8px edge. */
+   --icon-x, which puts its nose on the rows' 8px edge. */
 .logo-armadillo {
   display: block; flex-shrink: 0; width: 50px; height: 23.08px; overflow: visible;
   margin-left: calc(var(--icon-x) - var(--side-pad) - 21.15px);
@@ -235,11 +235,22 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
 }
 .project-name.active { color: var(--text); font-weight: 500; }
 .row-actions { display: flex; align-items: center; }
-/* Secondary row actions appear on hover or keyboard focus; always visible on touch screens. */
+/* Secondary row actions appear on hover or keyboard focus (not the focus a click leaves on the row's own button);
+   always visible on touch screens. */
 .project-row .reveal { opacity: 0; }
-.project-row:hover .reveal, .project-row:focus-within .reveal, .reveal[aria-expanded="true"] { opacity: 1; }
+.project-row:hover .reveal, .project-row:has(:focus-visible) .reveal, .reveal[aria-expanded="true"] { opacity: 1; }
 .icon-btn[aria-expanded="true"] { background: var(--surface-2); color: var(--text); }
 @media (hover: none) { .project-row .reveal { opacity: 1; } }
+/* A session's menu button sits over its time and takes its place on hover or focus; touch screens give it room. */
+.session-item { position: relative; }
+/* Centred without a transform, which would become the containing block of the menu's fixed position. */
+.session-item .row-actions { position: absolute; top: 0; bottom: 0; right: 4px; }
+@media (hover: hover) {
+  .session-item .reveal { opacity: 0; }
+  .session-item:is(:hover, :has(:focus-visible)) .reveal, .session-item .reveal[aria-expanded="true"] { opacity: 1; }
+  .session-item:is(:hover, :has(:focus-visible), :has(.reveal[aria-expanded="true"])) .session-time { opacity: 0; }
+}
+@media (hover: none) { .session-item .session-row { padding-right: 40px; } }
 .session-row {
   display: flex; align-items: center; gap: 10px;
   padding: 7px 12px 7px 16px; border-radius: var(--row-r); font-size: 14px; color: var(--text-2);
@@ -431,6 +442,34 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .set-text p { margin: 0; color: var(--muted); font-size: 13px; text-wrap: pretty; }
 .set-row > :is(.dropdown, .input) { width: min(300px, 50%); flex-shrink: 0; }
 .set-row > .btn { flex-shrink: 0; }
+/* The decision model's threshold (DecisionsSettings.tsx): a 4px track filled up to a square thumb, in the state colour
+   of how risky the value is (green, amber, red), a tick at the default, and the value in percent. Greyed out while
+   the decision model is off. --at and --default are 0–1 along the track. */
+.threshold { --tone: var(--green); display: flex; align-items: center; gap: 12px; width: min(300px, 50%); flex-shrink: 0; }
+.threshold.caution { --tone: var(--amber); }
+.threshold.danger { --tone: var(--red); }
+.threshold.off { --tone: var(--idle); }
+.threshold-track { position: relative; flex: 1; display: flex; align-items: center; height: 24px; }
+.threshold input[type="range"] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 24px; margin: 0; background: none; cursor: pointer;
+}
+.threshold input[type="range"]:disabled { cursor: not-allowed; }
+.threshold input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px; background: linear-gradient(to right, var(--tone) calc(7px + (100% - 14px) * var(--at)), var(--border-strong) 0);
+}
+.threshold input[type="range"]::-moz-range-track { height: 4px; background: var(--border-strong); }
+.threshold input[type="range"]::-moz-range-progress { height: 4px; background: var(--tone); }
+.threshold input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 14px; height: 14px; margin-top: -5px;
+  border: 2px solid var(--tone); background: var(--surface); box-sizing: border-box;
+}
+.threshold input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border: 2px solid var(--tone); border-radius: 0; background: var(--surface); box-sizing: border-box; }
+.threshold input[type="range"]:focus-visible { outline: none; }
+.threshold input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.threshold input[type="range"]:focus-visible::-moz-range-thumb { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.threshold-default { position: absolute; top: 4px; bottom: 4px; width: 1px; left: calc(7px + (100% - 14px) * var(--default)); background: var(--muted); pointer-events: none; }
+.threshold-value { min-width: 4ch; text-align: right; font: 13px var(--mono); font-variant-numeric: tabular-nums; color: var(--text-2); }
+.threshold.off .threshold-value { color: var(--muted); }
 .set-facts { margin: 0; }
 .set-facts dt { font-size: 14px; }
 .set-facts dd { margin: 0; font-size: 14px; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
@@ -447,14 +486,17 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .btn:disabled { opacity: 0.5; }
 
 /* The avatar picker: a small square modal over Settings. */
-.avatar-dialog {
+/* Small modals: the avatar picker and Rename session (RenameSession.tsx). */
+.avatar-dialog, .small-dialog {
   max-width: calc(100vw - 32px); padding: 0; border: 1px solid var(--border-strong); border-radius: 0;
   background: var(--dialog); color: var(--text); box-shadow: var(--shadow-pop);
 }
-.avatar-dialog::backdrop { background: rgb(0 0 0 / 0.4); }
-.avatar-dialog form { display: flex; flex-direction: column; padding: 24px 28px; }
-.avatar-dialog h2 { margin: 0 0 6px; font-size: 18px; font-weight: 600; }
-.avatar-dialog form > p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+.small-dialog { width: 440px; }
+.avatar-dialog::backdrop, .small-dialog::backdrop { background: rgb(0 0 0 / 0.4); }
+.avatar-dialog form, .small-dialog form { display: flex; flex-direction: column; padding: 24px 28px; }
+.avatar-dialog h2, .small-dialog h2 { margin: 0 0 6px; font-size: 18px; font-weight: 600; }
+.avatar-dialog form > p, .small-dialog-desc { margin: 0 0 20px; color: var(--muted); font-size: 14px; text-wrap: pretty; }
+.small-dialog .error { margin: 8px 0 0; }
 .avatar-grid { display: grid; grid-template-columns: repeat(8, 52px); gap: 14px; }
 .avatar-option { position: relative; width: 52px; height: 52px; border-radius: 50%; cursor: pointer; }
 .avatar-option:has(input:checked) .avatar { box-shadow: 0 0 0 3px var(--dialog), 0 0 0 5px var(--text); }
@@ -463,7 +505,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
   position: absolute; right: -4px; bottom: -4px; width: 20px; height: 20px; display: grid; place-items: center;
   border-radius: 50%; background: var(--text); color: var(--dialog); box-shadow: 0 0 0 2px var(--dialog);
 }
-.avatar-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+.avatar-actions, .small-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
 
 /* ---- pages ---- */
 .page { width: 100%; max-width: 1080px; margin: 0 auto; padding: 72px 32px 48px; overflow-y: auto; }
@@ -503,9 +545,11 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .composer.compact textarea { flex: 1; font-size: 15px; padding: 11px 14px; min-height: 0; }
 .composer.compact .composer-row { height: auto; border-top: 0; }
 .composer.compact .send-btn { width: 44px; min-height: 44px; }
-/* A control beside the send block (the saved prompts), as tall as it. */
-.composer.compact .composer-controls { flex: none; }
-.composer.compact .composer-controls .icon-btn { width: 44px; height: 100%; min-height: 44px; }
+/* The saved prompts (SavedPromptsMenu, ADR 0020): an icon block ruled like the pickers beside it, or beside the send
+   block in a compact one. */
+.composer-controls > .composer-prompts { width: 44px; height: 100%; border-right: 1px solid var(--border); }
+.composer.compact .composer-controls > .composer-prompts { height: auto; border-right: 0; border-left: 1px solid var(--border); }
+.composer-prompts:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
 
 /* ---- workspace: terminal panels (dockview + xterm) ---- */
 .workspace { display: flex; flex-direction: column; height: 100%; min-height: 0; }
@@ -602,7 +646,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .mobile-tab { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 180px; }
 .mobile-tabs .tab-close { opacity: 1; }
 
-/* ---- side panel (SidePanel.tsx): a project's Sprockets and Git, beside its panes, behind one toggle ---- */
+/* ---- side panel (SidePanel.tsx): a project's Sprockets, Files and Git, beside its panes, behind one toggle ---- */
 .side-panel {
   width: 400px; flex-shrink: 0; border-left: 1px solid var(--border); background: var(--bg);
   display: flex; flex-direction: column; min-height: 0;
@@ -640,6 +684,39 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .git-code.c-mod { color: var(--amber); }
 .git-code.c-del { color: var(--red); }
 .diff { flex: 1; overflow: auto; margin: 0; font: 12px/1.6 var(--mono); padding: 8px 0; }
+/* The Files tab (FilesPanel.tsx): a tree of 26px rows, indented 14px a level, a chevron for folders, then the icon,
+   the name and, for a changed file, its git letter at the right in the state colour (the name tinted too); a folder
+   holding changes gets a dot. What git ignores is muted. A file opens in place of the tree, with line numbers. */
+.file-tree { list-style: none; margin: 0; padding: 4px 0; flex: 1; min-height: 0; overflow-y: auto; font-size: 13px; }
+.file-row {
+  display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 14px 0 calc(8px + var(--depth) * 14px);
+  color: var(--text-2); cursor: pointer; user-select: none;
+}
+.file-row:hover { background: var(--hover); }
+.file-row:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+.file-chev { flex: none; width: 14px; color: var(--muted); }
+.file-row[aria-expanded="true"] > .file-chev { transform: rotate(90deg); }
+.file-icon { flex: none; color: var(--muted); }
+.file-name { flex: 1; min-width: 0; }
+.file-mark { flex: none; width: 12px; text-align: center; font: 11px var(--mono); }
+.file-dot { flex: none; width: 6px; height: 6px; margin: 0 3px; border-radius: 50%; background: currentColor; }
+.file-row.t-new :is(.file-name, .file-mark, .file-dot) { color: var(--green); }
+.file-row.t-mod :is(.file-name, .file-mark, .file-dot) { color: var(--amber); }
+.file-row.t-del :is(.file-name, .file-mark, .file-dot) { color: var(--red); }
+.file-row.ignored :is(.file-name, .file-icon) { color: var(--muted); opacity: 0.75; }
+.file-row.t-del:not([aria-expanded]) .file-name { text-decoration: line-through; }
+.file-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.file-path { min-width: 0; font: 12px var(--mono); color: var(--text-2); }
+.file-views { display: flex; margin-right: 4px; border: 1px solid var(--border-strong); }
+.file-view-btn { padding: 2px 8px; font-size: 12px; color: var(--muted); }
+.file-view-btn[aria-pressed="true"] { background: var(--surface-2); color: var(--text); }
+.file-body { flex: 1; min-height: 0; overflow: auto; }
+.file-text { margin: 0; padding: 8px 0; font: 12px/1.6 var(--mono); counter-reset: line; }
+.file-text > div { padding-right: 14px; white-space: pre; }
+.file-text > div::before {
+  counter-increment: line; content: counter(line); display: inline-block; width: 4ch; margin-right: 12px;
+  text-align: right; color: var(--muted); user-select: none;
+}
 .diff > div { padding: 0 14px; white-space: pre; }
 .diff .add { background: var(--diff-add); color: var(--diff-add-ink); }
 .diff .del { background: var(--diff-del); color: var(--diff-del-ink); }
@@ -859,7 +936,8 @@ ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
 }
 .sp-suggestion-text:focus-visible { outline: none; } /* the card's border shows focus */
 .sp-suggestion-text:disabled { color: var(--text-2); }
-.sp-suggestion-rule { margin-top: 8px; margin-bottom: 0; color: var(--muted); font-size: 13px; text-wrap: pretty; }
+.sp-suggestion-rule,
+.sp-suggestion-from { margin-top: 8px; margin-bottom: 0; color: var(--muted); font-size: 13px; text-wrap: pretty; }
 /* A handoff's attached words (ADR 0015): collapsed under the text, a quote when open, scrolling past 12 lines. */
 .sp-attachment { margin-top: 8px; }
 .sp-attachment-summary { display: flex; align-items: center; gap: 6px; width: fit-content; max-width: 100%; list-style: none; cursor: pointer; color: var(--muted); font-size: 13px; }
@@ -902,24 +980,29 @@ ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
 .sp-panel-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 16px 16px 24px; display: flex; flex-direction: column; gap: 28px; }
 /* A page's fields, 16px apart; Delete sits 28px below them (twice the gap inside). */
 .sp-section { display: flex; flex-direction: column; gap: 16px; }
-textarea.input.sp-grow { resize: none; overflow: hidden; }
+/* The description: a fixed height that scrolls, so the panel doesn't shift as lines come and go. */
+textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .sp-danger-zone { display: flex; }
 .sp-panel .settings-field > :is(.input, .dropdown) { width: 100%; }
 .sp-field-foot { display: flex; align-items: center; gap: 8px; }
 .sp-field-label { font-size: 13px; color: var(--text-2); }
-/* A Coordinator's rules (SprocketSettings.tsx): numbered rows that are fields themselves (the row takes the
-   field's focus edge), each with a remove button, then a field to add one. */
-.sp-rules-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.sp-rule {
-  display: flex; align-items: flex-start; gap: 8px; padding: 5px 3px 5px 11px;
-  border: 1px solid var(--border-field); background: var(--field);
-}
-.sp-rule:focus-within { border-color: var(--border-focus); }
-.sp-rule-n { flex: none; min-width: 1ch; padding-top: 3px; color: var(--muted); font: 12px/1.5 var(--mono); }
+/* A Coordinator's rules (SprocketSettings.tsx): one ruled list of numbered sentences. A row turns into a field
+   (--field, the focus edge) only while it's edited; its remove button shows on hover or focus. "Add" sits in the
+   heading. */
+.sp-field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sp-field-head .btn svg { margin-left: -4px; }
+.sp-rules-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+.sp-rule { display: flex; align-items: flex-start; gap: 8px; padding: 6px 3px 6px 8px; border-bottom: 1px solid var(--border); }
+.sp-rule:hover { background: var(--hover); }
+.sp-rule:focus-within, .sp-rule.editing { background: var(--field); box-shadow: inset 0 0 0 1px var(--border-focus); }
+.sp-rule .sp-rule-remove { opacity: 0; }
+.sp-rule:is(:hover, :has(:focus-visible)) .sp-rule-remove { opacity: 1; }
+@media (hover: none) { .sp-rule .sp-rule-remove { opacity: 1; } }
+.sp-rule-count { flex: none; padding-top: 3px; font-variant-numeric: tabular-nums; }
+.sp-rule-n { flex: none; min-width: 2ch; padding-top: 3px; text-align: right; color: var(--muted); font: 12px/1.5 var(--mono); } /* room for 10 */
 .sp-rule-text { flex: 1; min-width: 0; padding: 2px 0; border: 0; background: none; font-size: 14px; line-height: 1.5; resize: none; overflow: hidden; }
 .sp-rule-text:focus-visible { outline: none; } /* the row's border shows focus */
 .sp-rule-remove { flex: none; width: 26px; height: 26px; }
-.sp-rule-add { display: flex; flex-direction: column; gap: 6px; }
 /* Pending handoffs (ADR 0015): ruled rows like the rules, the route on top and the note under it. */
 .sp-handoffs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .sp-handoff {
@@ -932,8 +1015,7 @@ textarea.input.sp-grow { resize: none; overflow: hidden; }
 .sp-handoff-arrow { flex: none; color: var(--muted); }
 .sp-handoff-note { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .sp-owner-paths { margin: 0; font-family: var(--mono); font-size: 11.5px; line-height: 1.6; color: var(--text-2); overflow-wrap: anywhere; }
-.sp-rule-add textarea.input { width: 100%; resize: none; overflow: hidden; }
-/* ---- Customize: agent profiles and saved prompts (components/customize, ADR 0018), on the Sprockets page's list and header ---- */
+/* ---- Customize: agent profiles and saved prompts (components/customize, ADR 0020), on the Sprockets page's list and header ---- */
 .sp-row.cz-new-row { width: 100%; margin-top: 10px; border: 0; background: none; color: var(--text-2); font-size: 14px; text-align: left; }
 .cz-list-note { margin: 0; padding: 4px 6px 8px; }
 .sp-group-title.cz-group-gap { margin-top: 18px; }
@@ -955,6 +1037,8 @@ textarea.input.cz-prompt-text { min-height: 200px; }
 textarea.input.cz-instructions { width: 100%; min-height: 96px; max-height: 480px; overflow-y: auto; resize: none; line-height: 1.5; }
 .cz-warn, .set-text p.cz-warn { margin: 0; color: var(--red); font-size: 13px; }
 .cz-actions { display: flex; gap: 8px; margin-top: 12px; }
+/* Tool patterns: the Sprocket rules' rows, then a field to add one. */
+.cz-field > .sp-rule-add { display: flex; flex-direction: column; gap: 6px; }
 .cz-end { gap: 0; }
 .cz-end > .set-intro { margin-top: 0; }
 /* Skills and MCP servers: ruled rows, the name and where it's from on top, then what it is. */
@@ -1090,13 +1174,13 @@ textarea.input.cz-instructions { width: 100%; min-height: 96px; max-height: 480p
    Navigation (sidebar rows, Settings sections, the Sprocket list, gallery cards) takes the blue tint;
    actions (menu items, buttons, icon buttons, files) take a neutral fill. ---- */
 @media (hover: hover) {
-  .nav-item:hover:not(.active, .primary), .project-row:hover, .session-row:hover:not(.active), .empty-hint:hover, .account-row:hover,
+  .nav-item:hover:not(.active, .primary), .project-row:hover, .session-item:hover .session-row:not(.active), .empty-hint:hover, .account-row:hover,
   .settings-tab:hover:not([aria-selected="true"]), .settings-result:hover, .sp-row:hover:not([aria-current="page"]) {
     background: var(--tint); color: var(--tint-ink);
   }
   .project-row:hover .project-name, .more:hover { color: var(--tint-ink); }
-  .project-row:hover .muted, .session-row:hover:not(.active) .muted, .sp-row:hover:not([aria-current="page"]) .muted { color: var(--tint-ink); }
-  .project-row .icon-btn:hover { background: color-mix(in srgb, var(--tint-ink) 14%, transparent); color: var(--tint-ink); }
+  .project-row:hover .muted, .session-item:hover .session-row:not(.active) .muted, .sp-row:hover:not([aria-current="page"]) .muted { color: var(--tint-ink); }
+  .project-row .icon-btn:hover, .session-item .icon-btn:hover { background: color-mix(in srgb, var(--tint-ink) 14%, transparent); color: var(--tint-ink); }
   .icon-btn:hover, .tab-close:hover { background: var(--hover); color: var(--text); }
   .avatar-btn:hover .avatar-edit { opacity: 1; }
   .sp-jump:hover { background: var(--hover); }
@@ -1150,7 +1234,7 @@ textarea.input.cz-instructions { width: 100%; min-height: 96px; max-height: 480p
   .settings-panel-body { padding: 20px 16px 24px; gap: 32px; }
   .settings-title { font-size: 24px; }
   .set-row { flex-wrap: wrap; gap: 10px 24px; }
-  .set-row > :is(.dropdown, .input) { width: 100%; }
+  .set-row > :is(.dropdown, .input, .threshold) { width: 100%; }
   .avatar-grid { grid-template-columns: repeat(4, 52px); }
 }
 @media (prefers-reduced-motion: reduce) {

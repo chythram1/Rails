@@ -19,7 +19,7 @@ packages/
 ## Runtime picture
 
 ```
- browser(s) ──HTTP /api/*──▶ Hono (index.ts) ──▶ services: projects.ts, panels.ts, git.ts
+ browser(s) ──HTTP /api/*──▶ Hono (index.ts) ──▶ services: projects.ts, panels.ts, git.ts, customize.ts
      ▲                                             │          │
      │                                             │          ├─▶ db.ts: projects, panels, layouts (SQLite)
      │                                             │          └─▶ tmux.ts: new-session / kill / running panels
@@ -32,6 +32,9 @@ packages/
    session p-<panelId> ──▶ `claude --resume <id>` | `pi --session <id>` | `codex resume <id>` | $SHELL -l
 ```
 
+- **Titles:** a session shows the name the user gave it in Rails (ADR 0019, `names.ts`), else the agent's own title
+  (Claude Code's `custom-title` or `ai-title`, pi's `/name`, Codex's thread name in `session_index.jsonl`), else its
+  first prompt. `sessionTitle` in `titles.ts` is the one place that decides.
 - **History** lives in provider transcripts. Rails reads them for discovery (titles, dates, the sidebar)
   and, when a Sprocket asks, the end of one transcript (`session_conversation`, at most its last 1 MB). The
   agents write their own transcripts while they run in panels.
@@ -40,6 +43,7 @@ packages/
   front (`--session-id`), so the panel knows its session immediately. New Codex panels don't know their
   session id. Opening a session that already has a running panel returns that panel.
   `DELETE /api/panels/:id` kills the tmux session.
+  An agent profile adds its flags to the command line (see **Customize** below).
 - **Terminals:** each browser terminal sends `term.attach` with its size and a page-unique `attachId`; the server spawns
   `tmux attach` in a PTY for it and streams bytes both ways. Killing that PTY only detaches. While a
   browser terminal is being resized it refits (and reports `term.resize`) at most every 100ms, plus once at
@@ -75,7 +79,7 @@ packages/
   `suggestions.ts`, ADR 0010), shown under its message; when the user sends it, `bridge/deliver.ts` puts it into
   the session: Claude Code's message socket, the pi extension's long poll (`GET /bridge/<panelId>/pi/inbox`, confirmed with `POST …/pi/delivered`) or
   Codex's `thread/queue/add`. Suggestions expire as soon as their session moves on. A handoff (ADR 0015, `handoffs.ts`, planned by the Coordinator when the user asks) wakes it when its session ends a turn without a question, to draft the message for the other session; handoffs expire after 24 hours and are cancelled when either session ends. Owners (ADR 0016, `owners.ts`), recorded by the Coordinator with `set_owner`, route its requests; an edit to files another session owns wakes it like an overlap. Shell commands' edits count too (`shellEdits.ts`): Rails compares `git status` and file times at a command's start and end. Each run's usage goes in `sprocket_usage`. An overlap also wakes the Coordinator, for the session that changed the files second (batched over 15 s, once per pair and file per 30 minutes); it judges whether they clash and may draft a heads-up with `suggest_message`. A Coordinator's standing rules (ADR 0011) are in its prompt, numbered; a suggestion records the rule it followed. If the user picked a decision model, `decisions.ts` (ADR 0012) asks it about every turn end and unknown dialog in projects with a Coordinator, through pi-ai's `classify()`, and logs its answers next to Rails' own (`decisions` table, `GET /api/decisions`, `decisions.changed`). It may also wake the Coordinator (ADR 0013, `wakeFromModel` in `watches.ts`) for a question the rules missed, unless the session moved on meanwhile; `RAILS_DECISIONS=shadow` keeps it to judging.
-- **Agent profiles** (ADR 0018, `agentProfiles.ts`): saved ways to start Claude Code, made in Customize and
+- **Agent profiles** (ADR 0020, `agentProfiles.ts`): saved ways to start Claude Code, made in Customize and
   stored in SQLite (`agent_profiles`). `openPanel` adds the profile's flags after the bridge's (the one in
   `agentProfileId`, else the session's own, else the agent's default; `launchProfile()`): `--model`, `--effort`, `--permission-mode`, `--append-system-prompt`, `--allowedTools` / `--disallowedTools`,
   `--mcp-config <json>` (`--strict-mcp-config` for "Only these servers") and `--plugin-dir` for skills. The
@@ -89,7 +93,9 @@ packages/
   `saved_prompts`) fill Home's composer and Sprocket chats, and Sprockets read them with `saved_prompts`. Changes
   to either are broadcast as `customize.changed`. Routes: `GET/POST /api/agent-profiles`,
   `PUT/DELETE /api/agent-profiles/:id`, `GET /api/agent-profiles/:id/panels` (where it's in use),
-  `GET/POST /api/prompts`, `PUT/DELETE /api/prompts/:id`, `GET /api/skills`, `POST /api/skills/import`.
+  `GET/POST /api/prompts`, `PUT/DELETE /api/prompts/:id`, `GET /api/skills`, `POST /api/skills/import`. The web
+  pages are `#/customize`, `#/customize/profiles/<id>` and `#/customize/prompts/<id>`; a profile's Start opens a
+  panel with it, and a prompt's "Use on Home" goes to `#/new/<promptId>`, which fills Home's composer.
 - **Persistence:** panels survive browser disconnects and server restarts (`tsx watch` included).
   On a reboot the tmux server is gone; the next workspace read drops panels whose tmux session no
   longer exists. Their transcripts remain, so sessions can be resumed from the sidebar.
@@ -97,7 +103,7 @@ packages/
   server stores it opaquely. The server's panel list is the source of truth: on load the client
   restores the layout, then adds panels missing from it and removes ones that were closed.
   `panels.changed` broadcasts keep other devices' panel lists current. Beside the panes, a side panel
-  (`SidePanel.tsx`) shows the project's Sprocket's chat (one per project, ADR 0016) or Git; panels with a suggested reply waiting
+  (`SidePanel.tsx`) shows the project's Sprocket's chat (one per project, ADR 0016), its files (a tree with each file's git state, `tree.ts`) or Git; panels with a suggested reply waiting
   (`Sprocket.pending`) get a mark on their tab.
 - **Sprockets** (ADR 0005, 0006): `sprockets.ts` stores Sprockets, their chats and settings (project, model,
   description, whether it's its project's Coordinator; core memory stays internal) in SQLite and broadcasts `sprockets.changed`. A user message (or, for a Coordinator, an event) starts a run (`runs.ts`): a
@@ -142,16 +148,23 @@ packages/
 
 ## Provider support matrix
 
-| Provider | Discovery | Panels (new / resume) | Agent profiles (ADR 0018) |
+| Provider | Discovery | Panels (new / resume) | Agent profiles (ADR 0020) |
 | --- | --- | --- | --- |
 | claude | ✅ `~/.claude/projects/*/*.jsonl` | ✅ `claude --session-id <uuid> [-- prompt]` / `claude --resume <id>` | ✅ model, effort, permission mode, instructions, tools, MCP servers, skills |
 | pi | ✅ `~/.pi/agent/sessions/*/*.jsonl` | ✅ `pi --session-id <uuid> [-- prompt]` / `pi --session <id>` | — |
-| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl` (checked with Codex 0.163) | ✅ `codex [-- prompt]` / `codex resume <id>`; a new panel learns its session id from Codex's daemon (ADR 0007) | — (any `-c` flag takes a panel off the daemon) |
+| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl`, names from `~/.codex/session_index.jsonl` (checked with Codex 0.163) | ✅ `codex [-- prompt]` / `codex resume <id>`; a new panel learns its session id from Codex's daemon (ADR 0007) | — (any `-c` flag takes a panel off the daemon) |
 
 Every provider panel reports to the bridge (ADR 0007): Claude Code through hooks, pi through the Rails
 extension, Codex through its app-server daemon. Edits count for overlaps (ADR 0014) once they worked: Claude
 Code's PostToolUse, pi's tool end without an error, Codex's completed file changes (checked live with all
-three). Files changed by shell commands aren't seen.
+three). Files changed by shell commands count too (ADR 0016).
+
+Agent tools (ADR 0018): Claude Code and pi panels get Rails' MCP server at `/bridge/<panel>/mcp`, behind the
+panel's token (`agentTools.ts`): Claude Code from `--mcp-config`, pi from the Rails extension. `neighbours` shows an
+agent the other sessions in its project; `message` drafts a message for one of them, which waits in the
+Coordinator's chat until the user sends it (no model runs); `wait_for` waits, up to 100 seconds a call, until
+another session ends its turn, stops, fails or needs its user. Codex panels get none (it would need the user's config
+or a `-c` flag), but they receive messages.
 
 A provider is only offered when its CLI is on the server's `PATH` (`ProviderInfo.installed`).
 Transcript format notes are in [providers.md](./providers.md).

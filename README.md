@@ -37,12 +37,16 @@ Status:
 - Sprockets (ADR 0005, 0006): always-on agent characters that reply on your own model provider (API key
   or "Continue with ChatGPT"), attach to a project, follow a short description you write and see what every session
   in the project is doing (ADR 0007)
-- Agent profiles in Customize (ADR 0018): saved ways to start Claude Code (model, effort, instructions, permission
-  mode, tools, MCP servers and skills), picked from the `+` menu or on Home, with one default per agent; resuming a
-  session reapplies its profile
-- Saved prompts in Customize (ADR 0018), filled into Home's composer and Sprocket chats
 - A red dot when an agent needs you (a permission, a question) or its turn failed, and an amber mark when
   two sessions change the same files (ADR 0014)
+- Agent tools (ADR 0018): Claude Code and pi sessions can see what the other sessions in their project are doing,
+  wait for one to finish, and draft messages for them, which you read and send
+- Session names (ADR 0019): rename a session from its menu in the sidebar or by double-clicking its tab, and
+  Rails, the Coordinator and the agents call it by that name
+- Customize (ADR 0020): agent profiles that start Claude Code with your model, effort, permission mode,
+  instructions, tools, MCP servers and skills (picked from the `+` menu or on Home, one default per agent; start one
+  in a project from Customize, and see where it's in use; resuming a session reapplies its profile), and saved
+  prompts for Home's and Sprocket chats' composer. Sprockets see which profile each session started with.
 
 Docs: [architecture](docs/architecture.md) · [glossary](docs/CONTEXT.md) · [decisions](docs/adr) · [provider formats](docs/providers.md) · [roadmap](docs/roadmap.md)
 

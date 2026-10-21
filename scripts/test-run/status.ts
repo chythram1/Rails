@@ -50,13 +50,16 @@ export function status(state: RunState, { lines = 4, advance = true } = {}): Sta
     }
     if (idle === state.config.agents.length) attention.push("every agent is idle");
 
-    const drafts = all<{ id: string; mode: string; title: string; text: string; attachment: string | null }>(
+    const drafts = all<{ id: string; mode: string; title: string; text: string; attachment: string | null; sender: string | null }>(
       db,
-      "SELECT id, mode, title, text, attachment FROM suggestions WHERE sprocket_id = ? AND status = 'pending' AND message_id IS NOT NULL ORDER BY created_at",
+      "SELECT id, mode, title, text, attachment, sender FROM suggestions WHERE sprocket_id = ? AND status = 'pending' AND message_id IS NOT NULL ORDER BY created_at",
       state.sprocketId ?? "",
     );
     out.push("-- drafts waiting for you");
-    for (const d of drafts) out.push(`   ${d.id.slice(0, 8)} [${d.mode}] for ${oneLine(d.title, 30)}: ${oneLine(d.text, 160)}${d.attachment ? " (+ the agent's own words)" : ""}`);
+    for (const d of drafts) {
+      const from = d.sender ? ` from ${oneLine((JSON.parse(d.sender) as { title: string }).title, 30)}` : "";
+      out.push(`   ${d.id.slice(0, 8)} [${d.mode}${from}] for ${oneLine(d.title, 30)}: ${oneLine(d.text, 160)}${d.attachment ? " (+ the agent's own words)" : ""}`);
+    }
     if (drafts.length) attention.push(`${drafts.length} draft${drafts.length > 1 ? "s" : ""} to send, edit or dismiss`);
 
     const messages = all<{ created_at: string; author: string; what: string | null; quiet: number | null; text: string; activity: string | null }>(
@@ -95,10 +98,11 @@ export function status(state: RunState, { lines = 4, advance = true } = {}): Sta
  * Look every 10 s until something needs the user, or `maxSec` passes. Every agent being idle only counts after
  * the first 15 s (a prompt just typed hasn't reached Rails yet). Prints the last look and everything new.
  */
-export async function watch(state: RunState, maxSec: number): Promise<string> {
+export async function watch(state: RunState, maxSec: number, tick?: () => Promise<void>): Promise<string> {
   const started = Date.now();
   const news: string[] = [];
   for (;;) {
+    await tick?.().catch(() => {});
     const s = status(state);
     news.push(...s.news);
     const now = Date.now();

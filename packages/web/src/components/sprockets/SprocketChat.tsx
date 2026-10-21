@@ -47,7 +47,7 @@ export function SprocketChat({ sprocket, panelOpen, embedded = false }: { sprock
   const [reveal, setReveal] = useState<{ text: string; live: boolean; id?: string } | null>(null);
   /** The reply's run log while it's written: the step it's on, and what it has done so far. */
   const [activity, setActivity] = useState<{ step: string | null; summary: string | null }>({ step: null, summary: null });
-  /** A saved prompt to put in the composer (ADR 0018). */
+  /** A saved prompt to put in the composer (Customize, ADR 0020). */
   const [fill, setFill] = useState<{ text: string }>();
   /** Messages already shown; null until the first load, whose messages show at once. */
   const seen = useRef<Set<string> | null>(null);

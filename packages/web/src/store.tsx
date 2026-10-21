@@ -7,7 +7,7 @@ import { socket } from "./ws.ts";
 interface Store {
   projects: Project[];
   providers: ProviderInfo[];
-  /** Agent profiles and saved prompts (ADR 0018), by name; null until loaded. */
+  /** Agent profiles and saved prompts (ADR 0020), by name; null until loaded. */
   agentProfiles: AgentProfile[] | null;
   savedPrompts: SavedPrompt[] | null;
   /** Why they couldn't be loaded, if they couldn't. */

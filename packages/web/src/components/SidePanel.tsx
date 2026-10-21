@@ -1,16 +1,17 @@
 import { IconArrowUpRight as ArrowUpRight, IconX as X } from "@tabler/icons-react";
 import type { Sprocket as SprocketData } from "@rails/shared";
 import { href } from "../router.ts";
+import { FilesPanel } from "./FilesPanel.tsx";
 import { GitPanel } from "./GitPanel.tsx";
 import { Sprocket } from "./sprockets/Sprocket.tsx";
 import { SprocketChat } from "./sprockets/SprocketChat.tsx";
 import { onTabKeys } from "./tabKeys.ts";
 
-export type SideView = "sprockets" | "git";
+export type SideView = "sprockets" | "files" | "git";
 
 /**
- * The panel beside a project's workspace, opened by one toggle in the pane header (Workspace.tsx), with two
- * tabs: the project's Sprockets (their chats, where suggested replies wait) and Git. Refs: Snowflake's CoCo,
+ * The panel beside a project's workspace, opened by one toggle in the pane header (Workspace.tsx), with three
+ * tabs: the project's Sprockets (their chats, where suggested replies wait), its Files and Git. Refs: Snowflake's CoCo,
  * Gumloop.
  */
 export function SidePanel(props: {
@@ -44,6 +45,7 @@ export function SidePanel(props: {
       <header className="side-head">
         <div className="side-views" role="tablist" aria-label="Show" onKeyDown={onTabKeys}>
           {tab("sprockets", "Sprockets", waiting > 0)}
+          {tab("files", "Files")}
           {tab("git", "Git")}
         </div>
         <span className="grow" />
@@ -52,7 +54,13 @@ export function SidePanel(props: {
         </button>
       </header>
       <div id="side-view" className="side-view" role="tabpanel" aria-labelledby={`side-tab-${view}`}>
-        {view === "git" ? <GitPanel projectId={projectId} refreshKey={props.refreshKey} /> : <SprocketView projectName={projectName} sprocket={sprocket} />}
+        {view === "git" ? (
+          <GitPanel projectId={projectId} refreshKey={props.refreshKey} />
+        ) : view === "files" ? (
+          <FilesPanel projectId={projectId} refreshKey={props.refreshKey} />
+        ) : (
+          <SprocketView projectName={projectName} sprocket={sprocket} />
+        )}
       </div>
     </aside>
   );

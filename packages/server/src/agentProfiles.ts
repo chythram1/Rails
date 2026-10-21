@@ -1,4 +1,4 @@
-// Agent profiles (ADR 0018): saved ways to start an agent, turned into command-line flags when a panel starts.
+// Agent profiles (ADR 0020): saved ways to start an agent, turned into command-line flags when a panel starts.
 // Rails never writes the agents' own settings; skills reach Claude Code through a plugin folder per panel.
 import { mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -114,7 +114,7 @@ function parseInput(body: Record<string, unknown>, selfId?: string): AgentProfil
 
   const description = str(body.description).trim();
   if (description.length > AGENT_PROFILE_DESCRIPTION_MAX) throw bad(`Descriptions can be at most ${AGENT_PROFILE_DESCRIPTION_MAX} characters.`);
-  // Codex and pi aren't mapped yet (ADR 0018).
+  // Codex and pi aren't mapped yet (ADR 0020).
   if ((body.provider ?? "claude") !== "claude") throw bad("Agent profiles are for Claude Code for now.");
   const model = str(body.model).trim();
   if (model.length > 100 || !/^[A-Za-z0-9._:\[\]-]*$/.test(model)) throw bad("That doesn't look like a model name, like opus or claude-sonnet-5-5.");

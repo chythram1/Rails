@@ -51,7 +51,7 @@ const PERMISSION_HELP: Record<PermissionMode | "", string> = {
 const skillKey = (r: SkillRef) => `${r.source}:${r.name}`;
 
 /**
- * One agent profile (ADR 0018), in Settings-style groups. Everything saves as you go: a text field when it loses
+ * One agent profile (ADR 0020), in Settings-style groups. Everything saves as you go: a text field when it loses
  * focus (Enter for one-line fields; Escape puts it back), a choice at once, and "Saved" shows in the header for a
  * moment. Open panels keep the settings they started with.
  */
@@ -405,7 +405,7 @@ function InstructionsField({ profile, onSave }: { profile: AgentProfile; onSave(
       <textarea
         ref={ref}
         id="cz-instructions"
-        className="input sp-grow cz-instructions"
+        className="input cz-instructions"
         rows={4}
         maxLength={AGENT_PROFILE_INSTRUCTIONS_MAX}
         placeholder="e.g. You work on the frontend. Follow DESIGN.md, reuse the tokens in styles.css and check every screen in both themes."
@@ -653,11 +653,11 @@ function McpForm({ initial, onSave, onCancel }: { initial?: McpServer; onSave(s:
           </div>
           <div className="settings-field">
             <label htmlFor={`${id}-args`}>Arguments</label>
-            <textarea ref={argsRef} id={`${id}-args`} className="input mono sp-grow" rows={1} placeholder="One per line, e.g. -y" value={args} onChange={(e) => setArgs(e.target.value)} />
+            <textarea ref={argsRef} id={`${id}-args`} className="input mono" rows={1} placeholder="One per line, e.g. -y" value={args} onChange={(e) => setArgs(e.target.value)} />
           </div>
           <div className="settings-field">
             <label htmlFor={`${id}-env`}>Environment</label>
-            <textarea ref={envRef} id={`${id}-env`} className="input mono sp-grow" rows={1} placeholder="One per line, e.g. GITHUB_TOKEN=${GITHUB_TOKEN}" value={env} onChange={(e) => setEnv(e.target.value)} />
+            <textarea ref={envRef} id={`${id}-env`} className="input mono" rows={1} placeholder="One per line, e.g. GITHUB_TOKEN=${GITHUB_TOKEN}" value={env} onChange={(e) => setEnv(e.target.value)} />
           </div>
         </>
       ) : (
@@ -668,7 +668,7 @@ function McpForm({ initial, onSave, onCancel }: { initial?: McpServer; onSave(s:
           </div>
           <div className="settings-field">
             <label htmlFor={`${id}-headers`}>Headers</label>
-            <textarea ref={headersRef} id={`${id}-headers`} className="input mono sp-grow" rows={1} placeholder="One per line, e.g. Authorization: Bearer ${API_TOKEN}" value={headers} onChange={(e) => setHeaders(e.target.value)} />
+            <textarea ref={headersRef} id={`${id}-headers`} className="input mono" rows={1} placeholder="One per line, e.g. Authorization: Bearer ${API_TOKEN}" value={headers} onChange={(e) => setHeaders(e.target.value)} />
           </div>
         </>
       )}

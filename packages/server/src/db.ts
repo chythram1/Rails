@@ -79,25 +79,13 @@ addColumn("sprocket_messages", "steps", "TEXT");
 /** On an event: the SprocketEvent, as JSON. */
 addColumn("sprocket_messages", "event", "TEXT");
 addColumn("panels", "bridge_token", "TEXT");
-/** The agent profile it started with (ADR 0018), as JSON: a PanelProfile. */
+/** The agent profile it started with (ADR 0020), as JSON: a PanelProfile, since the profile may change later. */
 addColumn("panels", "profile", "TEXT");
+/** Which agent profile started a session, so resuming it can use the same one (ADR 0020). */
 db.exec(`
-  CREATE TABLE IF NOT EXISTS agent_profiles (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE,
-    json TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
   CREATE TABLE IF NOT EXISTS session_profiles (
     session_id TEXT PRIMARY KEY,
     agent_profile_id TEXT NOT NULL
-  );
-  CREATE TABLE IF NOT EXISTS saved_prompts (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    text TEXT NOT NULL,
-    created_at TEXT NOT NULL
   );
 `);
 db.exec(`
@@ -135,6 +123,9 @@ addColumn("suggestions", "rule", "TEXT");
 addColumn("suggestions", "queued", "INTEGER NOT NULL DEFAULT 0");
 /** On a handoff's message: what the finished session said last, as JSON {title, text} (ADR 0015). */
 addColumn("suggestions", "attachment", "TEXT");
+/** On an agent's message: the session that drafted it, as JSON {panelId, kind, title} (ADR 0018). */
+addColumn("suggestions", "sender", "TEXT");
+addColumn("suggestions", "edited", "INTEGER NOT NULL DEFAULT 0");
 db.exec(`
   -- Shadow judgments of the fast decision model (ADR 0012). Kept to the latest few hundred.
   CREATE TABLE IF NOT EXISTS decisions (
@@ -154,7 +145,36 @@ db.exec(`
     event_message_id TEXT
   );
   CREATE INDEX IF NOT EXISTS decisions_by_panel ON decisions (panel_id, at);
+  -- Customize (ADR 0020). A profile's launch options are JSON, checked by the service when read, so options
+  -- for more agents don't need new columns.
+  CREATE TABLE IF NOT EXISTS agent_profiles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    is_default INTEGER NOT NULL DEFAULT 0,
+    options TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS saved_prompts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
 `);
+addColumn("agent_profiles", "updated_at", "TEXT");
+// An earlier shape kept everything but the name in a `json` column: move it into `options` (agent and default
+// were in it too).
+if ((db.prepare("PRAGMA table_info(agent_profiles)").all() as { name: string }[]).some((c) => c.name === "json")) {
+  addColumn("agent_profiles", "agent", "TEXT NOT NULL DEFAULT 'claude'");
+  addColumn("agent_profiles", "is_default", "INTEGER NOT NULL DEFAULT 0");
+  addColumn("agent_profiles", "options", "TEXT NOT NULL DEFAULT '{}'");
+  db.exec(`
+    UPDATE agent_profiles SET options = json, agent = coalesce(json_extract(json, '$.provider'), 'claude'),
+      is_default = coalesce(json_extract(json, '$.isDefault'), 0);
+    ALTER TABLE agent_profiles DROP COLUMN json;
+  `);
+}
 db.exec(`
   -- Handoffs a Coordinator planned (ADR 0015). Status: pending, done, cancelled or expired.
   CREATE TABLE IF NOT EXISTS handoffs (
@@ -189,9 +209,19 @@ db.exec(`
     cost REAL NOT NULL
   );
   CREATE INDEX IF NOT EXISTS sprocket_usage_by_sprocket ON sprocket_usage (sprocket_id);
+  -- The names the user gave sessions in Rails (names.ts), by session, so they outlive the panels.
+  CREATE TABLE IF NOT EXISTS session_names (
+    provider TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (provider, session_id)
+  );
 `);
 /** On a judgment: 1 when it woke the Coordinator itself (ADR 0013). */
 addColumn("decisions", "acted", "INTEGER NOT NULL DEFAULT 0");
+addColumn("handoffs", "from_session_id", "TEXT");
+addColumn("handoffs", "to_session_id", "TEXT");
 
 type Row = { id: string; name: string; path: string; created_at: string };
 const toProject = (r: Row): Project => ({ id: r.id, name: r.name, path: r.path, createdAt: r.created_at });
@@ -214,15 +244,7 @@ export const projects = {
   },
 };
 
-type PanelRow = {
-  id: string;
-  project_id: string;
-  kind: PanelKind;
-  session_id: string | null;
-  title: string;
-  profile: string | null;
-  created_at: string;
-};
+type PanelRow = { id: string; project_id: string; kind: PanelKind; session_id: string | null; title: string; created_at: string; profile: string | null };
 const toPanel = (r: PanelRow): Panel => ({
   id: r.id,
   projectId: r.project_id,
@@ -231,6 +253,7 @@ const toPanel = (r: PanelRow): Panel => ({
   title: r.title,
   ...(r.profile ? { profile: JSON.parse(r.profile) as PanelProfile } : {}),
   createdAt: r.created_at,
+  ...(r.profile ? { profile: JSON.parse(r.profile) } : {}),
 });
 
 export const panels = {
@@ -250,14 +273,14 @@ export const panels = {
   },
   create(p: Omit<Panel, "id" | "createdAt">): Panel {
     const panel: Panel = { ...p, id: randomUUID(), createdAt: new Date().toISOString() };
-    db.prepare("INSERT INTO panels (id, project_id, kind, session_id, title, profile, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
+    db.prepare("INSERT INTO panels (id, project_id, kind, session_id, title, created_at, profile) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
       panel.id,
       panel.projectId,
       panel.kind,
       panel.sessionId ?? null,
       panel.title,
-      panel.profile ? JSON.stringify(panel.profile) : null,
       panel.createdAt,
+      panel.profile ? JSON.stringify(panel.profile) : null,
     );
     return panel;
   },
@@ -472,7 +495,9 @@ type SuggestionRow = {
   text: string;
   rule: string | null;
   attachment: string | null;
+  sender: string | null;
   queued: number;
+  edited: number;
   status: Suggestion["status"];
   error: string | null;
   created_at: string;
@@ -490,9 +515,11 @@ const toSuggestion = (r: SuggestionRow): Suggestion & { sprocketId: string; mess
   text: r.text,
   ...(r.rule ? { rule: r.rule } : {}),
   ...(r.attachment ? { attachment: JSON.parse(r.attachment) as NonNullable<Suggestion["attachment"]> } : {}),
+  ...(r.sender ? { from: JSON.parse(r.sender) as NonNullable<Suggestion["from"]> } : {}),
   status: r.status,
   ...(r.error ? { error: r.error } : {}),
   ...(r.queued ? { queued: true } : {}),
+  ...(r.edited ? { edited: true } : {}),
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -508,12 +535,27 @@ export const suggestions = {
     text: string;
     rule?: string;
     attachment?: Suggestion["attachment"];
+    from?: Suggestion["from"];
   }) {
     const id = randomUUID();
     const now = new Date().toISOString();
     db.prepare(
-      "INSERT INTO suggestions (id, sprocket_id, panel_id, kind, title, session_id, mode, text, rule, attachment, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
-    ).run(id, s.sprocketId, s.panelId, s.kind, s.title, s.sessionId ?? null, s.mode, s.text, s.rule ?? null, s.attachment ? JSON.stringify(s.attachment) : null, now, now);
+      "INSERT INTO suggestions (id, sprocket_id, panel_id, kind, title, session_id, mode, text, rule, attachment, sender, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+    ).run(
+      id,
+      s.sprocketId,
+      s.panelId,
+      s.kind,
+      s.title,
+      s.sessionId ?? null,
+      s.mode,
+      s.text,
+      s.rule ?? null,
+      s.attachment ? JSON.stringify(s.attachment) : null,
+      s.from ? JSON.stringify(s.from) : null,
+      now,
+      now,
+    );
     return this.get(id)!;
   },
   get(id: string) {
@@ -535,6 +577,19 @@ export const suggestions = {
     const rows = db.prepare("SELECT DISTINCT panel_id FROM suggestions WHERE sprocket_id = ? AND status = 'pending' AND message_id IS NOT NULL").all(sprocketId) as { panel_id: string }[];
     return rows.map((r) => r.panel_id);
   },
+  /** How many of the messages a session drafted for others wait for the user (ADR 0018). */
+  pendingFrom(panelId: string): number {
+    const r = db.prepare("SELECT count(*) AS n FROM suggestions WHERE status = 'pending' AND json_extract(sender, '$.panelId') = ?").get(panelId) as { n: number };
+    return Number(r.n);
+  },
+  /** The messages a session drafted for others since `since` (ADR 0018), newest first, without replaced ones. */
+  byAgent(panelId: string, since: string) {
+    return (
+      db
+        .prepare("SELECT * FROM suggestions WHERE json_extract(sender, '$.panelId') = ? AND created_at >= ? AND status != 'replaced' ORDER BY created_at DESC, rowid DESC")
+        .all(panelId, since) as SuggestionRow[]
+    ).map(toSuggestion);
+  },
   /** Pending ones for a panel (from any Sprocket). */
   pendingFor(panelId: string) {
     return (db.prepare("SELECT * FROM suggestions WHERE panel_id = ? AND status = 'pending'").all(panelId) as SuggestionRow[]).map(toSuggestion);
@@ -554,12 +609,12 @@ export const suggestions = {
   drop(ids: string[]): void {
     for (const id of ids) db.prepare("DELETE FROM suggestions WHERE id = ? AND message_id IS NULL").run(id);
   },
-  /** Change the status if it's one of `from`. False when it wasn't (someone else changed it first). */
-  setStatus(id: string, from: Suggestion["status"][], to: Suggestion["status"], extra: { error?: string; text?: string; queued?: boolean } = {}): boolean {
+  /** Change the status if it's one of `from`. False when it wasn't (someone else changed it first). Once edited, it stays edited. */
+  setStatus(id: string, from: Suggestion["status"][], to: Suggestion["status"], extra: { error?: string; text?: string; queued?: boolean; edited?: boolean } = {}): boolean {
     const marks = from.map(() => "?").join(", ");
     const r = db
-      .prepare(`UPDATE suggestions SET status = ?, error = ?, text = COALESCE(?, text), queued = ?, updated_at = ? WHERE id = ? AND status IN (${marks})`)
-      .run(to, extra.error ?? null, extra.text ?? null, extra.queued ? 1 : 0, new Date().toISOString(), id, ...from);
+      .prepare(`UPDATE suggestions SET status = ?, error = ?, text = COALESCE(?, text), queued = ?, edited = MAX(edited, ?), updated_at = ? WHERE id = ? AND status IN (${marks})`)
+      .run(to, extra.error ?? null, extra.text ?? null, extra.queued ? 1 : 0, extra.edited ? 1 : 0, new Date().toISOString(), id, ...from);
     return r.changes > 0;
   },
 };
@@ -656,10 +711,16 @@ export const decisions = {
   },
 };
 
-type AgentProfileRow = { id: string; name: string; json: string; created_at: string; updated_at: string };
-// Fields added since a row was saved get their empty value.
-const toAgentProfile = (r: AgentProfileRow): AgentProfile => ({ effort: "", isDefault: false, ...JSON.parse(r.json), id: r.id, name: r.name, createdAt: r.created_at, updatedAt: r.updated_at });
-/** Agent profiles (ADR 0018). Everything but the name is one JSON column: it's only ever read whole. */
+type AgentProfileRow = { id: string; name: string; agent: AgentProfile["provider"]; is_default: number; options: string; created_at: string; updated_at: string | null };
+/** Options a row doesn't have (saved before they existed) get their empty value. */
+const NO_OPTIONS = { description: "", model: "", effort: "", permissionMode: "", instructions: "", skills: [], allowedTools: [], disallowedTools: [], mcpServers: [], mcpOnly: false } as const;
+const toAgentProfile = (r: AgentProfileRow): AgentProfile => {
+  // An older row's options may still hold its agent and default; the columns win.
+  const { provider: _p, isDefault: _d, ...options } = JSON.parse(r.options);
+  return { ...NO_OPTIONS, ...options, id: r.id, name: r.name, provider: r.agent, isDefault: r.is_default === 1, createdAt: r.created_at, updatedAt: r.updated_at ?? r.created_at };
+};
+const optionsOf = ({ name: _n, provider: _p, isDefault: _d, ...options }: AgentProfileInput) => JSON.stringify(options);
+/** Agent profiles (ADR 0020). The options are one JSON column: they're only ever read whole. */
 export const agentProfiles = {
   list(): AgentProfile[] {
     return (db.prepare("SELECT * FROM agent_profiles ORDER BY name COLLATE NOCASE").all() as AgentProfileRow[]).map(toAgentProfile);
@@ -673,15 +734,28 @@ export const agentProfiles = {
     return r && toAgentProfile(r);
   },
   create(input: AgentProfileInput): AgentProfile {
-    const { name, ...rest } = input;
     const now = new Date().toISOString();
     const id = randomUUID();
-    db.prepare("INSERT INTO agent_profiles (id, name, json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run(id, name, JSON.stringify(rest), now, now);
+    db.prepare("INSERT INTO agent_profiles (id, name, agent, is_default, options, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
+      id,
+      input.name,
+      input.provider,
+      input.isDefault ? 1 : 0,
+      optionsOf(input),
+      now,
+      now,
+    );
     return { ...input, id, createdAt: now, updatedAt: now };
   },
   update(id: string, input: AgentProfileInput): void {
-    const { name, ...rest } = input;
-    db.prepare("UPDATE agent_profiles SET name = ?, json = ?, updated_at = ? WHERE id = ?").run(name, JSON.stringify(rest), new Date().toISOString(), id);
+    db.prepare("UPDATE agent_profiles SET name = ?, agent = ?, is_default = ?, options = ?, updated_at = ? WHERE id = ?").run(
+      input.name,
+      input.provider,
+      input.isDefault ? 1 : 0,
+      optionsOf(input),
+      new Date().toISOString(),
+      id,
+    );
   },
   remove(id: string): void {
     db.prepare("DELETE FROM agent_profiles WHERE id = ?").run(id);
@@ -698,7 +772,7 @@ export const agentProfiles = {
 
 type SavedPromptRow = { id: string; name: string; text: string; created_at: string };
 const toSavedPrompt = (r: SavedPromptRow): SavedPrompt => ({ id: r.id, name: r.name, text: r.text, createdAt: r.created_at });
-/** Saved prompts (ADR 0018). */
+/** Saved prompts (ADR 0020). */
 export const savedPrompts = {
   list(): SavedPrompt[] {
     return (db.prepare("SELECT * FROM saved_prompts ORDER BY name COLLATE NOCASE").all() as SavedPromptRow[]).map(toSavedPrompt);
@@ -740,6 +814,8 @@ type HandoffRow = {
   to_panel_id: string;
   to_kind: PanelKind;
   to_title: string;
+  from_session_id: string | null;
+  to_session_id: string | null;
   note: string;
   status: string;
   created_at: string;
@@ -748,8 +824,8 @@ export type StoredHandoff = Handoff & { sprocketId: string };
 const toHandoff = (r: HandoffRow): StoredHandoff => ({
   id: r.id,
   sprocketId: r.sprocket_id,
-  from: { panelId: r.from_panel_id, kind: r.from_kind, title: r.from_title },
-  to: { panelId: r.to_panel_id, kind: r.to_kind, title: r.to_title },
+  from: { panelId: r.from_panel_id, kind: r.from_kind, title: r.from_title, ...(r.from_session_id ? { sessionId: r.from_session_id } : {}) },
+  to: { panelId: r.to_panel_id, kind: r.to_kind, title: r.to_title, ...(r.to_session_id ? { sessionId: r.to_session_id } : {}) },
   note: r.note,
   createdAt: r.created_at,
 });
@@ -759,8 +835,8 @@ export const handoffs = {
     const id = randomUUID();
     const now = new Date().toISOString();
     db.prepare(
-      "INSERT INTO handoffs (id, sprocket_id, from_panel_id, from_kind, from_title, to_panel_id, to_kind, to_title, note, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
-    ).run(id, sprocketId, h.from.panelId, h.from.kind, h.from.title, h.to.panelId, h.to.kind, h.to.title, h.note, now, now);
+      "INSERT INTO handoffs (id, sprocket_id, from_panel_id, from_kind, from_title, from_session_id, to_panel_id, to_kind, to_title, to_session_id, note, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+    ).run(id, sprocketId, h.from.panelId, h.from.kind, h.from.title, h.from.sessionId ?? null, h.to.panelId, h.to.kind, h.to.title, h.to.sessionId ?? null, h.note, now, now);
     return { id, sprocketId, ...h, createdAt: now };
   },
   /** Pending ones, oldest first: a Sprocket's, or all of them. */
@@ -781,6 +857,10 @@ export const handoffs = {
     const b = db.prepare("UPDATE handoffs SET to_title = ?, updated_at = ? WHERE status = 'pending' AND to_panel_id = ? AND to_title != ?").run(title, now, panelId, title).changes;
     return Number(a) + Number(b) > 0;
   },
+  /** A pending one's side now follows another session (handoffs.ts, followSessions). */
+  setSession(id: string, side: "from" | "to", sessionId: string): void {
+    db.prepare(`UPDATE handoffs SET ${side}_session_id = ?, updated_at = ? WHERE id = ? AND status = 'pending'`).run(sessionId, new Date().toISOString(), id);
+  },
   /** End a pending one. False when it wasn't pending (someone else ended it first). */
   end(id: string, status: "done" | "cancelled" | "expired"): boolean {
     return db.prepare("UPDATE handoffs SET status = ?, updated_at = ? WHERE id = ? AND status = 'pending'").run(status, new Date().toISOString(), id).changes > 0;
@@ -788,6 +868,24 @@ export const handoffs = {
 };
 
 /** Which files or folders sessions own (ADR 0016). */
+/** The names the user gave sessions in Rails. */
+export const sessionNames = {
+  get(provider: string, sessionId: string): string | undefined {
+    return (db.prepare("SELECT name FROM session_names WHERE provider = ? AND session_id = ?").get(provider, sessionId) as { name: string } | undefined)?.name;
+  },
+  set(provider: string, sessionId: string, name: string): void {
+    db.prepare("INSERT INTO session_names (provider, session_id, name, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT (provider, session_id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at").run(
+      provider,
+      sessionId,
+      name,
+      new Date().toISOString(),
+    );
+  },
+  clear(provider: string, sessionId: string): void {
+    db.prepare("DELETE FROM session_names WHERE provider = ? AND session_id = ?").run(provider, sessionId);
+  },
+};
+
 export const owners = {
   list(projectId: string): { panelId: string; path: string }[] {
     return (db.prepare("SELECT panel_id, path FROM owners WHERE project_id = ? ORDER BY created_at, rowid").all(projectId) as { panel_id: string; path: string }[]).map(

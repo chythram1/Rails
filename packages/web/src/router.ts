@@ -7,7 +7,7 @@ export type Route =
   | { name: "workspace"; projectId: string; openKey?: string }
   /** Sprockets (ADR 0005): the list, the creator (`new`), one Sprocket's chat or its settings. */
   | { name: "sprockets"; view: "list" | "new" | "chat" | "settings"; id?: string }
-  /** Customize (ADR 0018): agent profiles and saved prompts, or one of them open for editing. */
+  /** Customize (ADR 0020): agent profiles and saved prompts, or one of them open for editing. */
   | { name: "customize"; view: "list" | "profile" | "prompt"; id?: string }
   | { name: "automate" };
 

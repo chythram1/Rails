@@ -1,4 +1,4 @@
-// The user's saved prompts (ADR 0018), for any Sprocket: "send my Review prompt to the API session"
+// The user's saved prompts (ADR 0020), for any Sprocket: "send my Review prompt to the API session"
 // becomes a suggest_message with that prompt's text. Read-only; the user edits them in Customize.
 import { Type } from "@earendil-works/pi-ai";
 import { savedPrompts } from "../db.ts";

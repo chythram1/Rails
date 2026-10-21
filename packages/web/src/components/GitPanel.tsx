@@ -88,7 +88,7 @@ function codeClass(status: string) {
 }
 
 /** Colour class for one line of unified diff output. File headers (+++ / ---) stay uncoloured. */
-function diffLineClass(line: string) {
+export function diffLineClass(line: string) {
   if (line.startsWith("+++") || line.startsWith("---")) return "";
   if (line.startsWith("+")) return "add";
   if (line.startsWith("-")) return "del";

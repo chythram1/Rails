@@ -13,7 +13,9 @@ import { useAutoGrow } from "../useAutoGrow.ts";
  * on. The user edits it and sends it, or dismisses it; nothing reaches the session until they send it. A
  * dialog's answer is picked in the panel, so that card links there instead. Once it's sent (or queued in a
  * busy session), dismissed or out of date, a muted line says so. A handoff's message also carries what the
- * finished session said last (ADR 0015), sent as it is under the text: collapsed, to read if you want.
+ * finished session said last (ADR 0015), sent as it is under the text: collapsed, to read if you want. A message
+ * an agent drafted (ADR 0018) says which session wrote it, as plainly as the text: pi and Codex take what the user
+ * sends as the user's own instruction.
  */
 function Attachment({ attachment }: { attachment: NonNullable<Suggestion["attachment"]> }) {
   return (
@@ -59,8 +61,9 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
         {s.attachment && <Attachment attachment={s.attachment} />}
       </div>
     );
-  // A newer suggestion for the same session sits further down: this one would only be noise.
-  if (s.status === "replaced") return null;
+  // A newer suggestion for the same session sits further down: this one would only be noise. An agent's message
+  // keeps a line, since its event row says who wanted to tell whom.
+  if (s.status === "replaced") return s.from ? <p className="sp-suggestion-line">Replaced by a newer message.</p> : null;
   if (s.status === "dismissed") return <p className="sp-suggestion-line">Dismissed.</p>;
   if (s.status === "expired") return <p className="sp-suggestion-line">Not sent: {lower(s.error ?? "The session moved on.")}</p>;
 
@@ -120,6 +123,11 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
           }
         }}
       />
+      {s.from && (
+        <p className="sp-suggestion-from">
+          Written by the session “<span title={s.from.title}>{shortTitle(s.from.title)}</span>”. Send it only if you’d say it yourself.
+        </p>
+      )}
       {s.attachment && <Attachment attachment={s.attachment} />}
       {rule}
       {problem && <p className="error small" role="alert">{problem}</p>}

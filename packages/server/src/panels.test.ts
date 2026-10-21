@@ -17,8 +17,9 @@ vi.mock("./providers/index.ts", () => ({
   }),
 }));
 
-const { openPanel } = await import("./panels.ts");
+const { getWorkspace, openPanel, panelEnded } = await import("./panels.ts");
 const { panels, projects } = await import("./db.ts");
+const { createAgentProfile, deleteAgentProfile } = await import("./agentProfiles.ts");
 
 describe("openPanel", () => {
   let projectId: string;
@@ -48,9 +49,49 @@ describe("openPanel", () => {
     const panel = await openPanel(projectId, { kind: "pi", sessionId: "s-fail" });
     expect(panel.sessionId).toBe("s-fail");
   });
+
+  it("keeps a panel that's still starting when the workspace is read meanwhile", async () => {
+    // A session clicked on another page: the workspace loads its panels while the session's panel starts.
+    const { startSession } = await import("./tmux.ts");
+    let started = () => {};
+    vi.mocked(startSession).mockImplementationOnce(async (id: string) => {
+      await new Promise<void>((r) => (started = r));
+      running.add(id);
+    });
+    const opening = openPanel(projectId, { kind: "pi", sessionId: "s-starting" });
+    await new Promise((r) => setTimeout(r, 50)); // past the session lookup: the panel exists, its process doesn't yet
+    const [starting] = panels.list(projectId);
+    expect(starting.sessionId).toBe("s-starting");
+    expect((await getWorkspace(projectId)).panels).toEqual([]); // not shown before it runs (nothing to attach to)
+    await panelEnded(starting.id); // a browser's tmux client giving up early doesn't end it either
+    started();
+    const panel = await opening;
+    expect(panels.get(panel.id)).toBeDefined();
+    expect((await getWorkspace(projectId)).panels.map((p) => p.id)).toEqual([panel.id]);
+  });
+
+  it("starts Claude Code with a profile's flags after the bridge's, new or resumed", async () => {
+    const { startSession } = await import("./tmux.ts");
+    const profile = createAgentProfile({ name: "Plan", permissionMode: "plan", allowedTools: ["Edit"], isDefault: true });
+    vi.mocked(startSession).mockClear();
+    const panel = await openPanel(projectId, { kind: "claude", prompt: "hi", agentProfileId: profile.id });
+    expect(panel.profile).toEqual({ id: profile.id, name: "Plan", model: "", effort: "", permissionMode: "plan" });
+    const argv = vi.mocked(startSession).mock.calls[0][2];
+    expect(argv[0]).toBe("claude");
+    const after = (a: string[]) => a.slice(a.indexOf("--settings") + 2); // the bridge's flags (ADR 0007, 0018) come first
+    expect(argv.slice(1, 5).filter((a) => a.startsWith("--"))).toEqual(["--mcp-config", "--settings"]);
+    expect(after(argv).slice(0, 5)).toEqual(["--permission-mode", "plan", "--allowedTools", "Edit", "--session-id"]);
+    expect(argv.slice(-2)).toEqual(["--", "hi"]);
+
+    // Resuming from the sidebar picks no profile: the agent's default applies.
+    vi.mocked(startSession).mockClear();
+    await openPanel(projectId, { kind: "claude", sessionId: "s-profile" });
+    expect(after(vi.mocked(startSession).mock.calls[0][2])).toEqual(["--permission-mode", "plan", "--allowedTools", "Edit", "--resume", "s-profile"]);
+    deleteAgentProfile(profile.id); // a default changes how every later Claude Code panel starts
+  });
 });
 
-describe("openPanel with an agent profile (ADR 0018)", () => {
+describe("openPanel with an agent profile (ADR 0020)", () => {
   let projectId: string;
   beforeEach(() => {
     projectId = projects.create("app", `/work/app-${Math.random()}`).id;

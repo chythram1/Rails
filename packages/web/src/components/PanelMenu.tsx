@@ -17,7 +17,7 @@ export function PanelIcon({ kind }: { kind: PanelKind }) {
   return kind === "shell" ? <SquareTerminal size={15} className="shell-icon" aria-label="Shell" /> : <ProviderIcon provider={kind} />;
 }
 
-/** The "+" that starts a new agent or shell, or an agent with one of the agent profiles (ADR 0018). */
+/** The "+" that starts a new agent or shell, or an agent with one of the agent profiles (ADR 0020). */
 export function PanelMenu({ onPick }: { onPick(kind: PanelKind, agentProfileId?: string): void }) {
   const { providers, agentProfiles } = useStore();
   const isInstalled = (id: ProviderId) => providers.find((p) => p.id === id)?.installed ?? false;

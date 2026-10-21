@@ -252,6 +252,25 @@ describe("Coordinators", () => {
     expect(list[0].event?.quiet).toBe(true);
   });
 
+  it("marks it quiet too when the Coordinator explains first and ends with (quiet)", async () => {
+    const project = projects.create("app", `/work/coord-${Math.random()}`);
+    const s = createSprocket({ name: "Lead", look });
+    updateSettings(s.id, { projectId: project.id });
+    const p = panels.create({ projectId: project.id, kind: "pi", title: "Docs" });
+    faux.setResponses([fauxAssistantMessage("It only asks out of habit; the cache was cleared already. (quiet)")]);
+
+    vi.useFakeTimers();
+    receive(p.id, "pi", "agent_end", { text: "Done. Should I also clear the cache?" });
+    vi.advanceTimersByTime(GRACE_MS);
+    vi.useRealTimers();
+    await vi.waitFor(() => expect(listMessages(s.id).length).toBeGreaterThan(0));
+    await idle();
+
+    const list = listMessages(s.id);
+    expect(list.map((m) => m.author)).toEqual(["event"]);
+    expect(list[0].event?.quiet).toBe(true);
+  });
+
   it("wakes nobody in a project without a Sprocket", () => {
     const project = projects.create("app", `/work/coord-${Math.random()}`);
     const s = createSprocket({ name: "Helper", look }); // not attached

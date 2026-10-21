@@ -11,7 +11,7 @@ import { PromptEditor } from "./PromptEditor.tsx";
 type Kind = "profile" | "prompt";
 
 /**
- * Customize: agent profiles and saved prompts (ADR 0018), a list beside the open one's editor, laid out like the
+ * Customize: agent profiles and saved prompts (ADR 0020), a list beside the open one's editor, laid out like the
  * Sprockets page. On small screens only one of the two shows at a time.
  */
 export function CustomizePage({ route }: { route: Extract<Route, { name: "customize" }> }) {

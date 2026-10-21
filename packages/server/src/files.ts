@@ -55,7 +55,7 @@ async function inside(root: string, path: string): Promise<{ abs: string; rel: s
 }
 
 /** Which of `paths` git ignores, in one call (none outside a repository). */
-function ignoredAmong(root: string, paths: string[]): Promise<Set<string>> {
+export function ignoredAmong(root: string, paths: string[]): Promise<Set<string>> {
   if (!paths.length) return Promise.resolve(new Set());
   return new Promise((resolve) => {
     const child = spawn("git", ["-C", root, "check-ignore", "--stdin"], { stdio: ["pipe", "pipe", "ignore"] });

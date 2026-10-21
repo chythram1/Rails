@@ -34,17 +34,36 @@ export function parseSessionKey(key: SessionKey): { provider: ProviderId; id: st
   return { provider: key.slice(0, i) as ProviderId, id: key.slice(i + 1) };
 }
 
+/**
+ * A session's title short enough to sit beside other text: agents title a session with its whole first prompt
+ * ("Without using any tools, say hello, then end your reply…"), so cut it at a word near `max` characters.
+ * Show the full title where there's room or as a tooltip.
+ */
+export function shortTitle(title: string, max = 40): string {
+  const t = title.replace(/\s+/g, " ").trim().replace(/…$/, "");
+  if (t.length <= max) return t === title.trim() ? t : `${t}…`;
+  const cut = t.slice(0, max + 1);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max / 2 ? cut.slice(0, space) : t.slice(0, max)).replace(/[\s,;:.-]+$/, "")}…`;
+}
+
 export interface SessionSummary {
   key: SessionKey;
   provider: ProviderId;
   id: string;
   cwd: string;
+  /** What Rails shows: the name the user gave it in Rails, else the agent's title. */
   title: string;
+  /** The agent's own title, when a name the user gave it in Rails replaces it. */
+  agentTitle?: string;
   createdAt: string;
   updatedAt: string;
   /** Id of the panel this session is open in, if any. */
   panelId?: string;
 }
+
+/** The longest name the user can give a session in Rails (a tab's or the sidebar's width). */
+export const SESSION_NAME_MAX = 40;
 
 /** Why a panel needs the user (ADR 0007): its agent waits for a permission or an answer, or its turn failed. */
 export type AttentionReason = "waiting" | "failed";
@@ -70,7 +89,9 @@ export interface Panel {
   /** Provider session shown in this panel. Unknown for shells and for new Codex sessions. */
   sessionId?: string;
   title: string;
-  /** The agent profile it started with (ADR 0018), as it was then: editing the profile doesn't change a running panel. */
+  /** The name the user gave its session in Rails (in a workspace only): browsers show it instead of any title. */
+  name?: string;
+  /** The agent profile it started with (ADR 0020), as it was then: editing the profile doesn't change a running panel. */
   profile?: PanelProfile;
   createdAt: string;
 }
@@ -96,7 +117,7 @@ export interface OpenPanel {
   /** First message for a new agent session. */
   prompt?: string;
   /**
-   * Start the agent with this agent profile (ADR 0018). Without one, a resumed session uses the profile it started
+   * Start the agent with this agent profile (ADR 0020). Without one, a resumed session uses the profile it started
    * with, and anything else the agent's default profile, if it has one.
    */
   agentProfileId?: string;
@@ -112,6 +133,31 @@ export interface GitFile {
   path: string;
   /** Two-letter porcelain XY code, e.g. " M", "A ", "??". */
   status: string;
+}
+
+/** A file's state in git, for the file tree (porcelain codes, read): what changed since the last commit. */
+export type GitState = "modified" | "added" | "deleted" | "renamed" | "untracked" | "conflict";
+
+/** One entry of a folder in the file tree (the side panel's Files tab). */
+export interface FileEntry {
+  name: string;
+  /** From the project's folder, with `/`. */
+  path: string;
+  dir: boolean;
+  /** A file's state; for a folder, the strongest state of what it holds. None when unchanged. */
+  git?: GitState;
+  /** git ignores it (build output, dependencies, private files). */
+  ignored?: true;
+}
+
+export interface FolderListing {
+  path: string;
+  entries: FileEntry[];
+  /** It holds more entries than one listing shows. */
+  more: boolean;
+  isRepo: boolean;
+  /** Files git has as deleted in this folder (gone from the disk, so not among the entries). */
+  deleted: string[];
 }
 
 export interface GitStatus {
@@ -196,6 +242,8 @@ export interface HandoffSession {
   panelId: string;
   kind: PanelKind;
   title: string;
+  /** The session it was planned for, once known: a handoff follows that session, not just its panel. */
+  sessionId?: string;
 }
 
 /**
@@ -254,9 +302,10 @@ export interface SprocketEvent {
   sessionId?: string;
   /**
    * It asked in a dialog (or a form), it ended its turn with what looks like a question, it changed files
-   * other sessions changed shortly before (ADR 0014), or it finished a turn a handoff waits for (ADR 0015).
+   * other sessions changed shortly before (ADR 0014), it finished a turn a handoff waits for (ADR 0015), or it
+   * drafted a message for another session (ADR 0018), shown under the event, with the text as the event's.
    */
-  what: "question" | "turn_end" | "overlap" | "handoff";
+  what: "question" | "turn_end" | "overlap" | "handoff" | "message";
   questions?: SessionQuestion[];
   /** The Coordinator looked and decided the user needn't hear about it. */
   quiet?: boolean;
@@ -269,6 +318,8 @@ export interface SprocketEvent {
   overlaps?: { panelId: string; kind: PanelKind; title: string; sessionId?: string; files: string[]; owns?: boolean }[];
   /** For a handoff: which one, the session it's for and what to pass on. */
   handoff?: { id: string; to: HandoffSession & { sessionId?: string }; note: string };
+  /** For a message: the session it's for. */
+  to?: HandoffSession;
 }
 
 /** One message in a Sprocket's chat. */
@@ -311,8 +362,15 @@ export interface Suggestion {
    * text, so nothing it said gets lost in the Coordinator's summary.
    */
   attachment?: { title: string; text: string };
-  /** "replaced": a newer answer for the same session took its place (it isn't shown). Messages aren't replaced. */
+  /** A message an agent drafted for this session (ADR 0018): the session it came from. */
+  from?: { panelId: string; kind: PanelKind; title: string };
+  /**
+   * "replaced": a newer answer for the same session took its place (it isn't shown), or, for an agent's message,
+   * the same agent's newer message for that session (ADR 0018). The Coordinator's messages aren't replaced.
+   */
   status: "pending" | "sending" | "sent" | "failed" | "dismissed" | "expired" | "replaced";
+  /** The user changed the text before sending it. */
+  edited?: boolean;
   /** Why it failed, or why it can't be sent anymore. */
   error?: string;
   /** Sent while the session was busy: it's in the session's own queue, for after its current turn. */
@@ -398,7 +456,16 @@ export interface ModelSettings {
    * wake the Coordinator where it's sure and Rails' rules weren't (ADR 0013).
    */
   decisionsInShadow: boolean;
+  /** How sure the decision model must be to wake the Coordinator for a reply (ADR 0013); a dialog takes DECISION_THRESHOLD.dialogMargin more. */
+  decisionThreshold: number;
 }
+
+/**
+ * The decision model's threshold (ADR 0013), which the user sets in Settings → Models. From its evaluation:
+ * messages that asked nothing scored up to 0.78, so below `caution` it starts waking the Coordinator for them,
+ * and below `danger` it will often.
+ */
+export const DECISION_THRESHOLD = { min: 0.5, max: 0.99, default: 0.9, dialogMargin: 0.05, caution: 0.85, danger: 0.8 } as const;
 
 /**
  * One shadow judgment (ADR 0012): what Rails decided in code about a session's moment, and what the fast
@@ -463,7 +530,7 @@ export interface SignIn {
 // ---- WebSocket protocol ----------------------------------------------------
 // Each attached panel gets its own tmux client on the server, sized to that browser's terminal.
 
-// ---- agent profiles (ADR 0018) ----
+// ---- agent profiles (ADR 0020) ----
 
 /** Where a skill was found: Rails' skill library, the user's own skill folders, or the project's. */
 export type SkillSource = "library" | "user" | "project";
@@ -536,7 +603,7 @@ export interface AgentProfile extends AgentProfileInput {
   updatedAt: string;
 }
 
-// ---- saved prompts (ADR 0018) ----
+// ---- saved prompts (ADR 0020) ----
 
 export const SAVED_PROMPT_NAME_MAX = 60;
 export const SAVED_PROMPT_TEXT_MAX = 4000;
@@ -560,7 +627,7 @@ export type ClientMsg =
 
 export type ServerMsg =
   | { type: "term.data"; panelId: string; attachId: number; data: string }
-  /** A project's panels changed: opened, closed, or ended on their own (possibly on another device). */
+  /** A project's panels changed: opened, closed, ended on their own (possibly on another device), or one of its sessions was renamed. */
   | { type: "panels.changed"; projectId: string }
   /** Every busy panel (its agent is thinking or replying), across all projects. Sent on connect and on change. */
   | { type: "panels.busy"; panelIds: string[] }
@@ -569,6 +636,8 @@ export type ServerMsg =
   | { type: "panels.overlaps"; overlaps: PanelOverlap[] }
   /** Sprockets or their messages changed (possibly on another device). */
   | { type: "sprockets.changed" }
+  /** Agent profiles or saved prompts changed (possibly on another device). */
+  | { type: "customize.changed" }
   /** A Sprocket's reply so far, while it's being written; null when it's done. */
   | { type: "sprockets.typing"; sprocketId: string; text: string | null }
   /** While a Sprocket replies: the step it's on ("Reading src/api.ts"), and what it has done so far; null when done. */
@@ -580,6 +649,4 @@ export type ServerMsg =
   | { type: "models.signIn"; signIn: SignIn }
   /** The profile. Sent on connect and when it changes (possibly on another device). */
   | { type: "profile.changed"; profile: Profile }
-  /** Agent profiles or saved prompts changed (possibly on another device). */
-  | { type: "customize.changed" }
   | { type: "error"; message: string };

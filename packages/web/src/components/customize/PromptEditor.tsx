@@ -7,7 +7,7 @@ import { useAutoGrow } from "../useAutoGrow.ts";
 import { TextRow } from "./AgentProfileEditor.tsx";
 
 /**
- * One saved prompt (ADR 0018): its name and its text, saved as you go like an agent profile. Home's composer and
+ * One saved prompt (ADR 0020): its name and its text, saved as you go like an agent profile. Home's composer and
  * Sprocket chats list them to fill in.
  */
 export function PromptEditor({ prompt }: { prompt: SavedPrompt }) {
@@ -109,7 +109,7 @@ function PromptText({ prompt, onSave }: { prompt: SavedPrompt; onSave(text: stri
       <textarea
         ref={ref}
         id="cz-prompt-text"
-        className="input sp-grow cz-instructions cz-prompt-text"
+        className="input cz-instructions cz-prompt-text"
         rows={8}
         maxLength={SAVED_PROMPT_TEXT_MAX}
         placeholder="e.g. Review the uncommitted changes and list anything risky."

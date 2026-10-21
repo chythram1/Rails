@@ -37,6 +37,24 @@ function flag(args: string[], name: string): string | undefined {
 const textArg = (raw: string) => (raw.startsWith("@") ? readFileSync(raw.slice(1), "utf8").trim() : raw);
 const git = (cwd: string, ...args: string[]) => execFileSync("git", ["-c", "user.email=test-run@rails.local", "-c", "user.name=Rails test run", ...args], { cwd, stdio: "ignore" });
 
+/**
+ * With `nameSessions`, name each agent's session after the agent (ADR 0019) whenever its panel shows no name: once
+ * Rails knows the session (Claude Code and pi from the start, Codex once it has a thread), and again if the panel
+ * moves on to another session (Codex can start a thread it never uses).
+ */
+async function nameSessions(api: Api, state: RunState): Promise<string[]> {
+  if (!state.config.nameSessions) return [];
+  const { panels } = await api.call<{ panels: { id: string; kind: string; sessionId?: string; name?: string }[] }>("GET", `/api/projects/${state.projectId}/workspace`);
+  const done: string[] = [];
+  for (const agent of state.config.agents) {
+    const panel = panels.find((p) => p.id === state.panels[agent.name]?.id);
+    if (!panel?.sessionId || panel.name) continue;
+    await api.call("PUT", `/api/projects/${state.projectId}/sessions/${encodeURIComponent(`${panel.kind}:${panel.sessionId}`)}/name`, { name: agent.name });
+    done.push(agent.name);
+  }
+  return done;
+}
+
 /** A draft by the start of its id, among the run's Sprocket's pending ones. */
 async function findDraft(api: Api, state: RunState, prefix: string): Promise<{ id: string; text: string }> {
   const messages = await api.call<{ suggestions?: { id: string; text: string; status: string }[] }[]>("GET", `/api/sprockets/${state.sprocketId}/messages`);
@@ -116,6 +134,8 @@ async function setup(path: string): Promise<void> {
   }
   state.seen = new Date().toISOString();
   saveState(state);
+  const named = await nameSessions(api, state);
+  if (named.length) console.log(`Named the sessions of ${named.join(", ")}${named.length < config.agents.length ? " (the others once Rails knows their session)" : ""}.`);
   const web = config.rails.webPort ? `http://<host>:${config.rails.webPort}/?token=${TOKEN}` : `no web UI (set rails.webPort)`;
   console.log(`\nReady. Watch it at ${web}. Next: \`prompt <agent> <text>\`, \`chat <text>\`, \`watch\`.`);
 }
@@ -134,11 +154,13 @@ async function main(argv: string[]): Promise<void> {
 
   const state = loadState(runName);
   const api = new Api(portOf(state.config));
+  const name = () => nameSessions(api, state).then(() => {});
   switch (command) {
     case "status":
+      await name().catch(() => {});
       return console.log(render(status(state), undefined, state.config.sprocket.name));
     case "watch":
-      return console.log(await watch(state, Number(rest[0] ?? 600)));
+      return console.log(await watch(state, Number(rest[0] ?? 600), name));
     case "prompt": {
       const [agent, ...words] = rest;
       const panel = state.panels[agent];

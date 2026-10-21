@@ -1,4 +1,4 @@
-// Skills an agent profile can load (ADR 0018): folders with a SKILL.md, found in Rails' skill library, the
+// Skills an agent profile can load (ADR 0020): folders with a SKILL.md, found in Rails' skill library, the
 // user's own skill folders and the project's. Read-only except for importing into the library. Discovery reads
 // only the start of each SKILL.md (its front matter), cached by mtime and size, so it stays cheap.
 import { cp, open, readdir, stat } from "node:fs/promises";

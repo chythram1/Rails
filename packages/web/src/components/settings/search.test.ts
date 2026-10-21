@@ -21,6 +21,7 @@ describe("settings search", () => {
     expect(find("token")).toContain("sign-out-everywhere");
     expect(find("profile picture")).toEqual(["avatar"]);
     expect(find("dark mode")).toEqual(["appearance"]);
+    expect(find("jev threshold")).toEqual(["decision-threshold"]);
   });
 
   it("puts label matches before synonym matches", () => {

@@ -17,8 +17,10 @@ async function scanFile(file: string): Promise<DiscoveredSession | null> {
   const { head, tail, mtime } = await headTail(file);
   const s = head[0];
   if (s?.type !== "session" || !s.cwd) return null;
+  // The user's /name: the latest session_info line counts, and an empty one clears it (pi 1.3). Only the head and
+  // tail are read, so a name set in the middle of a long session is missed.
   let title = "";
-  for (const e of [...head, ...tail]) if (e.type === "session_info" && e.name) title = e.name;
+  for (const e of [...head, ...tail]) if (e.type === "session_info") title = typeof e.name === "string" ? e.name.trim() : "";
   if (!title) {
     const u = head.find((e) => e.type === "message" && e.message?.role === "user" && textOf(e.message.content));
     title = u ? firstLine(textOf(u.message.content)) : "Untitled session";

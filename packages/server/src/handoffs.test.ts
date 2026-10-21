@@ -160,6 +160,33 @@ describe("handoffs that can't happen", () => {
     expect(notices(lead.id)).toEqual(["Handoff from \u201cAuth\u201d to \u201cUI\u201d cancelled: \u201cUI\u201d ended.", "Handoff from \u201cAuth\u201d to \u201cUI\u201d cancelled: \u201cAuth\u201d was closed first."]);
   });
 
+  it("are cancelled when a session that was in use moves on to another in its panel (/clear, resuming another)", async () => {
+    const { lead, auth, plan, pending } = setup();
+    const h = plan();
+    expect(h.from.sessionId).toBe(auth.sessionId);
+    receive(auth.id, "claude", "UserPromptSubmit", { session_id: auth.sessionId, prompt: "Build the login" });
+    receive(auth.id, "claude", "SessionStart", { session_id: "a-cleared", source: "clear" });
+    expect(pending()).toEqual([]);
+    expect(notices(lead.id)).toEqual(["Handoff from \u201cAuth\u201d to \u201cUI\u201d cancelled: \u201cAuth\u201d moved on to another session."]);
+    // The new session finishing a turn isn't what the handoff waited for: nothing wakes.
+    receive(auth.id, "claude", "Stop", { session_id: "a-cleared", last_assistant_message: "Done: something else." });
+    await idle();
+    expect(listMessages(lead.id).filter((m) => m.author === "event")).toEqual([]);
+  });
+
+  it("follow a session that started after they were planned, or replaced one that never had a turn", () => {
+    const { auth, ui, plan, pending } = setup();
+    plan();
+    expect(pending()[0].to.sessionId).toBeUndefined();
+    receive(ui.id, "pi", "session_start", { sessionId: "u1" }); // the UI session's id becomes known
+    expect(pending()[0].to.sessionId).toBe("u1");
+    // Codex can start a thread it never uses and Rails moves the panel to the real one (bridge/codex.ts): a
+    // session that hasn't had a turn is replaced, not left.
+    receive(auth.id, "claude", "SessionStart", { session_id: "a-real", source: "startup" });
+    expect(pending()).toHaveLength(1);
+    expect(pending()[0].from.sessionId).toBe("a-real");
+  });
+
   it("expire after a day", () => {
     vi.useFakeTimers();
     const { lead, plan, pending } = setup();

@@ -9,6 +9,7 @@ import { bridgeFlags } from "./bridge/wiring.ts";
 import { ServiceError } from "./errors.ts";
 import { getProject } from "./projects.ts";
 import { discovery, findSession, installed } from "./providers/index.ts";
+import { sessionName } from "./titles.ts";
 import * as tmux from "./tmux.ts";
 import { listeners } from "./util.ts";
 
@@ -59,14 +60,20 @@ function newCommand(kind: PanelKind, prompt: string | undefined): { argv: string
 const panelChanges = listeners<[projectId: string]>();
 export const onPanelsChanged = panelChanges.on;
 const changed = panelChanges.emit;
+/** For a session renamed (names.ts): browsers reload the panels and sessions, and so their titles. */
+export const panelsChanged = changed;
 
-// Codex picks a new session's id itself; the bridge learns it from Codex's daemon (bridge/codex.ts).
-onCodexSession((panelId, threadId) => {
+/**
+ * Codex picks a new session's id itself; the bridge learns it from Codex's daemon (bridge/codex.ts). It may move a
+ * new panel on to another thread, the one Codex really uses (CodexWatcher.started); resumed panels never get here.
+ */
+export function linkCodexThread(panelId: string, threadId: string): void {
   const panel = panels.get(panelId);
-  if (!panel || panel.sessionId || panels.bySession(threadId)) return;
+  if (!panel || panels.bySession(threadId)) return;
   panels.setSession(panelId, threadId);
   changed(panel.projectId);
-});
+}
+onCodexSession(linkCodexThread);
 
 /** Stop a panel's tmux session (if still there), drop the panel and tell every browser. */
 async function removePanel(panel: Panel): Promise<void> {
@@ -78,10 +85,17 @@ async function removePanel(panel: Panel): Promise<void> {
   changed(panel.projectId);
 }
 
+/**
+ * Panels whose process is starting: they're in the database, not yet in tmux. Not running isn't ended for them, so
+ * they're neither shown nor removed until they run. (Opening a session from another page loads the workspace while
+ * its panel starts; the load used to take it for ended and remove it.)
+ */
+const starting = new Set<string>();
+
 /** Called when a browser's tmux client exits on its own: if the panel's process ended, remove the panel. */
 export async function panelEnded(id: string): Promise<void> {
   const panel = panels.get(id);
-  if (panel && !(await tmux.runningPanels()).has(id)) await removePanel(panel);
+  if (panel && !starting.has(id) && !(await tmux.runningPanels()).has(id)) await removePanel(panel);
 }
 
 /** A project's panels and saved layout. Panels whose process ended while nobody was watching are dropped. */
@@ -90,7 +104,11 @@ export async function getWorkspace(projectId: string): Promise<Workspace> {
   const running = await tmux.runningPanels();
   const list: Panel[] = [];
   for (const p of panels.list(projectId)) {
-    if (running.has(p.id)) list.push(p);
+    if (starting.has(p.id)) continue; // shown once it runs (panels.changed)
+    if (running.has(p.id)) {
+      const name = sessionName(p);
+      list.push(name ? { ...p, name } : p);
+    }
     else await removePanel(p);
   }
   return { panels: list, layout: layouts.get(projectId) };
@@ -108,7 +126,7 @@ export async function openPanel(projectId: string, req: OpenPanel): Promise<Pane
   const project = getProject(projectId);
   if (!["claude", "codex", "pi", "shell"].includes(req.kind)) throw new ServiceError("Unknown panel kind", 400);
   if (req.kind !== "shell" && !installed(req.kind)) throw new ServiceError(`${discovery[req.kind].name} isn't installed on the server`, 400);
-  // The agent profile it starts with (ADR 0018): the one picked, the session's own, or the agent's default.
+  // The agent profile it starts with (ADR 0020): the one picked, the session's own, or the agent's default.
   const profile = launchProfile(req.kind, req.agentProfileId, req.sessionId);
 
   if (req.sessionId) {
@@ -138,15 +156,7 @@ async function openSession(projectId: string, kind: ProviderId, sessionId: strin
   return start(projectId, kind, sessionId, found.title, found.cwd, resumeCommand(kind, sessionId), profile);
 }
 
-async function start(
-  projectId: string,
-  kind: PanelKind,
-  sessionId: string | undefined,
-  title: string,
-  cwd: string,
-  argv: string[],
-  profile?: AgentProfile,
-) {
+async function start(projectId: string, kind: PanelKind, sessionId: string | undefined, title: string, cwd: string, argv: string[], profile?: AgentProfile) {
   const panel = panels.create({
     projectId,
     kind,
@@ -154,9 +164,10 @@ async function start(
     title,
     ...(profile ? { profile: { id: profile.id, name: profile.name, model: profile.model, effort: profile.effort, permissionMode: profile.permissionMode } } : {}),
   });
+  starting.add(panel.id);
   try {
     // Agents report to the bridge (ADR 0007): their flags go after the program name, the token in the env.
-    // An agent profile's flags (ADR 0018) come next.
+    // An agent profile's flags (ADR 0020) come next.
     const [program, ...rest] = argv;
     let profileArgv: string[] = [];
     if (profile) {
@@ -170,6 +181,8 @@ async function start(
     panels.remove(panel.id);
     await removePanelPlugin(panel.id);
     throw e;
+  } finally {
+    starting.delete(panel.id);
   }
   if (profile && sessionId) agentProfiles.setForSession(sessionId, profile.id);
   if (kind === "codex") watchCodex(panels.all(), sessionId ? undefined : { panelId: panel.id, cwd });

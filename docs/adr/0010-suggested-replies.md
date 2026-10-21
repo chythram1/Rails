@@ -13,6 +13,11 @@ Decisions:
   run saves; a run that saves no reply drops its suggestions. Nothing reaches a session until the user sends
   it, so a Sprocket never acts in a session on its own yet. When the user asks a Coordinator to "tell it …",
   it drafts a **message** instead (`suggest_message`, below).
+- **A draft stands on its own.** The session sees only the draft (and a handoff's attachment), so it starts
+  with what happened, which session did it and in which files, then says what to do. It keeps the user's own
+  limits and numbers, and never asks a session to coordinate with or tell another one: sessions can't talk to
+  each other, so each gets its own message. These are instructions to the model, measured with
+  `scripts/coordinator-check` (test run 2's mistakes, replayed).
 - **Two kinds, by the session's state when it's suggested** (`suggestions.ts`):
   - **reply**: the session's turn ended (or failed): the user can edit the text, then Send or Dismiss;
   - **answer**: the session waits on a question in a dialog (Claude Code's AskUserQuestion, a pi question
@@ -31,7 +36,7 @@ Decisions:
     session had a question open, and dropped it as soon as the session moved on.
 - **Suggestions go stale.** One answer per session per Coordinator (a newer one replaces the older).
   Messages don't replace each other (changed 2026-10-19, after a weak later draft replaced a useful one): up to
-  three can wait for one session. Anything the
+  three can wait for one session. An agent's own messages do (ADR 0018). Anything the
   session does (a prompt, a tool, the dialog answered, the session ending, the panel closing) expires its
   pending suggestions. Sending checks everything again: the panel is open and in the Coordinator's project,
   and the session isn't working, waiting on something else or gone; a failed send can be retried.

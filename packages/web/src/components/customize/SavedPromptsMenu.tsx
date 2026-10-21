@@ -4,7 +4,7 @@ import { useStore } from "../../store.tsx";
 import { MenuButton, type MenuItem } from "../Menu.tsx";
 
 /**
- * The saved prompts (ADR 0018) as a menu inside a composer: picking one hands its text to `onPick`
+ * The saved prompts (ADR 0020) as a menu inside a composer: picking one hands its text to `onPick`
  * (the composer fills it in, still editable), and the last item opens Customize.
  */
 export function SavedPromptsMenu({ onPick }: { onPick(text: string): void }) {

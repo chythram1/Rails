@@ -2,6 +2,7 @@ import type {
   AgentProfile,
   AgentProfileInput,
   DecisionLog,
+  FolderListing,
   GitStatus,
   ModelSettings,
   OpenPanel,
@@ -15,6 +16,7 @@ import type {
   SavedPrompt,
   SavedPromptInput,
   ServerInfo,
+  SessionKey,
   SessionSummary,
   SignIn,
   SkillInfo,
@@ -78,6 +80,9 @@ export const api = {
   pickProject: () => req<{ project: Project | null }>("/api/projects/pick", { method: "POST" }),
   removeProject: (id: string) => req("/api/projects/" + enc(id), { method: "DELETE" }),
   sessions: (projectId: string) => req<SessionSummary[]>(`/api/projects/${enc(projectId)}/sessions`),
+  /** Name a session in Rails; an empty name clears it (names.ts). */
+  nameSession: (projectId: string, key: SessionKey, name: string) =>
+    req<{ title: string }>(`/api/projects/${enc(projectId)}/sessions/${enc(key)}/name`, { method: "PUT", body: JSON.stringify({ name }) }),
   workspace: (projectId: string) => req<Workspace>(`/api/projects/${enc(projectId)}/workspace`),
   openPanel: (projectId: string, body: OpenPanel) =>
     req<Panel>(`/api/projects/${enc(projectId)}/panels`, { method: "POST", body: JSON.stringify(body) }),
@@ -85,6 +90,8 @@ export const api = {
   saveLayout: (projectId: string, layout: unknown) =>
     req(`/api/projects/${enc(projectId)}/layout`, { method: "PUT", body: JSON.stringify({ layout }) }),
   git: (projectId: string) => req<GitStatus>(`/api/projects/${enc(projectId)}/git`),
+  files: (projectId: string, dir: string) => req<FolderListing>(`/api/projects/${enc(projectId)}/files?dir=${enc(dir)}`),
+  fileText: (projectId: string, path: string) => req<{ text: string; cut: boolean }>(`/api/projects/${enc(projectId)}/files/content?path=${enc(path)}`),
   diff: (projectId: string, path: string) => req<string>(`/api/projects/${enc(projectId)}/git/diff?path=${enc(path)}`),
   sprockets: () => req<Sprocket[]>("/api/sprockets"),
   createSprocket: (body: SprocketInput) => req<Sprocket>("/api/sprockets", { method: "POST", body: JSON.stringify(body) }),
@@ -116,6 +123,7 @@ export const api = {
   models: () => req<ModelSettings>("/api/models"),
   setDefaultModel: (model: string | null) => req("/api/models/default", { method: "PUT", body: JSON.stringify({ model }) }),
   setDecisionModel: (model: string | null) => req("/api/models/decisions", { method: "PUT", body: JSON.stringify({ model }) }),
+  setDecisionThreshold: (threshold: number) => req("/api/models/decisions/threshold", { method: "PUT", body: JSON.stringify({ threshold }) }),
   decisions: () => req<DecisionLog>("/api/decisions"),
   /** Saves a key the provider accepted; `note` when it couldn't be checked. Refused keys come back as errors. */
   setProviderKey: (id: string, key: string) => req<{ note?: string }>(`/api/models/providers/${enc(id)}/key`, { method: "PUT", body: JSON.stringify({ key }) }),

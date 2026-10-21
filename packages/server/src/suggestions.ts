@@ -3,8 +3,8 @@
 // it. A dialog's answer is picked in the panel instead: Rails never types into one. Everything is checked
 // again when the user sends. An answer expires as soon as its session moves on (a new prompt, a tool, the
 // dialog answered); a message doesn't, and a busy session gets it in its own queue, after its current turn.
-import type { Panel, Suggestion } from "@rails/shared";
-import type { SessionCard } from "./bridge/board.ts";
+import { shortTitle, type Panel, type Suggestion } from "@rails/shared";
+import { AGENT, type SessionCard } from "./bridge/board.ts";
 import { deliver } from "./bridge/deliver.ts";
 import { ASKING, type SessionEvent } from "./bridge/events.ts";
 import { cardOf, onEvents, onPanelForgotten, onReturned } from "./bridge/index.ts";
@@ -51,14 +51,15 @@ export type Purpose = "answer" | "message";
  * A Coordinator suggests an answer to a session (following one of its rules, by its text, or its own
  * judgment) or a message for it. A session's question has one answer, so a new answer replaces the
  * Coordinator's earlier pending one. Messages are separate things to pass on (a handoff, a heads-up), so they
- * don't replace anything, up to MAX_PENDING_MESSAGES.
+ * don't replace anything, up to MAX_PENDING_MESSAGES; except that an agent's message (`from`, ADR 0018) replaces
+ * the same agent's earlier one for that session while it still waits, so the user sees its latest word once.
  */
 export function suggest(
   sprocketId: string,
   panel: Panel,
   title: string,
   raw: string,
-  { rule, purpose = "answer", attachment }: { rule?: string; purpose?: Purpose; attachment?: Suggestion["attachment"] } = {},
+  { rule, purpose = "answer", attachment, from }: { rule?: string; purpose?: Purpose; attachment?: Suggestion["attachment"]; from?: Suggestion["from"] } = {},
 ): Suggestion {
   const text = raw.trim();
   if (!text) throw new Error("The text is empty.");
@@ -66,14 +67,16 @@ export function suggest(
   const mode = modeFor(cardOf(panel), title, purpose);
   const mine = suggestions.pendingFor(panel.id).filter((s) => s.sprocketId === sprocketId);
   if (mode === "message") {
-    if (mine.filter((s) => s.mode === "message").length >= MAX_PENDING_MESSAGES)
+    const replaced = from ? mine.filter((s) => s.mode === "message" && s.from?.panelId === from.panelId) : [];
+    if (mine.filter((s) => s.mode === "message").length - replaced.length >= MAX_PENDING_MESSAGES)
       throw new Error(`${MAX_PENDING_MESSAGES} of your messages for "${title}" already wait for your user. Say what you'd add in your reply instead.`);
+    for (const old of replaced) suggestions.setStatus(old.id, ["pending"], "replaced");
   } else
     for (const old of mine.filter((s) => s.mode !== "message")) {
       if (old.messageId) suggestions.setStatus(old.id, ["pending"], "replaced");
       else suggestions.drop([old.id]); // from this same run: never shown
     }
-  const s = suggestions.create({ sprocketId, panelId: panel.id, kind: panel.kind, title, sessionId: panel.sessionId, mode, text, rule, attachment });
+  const s = suggestions.create({ sprocketId, panelId: panel.id, kind: panel.kind, title, sessionId: panel.sessionId, mode, text, rule, attachment, from });
   changes.emit();
   return shown(s);
 }
@@ -89,9 +92,16 @@ function blocked(card: SessionCard, mode: Suggestion["mode"]): string | undefine
   if (card.status === "waiting") return "The session is waiting for you in its panel.";
 }
 
-/** What a session gets: the text, and a handoff's attachment under it, marked as the other session's words. */
-export function deliveredText(text: string, attachment?: Suggestion["attachment"]): string {
-  return attachment ? `${text}\n\n---\nWhat "${attachment.title}" said when it finished, word for word:\n\n${attachment.text}` : text;
+/**
+ * What a session gets: the text, and a handoff's attachment under it, marked as the other session's words. An
+ * agent's message (ADR 0018) starts with which session wrote it.
+ */
+export function deliveredText(text: string, attachment?: Suggestion["attachment"], from?: Suggestion["from"]): string {
+  // The title and id as neighbours shows them (agentTools.ts), so the session can answer with the message tool.
+  const said = from
+    ? `A message from the session "${shortTitle(from.title, 60)}" (${AGENT[from.kind]}, id ${from.panelId.slice(0, 8)}) in this project; your user read it and sent it on:\n\n${text}`
+    : text;
+  return attachment ? `${said}\n\n---\nWhat "${attachment.title}" said when it finished, word for word:\n\n${attachment.text}` : said;
 }
 
 /** The user sends a suggested reply, possibly edited. */
@@ -112,10 +122,10 @@ export async function sendSuggestion(id: string, rawText: unknown): Promise<Sugg
     if (suggestions.setStatus(id, ["pending", "failed"], "expired", { error: why })) changes.emit();
     throw new ServiceError(why, 409);
   }
-  if (!suggestions.setStatus(id, ["pending", "failed"], "sending", { text })) throw new ServiceError("It's already being sent.", 409);
+  if (!suggestions.setStatus(id, ["pending", "failed"], "sending", { text, edited: text !== s.text })) throw new ServiceError("It's already being sent.", 409);
   changes.emit();
   try {
-    const { queued } = await deliver(panel!, card!, deliveredText(text, s.attachment), { queue: s.mode === "message" });
+    const { queued } = await deliver(panel!, card!, deliveredText(text, s.attachment, s.from), { queue: s.mode === "message" });
     suggestions.setStatus(id, ["sending"], "sent", { queued });
   } catch (e) {
     suggestions.setStatus(id, ["sending"], "failed", { error: (e as Error).message });
@@ -147,7 +157,7 @@ function expireFor(panelId: string, { all = false, error }: { all?: boolean; err
 /** pi put a queued message back in its editor when the user stopped its run: it wasn't sent after all. */
 function returned(panelId: string, text: string): void {
   for (const s of suggestions.sentTo(panelId))
-    if (s.queued && deliveredText(s.text, s.attachment) === text && suggestions.setStatus(s.id, ["sent"], "expired", { error: "pi put it back in its input box when its turn was stopped. Send it from there." }))
+    if (s.queued && deliveredText(s.text, s.attachment, s.from) === text && suggestions.setStatus(s.id, ["sent"], "expired", { error: "pi put it back in its input box when its turn was stopped. Send it from there." }))
       changes.emit();
 }
 

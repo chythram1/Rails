@@ -19,6 +19,7 @@ import { shortTitle } from "../util.ts";
 import { SidePanel, type SideView } from "./SidePanel.tsx";
 import { useSprockets } from "./sprockets/useSprockets.ts";
 import { PanelIcon, PanelMenu } from "./PanelMenu.tsx";
+import { RenameSession, type Renaming } from "./RenameSession.tsx";
 import { onTabKeys } from "./tabKeys.ts";
 import { TerminalView } from "./TerminalView.tsx";
 import { useWorkspace, type WorkspaceState } from "./useWorkspace.ts";
@@ -27,7 +28,7 @@ const MOBILE = "(max-width: 860px)";
 
 /** What the dockview tab / content / header components need from the workspace. */
 interface Ctx extends WorkspaceState {
-  /** Open a panel and place it in `group` (or the active group), with an agent profile if given (ADR 0018). */
+  /** Open a panel and place it in `group` (or the active group), with an agent profile if given (ADR 0020). */
   openIn(kind: PanelKind, group?: DockviewGroupPanel, opts?: { agentProfileId?: string }): void;
   /** Whether the side panel is open. */
   sideOpen: boolean;
@@ -267,11 +268,21 @@ function OverlapMark({ panelId }: { panelId: string }) {
 
 function PanelTab(props: IDockviewPanelHeaderProps) {
   const ws = useWs();
+  const { sessions } = useStore();
   const panel = usePanel(props.api.id);
+  const [renaming, setRenaming] = useState<Renaming>();
   if (!panel) return null;
   const title = ws.title(panel);
+  // Double-clicking an agent's tab renames its session (also in the session's menu in the sidebar).
+  const rename = () => {
+    // A double-click inside the open dialog reaches here too: React passes events up through its portal.
+    if (renaming || panel.kind === "shell" || !panel.sessionId) return;
+    const s = sessions[panel.projectId]?.find((x) => x.id === panel.sessionId);
+    setRenaming({ projectId: panel.projectId, key: sessionKey(panel.kind, panel.sessionId), name: panel.name, agentTitle: s?.agentTitle ?? s?.title ?? panel.title });
+  };
   return (
-    <div className="panel-tab" title={panel.profile && panel.profile.name !== title ? `${title} · ${panel.profile.name} profile` : title}>
+    <div className="panel-tab" title={panel.profile && panel.profile.name !== title ? `${title} · ${panel.profile.name} profile` : title} onDoubleClick={rename}>
+      {renaming && <RenameSession renaming={renaming} onClose={() => setRenaming(undefined)} />}
       <PanelIcon kind={panel.kind} />
       <span className="truncate">{title}</span>
       <OverlapMark panelId={panel.id} />
@@ -301,13 +312,13 @@ function HeaderAdd(props: IDockviewHeaderActionsProps) {
 }
 
 /**
- * The side panel's toggle (SidePanel.tsx: Sprockets and Git). Desktop shows it once, at the right end of the
+ * The side panel's toggle (SidePanel.tsx: Sprockets, Files and Git). Desktop shows it once, at the right end of the
  * top-right pane's tab bar. It carries a dot while a reply waits in one of the project's Sprockets.
  */
 function SideToggles() {
   const { sideOpen, toggleSide, replyReady } = useWs();
   const ready = replyReady.size;
-  const label = `Sprockets and Git${ready ? ` (${ready > 1 ? `${ready} replies` : "1 reply"} waiting)` : ""}`;
+  const label = `Sprockets, files and Git${ready ? ` (${ready > 1 ? `${ready} replies` : "1 reply"} waiting)` : ""}`;
   return (
     <div className="side-toggles">
       <button className={"icon-btn" + (sideOpen ? " active" : "")} aria-label={label} aria-pressed={sideOpen} title={label} onClick={toggleSide}>

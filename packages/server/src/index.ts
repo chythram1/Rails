@@ -10,12 +10,15 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { WebSocketServer } from "ws";
 import { serverInfo, onSignedOutEverywhere, signOutEverywhere } from "./account.ts";
 import { createAgentProfile, deleteAgentProfile, listAgentProfiles, profileUses, updateAgentProfile } from "./agentProfiles.ts";
+import { mcpRequest } from "./agentTools.ts";
 import { accessToken, HOST, PORT } from "./config.ts";
 import { watchCodex } from "./bridge/codex.ts";
 import { piInbox } from "./bridge/deliver.ts";
 import { loadAttention, receive, tokenOk as bridgeTokenOk } from "./bridge/index.ts";
 import { panels, projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
+import { listFolder, previewFile } from "./tree.ts";
+import { nameSession } from "./names.ts";
 import type { OpenPanel, SavedPromptInput, SprocketInput, SprocketSettings } from "@rails/shared";
 import { closePanel, getWorkspace, openPanel, saveLayout } from "./panels.ts";
 import { ServiceError } from "./errors.ts";
@@ -33,7 +36,7 @@ import { startShellEdits } from "./shellEdits.ts";
 import { createSavedPrompt, deleteSavedPrompt, listSavedPrompts, updateSavedPrompt } from "./savedPrompts.ts";
 import { importSkill, listSkills } from "./skills.ts";
 import { dismissSuggestion, sendSuggestion, startSuggestions } from "./suggestions.ts";
-import { decisionLog, setDecisionModel, startDecisions } from "./decisions.ts";
+import { decisionLog, setDecisionModel, setDecisionThreshold, startDecisions } from "./decisions.ts";
 import { version as tmuxVersion } from "./tmux.ts";
 import { sameSecret } from "./util.ts";
 
@@ -87,6 +90,16 @@ const BRIDGE_BODY_LIMIT = 4 * 1024 * 1024;
 /** Whether a bridge request comes from the panel itself: over loopback, with its token. */
 const fromPanel = (c: Context, panelId: string) =>
   LOOPBACK.has(getConnInfo(c).remote.address ?? "") && bridgeTokenOk(panelId, c.req.header("authorization")?.replace(/^Bearer\s+/i, ""));
+// Agent tools (ADR 0018): an MCP server for the agent in the panel (Streamable HTTP with plain JSON replies; no
+// event stream, so GET is refused, as the transport allows).
+app.post("/bridge/:panelId/mcp", bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({}, 413) }), async (c) => {
+  const panelId = c.req.param("panelId");
+  if (!fromPanel(c, panelId)) return c.json({ error: "Unauthorized" }, 401);
+  // The request's signal ends a wait_for when the agent gives up on the call (interrupted, or its time ran out).
+  const reply = await mcpRequest(panelId, await c.req.json().catch(() => null), c.req.raw.signal);
+  return reply ? c.json(reply) : c.body(null, 202);
+});
+app.get("/bridge/:panelId/mcp", (c) => c.body(null, 405));
 // The pi extension's long poll for replies the user sends (ADR 0010).
 app.get("/bridge/:panelId/pi/inbox", async (c) => {
   const panelId = c.req.param("panelId");
@@ -164,6 +177,10 @@ app.get("/api/projects/:id/sessions", async (c) =>
   c.json(await listProjectSessions(c.req.param("id"))),
 );
 
+app.put("/api/projects/:id/sessions/:key/name", async (c) =>
+  c.json(await nameSession(c.req.param("id"), c.req.param("key"), (await c.req.json<{ name?: unknown }>()).name)),
+);
+
 // ---- workspace: terminal panels (ADR 0003) ----
 app.get("/api/projects/:id/workspace", async (c) => c.json(await getWorkspace(c.req.param("id"))));
 
@@ -179,6 +196,10 @@ app.put("/api/projects/:id/layout", async (c) => {
   return c.json({ ok: true });
 });
 
+// ---- the file tree (read-only) ----
+app.get("/api/projects/:id/files", async (c) => c.json(await listFolder(getProject(c.req.param("id")).path, c.req.query("dir") ?? "")));
+app.get("/api/projects/:id/files/content", async (c) => c.json(await previewFile(getProject(c.req.param("id")).path, c.req.query("path") ?? "")));
+
 // ---- git (read-only) ----
 app.get("/api/projects/:id/git", async (c) => c.json(await gitStatus(getProject(c.req.param("id")).path)));
 
@@ -190,6 +211,10 @@ app.get("/api/projects/:id/git/diff", async (c) =>
 app.get("/api/models", async (c) => c.json(await modelSettings()));
 app.put("/api/models/decisions", async (c) => {
   await setDecisionModel((await c.req.json<{ model?: unknown }>()).model ?? null);
+  return c.json({ ok: true });
+});
+app.put("/api/models/decisions/threshold", async (c) => {
+  setDecisionThreshold((await c.req.json<{ threshold?: unknown }>()).threshold);
   return c.json({ ok: true });
 });
 app.get("/api/decisions", (c) => c.json(decisionLog()));
@@ -217,7 +242,7 @@ app.delete("/api/models/sign-ins/:id", async (c) => {
   return c.json({ ok: true });
 });
 
-// ---- agent profiles, saved prompts and skills (ADR 0018) ----
+// ---- agent profiles, saved prompts and skills (ADR 0020) ----
 app.get("/api/agent-profiles", (c) => c.json(listAgentProfiles()));
 
 app.post("/api/agent-profiles", async (c) => c.json(createAgentProfile(await c.req.json<Record<string, unknown>>()), 201));

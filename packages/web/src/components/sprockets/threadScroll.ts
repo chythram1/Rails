@@ -35,6 +35,10 @@ export const roomToSeat = (top: number, g: Pick<ThreadGeo, "viewport" | "content
 
 /** Space left above a seated message. */
 const GAP = 16;
+
+/** Where the view goes to seat a sent message at `sentTop`: just above it, or the very top for the chat's first
+ *  message, so the line that says where the chat begins isn't cut off. */
+export const seatTop = (sentTop: number, first: boolean): number => (first ? 0 : Math.max(0, sentTop - GAP));
 /** How much of the messages must be hidden below the view before "Jump to latest" shows. */
 const HIDDEN = 80;
 /** A glide: long enough to see the view travel (the browser's own smooth scroll is over in ~0.2 s and reads
@@ -119,7 +123,7 @@ export function useThreadScroll(
     if (sending.current === "seat") {
       const sent = [...el.querySelectorAll<HTMLElement>(".sp-message.user")].at(-1);
       if (sent) {
-        const top = Math.max(0, sent.offsetTop - GAP);
+        const top = seatTop(sent.offsetTop, !sent.previousElementSibling);
         page.current = { room: roomToSeat(top, g), contentAt: g.contentEnd };
         spacer.current!.style.height = `${spacerHeight(page.current, g.contentEnd)}px`;
         glide(el, top);
