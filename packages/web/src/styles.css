@@ -942,25 +942,29 @@ ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
 .sp-panel-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 16px 16px 24px; display: flex; flex-direction: column; gap: 28px; }
 /* A page's fields, 16px apart; Delete sits 28px below them (twice the gap inside). */
 .sp-section { display: flex; flex-direction: column; gap: 16px; }
-/* The description and a new rule: a fixed height that scrolls, so the panel doesn't shift as lines come and go. */
+/* The description: a fixed height that scrolls, so the panel doesn't shift as lines come and go. */
 textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .sp-danger-zone { display: flex; }
 .sp-panel .settings-field > :is(.input, .dropdown) { width: 100%; }
 .sp-field-foot { display: flex; align-items: center; gap: 8px; }
 .sp-field-label { font-size: 13px; color: var(--text-2); }
-/* A Coordinator's rules (SprocketSettings.tsx): numbered rows that are fields themselves (the row takes the
-   field's focus edge), each with a remove button, then a field to add one. */
-.sp-rules-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.sp-rule {
-  display: flex; align-items: flex-start; gap: 8px; padding: 5px 3px 5px 11px;
-  border: 1px solid var(--border-field); background: var(--field);
-}
-.sp-rule:focus-within { border-color: var(--border-focus); }
-.sp-rule-n { flex: none; min-width: 1ch; padding-top: 3px; color: var(--muted); font: 12px/1.5 var(--mono); }
+/* A Coordinator's rules (SprocketSettings.tsx): one ruled list of numbered sentences. A row turns into a field
+   (--field, the focus edge) only while it's edited; its remove button shows on hover or focus. "Add" sits in the
+   heading. */
+.sp-field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sp-field-head .btn svg { margin-left: -4px; }
+.sp-rules-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+.sp-rule { display: flex; align-items: flex-start; gap: 8px; padding: 6px 3px 6px 8px; border-bottom: 1px solid var(--border); }
+.sp-rule:hover { background: var(--hover); }
+.sp-rule:focus-within, .sp-rule.editing { background: var(--field); box-shadow: inset 0 0 0 1px var(--border-focus); }
+.sp-rule .sp-rule-remove { opacity: 0; }
+.sp-rule:is(:hover, :has(:focus-visible)) .sp-rule-remove { opacity: 1; }
+@media (hover: none) { .sp-rule .sp-rule-remove { opacity: 1; } }
+.sp-rule-count { flex: none; padding-top: 3px; font-variant-numeric: tabular-nums; }
+.sp-rule-n { flex: none; min-width: 2ch; padding-top: 3px; text-align: right; color: var(--muted); font: 12px/1.5 var(--mono); } /* room for 10 */
 .sp-rule-text { flex: 1; min-width: 0; padding: 2px 0; border: 0; background: none; font-size: 14px; line-height: 1.5; resize: none; overflow: hidden; }
 .sp-rule-text:focus-visible { outline: none; } /* the row's border shows focus */
 .sp-rule-remove { flex: none; width: 26px; height: 26px; }
-.sp-rule-add { display: flex; flex-direction: column; gap: 6px; }
 /* Pending handoffs (ADR 0015): ruled rows like the rules, the route on top and the note under it. */
 .sp-handoffs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .sp-handoff {
@@ -973,7 +977,6 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .sp-handoff-arrow { flex: none; color: var(--muted); }
 .sp-handoff-note { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .sp-owner-paths { margin: 0; font-family: var(--mono); font-size: 11.5px; line-height: 1.6; color: var(--text-2); overflow-wrap: anywhere; }
-.sp-rule-add textarea.input { width: 100%; }
 /* On/off switch (Switch.tsx): a pill, green when on, the one round control besides dots and avatars. */
 .switch {
   flex: none; display: inline-flex; align-items: center; width: 36px; height: 20px; padding: 2px;
