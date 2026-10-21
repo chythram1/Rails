@@ -301,24 +301,41 @@ export function SprocketChat({
                 </li>
               );
             })}
-            {/* Who's on it: faces that popped up when they got the message, the one writing as dots in its colour. */}
-            {watching.length > 0 && (
-              <li className="sp-message sprocket sp-watching" aria-hidden>
-                {watching.flatMap((w) => speaker(w) ?? []).map((w) =>
-                  w.id === writing ? (
-                    <span key={w.id + "-dots"} className="sp-dots" style={{ "--who": COLORS[w.look.color] } as CSSProperties}>
-                      <i />
-                      <i />
-                      <i />
-                    </span>
-                  ) : (
-                    <span key={w.id} className="sp-watcher">
-                      <Sprocket look={w.look} size={26} seed={w.id} />
-                    </span>
-                  ),
-                )}
-              </li>
-            )}
+            {/* Who's on it: the one writing as dots in its colour (in a team, beside its face, as its reply will be), and
+                below, the faces of those whose turns are coming, which popped up when they got the message. */}
+            {watching.length > 0 &&
+              (() => {
+                const who = watching.flatMap((w) => speaker(w) ?? []);
+                const writer = who.find((w) => w.id === writing);
+                const next = who.filter((w) => w !== writer);
+                return (
+                  <li className="sp-message sprocket sp-watching" aria-hidden>
+                    {writer && (
+                      <div className="sp-said">
+                        {team && (
+                          <span className="sp-avatar">
+                            <Sprocket look={writer.look} size={26} seed={writer.id} still />
+                          </span>
+                        )}
+                        <span className="sp-dots" style={{ "--who": COLORS[writer.look.color] } as CSSProperties}>
+                          <i />
+                          <i />
+                          <i />
+                        </span>
+                      </div>
+                    )}
+                    {next.length > 0 && (
+                      <div className="sp-next">
+                        {next.map((w) => (
+                          <span key={w.id} className="sp-watcher">
+                            <Sprocket look={w.look} size={26} seed={w.id} />
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                );
+              })()}
           </ol>
         )}
         <div className="sp-spacer" ref={spacer} aria-hidden />
