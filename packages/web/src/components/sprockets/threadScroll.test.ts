@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { keepInSight, roomToSeat, seatOnSend, seatTop, spacerHeight } from "./threadScroll.ts";
+import { followAfterScroll, keepInSight, roomToSeat, seatOnSend, seatTop, spacerHeight } from "./threadScroll.ts";
 
 describe("thread scrolling", () => {
   it("seats a sent message at the top unless over half the view is already empty below the messages", () => {
@@ -28,6 +28,15 @@ describe("thread scrolling", () => {
     expect(spacerHeight(page, 2600)).toBe(0); // and past it
     expect(spacerHeight(null, 2600)).toBe(0);
     expect(roomToSeat(100, { viewport: 600, contentEnd: 2000 })).toBe(0); // already enough content below
+  });
+
+  it("follows new messages unless the user scrolled up to read earlier ones, until they're back near the end", () => {
+    const g = (scrollTop: number) => ({ scrollTop, viewport: 500, contentEnd: 2000 });
+    expect(followAfterScroll(true, 1500, g(1200))).toBe(false); // scrolled up
+    expect(followAfterScroll(true, 1000, g(1200))).toBe(true); // scrolling down through a long reply
+    expect(followAfterScroll(false, 1000, g(1200))).toBe(false); // still above the end
+    expect(followAfterScroll(false, 1200, g(1460))).toBe(true); // back within 48px of the end
+    expect(followAfterScroll(false, 1700, g(1600))).toBe(true); // in the room reserved below the messages
   });
 
   it("keeps new replies in sight without passing the newest's top", () => {

@@ -1,14 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 // How a Sprocket chat's thread moves, after claude.ai's chat (its shipped code, October 2026):
-// - Opening a chat shows its end, and the view follows new messages while it's at the very bottom.
+// - Opening a chat shows its end.
+// - New messages are kept in sight (the view moves on with each, never past the top of the newest) unless the
+//   user is reading earlier ones: they scrolled up, by any means, and aren't back near the end. Scrolling back
+//   down to it, sending, or "Jump to latest" follows again.
 // - Sending "seats" the new message at the top of the thread with room reserved below it for the reply,
 //   unless more than half the visible area is already empty below the conversation: then the reply has
 //   room where it is and nothing moves.
-// - The reserved room (a spacer after the messages) shrinks as replies come in, so nothing jumps. Once they
-//   outgrow it (a team's round, a long reply), the view moves on with each new one, never past the top of the
-//   newest, until the user scrolls themselves. Once the room is out of view (the user scrolled up) and no
-//   reply is being written, it's dropped.
+// - The reserved room (a spacer after the messages) shrinks as replies come in, so nothing jumps. Once the room
+//   is out of view (the user scrolled up) and no reply is being written, it's dropped.
 
 /** Positions in the thread's scroll coordinates. `contentEnd` is where the messages end (the spacer's top). */
 export interface ThreadGeo {
@@ -40,10 +41,21 @@ const GAP = 16;
 /** Where the view goes to keep new replies in sight: their end at the bottom, unless the newest begins above that. */
 export const keepInSight = (newestTop: number, g: ThreadGeo): number => Math.max(g.scrollTop, Math.min(g.contentEnd - g.viewport, newestTop - GAP));
 
+/** How close to the end of the messages the view's bottom must be for the view to follow new ones again. */
+const NEAR = 48;
+
+/**
+ * Whether new messages should be kept in sight after the user's scroll from `before` to `g.scrollTop`: yes near
+ * the end of the messages (or below it, in the reserved room); no once they scroll up, reading earlier ones;
+ * otherwise as it was (scrolling down through a long reply keeps following).
+ */
+export const followAfterScroll = (following: boolean, before: number, g: ThreadGeo): boolean =>
+  g.contentEnd - (g.scrollTop + g.viewport) <= NEAR ? true : g.scrollTop < before - 1 ? false : following;
+
 /** Where the view goes to seat a sent message at `sentTop`: just above it, or the very top for the chat's first
  *  message, so the line that says where the chat begins isn't cut off. */
 export const seatTop = (sentTop: number, first: boolean): number => (first ? 0 : Math.max(0, sentTop - GAP));
-/** How much of the messages must be hidden below the view before "Jump to latest" shows. */
+/** How much of the messages must be hidden below the view before "Jump to latest" shows (when not following). */
 const HIDDEN = 80;
 /** A glide: long enough to see the view travel (the browser's own smooth scroll is over in ~0.2 s and reads
  *  as a jump), eased out like claude.ai's glides: quick to start, gentle to land. */
@@ -62,11 +74,13 @@ export function useThreadScroll(
   changes: unknown[],
 ) {
   const page = useRef<Page | null>(null);
-  /** At the very bottom with nothing reserved: new messages keep the view there. Opening a chat starts so. */
+  /** New messages are kept in sight: true unless the user is reading earlier ones (followAfterScroll). */
   const following = useRef(true);
+  /** The chat's end has been shown once (opening a chat starts there). */
+  const opened = useRef(false);
+  /** Where the view was at the last scroll event, to tell which way the user scrolled. */
+  const lastTop = useRef(0);
   const sending = useRef<"seat" | "stay" | null>(null);
-  /** Since the user's last send, until they scroll themselves: new replies are kept in sight. */
-  const tracking = useRef(false);
   /** A glide is moving the view (its scroll events aren't the user's). */
   const gliding = useRef(false);
   const stopGlide = useRef<() => void>(() => {});
@@ -119,7 +133,8 @@ export function useThreadScroll(
     const el = thread.current!;
     if (mayDrop && page.current && !runningRef.current && !gliding.current && g.scrollTop + g.viewport <= g.contentEnd) page.current = null;
     spacer.current!.style.height = `${spacerHeight(page.current, g.contentEnd)}px`;
-    setHidden(g.contentEnd - (el.scrollTop + g.viewport) > HIDDEN);
+    // Only for a user reading earlier messages: while following, the view gets there itself.
+    setHidden(!following.current && g.contentEnd - (el.scrollTop + g.viewport) > HIDDEN);
   };
 
   useLayoutEffect(() => {
@@ -138,10 +153,15 @@ export function useThreadScroll(
     const sent = sending.current !== null;
     sending.current = null;
     settle(geo()!, !sent); // measured again: seating may have just moved the view
-    if (following.current) el.scrollTop = el.scrollHeight;
-    else if (tracking.current && !sent && !gliding.current) {
+    const newest = [...el.querySelectorAll<HTMLElement>(".sp-message:not(.sp-watching)")].at(-1);
+    if (!opened.current) {
+      // Opening a chat: its end, at once.
+      if (newest) {
+        opened.current = true;
+        if (!sent) el.scrollTop = el.scrollHeight; // a first message sent is seated instead
+      }
+    } else if (following.current && !sent && !gliding.current) {
       const now = geo()!;
-      const newest = [...el.querySelectorAll<HTMLElement>(".sp-message:not(.sp-watching)")].at(-1);
       const top = keepInSight(newest?.offsetTop ?? now.contentEnd, now);
       if (top > now.scrollTop + 1) glide(el, top);
     }
@@ -151,24 +171,17 @@ export function useThreadScroll(
   useEffect(() => {
     const el = thread.current;
     if (!el) return;
+    // The user's own scrolling (wheel, touch, keys, the scrollbar; not a glide) says whether to follow.
     const onScroll = () => {
       const g = geo();
       if (!g) return;
-      if (!gliding.current) following.current = !page.current && el.scrollHeight - el.clientHeight - el.scrollTop <= 2;
+      if (!gliding.current && opened.current) following.current = followAfterScroll(following.current, lastTop.current, g);
+      lastTop.current = g.scrollTop;
       settle(g);
     };
-    // The user scrolling themselves (not a glide) ends keeping replies in sight.
-    const own = () => (tracking.current = false);
-    const keys = (e: KeyboardEvent) => ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(e.key) && own();
     el.addEventListener("scroll", onScroll, { passive: true });
-    el.addEventListener("wheel", own, { passive: true });
-    el.addEventListener("touchmove", own, { passive: true });
-    el.addEventListener("keydown", keys);
     return () => {
       el.removeEventListener("scroll", onScroll);
-      el.removeEventListener("wheel", own);
-      el.removeEventListener("touchmove", own);
-      el.removeEventListener("keydown", keys);
       stopGlide.current();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -176,8 +189,7 @@ export function useThreadScroll(
 
   const onSend = () => {
     const g = geo();
-    following.current = false;
-    tracking.current = true;
+    following.current = true;
     if (!g) return;
     if (seatOnSend(g)) sending.current = "seat";
     else {
@@ -194,6 +206,7 @@ export function useThreadScroll(
     if (!el || !g) return;
     page.current = null;
     following.current = true;
+    setHidden(false);
     spacer.current!.style.height = "0px";
     glide(el, Math.max(0, g.contentEnd - g.viewport));
   };
