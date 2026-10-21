@@ -55,9 +55,17 @@ async function nameSessions(api: Api, state: RunState): Promise<string[]> {
   return done;
 }
 
+/** The run's Sprocket's project chat (ADR 0021): where Rails' events, its drafts and the user's instructions go. */
+async function projectChat(api: Api, state: RunState): Promise<string> {
+  const list = await api.call<{ id: string; projectChat?: { id: string } }[]>("GET", "/api/sprockets");
+  const chat = list.find((s) => s.id === state.sprocketId)?.projectChat?.id;
+  if (!chat) throw new Error(`${state.config.sprocket.name} isn't attached to the run's project.`);
+  return chat;
+}
+
 /** A draft by the start of its id, among the run's Sprocket's pending ones. */
 async function findDraft(api: Api, state: RunState, prefix: string): Promise<{ id: string; text: string }> {
-  const messages = await api.call<{ suggestions?: { id: string; text: string; status: string }[] }[]>("GET", `/api/sprockets/${state.sprocketId}/messages`);
+  const messages = await api.call<{ suggestions?: { id: string; text: string; status: string }[] }[]>("GET", `/api/chats/${await projectChat(api, state)}/messages`);
   const draft = messages.flatMap((m) => m.suggestions ?? []).find((s) => s.id.startsWith(prefix) && (s.status === "pending" || s.status === "failed"));
   if (!draft) throw new Error(`No pending draft starts with "${prefix}". See \`status\`.`);
   return draft;
@@ -172,7 +180,7 @@ async function main(argv: string[]): Promise<void> {
     }
     case "chat": {
       const text = textArg(rest.join(" "));
-      await api.call("POST", `/api/sprockets/${state.sprocketId}/messages`, { text });
+      await api.call("POST", `/api/chats/${await projectChat(api, state)}/messages`, { text });
       log(state, { type: "chat", text });
       return console.log(`Sent to ${state.config.sprocket.name}.`);
     }

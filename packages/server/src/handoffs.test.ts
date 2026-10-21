@@ -8,7 +8,7 @@ import { handoffs, panels, projects, settings } from "./db.ts";
 import { cancelHandoff, expireHandoffs, HANDOFF_TTL_MS, MAX_HANDOFFS, planHandoff, startHandoffs } from "./handoffs.ts";
 import { models, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
-import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings } from "./sprockets.ts";
+import { createSprocket, deleteSprocket, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
 import { deliveredText } from "./suggestions.ts";
 import { startWatches } from "./watches.ts";
 
@@ -59,10 +59,10 @@ describe("planning handoffs", () => {
         return fauxAssistantMessage("One handoff is waiting.");
       },
     ]);
-    sendMessage(lead.id, "When auth is done, tell the UI session to use the new /login endpoint.");
+    sendMessage(projectChat(lead.id), "When auth is done, tell the UI session to use the new /login endpoint.");
     await idle();
     expect(pending()).toEqual([expect.objectContaining({ from: expect.objectContaining({ panelId: auth.id }), note: "Tell it to use the new /login endpoint." })]);
-    sendMessage(lead.id, "Anything waiting?");
+    sendMessage(projectChat(lead.id), "Anything waiting?");
     await idle();
     expect(system).toContain(`- ${pending()[0].id.slice(0, 8)}: when \\"Auth\\" (id ${auth.id.slice(0, 8)}) is done, for \\"UI\\"`);
   });
@@ -83,10 +83,10 @@ describe("a handoff's session finishing", () => {
     ]);
     receive(auth.id, "claude", "Stop", { last_assistant_message: "Should I add tests too?" }); // asks: not finished
     receive(auth.id, "claude", "Stop", { last_assistant_message: "Done: /login now issues tokens." });
-    await vi.waitFor(() => expect(listMessages(lead.id).length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(listMessages(projectChat(lead.id)).length).toBeGreaterThan(0));
     await idle();
 
-    const [event, reply] = listMessages(lead.id);
+    const [event, reply] = listMessages(projectChat(lead.id));
     expect(event.event).toMatchObject({ panelId: auth.id, what: "handoff", handoff: { id: h.id, to: { panelId: ui.id, kind: "pi", title: "UI" }, note: h.note } });
     expect(event.text).toBe("Done: /login now issues tokens.");
     expect(prompt).toContain(`passing handoff: \\"${h.id.slice(0, 8)}\\"`);
@@ -110,7 +110,7 @@ describe("a handoff's session finishing", () => {
     record(codex.id, fromCodex("turn/completed", { turn: { status: "interrupted", items: [] } })); // Codex, Escape
     receive(ui.id, "pi", "agent_end", { aborted: true }); // pi, Escape
     await new Promise((r) => setTimeout(r, 50));
-    expect(listMessages(lead.id).filter((m) => m.author === "event")).toEqual([]);
+    expect(listMessages(projectChat(lead.id)).filter((m) => m.author === "event")).toEqual([]);
     expect(pending()).toHaveLength(2);
   });
 
@@ -119,9 +119,9 @@ describe("a handoff's session finishing", () => {
     plan();
     faux.setResponses([fauxAssistantMessage("(quiet)")]);
     receive(auth.id, "claude", "Stop", { last_assistant_message: "Half way there." });
-    await vi.waitFor(() => expect(listMessages(lead.id).length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(listMessages(projectChat(lead.id)).length).toBeGreaterThan(0));
     await idle();
-    expect(listMessages(lead.id)[0].event?.quiet).toBe(true);
+    expect(listMessages(projectChat(lead.id))[0].event?.quiet).toBe(true);
     expect(pending()).toHaveLength(1);
   });
 });
@@ -145,7 +145,7 @@ describe("handoff titles", () => {
 });
 
 describe("handoffs that can't happen", () => {
-  const notices = (id: string) => listMessages(id).filter((m) => m.author === "notice").map((m) => m.text);
+  const notices = (id: string) => listMessages(projectChat(id)).filter((m) => m.author === "notice").map((m) => m.text);
 
   it("are cancelled when a session ends or a panel closes, with a line in the chat", () => {
     const { lead, auth, ui, plan, pending } = setup();
@@ -171,7 +171,7 @@ describe("handoffs that can't happen", () => {
     // The new session finishing a turn isn't what the handoff waited for: nothing wakes.
     receive(auth.id, "claude", "Stop", { session_id: "a-cleared", last_assistant_message: "Done: something else." });
     await idle();
-    expect(listMessages(lead.id).filter((m) => m.author === "event")).toEqual([]);
+    expect(listMessages(projectChat(lead.id)).filter((m) => m.author === "event")).toEqual([]);
   });
 
   it("follow a session that started after they were planned, or replaced one that never had a turn", () => {
@@ -213,10 +213,10 @@ describe("handoffs that can't happen", () => {
         return fauxAssistantMessage("It was cancelled.");
       },
     ]);
-    sendMessage(lead.id, "Pass it on now.");
+    sendMessage(projectChat(lead.id), "Pass it on now.");
     await idle();
     expect(result).toContain("No pending handoff");
-    expect(listMessages(lead.id).at(-1)!.suggestions ?? []).toEqual([]);
+    expect(listMessages(projectChat(lead.id)).at(-1)!.suggestions ?? []).toEqual([]);
     expect(pending()).toEqual([]);
   });
 
@@ -228,7 +228,7 @@ describe("handoffs that can't happen", () => {
     const elsewhere = projects.create("lib", `/work/handoff-${Math.random()}`);
     updateSettings(lead.id, { projectId: elsewhere.id });
     expect(handoffs.pending(lead.id)).toEqual([]);
-    expect(listMessages(lead.id)).toEqual([]); // its chat went with the move: nothing to say there
+    expect(listMessages(projectChat(lead.id))).toEqual([]); // its project chat went with the move: nothing to say there
 
     updateSettings(lead.id, { projectId: project });
     plan();

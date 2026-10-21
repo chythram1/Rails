@@ -54,6 +54,7 @@ Decisions:
   the user asked again.
 - **One project per Sprocket**, any number of Sprockets per project. Moving a Sprocket to another project,
   or detaching it, deletes its chat (it belonged to that project). Removing a project detaches its Sprockets.
+  (Changed by ADR 0021: it deletes the project's chat, and the Sprocket's direct chat stays.)
 - **A description and a core memory**, both staying with a Sprocket wherever it goes:
   - the **description** (at most 500 characters) is the user's standing instructions for it, like a small
     AGENTS.md or Muse's and Hermes' identity files. The user writes it in the Sprocket's settings; every run

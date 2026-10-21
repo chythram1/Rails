@@ -10,7 +10,7 @@ import { panels, projects, settings, suggestions } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { setOwner } from "./owners.ts";
 import { idle } from "./runs.ts";
-import { createSprocket, listMessages, sendMessage, updateSettings } from "./sprockets.ts";
+import { createSprocket, listMessages, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
 import { dismissSuggestion, sendSuggestion, suggest, SUGGESTION_MAX } from "./suggestions.ts";
 
 const faux = fauxProvider();
@@ -191,7 +191,7 @@ describe("message (ADR 0018)", () => {
     const { lead, engine, ui } = team();
     expect(await messageFromAgent(ui.id, engine.id.slice(0, 8), TEXT)).toMatch(/Lead's chat.*decides whether to send/s);
     await idle();
-    const [event, ...rest] = listMessages(lead.id);
+    const [event, ...rest] = listMessages(projectChat(lead.id));
     expect(rest).toEqual([]); // no reply: no model ran
     expect(event).toMatchObject({ author: "event", text: TEXT, event: { panelId: ui.id, kind: "pi", title: "UI", what: "message", to: { panelId: engine.id, kind: "claude", title: "Engine" } } });
     expect(event.suggestions).toMatchObject([{ panelId: engine.id, mode: "message", text: TEXT, status: "pending", from: { panelId: ui.id, kind: "pi", title: "UI" } }]);
@@ -200,7 +200,7 @@ describe("message (ADR 0018)", () => {
   it("goes out when the user sends it, saying who it's from", async () => {
     const { lead, engine, ui } = team();
     await messageFromAgent(ui.id, "Engine", TEXT);
-    const [s] = listMessages(lead.id)[0].suggestions!;
+    const [s] = listMessages(projectChat(lead.id))[0].suggestions!;
     expect(await sendSuggestion(s.id, undefined)).toMatchObject({ status: "sent" });
     await new Promise((r) => setTimeout(r, 50));
     const content: string = JSON.parse(received.at(-1)!).message.content;
@@ -249,11 +249,11 @@ describe("message (ADR 0018)", () => {
     suggest(lead.id, engine, "Engine", "From Lead.", { purpose: "message" });
     await messageFromAgent(game.id, "Engine", "From Codex.");
     expect(await messageFromAgent(ui.id, "Engine", "Second, with everything.")).toMatch(/replaces your earlier draft for "Engine".*everything it needs in this one\. The earlier draft: "First\."$/s);
-    const drafts = () => listMessages(lead.id).flatMap((m) => m.suggestions ?? []).map((s) => [s.text, s.status]);
+    const drafts = () => listMessages(projectChat(lead.id)).flatMap((m) => m.suggestions ?? []).map((s) => [s.text, s.status]);
     // Only its own, and only while it waits: the Coordinator's and other sessions' stay.
     expect(drafts()).toEqual([["First.", "replaced"], ["From Codex.", "pending"], ["Second, with everything.", "pending"]]);
     expect(suggestions.pendingFor(engine.id).map((s) => s.text).sort()).toEqual(["From Codex.", "From Lead.", "Second, with everything."]);
-    const second = listMessages(lead.id).at(-1)!.suggestions![0];
+    const second = listMessages(projectChat(lead.id)).at(-1)!.suggestions![0];
     await sendSuggestion(second.id, undefined);
     expect(await messageFromAgent(ui.id, "Engine", "Third.")).not.toMatch(/replaces/); // a sent one stays sent
     expect(drafts().at(-2)).toEqual(["Second, with everything.", "sent"]);
@@ -262,13 +262,13 @@ describe("message (ADR 0018)", () => {
   it("tells the agent what its user did with its drafts: in neighbours, and when it drafts for that session again", async () => {
     const { lead, engine, ui } = team();
     await messageFromAgent(ui.id, "Gameplay", "Make the canvas 768 high.");
-    dismissSuggestion(listMessages(lead.id).at(-1)!.suggestions![0].id);
+    dismissSuggestion(listMessages(projectChat(lead.id)).at(-1)!.suggestions![0].id);
     await messageFromAgent(ui.id, "Engine", "Emit tower:shot. And make the map bigger.");
     // Quoted in full, not cut short like the others: the change can be anywhere, often a cut at the end.
     const edited = `Emit tower:shot. ${"Keep the canvas at the brief's 960x576. ".repeat(8)}`.trim();
-    await sendSuggestion(listMessages(lead.id).at(-1)!.suggestions![0].id, edited);
+    await sendSuggestion(listMessages(projectChat(lead.id)).at(-1)!.suggestions![0].id, edited);
     await messageFromAgent(ui.id, "Engine", "The HUD reads state.lives now.");
-    await sendSuggestion(listMessages(lead.id).at(-1)!.suggestions![0].id, undefined);
+    await sendSuggestion(listMessages(projectChat(lead.id)).at(-1)!.suggestions![0].id, undefined);
     const text = await neighboursText(ui.id);
     expect(text).toMatch(/Your messages in the last hour/);
     expect(text).toMatch(/for "Gameplay", just now: dismissed by your user\. You wrote: "Make the canvas 768 high\."/);
@@ -289,7 +289,7 @@ describe("message (ADR 0018)", () => {
         return fauxAssistantMessage("Noted.");
       },
     ]);
-    sendMessage(lead.id, "anything new?");
+    sendMessage(projectChat(lead.id), "anything new?");
     await idle();
     expect(prompt).toContain('\\"UI\\" (pi, id');
     expect(prompt).toContain(`drafted a message for \\"Engine\\" (Claude Code, id ${engine.id.slice(0, 8)})`);

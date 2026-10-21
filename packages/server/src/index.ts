@@ -26,7 +26,7 @@ import { attachPickedFolder, attachProject, detachProject, getProject, listProje
 import { providerInfo } from "./providers/index.ts";
 import { getProfile, updateProfile } from "./profile.ts";
 import { cancelSignIn, modelSettings, removeCredential, setApiKey, setDefaultModel, startSignIn, submitSignInCode } from "./models.ts";
-import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets.ts";
+import { clearChat, createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets.ts";
 import { TerminalHub } from "./terminals.ts";
 import { startWatches } from "./watches.ts";
 import { startOverlaps } from "./overlaps.ts";
@@ -270,11 +270,17 @@ app.delete("/api/sprockets/:id", (c) => {
 
 app.put("/api/sprockets/:id/settings", async (c) => c.json(updateSettings(c.req.param("id"), await c.req.json<SprocketSettings>())));
 
-app.get("/api/sprockets/:id/messages", (c) => c.json(listMessages(c.req.param("id"))));
+// A Sprocket's chats (ADR 0021): its direct chat and its project's chat, by chat id. DELETE clears one.
+app.get("/api/chats/:id/messages", (c) => c.json(listMessages(c.req.param("id"))));
 
-app.post("/api/sprockets/:id/messages", async (c) =>
+app.post("/api/chats/:id/messages", async (c) =>
   c.json(sendMessage(c.req.param("id"), (await c.req.json<{ text?: unknown }>()).text), 201),
 );
+
+app.delete("/api/chats/:id/messages", (c) => {
+  clearChat(c.req.param("id"));
+  return c.json({ ok: true });
+});
 
 // Replies a Coordinator suggests (ADR 0010): the user sends them (edited or not) or dismisses them.
 app.post("/api/suggestions/:id/send", async (c) => {

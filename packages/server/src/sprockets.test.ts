@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { idle } from "./runs.ts";
 import { sprockets } from "./db.ts";
-import { createSprocket, deleteSprocket, listMessages, listSprockets, onSprocketsChanged, sendMessage, updateSprocket } from "./sprockets.ts";
+import { createSprocket, deleteSprocket, directChat, listMessages, listSprockets, onSprocketsChanged, sendMessage, updateSprocket } from "./sprockets.ts";
 
 const look = { character: "roo", color: "blue", accessory: "cap" } as const;
 
@@ -38,19 +38,20 @@ describe("sprockets", () => {
   it("updates, stores messages in order and deletes them with the Sprocket", async () => {
     const s = createSprocket({ name: "Helper", look });
     expect(updateSprocket(s.id, { name: "Helper 2", look: { ...look, color: "green" } }).look.color).toBe("green");
-    sendMessage(s.id, " first ");
-    sendMessage(s.id, "second");
+    const chat = directChat(s.id);
+    sendMessage(chat, " first ");
+    sendMessage(chat, "second");
     // With no model set up, each message also gets a notice saying so (see runs.test.ts).
-    expect(listMessages(s.id).filter((m) => m.author === "user").map((m) => m.text)).toEqual(["first", "second"]);
+    expect(listMessages(chat).filter((m) => m.author === "user").map((m) => m.text)).toEqual(["first", "second"]);
     await idle();
     deleteSprocket(s.id);
-    expect(() => listMessages(s.id)).toThrow("Not found");
+    expect(() => listMessages(chat)).toThrow("Not found");
   });
 
   it("refuses empty and oversized messages", () => {
     const s = createSprocket({ name: "Quiet", look });
-    expect(() => sendMessage(s.id, "   ")).toThrow("Message is empty");
-    expect(() => sendMessage(s.id, "x".repeat(4001))).toThrow("at most 4000");
-    expect(() => sendMessage(s.id, 42)).toThrow("Message is empty");
+    expect(() => sendMessage(directChat(s.id), "   ")).toThrow("Message is empty");
+    expect(() => sendMessage(directChat(s.id), "x".repeat(4001))).toThrow("at most 4000");
+    expect(() => sendMessage(directChat(s.id), 42)).toThrow("Message is empty");
   });
 });

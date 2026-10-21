@@ -22,11 +22,11 @@ import { useAutoGrow } from "../useAutoGrow.ts";
  * and at the panel's own top right while the panel is open (ref/sprockets/stage2/chat2.png), so it never moves
  * from under the pointer's corner and the panel needs no title or close button of its own.
  */
-export function PanelToggle({ sprocket, open }: { sprocket: SprocketData; open: boolean }) {
+export function PanelToggle({ sprocket, project = false, open }: { sprocket: SprocketData; project?: boolean; open: boolean }) {
   return (
     <a
       className={"icon-btn sp-panel-toggle" + (open ? " active" : "")}
-      href={open ? href.sprocket(sprocket.id) : href.sprocketSettings(sprocket.id)}
+      href={open ? href.sprocket(sprocket.id, project) : href.sprocketSettings(sprocket.id, project)}
       aria-label={`${sprocket.name} settings`}
       aria-expanded={open}
       title={open ? "Close settings" : "Settings"}
@@ -42,11 +42,12 @@ export function PanelToggle({ sprocket, open }: { sprocket: SprocketData; open: 
  * standing rules and its pending handoffs. A cog at the top right leads to Settings, what rarely changes (name,
  * description, model, Delete), which has a back arrow at its top left. Everything saves as you go: a field
  * when you leave it, a choice at once, and a quiet "Saved" in the header confirms it. Its core memory is its
- * own business. Moving it to another project deletes its chat there, so that asks first. The panel has its
+ * own business. Moving it to another project deletes its project chat (ADR 0021), so that asks first. The panel has its
  * own URL (`#/sprockets/<id>/settings`): its toggle, Escape (from Settings: back first) or the browser's back
  * button close it.
  */
-export function SprocketSettings({ sprocket, all }: { sprocket: SprocketData; all: SprocketData[] }) {
+/** `onProjectChat`: it opened beside the project chat, so closing it goes back there. */
+export function SprocketSettings({ sprocket, all, onProjectChat = false }: { sprocket: SprocketData; all: SprocketData[]; onProjectChat?: boolean }) {
   const { id, name } = sprocket;
   const { projects } = useStore();
   const project = projects.find((p) => p.id === sprocket.projectId);
@@ -57,7 +58,7 @@ export function SprocketSettings({ sprocket, all }: { sprocket: SprocketData; al
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(0);
   const [page, setPage] = useState<"job" | "settings">("job");
-  const close = () => navigate(href.sprocket(id));
+  const close = () => navigate(href.sprocket(id, onProjectChat));
   // Changing pages puts focus where the page starts: the back arrow on Settings, the cog back on the job.
   const pageStart = useRef<HTMLButtonElement>(null);
   const moved = useRef(false);
@@ -92,7 +93,7 @@ export function SprocketSettings({ sprocket, all }: { sprocket: SprocketData; al
   const move = async (projectId: string) => {
     const to = projects.find((p) => p.id === projectId);
     const question = to ? `Attach ${name} to ${to.name}?` : `Detach ${name} from its project?`;
-    if (sprocket.lastMessage && !confirm(`${question}\n\nIts chat is deleted. Its name, look and core memory stay.`)) return;
+    if (sprocket.projectChat?.lastMessage && !confirm(`${question}\n\nIts project chat is deleted. Its own chat with you, name, look and core memory stay.`)) return;
     await save({ projectId: projectId || null });
   };
 
@@ -139,7 +140,7 @@ export function SprocketSettings({ sprocket, all }: { sprocket: SprocketData; al
               <Cog size={18} />
             </button>
           )}
-          <PanelToggle sprocket={sprocket} open />
+          <PanelToggle sprocket={sprocket} project={onProjectChat} open />
         </div>
       </header>
       <div className="sp-panel-body">

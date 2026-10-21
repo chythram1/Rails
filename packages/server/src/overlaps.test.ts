@@ -6,7 +6,7 @@ import { panels, projects, settings } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { BATCH_MS, OverlapWakes, overlapList, startOverlaps } from "./overlaps.ts";
 import { idle } from "./runs.ts";
-import { createSprocket, listMessages, updateSettings } from "./sprockets.ts";
+import { createSprocket, directChat, listMessages, projectChat, updateSettings } from "./sprockets.ts";
 
 const look = { character: "cog", color: "green", accessory: "none" } as const;
 
@@ -99,10 +99,10 @@ describe("overlaps", () => {
     ]);
     vi.advanceTimersByTime(BATCH_MS);
     vi.useRealTimers();
-    await vi.waitFor(() => expect(listMessages(s.id).length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(listMessages(projectChat(s.id)).length).toBeGreaterThan(0));
     await idle();
 
-    const [event] = listMessages(s.id);
+    const [event] = listMessages(projectChat(s.id));
     expect(event.event).toEqual({
       panelId: a.id,
       kind: "claude",
@@ -149,6 +149,6 @@ describe("overlaps", () => {
     vi.advanceTimersByTime(BATCH_MS);
     vi.useRealTimers();
     expect(mine([a.id, b.id])).toHaveLength(2);
-    expect(listMessages(s.id)).toEqual([]);
+    expect(listMessages(directChat(s.id))).toEqual([]); // not attached: no project chat, and events never go to its direct chat
   });
 });

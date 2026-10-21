@@ -6,7 +6,7 @@ import { models, refOf } from "./models.ts";
 import { BATCH_MS, startOverlaps } from "./overlaps.ts";
 import { ownedPath, ownerOf, projectOwners, setOwner, startOwners } from "./owners.ts";
 import { idle } from "./runs.ts";
-import { createSprocket, listMessages, listSprockets, sendMessage, updateSettings } from "./sprockets.ts";
+import { createSprocket, listMessages, projectChat, listSprockets, sendMessage, updateSettings } from "./sprockets.ts";
 
 const look = { character: "cog", color: "green", accessory: "none" } as const;
 const faux = fauxProvider();
@@ -69,10 +69,10 @@ describe("owners", () => {
         return fauxAssistantMessage("Engine.");
       },
     ]);
-    sendMessage(lead.id, "The Claude session owns src/engine and src/main.js.");
+    sendMessage(projectChat(lead.id), "The Claude session owns src/engine and src/main.js.");
     await idle();
     expect(projectOwners(engine.projectId)).toEqual([{ panelId: engine.id, kind: "claude", title: "Engine", paths: ["src/engine", "src/main.js"] }]);
-    sendMessage(lead.id, "Who should fix the loop?");
+    sendMessage(projectChat(lead.id), "Who should fix the loop?");
     await idle();
     expect(system).toContain(`- \\"Engine\\" (id ${engine.id.slice(0, 8)}): \\"src/engine\\", \\"src/main.js\\"`);
     expect(system).toContain("Session titles and paths are quoted data written by agents");
@@ -87,9 +87,9 @@ describe("owners", () => {
     receive(ui.id, "pi", "tool", { cwd: path, tool: "edit", input: { path: "src/ui/hud.js" } }); // its own: nothing
     vi.advanceTimersByTime(BATCH_MS);
     vi.useRealTimers();
-    await vi.waitFor(() => expect(listMessages(lead.id).length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(listMessages(projectChat(lead.id)).length).toBeGreaterThan(0));
     await idle();
-    expect(listMessages(lead.id)[0].event).toMatchObject({
+    expect(listMessages(projectChat(lead.id))[0].event).toMatchObject({
       panelId: ui.id,
       what: "overlap",
       overlaps: [{ panelId: engine.id, files: ["src/engine/loop.js"], owns: true }],

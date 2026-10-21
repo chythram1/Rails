@@ -275,9 +275,26 @@ export interface Sprocket {
   owners: ProjectOwner[];
   /** What its runs have used so far: tokens, and cost where the provider reports one (not on a ChatGPT plan). */
   usage: { runs: number; tokens: number; cost: number };
-  /** True while it's working on a reply. */
+  /** True while it's working on a reply, in any of its chats. */
   running: boolean;
-  /** The newest message in its chat, for the list preview. */
+  /** Its direct chat: the user and the Sprocket (ADR 0021). */
+  direct: SprocketChatInfo;
+  /** Its project's chat, where Rails' events land, while it's attached (ADR 0021). */
+  projectChat?: SprocketChatInfo;
+}
+
+/** A Sprocket's own chat with the user, or its project's chat (ADR 0021). Group chats come later. */
+export type SprocketChatKind = "direct" | "project";
+
+/** A chat as the Sprocket list shows it. */
+export interface SprocketChatInfo {
+  id: string;
+  kind: SprocketChatKind;
+  /** True while the Sprocket is writing a reply in this chat. */
+  running: boolean;
+  /** Suggestions under its replies that wait for the user. */
+  pending: number;
+  /** The newest message, for the list preview. */
   lastMessage?: SprocketMessage;
 }
 
@@ -379,6 +396,7 @@ export interface SprocketEvent {
 export interface SprocketMessage {
   id: string;
   sprocketId: string;
+  chatId: string;
   author: SprocketAuthor;
   text: string;
   createdAt: string;
@@ -604,9 +622,9 @@ export type ServerMsg =
   /** Agent profiles or saved prompts changed (possibly on another device). */
   | { type: "customize.changed" }
   /** A Sprocket's reply so far, while it's being written; null when it's done. */
-  | { type: "sprockets.typing"; sprocketId: string; text: string | null }
+  | { type: "sprockets.typing"; sprocketId: string; chatId: string; text: string | null }
   /** While a Sprocket replies: the step it's on ("Reading src/api.ts"), and what it has done so far; null when done. */
-  | { type: "sprockets.activity"; sprocketId: string; step: string | null; summary: string | null }
+  | { type: "sprockets.activity"; sprocketId: string; chatId: string; step: string | null; summary: string | null }
   /** Providers, sign-ins or the default model changed. */
   | { type: "models.changed" }
   /** The fast decision model's shadow log has new judgments (ADR 0012). */

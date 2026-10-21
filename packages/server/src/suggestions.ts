@@ -146,6 +146,13 @@ export function dismissSuggestion(id: string): Suggestion {
 const movesOn = (e: SessionEvent) => e.kind === "prompt" || e.kind === "tool" || e.kind === "resumed" || e.kind === "stopped";
 
 /** Expire a panel's pending answers, or (`all`) its messages too. */
+/** A chat was cleared (ADR 0021): what waited under its replies can't be sent from it anymore. */
+export function expireInChat(chatId: string): void {
+  let any = false;
+  for (const id of suggestions.waitingIn(chatId)) any = suggestions.setStatus(id, ["pending", "failed"], "expired", { error: "The chat was cleared." }) || any;
+  if (any) changes.emit();
+}
+
 function expireFor(panelId: string, { all = false, error }: { all?: boolean; error?: string } = {}) {
   let any = false;
   for (const s of suggestions.pendingFor(panelId))

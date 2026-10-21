@@ -28,7 +28,7 @@ Decisions:
     pi dialog is a question only when it opens while a tool whose input holds questions is running; the
     questions are read by their shape, whatever the tool is called (docs/providers.md). A question without
     options is open, and the Coordinator is told it's answered by typing.
-- **Waits arrive as chat messages** from Rails (author `event`), with the session, what it waits for (the
+- **Waits arrive as chat messages** (in the project's chat since ADR 0021) from Rails (author `event`), with the session, what it waits for (the
   dialog's questions and options, or the end of its last message) and a link to its panel. The model reads
   them as `[Rails event, not from your user]`, with the session's text quoted as data. The Coordinator's run
   replies as usual: which session, what it's asking, what it would answer and why. If the wait doesn't need

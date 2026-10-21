@@ -11,7 +11,7 @@ import { fromCodex } from "../../packages/server/src/bridge/events.ts";
 import { panels, projects, sprocketMessages, suggestions, usage } from "../../packages/server/src/db.ts";
 import { planHandoff } from "../../packages/server/src/handoffs.ts";
 import { setOwner } from "../../packages/server/src/owners.ts";
-import { createSprocket, listMessages, postEvent, sendMessage, updateSettings } from "../../packages/server/src/sprockets.ts";
+import { createSprocket, listMessages, postEvent, projectChat, sendMessage, updateSettings } from "../../packages/server/src/sprockets.ts";
 import { sessionTitle } from "../../packages/server/src/titles.ts";
 
 type Kind = "claude" | "pi" | "codex";
@@ -141,15 +141,15 @@ export class World {
     return planHandoff(this.coordinator.id, { panel: from, title: from.title }, { panel: to, title: to.title }, note).id;
   }
 
-  /** Earlier chat: the user's message and the Coordinator's reply, without running it. */
+  /** Earlier chat in the project chat (ADR 0021): the user's message and the Coordinator's reply, without running it. */
   history(user: string, reply: string): void {
-    sprocketMessages.create(this.coordinator.id, "user", user, this.tick());
-    sprocketMessages.create(this.coordinator.id, "sprocket", reply, this.tick());
+    sprocketMessages.create(projectChat(this.coordinator.id), "user", user, this.tick());
+    sprocketMessages.create(projectChat(this.coordinator.id), "sprocket", reply, this.tick());
   }
 
-  /** The user writes to the Coordinator, which replies. */
+  /** The user writes to the Coordinator in the project chat, which replies. */
   say(text: string): void {
-    sendMessage(this.coordinator.id, text);
+    sendMessage(projectChat(this.coordinator.id), text);
   }
 
   /** Rails wakes the Coordinator, as watches.ts, overlaps.ts and handoffs do. */
@@ -163,7 +163,7 @@ export class World {
 
   /** What the Coordinator did: its replies since the scene was set, whether it stayed quiet, and its drafts. */
   outcome(): Outcome {
-    const messages = listMessages(this.coordinator.id);
+    const messages = listMessages(projectChat(this.coordinator.id));
     const lastUser = messages.findLastIndex((m) => m.author === "user" || m.author === "event");
     const after = messages.slice(lastUser + 1);
     const drafts = [...suggestions.byMessage(this.coordinator.id).values()].flat().map((s) => ({
@@ -175,7 +175,7 @@ export class World {
       attachment: !!s.attachment,
     }));
     const replies = after.filter((m) => m.author === "sprocket");
-    const steps = sprocketMessages.recentSteps(this.coordinator.id, 3);
+    const steps = sprocketMessages.recentSteps(projectChat(this.coordinator.id), 3);
     return {
       reply: replies.map((m) => m.text).join("\n\n"),
       activity: replies.map((m) => m.activity ?? "").filter(Boolean).join("; "),
