@@ -2,7 +2,8 @@ import { useLayoutEffect, useRef } from "react";
 
 /**
  * A textarea that grows with its text (its CSS max-height, if any, then makes it scroll), measured again when
- * its text changes or its width does (a panel opening, the window turning into a phone's).
+ * its text changes, its width does (a panel opening, the window turning into a phone's) or a font finishes
+ * loading (the text wraps differently in it, at the same width).
  */
 export function useAutoGrow(value: string) {
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -21,7 +22,11 @@ export function useAutoGrow(value: string) {
       fit();
     });
     observer.observe(el);
-    return () => observer.disconnect();
+    document.fonts?.addEventListener("loadingdone", fit);
+    return () => {
+      observer.disconnect();
+      document.fonts?.removeEventListener("loadingdone", fit);
+    };
   }, [value]);
   return ref;
 }
