@@ -166,7 +166,7 @@ button.link { padding: 0; border: 0; background: none; color: var(--blue); font-
 
 /* The logo (Logo.tsx): 50 × 23px (its 156 × 72 box at 0.32), the ball 22px. Ink in the text colour, feet in --muted,
    so it follows the theme. The same place in both states: the ball's middle (66 units, 21.15px into the box) on
-   --icon-x, which puts the tip of the tail on the rows' 8px edge. */
+   --icon-x, which puts its nose on the rows' 8px edge. */
 .logo-armadillo {
   display: block; flex-shrink: 0; width: 50px; height: 23.08px; overflow: visible;
   margin-left: calc(var(--icon-x) - var(--side-pad) - 21.15px);

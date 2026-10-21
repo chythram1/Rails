@@ -1,15 +1,14 @@
 import type { CSSProperties } from "react";
 
 /**
- * The Rails logo: an armadillo made of rounded bars, facing the wordmark (the drawing on its own, for pages
- * outside the app, is `assets/logo.svg`). It walks in place while the pointer is on the brand, and in the collapsed
- * sidebar it curls up into a ball: the eight bands of its shell round into a circle resting where its feet stood,
+ * The Rails logo: an armadillo made of rounded bars, facing left, its tail toward the wordmark (the drawing on its
+ * own, for pages outside the app, is `assets/logo.svg`). It walks in place while the pointer is on the brand, and in
+ * the collapsed sidebar it curls up into a ball: the eight bands of its shell round into a circle resting where its feet stood,
  * and the head, tail and feet tuck in under them. Every bar carries its place in the ball as `--curl` (a transform
  * worked out below); styles.css applies it in the rail and times the moves. Decorative: the wordmark or the
  * sidebar's button names it.
  *
- * The coordinates are the source drawing's, which faces left; the drawing is mirrored as a whole (around the shell's
- * middle), so the walk and the curl mirror with it.
+ * The coordinates are the source drawing's, which faces left as the logo does.
  */
 
 /** Every bar is 5 wide with round ends. */
@@ -17,13 +16,13 @@ const W = 5;
 type Bar = { x: number; y: number; h: number };
 
 /**
- * The ball, its bottom on the ground the feet stand on (y = 91). It forms 20 units behind the shell's middle
- * (x = 86), toward the tail: standing, the long tail needs room before the sidebar's edge, which puts the shell's
- * middle right of the icon column; the ball has to sit on that column, so the armadillo curls back onto its tail
- * there rather than sliding over.
+ * The ball, its bottom on the ground the feet stand on (y = 91). It forms where the shell stands, 2 units toward
+ * the head from the shell's middle (x = 86): with the short head at the sidebar's edge, that's the icon column, so
+ * the armadillo curls up in place. (Facing the other way, the long tail put the shell well right of the column,
+ * and the ball had to form 20 units back.)
  */
 const SHELL_MID = 86;
-const BALL = { x: 106, r: 34.5, bottom: 91 };
+const BALL = { x: 84, r: 34.5, bottom: 91 };
 const BEHIND = BALL.x - SHELL_MID;
 const BALL_Y = BALL.bottom - Math.sqrt(BALL.r ** 2 - 4.5 ** 2);
 
@@ -94,39 +93,37 @@ function Part({ bar, to, kind, className, style }: { bar: Bar; to: Bar; kind: st
 
 export function Logo() {
   return (
-    // Mirrored, the drawing spans 1 (the tip of the tail) to 153 (the nose); the ball's middle is at 172 - 106 = 66.
-    <svg className="logo-armadillo" viewBox="0 20.8 156 72" aria-hidden focusable="false">
-      <g transform={`matrix(-1 0 0 1 ${2 * SHELL_MID} 0)`}>
-        <g className="lg-ink">
-          {TAIL.map((t) => (
-            <Part
-              key={t.x}
-              bar={t}
-              to={tucked(LAST, Math.min(t.h, 20))}
-              kind="lg-tuck"
-              className="lg-motion lg-tail"
-              style={{ "--lift": `${t.lift}px`, "--drop": `${t.drop}px`, "--lag": `${t.lag}s` }}
-            />
+    // The drawing spans 19 (the nose) to 171 (the tip of the tail), 1 to 153 in the box; the ball's middle is at 84 - 18 = 66.
+    <svg className="logo-armadillo" viewBox="18 20.8 156 72" aria-hidden focusable="false">
+      <g className="lg-ink">
+        {TAIL.map((t) => (
+          <Part
+            key={t.x}
+            bar={t}
+            to={tucked(LAST, Math.min(t.h, 20))}
+            kind="lg-tuck"
+            className="lg-motion lg-tail"
+            style={{ "--lift": `${t.lift}px`, "--drop": `${t.drop}px`, "--lag": `${t.lag}s` }}
+          />
+        ))}
+      </g>
+      <g className="lg-foot">
+        {FEET.map((f) => (
+          <Part key={f.x} bar={f} to={tucked(f.band, 5, 75)} kind="lg-feet" className={`lg-motion lg-step-${f.step}`} />
+        ))}
+      </g>
+      <g className="lg-ink">
+        <g className="lg-motion lg-head">
+          {HEAD.map((b) => (
+            <Part key={`${b.x},${b.y}`} bar={b} to={tucked(FIRST, Math.min(b.h, 20))} kind="lg-tuck" />
           ))}
-        </g>
-        <g className="lg-foot">
-          {FEET.map((f) => (
-            <Part key={f.x} bar={f} to={tucked(f.band, 5, 75)} kind="lg-feet" className={`lg-motion lg-step-${f.step}`} />
-          ))}
-        </g>
-        <g className="lg-ink">
-          <g className="lg-motion lg-head">
-            {HEAD.map((b) => (
-              <Part key={`${b.x},${b.y}`} bar={b} to={tucked(FIRST, Math.min(b.h, 20))} kind="lg-tuck" />
-            ))}
-            <g className="lg-part lg-tuck" style={{ "--curl": `translate(${FIRST + BEHIND - 34}px, ${Math.round((BALL_Y - 56) * 100) / 100}px)` } as Vars}>
-              <circle cx="36.5" cy="56" r="1.8" />
-            </g>
+          <g className="lg-part lg-tuck" style={{ "--curl": `translate(${FIRST + BEHIND - 34}px, ${Math.round((BALL_Y - 56) * 100) / 100}px)` } as Vars}>
+            <circle cx="36.5" cy="56" r="1.8" />
           </g>
-          {BANDS.map((b, i) => (
-            <Part key={b.x} bar={b} to={inBall(b.x)} kind="lg-band" className="lg-motion lg-ripple" style={{ "--lag": `${i * 0.025}s` }} />
-          ))}
         </g>
+        {BANDS.map((b, i) => (
+          <Part key={b.x} bar={b} to={inBall(b.x)} kind="lg-band" className="lg-motion lg-ripple" style={{ "--lag": `${i * 0.025}s` }} />
+        ))}
       </g>
     </svg>
   );
