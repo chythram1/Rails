@@ -301,37 +301,33 @@ export function SprocketChat({
                 </li>
               );
             })}
-            {/* Who's on it: the one writing as dots in its colour (in a team, beside its face, as its reply will be), and
-                below, the faces of those whose turns are coming, which popped up when they got the message. */}
+            {/* Who's on it: one face at a time, of the member whose turn it is (the others wait unseen). It pops up
+                when it gets the message, then writes as dots in its colour, beside its face in a team as its reply
+                will be. */}
             {watching.length > 0 &&
               (() => {
                 const who = watching.flatMap((w) => speaker(w) ?? []);
-                const writer = who.find((w) => w.id === writing);
-                const next = who.filter((w) => w !== writer);
+                const one = who.find((w) => w.id === writing) ?? who[0];
+                if (!one) return null;
                 return (
                   <li className="sp-message sprocket sp-watching" aria-hidden>
-                    {writer && (
-                      <div className="sp-said">
+                    {one.id === writing ? (
+                      <div key={one.id} className="sp-said">
                         {team && (
                           <span className="sp-avatar">
-                            <Sprocket look={writer.look} size={26} seed={writer.id} still />
+                            <Sprocket look={one.look} size={26} seed={one.id} still />
                           </span>
                         )}
-                        <span className="sp-dots" style={{ "--who": COLORS[writer.look.color] } as CSSProperties}>
+                        <span className="sp-dots" style={{ "--who": COLORS[one.look.color] } as CSSProperties}>
                           <i />
                           <i />
                           <i />
                         </span>
                       </div>
-                    )}
-                    {next.length > 0 && (
-                      <div className="sp-next">
-                        {next.map((w) => (
-                          <span key={w.id} className="sp-watcher">
-                            <Sprocket look={w.look} size={26} seed={w.id} />
-                          </span>
-                        ))}
-                      </div>
+                    ) : (
+                      <span key={one.id} className="sp-watcher">
+                        <Sprocket look={one.look} size={26} seed={one.id} />
+                      </span>
                     )}
                   </li>
                 );

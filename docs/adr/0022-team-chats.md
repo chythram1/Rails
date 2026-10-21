@@ -66,8 +66,9 @@ Decisions:
   changed (name, members, lead) or deleted in its settings panel, as a Sprocket is; the chat's `…` menu clears its
   chat (ADR 0021). Typing `@` in a team's composer suggests the members whose names fit what follows it, and
   mentions of members read as chips. Each member's run of replies has its name over it and its face at its foot.
-  A member's face pops up at the bottom left once Rails knows it answers (never while Rails works out who), in
-  turn order, and the one writing turns into dots.
+  One face at a time pops up at the bottom left: the member whose turn it is, once Rails knows it answers (never
+  while Rails works out who), turning into dots as it writes. Members whose turns come later aren't shown, so the
+  thread never has a row of faces that reads as part of a message.
 - **Characters in the list stand still.** A team's row shows several faces, so a list of them blinking and bobbing
   is too busy; the gallery, the chats and the creator keep their motion.
 - **When Sprockets go.** Deleting a Sprocket takes it out of its teams. Its messages there stay, shown as a deleted
