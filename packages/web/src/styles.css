@@ -550,7 +550,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .composer-controls > .composer-prompts { width: 44px; height: 100%; border-right: 1px solid var(--border); }
 .composer.compact .composer-controls > .composer-prompts { height: auto; border-right: 0; border-left: 1px solid var(--border); }
 .composer-prompts:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
-/* @mention suggestions (a group chat's members, ADR 0022): a menu-like list just above the composer's left edge. */
+/* @mention suggestions (a team chat's members, ADR 0022): a menu-like list just above the composer's left edge. */
 .composer { position: relative; }
 .mention-list {
   position: absolute; left: -1px; bottom: calc(100% + 6px); z-index: 50; min-width: 220px; max-width: min(320px, 100%); margin: 0; padding: 0; list-style: none;
@@ -817,7 +817,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-groups { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 6px 6px; }
 .sp-group-title { margin: 0; padding: 12px 6px 6px; }
 .sp-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
-/* A group's picture (ADR 0022, GroupFace.tsx): its members standing still in one character's box, the lead in front. */
+/* A team's picture (ADR 0022, TeamFace.tsx): its members standing still in one character's box, the lead in front. */
 .sp-face { position: relative; display: block; flex-shrink: 0; }
 .sp-face > span { position: absolute; line-height: 0; }
 .sp-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 6px; border-radius: var(--row-r); }
@@ -1060,11 +1060,11 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 }
 /* The run log above a reply: what the Sprocket looked at or did for it. */
 .sp-steps { margin: 0 0 4px; color: var(--muted); font-size: 13px; text-wrap: pretty; }
-/* In a group (ADR 0022), a member's character and name head its replies. */
+/* In a team (ADR 0022), a member's character and name head its replies. */
 .sp-author { display: flex; align-items: center; gap: 6px; margin: 0 0 2px; color: var(--text-2); font-size: 13px; font-weight: 500; }
 .sp-intro-members { list-style: none; margin: 0 0 6px; padding: 0; display: flex; justify-content: center; gap: 20px; }
 .sp-intro-members li { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-/* The New group dialog's member slots: two to a row, filled ones ruled, empty ones dashed. The lead's carries a star. */
+/* The New team dialog's member slots: two to a row, filled ones ruled, empty ones dashed. The lead's carries a star. */
 .sp-slots-label { margin: 18px 0 8px; }
 .sp-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .sp-slot { display: flex; align-items: center; gap: 10px; min-width: 0; height: 52px; padding: 0 12px; border: 1px solid var(--border-strong); font-size: 14px; text-align: left; }

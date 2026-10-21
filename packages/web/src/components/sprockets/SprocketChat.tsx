@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IconArrowDown as ArrowDown, IconChevronLeft as ChevronLeft } from "@tabler/icons-react";
-import { GROUP_TURNS_MAX, type Sprocket as SprocketData, type SprocketChatInfo, type SprocketGroup, type SprocketMessage } from "@rails/shared";
+import { TEAM_TURNS_MAX, type Sprocket as SprocketData, type SprocketChatInfo, type SprocketTeam, type SprocketMessage } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href } from "../../router.ts";
 import { socket } from "../../ws.ts";
@@ -9,7 +9,7 @@ import { SavedPromptsMenu } from "../customize/SavedPromptsMenu.tsx";
 import { MenuButton } from "../Menu.tsx";
 import { useStore } from "../../store.tsx";
 import { ChatMenu } from "./ChatMenu.tsx";
-import { GroupFace } from "./GroupFace.tsx";
+import { TeamFace } from "./TeamFace.tsx";
 import { Sprocket } from "./Sprocket.tsx";
 import { PanelToggle } from "./SprocketSettings.tsx";
 import { EventRow } from "./EventRow.tsx";
@@ -41,7 +41,7 @@ function stamp(iso: string): string {
  * replies on the left, and Rails' own notices (no model yet, errors) in the middle. A reply shows as it's written.
  * `embedded` is the project chat in a workspace's side panel (SidePanel.tsx), which has a header of its own.
  *
- * A group chat (ADR 0022) passes `group` (and its lead as `sprocket`): each member's reply carries its character and
+ * A team chat (ADR 0022) passes `team` (and its lead as `sprocket`): each member's reply carries its character and
  * name, and the composer can @mention a member.
  */
 export function SprocketChat({
@@ -49,27 +49,27 @@ export function SprocketChat({
   chat,
   panelOpen,
   embedded = false,
-  group,
+  team,
 }: {
   sprocket: SprocketData;
   chat: SprocketChatInfo;
   panelOpen: boolean;
   embedded?: boolean;
-  group?: { info: SprocketGroup; all: SprocketData[] };
+  team?: { info: SprocketTeam; all: SprocketData[] };
 }) {
   const { id, name } = sprocket;
   const chatId = chat.id;
   const running = chat.running;
   const { projects } = useStore();
-  const project = group ? undefined : projects.find((p) => p.id === sprocket.projectId);
+  const project = team ? undefined : projects.find((p) => p.id === sprocket.projectId);
   const projectChat = chat.kind === "project";
-  const members = group ? group.info.members.flatMap((m) => group.all.find((s) => s.id === m) ?? []) : [sprocket];
-  /** Who wrote a message: in a group, the member (gone if it was deleted); otherwise the chat's Sprocket. */
-  const speaker = (sprocketId: string) => (group ? group.all.find((s) => s.id === sprocketId) : sprocket);
-  /** The chat's name: the group's, or the Sprocket's. */
-  const title = group ? group.info.name : name;
+  const members = team ? team.info.members.flatMap((m) => team.all.find((s) => s.id === m) ?? []) : [sprocket];
+  /** Who wrote a message: in a team, the member (gone if it was deleted); otherwise the chat's Sprocket. */
+  const speaker = (sprocketId: string) => (team ? team.all.find((s) => s.id === sprocketId) : sprocket);
+  /** The chat's name: the team's, or the Sprocket's. */
+  const title = team ? team.info.name : name;
   /** What screen readers call it. */
-  const chatName = group ? `Group chat ${title}` : projectChat && project ? `${project.name}'s chat with ${name}` : `Chat with ${name}`;
+  const chatName = team ? `Team chat ${title}` : projectChat && project ? `${project.name}'s chat with ${name}` : `Chat with ${name}`;
   const [messages, setMessages] = useState<SprocketMessage[] | null>(null);
   /** The reply being revealed (revealText.tsx): while it's written, then as the saved message `id`. */
   const [reveal, setReveal] = useState<{ text: string; live: boolean; id?: string } | null>(null);
@@ -77,9 +77,9 @@ export function SprocketChat({
   const [activity, setActivity] = useState<{ step: string | null; summary: string | null }>({ step: null, summary: null });
   /** A saved prompt to put in the composer (Customize, ADR 0020). */
   const [fill, setFill] = useState<{ text: string }>();
-  /** In a group: the member whose reply is being written, as its typing says (until the list says so too). */
+  /** In a team: the member whose reply is being written, as its typing says (until the list says so too). */
   const [typingBy, setTypingBy] = useState<string>();
-  const replier = group ? (group.info.replying ?? typingBy) : id;
+  const replier = team ? (team.info.replying ?? typingBy) : id;
   /** Messages already shown; null until the first load, whose messages show at once. */
   const seen = useRef<Set<string> | null>(null);
   /** Re-renders once a minute, so "5 minutes ago" under each message stays true. */
@@ -130,9 +130,9 @@ export function SprocketChat({
     });
   }, [load, chatId]);
 
-  // A new run (possibly started on another device; in a group, the next member's turn) starts with "Thinking…", not
+  // A new run (possibly started on another device; in a team, the next member's turn) starts with "Thinking…", not
   // the last reply.
-  const runKey = running ? (group?.info.replying ?? "run") : "";
+  const runKey = running ? (team?.info.replying ?? "run") : "";
   useEffect(() => {
     if (running) setReveal((r) => (r?.id ? null : r));
     if (running) setActivity((a) => (reveal?.id ? { step: null, summary: null } : a));
@@ -162,10 +162,10 @@ export function SprocketChat({
           <a className="icon-btn sp-back" href={href.sprockets()} aria-label="All Sprockets">
             <ChevronLeft size={18} />
           </a>
-          {group ? <GroupFace looks={members} size={28} /> : <Sprocket look={sprocket.look} size={28} seed={id} />}
-          {/* A group's name, then its members. */}
-          <h2 id="sp-chat-title" className="truncate" title={group ? `${title} · ${members.map((m) => m.name).join(", ")}` : name}>
-            {group ? (
+          {team ? <TeamFace looks={members} size={28} /> : <Sprocket look={sprocket.look} size={28} seed={id} />}
+          {/* A team's name, then its members. */}
+          <h2 id="sp-chat-title" className="truncate" title={team ? `${title} · ${members.map((m) => m.name).join(", ")}` : name}>
+            {team ? (
               <>
                 {title} <span className="sp-head-sub">{members.map((m) => m.name).join(", ")}</span>
               </>
@@ -174,16 +174,16 @@ export function SprocketChat({
             )}
           </h2>
           {/* An attached Sprocket's two chats (ADR 0021): its project's, then its own. */}
-          {!group && project && sprocket.projectChat && (
+          {!team && project && sprocket.projectChat && (
             <nav className="sp-chat-tabs" aria-label={`${name}'s chats`}>
               <ChatTab href={href.sprocket(id, true)} current={projectChat} label={project.name} chat={sprocket.projectChat} />
               <ChatTab href={href.sprocket(id)} current={!projectChat} label="Direct" chat={sprocket.direct} />
             </nav>
           )}
           <span className="grow" />
-          <ChatMenu chatId={chatId} name={title} project={projectChat ? project?.name : undefined} group={group} empty={!messages?.length} />
-          {/* While the settings panel is open, its toggle sits at the panel's top right instead. A group has none. */}
-          {!panelOpen && !group && <PanelToggle sprocket={sprocket} project={projectChat} open={false} />}
+          <ChatMenu chatId={chatId} name={title} project={projectChat ? project?.name : undefined} team={team} empty={!messages?.length} />
+          {/* While the settings panel is open, its toggle sits at the panel's top right instead. A team has none. */}
+          {!panelOpen && !team && <PanelToggle sprocket={sprocket} project={projectChat} open={false} />}
         </header>
       )}
       <div className="sp-thread" ref={thread}>
@@ -197,13 +197,13 @@ export function SprocketChat({
         {messages &&
           (messages.length ? (
             <p className="sp-intro-line muted small">
-              {group
-                ? `This is the beginning of the group chat ${title}.`
+              {team
+                ? `This is the beginning of the team chat ${title}.`
                 : projectChat && project
                   ? `This is the beginning of ${project.name}'s chat with ${name}.`
                   : `This is the beginning of your chat with ${name}.`}
             </p>
-          ) : group ? (
+          ) : team ? (
             <div className="sp-intro alone">
               <ul className="sp-intro-members">
                 {members.map((m, i) => (
@@ -215,7 +215,7 @@ export function SprocketChat({
               </ul>
               <p className="sp-intro-title">Say hello to {title}</p>
               <p className="muted small">
-                {members[0]?.name} answers unless you @mention someone, and a reply can pass the turn on. After {GROUP_TURNS_MAX} replies in a row they wait for you.
+                {members[0]?.name} answers unless you @mention someone, and a reply can pass the turn on. After {TEAM_TURNS_MAX} replies in a row they wait for you.
               </p>
             </div>
           ) : (
@@ -244,8 +244,8 @@ export function SprocketChat({
               const prev = messages[i - 1];
               const label = !prev || newGroup(prev.createdAt, m.createdAt);
               const by = m.author === "sprocket" ? speaker(m.sprocketId) : undefined;
-              // In a group, a member's name heads its replies, once per run of them.
-              const author = group && m.author === "sprocket" && (label || prev?.author !== "sprocket" || prev.sprocketId !== m.sprocketId);
+              // In a team, a member's name heads its replies, once per run of them.
+              const author = team && m.author === "sprocket" && (label || prev?.author !== "sprocket" || prev.sprocketId !== m.sprocketId);
               return (
                 <li key={m.id + i} className={"sp-message " + m.author}>
                   {label && <time className="sp-stamp" dateTime={m.createdAt}>{stamp(m.createdAt)}</time>}
@@ -279,7 +279,7 @@ export function SprocketChat({
             })}
             {running && !reveal?.id && (
               <li className="sp-message sprocket" aria-hidden>
-                {group && <Author sprocket={replier ? speaker(replier) : undefined} />}
+                {team && <Author sprocket={replier ? speaker(replier) : undefined} />}
                 {/* The same line the saved reply will carry, so nothing moves when it replaces this. */}
                 {activity.summary && <p className="sp-steps">{activity.summary}</p>}
                 {/* "Thinking…" (or the step it's on) holds its place until the first words show, so the row never empties. */}
@@ -308,12 +308,12 @@ export function SprocketChat({
         )}
         {error && <p className="error" role="alert">{error}</p>}
         <Composer
-          placeholder={group ? `Message ${title}, or @ someone` : `Message ${title}`}
+          placeholder={team ? `Message ${title}, or @ someone` : `Message ${title}`}
           onSubmit={(text) => void send(text)}
           autoFocus={!embedded}
           compact
           fill={fill}
-          mentions={group && members.map((m, i) => ({ name: m.name, note: i === 0 ? "Lead" : undefined, icon: <Sprocket look={m.look} size={18} seed={m.id} still /> }))}
+          mentions={team && members.map((m, i) => ({ name: m.name, note: i === 0 ? "Lead" : undefined, icon: <Sprocket look={m.look} size={18} seed={m.id} still /> }))}
         >
           <SavedPromptsMenu onPick={(text) => setFill({ text })} />
         </Composer>
@@ -322,7 +322,7 @@ export function SprocketChat({
   );
 }
 
-/** A group member's name over its replies (ADR 0022): its character, standing still, and its name. */
+/** A team member's name over its replies (ADR 0022): its character, standing still, and its name. */
 function Author({ sprocket }: { sprocket?: SprocketData }) {
   return (
     <p className="sp-author" aria-hidden>

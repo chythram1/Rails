@@ -12,7 +12,7 @@ interface Props {
   children?: ReactNode; // controls shown in the bottom row (selectors)
   /** Put this text in the box (a saved prompt), replacing what's there. A new object each time. */
   fill?: { text: string };
-  /** Names `@` completes (a group's members, ADR 0022): typing `@` and part of one lists the ones that fit. */
+  /** Names `@` completes (a team's members, ADR 0022): typing `@` and part of one lists the ones that fit. */
   mentions?: Mention[];
 }
 

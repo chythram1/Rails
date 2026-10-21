@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { IconChevronDown as ChevronDown, IconEdit as Compose, IconFilter as Filter, IconPlus as Plus, IconSearch as Search, IconUsersPlus as UsersPlus } from "@tabler/icons-react";
-import type { Project, Sprocket as SprocketData, SprocketChatInfo, SprocketGroup } from "@rails/shared";
+import type { Project, Sprocket as SprocketData, SprocketChatInfo, SprocketTeam } from "@rails/shared";
 import { href, navigate, type Route } from "../../router.ts";
 import { useStore } from "../../store.tsx";
 import { timeAgo } from "../../util.ts";
 import { MenuButton } from "../Menu.tsx";
-import { GroupDialog } from "./GroupDialog.tsx";
-import { GroupFace } from "./GroupFace.tsx";
+import { TeamDialog } from "./TeamDialog.tsx";
+import { TeamFace } from "./TeamFace.tsx";
 import { Sprocket, VIEW } from "./Sprocket.tsx";
 import { SprocketChat } from "./SprocketChat.tsx";
 import { SprocketCreator } from "./SprocketCreator.tsx";
@@ -18,24 +18,24 @@ type SprocketsRoute = Extract<Route, { name: "sprockets" }>;
 
 /**
  * Sprockets (ADR 0005): a list of the user's Sprockets beside the selected chat, or the creator. A Sprocket's own chat
- * row opens its chats: an attached one's project chat (ADR 0021) first, with its direct chat a tab away. Group chats
- * (ADR 0022) come first, under Groups. On small screens only one of the two shows at a time.
+ * row opens its chats: an attached one's project chat (ADR 0021) first, with its direct chat a tab away. Team chats
+ * (ADR 0022) come first, under Teams. On small screens only one of the two shows at a time.
  */
 export function SprocketsPage({ route }: { route: SprocketsRoute }) {
-  const { list, groups: chats, error } = useSprockets();
+  const { list, teams: chats, error } = useSprockets();
   const { projects } = useStore();
-  /** Which part of the list shows: all, "groups" (group chats), a project's id, or "general" (unattached). */
+  /** Which part of the list shows: all, "teams" (team chats), a project's id, or "general" (unattached). */
   const [filter, setFilter] = useState("all");
-  /** The New group dialog (from the list's New menu). */
-  const [makingGroup, setMakingGroup] = useState(false);
+  /** The New team dialog (from the list's New menu). */
+  const [makingTeam, setMakingTeam] = useState(false);
 
   if (!list) return error ? <p className="error pad" role="alert">{error}</p> : null;
   // A filter for a heading that's gone (its last Sprocket moved or was deleted) shows everything again.
-  const shownFilter = filter === "all" || (filter === "groups" ? chats.length > 0 : groupSprockets(list, projects).some((g) => g.key === filter)) ? filter : "all";
+  const shownFilter = filter === "all" || (filter === "teams" ? chats.length > 0 : groupSprockets(list, projects).some((g) => g.key === filter)) ? filter : "all";
 
-  const current = route.id && route.view !== "group" ? list.find((s) => s.id === route.id) : undefined;
-  const group = route.view === "group" ? chats.find((g) => g.id === route.id) : undefined;
-  const lead = group && list.find((s) => s.id === group.members[0]);
+  const current = route.id && route.view !== "team" ? list.find((s) => s.id === route.id) : undefined;
+  const team = route.view === "team" ? chats.find((g) => g.id === route.id) : undefined;
+  const lead = team && list.find((s) => s.id === team.members[0]);
   const creating = route.view === "new" || (route.view === "list" && list.length === 0);
   let main;
   if (creating) {
@@ -53,14 +53,14 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
         {panel && <SprocketSettings sprocket={current} all={list} onProjectChat={onProject} />}
       </div>
     );
-  } else if (group && lead) {
+  } else if (team && lead) {
     main = (
-      <div key={group.id} className="sp-detail">
-        <SprocketChat sprocket={lead} chat={group} panelOpen={false} group={{ info: group, all: list }} />
+      <div key={team.id} className="sp-detail">
+        <SprocketChat sprocket={lead} chat={team} panelOpen={false} team={{ info: team, all: list }} />
       </div>
     );
   } else if (route.id) {
-    main = <p className="sp-placeholder muted">This {route.view === "group" ? "group" : "one"} doesn't exist anymore. It may have been deleted on another device.</p>;
+    main = <p className="sp-placeholder muted">This {route.view === "team" ? "team" : "one"} doesn't exist anymore. It may have been deleted on another device.</p>;
   } else {
     main = <Gallery list={list} />;
   }
@@ -73,16 +73,16 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
         projects={projects}
         filter={shownFilter}
         onFilter={setFilter}
-        onNewGroup={() => setMakingGroup(true)}
+        onNewTeam={() => setMakingTeam(true)}
         activeId={route.id}
       />
       <section className="sp-main">{main}</section>
-      {makingGroup && (
-        <GroupDialog
+      {makingTeam && (
+        <TeamDialog
           all={list}
           projects={projects}
-          onSaved={(g) => navigate(href.group(g.id))}
-          onClose={() => setMakingGroup(false)}
+          onSaved={(g) => navigate(href.team(g.id))}
+          onClose={() => setMakingTeam(false)}
           returnFocus={() => document.querySelector<HTMLElement>(".sp-new-btn")}
         />
       )}
@@ -93,20 +93,20 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
 /**
  * The list column. Its header is a search field; under it, always there so
  * nothing shifts when a group appears, a filter menu named after what it shows: All Sprockets, each project with
- * Sprockets, General. Rows are grouped by project under small headings, after the group chats (ADR 0022): one row per
- * Sprocket, one per group. The New button beside the search makes either. Characters here stand still: a list of
- * faces moving at once is too busy, and a group's row has several.
+ * Sprockets, General. Rows are grouped by project under small headings, after the team chats (ADR 0022): one row per
+ * Sprocket, one per team. The New button beside the search makes either. Characters here stand still: a list of
+ * faces moving at once is too busy, and a team's row has several.
  */
 function SprocketList(props: {
   list: SprocketData[];
-  chats: SprocketGroup[];
+  chats: SprocketTeam[];
   projects: Project[];
   filter: string;
   onFilter(key: string): void;
-  onNewGroup(): void;
+  onNewTeam(): void;
   activeId?: string;
 }) {
-  const { list, chats, projects, filter, onFilter, onNewGroup, activeId } = props;
+  const { list, chats, projects, filter, onFilter, onNewTeam, activeId } = props;
   const [query, setQuery] = useState("");
   const all = useMemo(() => groupSprockets(list, projects), [list, projects]);
   const nameOf = (id: string) => list.find((s) => s.id === id)?.name;
@@ -115,14 +115,14 @@ function SprocketList(props: {
   const groups = useMemo(() => {
     const projectName = (s: SprocketData) => projects.find((p) => p.id === s.projectId)?.name.toLowerCase() ?? "";
     const match = (s: SprocketData) => !q || s.name.toLowerCase().includes(q) || projectName(s).includes(q) || said(s.direct) || said(s.projectChat);
-    return filter === "groups" ? [] : groupSprockets(list.filter(match), projects, filter);
+    return filter === "teams" ? [] : groupSprockets(list.filter(match), projects, filter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list, projects, filter, q]);
-  // Group chats, the most recently active first.
-  const shownChats = (filter === "all" || filter === "groups" ? chats : [])
+  // Team chats, the most recently active first.
+  const shownChats = (filter === "all" || filter === "teams" ? chats : [])
     .filter((g) => !q || g.name.toLowerCase().includes(q) || g.members.some((m) => nameOf(m)?.toLowerCase().includes(q)) || said(g))
     .sort((a, b) => (b.lastMessage?.createdAt ?? b.createdAt).localeCompare(a.lastMessage?.createdAt ?? a.createdAt));
-  const shownName = filter === "all" ? "All Sprockets" : filter === "groups" ? "Groups" : all.find((g) => g.key === filter)?.title;
+  const shownName = filter === "all" ? "All Sprockets" : filter === "teams" ? "Teams" : all.find((g) => g.key === filter)?.title;
   return (
     <aside className="sp-list" aria-labelledby="sp-list-title">
       <h1 id="sp-list-title" className="sr-only">Sprockets</h1>
@@ -133,13 +133,13 @@ function SprocketList(props: {
         </label>
         <MenuButton
           label="New"
-          title="New Sprocket or group"
+          title="New Sprocket or team"
           icon={<Compose size={18} />}
           className="sp-new-btn"
           align="right"
           items={[
             { label: "New Sprocket", icon: <Plus size={16} />, onSelect: () => navigate(href.newSprocket()) },
-            { label: "New group", icon: <UsersPlus size={16} />, disabled: list.length < 2, note: list.length < 2 ? "Needs two Sprockets" : undefined, onSelect: onNewGroup },
+            { label: "New team", icon: <UsersPlus size={16} />, disabled: list.length < 2, note: list.length < 2 ? "Needs two Sprockets" : undefined, onSelect: onNewTeam },
           ]}
         />
       </div>
@@ -159,7 +159,7 @@ function SprocketList(props: {
           items={[
             { label: "All Sprockets", checked: filter === "all", onSelect: () => onFilter("all") },
             ...(all.length || chats.length ? ["separator" as const] : []),
-            ...(chats.length ? [{ label: "Groups", checked: filter === "groups", onSelect: () => onFilter("groups") }] : []),
+            ...(chats.length ? [{ label: "Teams", checked: filter === "teams", onSelect: () => onFilter("teams") }] : []),
             ...all.map((g) => ({ label: g.title, checked: filter === g.key, onSelect: () => onFilter(g.key) })),
           ]}
         />
@@ -171,12 +171,12 @@ function SprocketList(props: {
       ) : (
         <div className="sp-groups">
           {shownChats.length > 0 && (
-            <section className="sp-group" aria-labelledby="sp-group-chats">
-              <h2 id="sp-group-chats" className="sp-group-title">Groups</h2>
+            <section className="sp-group" aria-labelledby="sp-group-teams">
+              <h2 id="sp-group-teams" className="sp-group-title">Teams</h2>
               <ul className="sp-rows">
                 {shownChats.map((g) => (
                   <li key={g.id}>
-                    <GroupRow group={g} list={list} active={g.id === activeId} />
+                    <TeamRow team={g} list={list} active={g.id === activeId} />
                   </li>
                 ))}
               </ul>
@@ -216,12 +216,12 @@ function SprocketRow({ sprocket: s, active }: { sprocket: SprocketData; active: 
   );
 }
 
-/** A group chat (ADR 0022): its members' characters (the lead in front), its name, and the last line with who wrote it. */
-function GroupRow({ group: g, list, active }: { group: SprocketGroup; list: SprocketData[]; active: boolean }) {
+/** A team chat (ADR 0022): its members' characters (the lead in front), its name, and the last line with who wrote it. */
+function TeamRow({ team: g, list, active }: { team: SprocketTeam; list: SprocketData[]; active: boolean }) {
   const members = g.members.flatMap((m) => list.find((s) => s.id === m) ?? []);
   return (
-    <a className="sp-row" href={href.group(g.id)} title={`${g.name}: ${members.map((m) => m.name).join(", ")}`} aria-current={active ? "page" : undefined}>
-      <GroupFace looks={members} size={36} />
+    <a className="sp-row" href={href.team(g.id)} title={`${g.name}: ${members.map((m) => m.name).join(", ")}`} aria-current={active ? "page" : undefined}>
+      <TeamFace looks={members} size={36} />
       <RowText name={g.name} chat={g} nameOf={(id) => list.find((s) => s.id === id)?.name} />
     </a>
   );
@@ -229,7 +229,7 @@ function GroupRow({ group: g, list, active }: { group: SprocketGroup; list: Spro
 
 /**
  * A chat's name, when it was last active (nothing while it's empty, as after Clear), its last line and a dot while a
- * reply waits. In a group, `nameOf` names who wrote the last line.
+ * reply waits. In a team, `nameOf` names who wrote the last line.
  */
 function RowText({ name, chat, nameOf }: { name: string; chat: SprocketChatInfo; nameOf?(id: string): string | undefined }) {
   return (
@@ -293,7 +293,7 @@ function NewArt() {
   );
 }
 
-/** The list's one-line preview of a chat; in a group, `nameOf` names the member that wrote it. */
+/** The list's one-line preview of a chat; in a team, `nameOf` names the member that wrote it. */
 function preview(chat: SprocketChatInfo, nameOf?: (id: string) => string | undefined): string {
   if (chat.running) return "Replying…";
   const m = chat.lastMessage;

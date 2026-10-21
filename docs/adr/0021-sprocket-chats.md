@@ -1,6 +1,6 @@
 # ADR 0021: A direct chat per Sprocket, and a chat per project
 
-Status: accepted (changes the one chat of ADR 0005, 0006 and 0009; group chats are ADR 0022).
+Status: accepted (changes the one chat of ADR 0005, 0006 and 0009; team chats are ADR 0022).
 
 A Sprocket had one chat. For a Coordinator that chat held everything: what the user asked it, Rails' events
 (sessions that wait, overlaps, handoffs, agents' messages) and the suggestion cards under them. A question like
@@ -11,7 +11,7 @@ Decisions:
 - **Two kinds of chat.** Every Sprocket has one **direct chat**, made with it: the user and the Sprocket. An
   attached Sprocket also has its project's **project chat**, made when it's attached (a project has one Sprocket,
   ADR 0016, so one project chat). Rails' events, and its notices about them, go to the project chat only. The user
-  can write in both. A later ADR adds **group chats** (several Sprockets with the user, many of them); the storage
+  can write in both. A later ADR adds **team chats** (several Sprockets with the user, many of them); the storage
   is built for that: chats are rows (`sprocket_chats`: id, kind, the Sprocket that answers, the project for a
   project chat, when it was last cleared), and messages carry their chat's id.
 - **Where they show.** The workspace's side panel shows the project chat. The Sprockets page lists each Sprocket
@@ -41,5 +41,5 @@ Decisions:
 Consequences:
 - A Coordinator's project chat holds only project work, so its runs read fewer unrelated messages; talk with the
   user moves to the direct chat.
-- Group chats need their own decisions (who answers a message, and how Sprockets keep from replying to each other
+- Team chats need their own decisions (who answers a message, and how Sprockets keep from replying to each other
   without end), but no change to how chats are stored.

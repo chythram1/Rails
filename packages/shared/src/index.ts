@@ -283,14 +283,14 @@ export interface Sprocket {
   projectChat?: SprocketChatInfo;
 }
 
-/** A Sprocket's own chat with the user, its project's chat (ADR 0021), or a group of Sprockets' (ADR 0022). */
-export type SprocketChatKind = "direct" | "project" | "group";
+/** A Sprocket's own chat with the user, its project's chat (ADR 0021), or a team of Sprockets' (ADR 0022). */
+export type SprocketChatKind = "direct" | "project" | "team";
 
 /** A chat as the Sprocket list shows it. */
 export interface SprocketChatInfo {
   id: string;
   kind: SprocketChatKind;
-  /** True while the Sprocket (in a group, one of its members) is writing a reply in this chat. */
+  /** True while the Sprocket (in a team, one of its members) is writing a reply in this chat. */
   running: boolean;
   /** Suggestions under its replies that wait for the user. */
   pending: number;
@@ -299,11 +299,11 @@ export interface SprocketChatInfo {
 }
 
 /**
- * A group chat (ADR 0022): the user and two to four Sprockets. The user's messages go to the lead (the first
+ * A team chat (ADR 0022): the user and two to four Sprockets. The user's messages go to the lead (the first
  * member) unless they @mention others, and a reply passes the turn on by mentioning someone.
  */
-export interface SprocketGroup extends SprocketChatInfo {
-  kind: "group";
+export interface SprocketTeam extends SprocketChatInfo {
+  kind: "team";
   name: string;
   /** Its members' ids, the lead first. */
   members: string[];
@@ -312,17 +312,17 @@ export interface SprocketGroup extends SprocketChatInfo {
   createdAt: string;
 }
 
-/** A group as the user makes or edits it. */
-export interface SprocketGroupInput {
+/** A team as the user makes or edits it. */
+export interface SprocketTeamInput {
   name: string;
   /** Two to four Sprockets with different names, the lead first. */
   members: string[];
 }
 
-export const GROUP_MEMBERS_MIN = 2;
-export const GROUP_MEMBERS_MAX = 4;
-/** Replies in a row, after one message from the user, before a group waits for them again (ADR 0022). */
-export const GROUP_TURNS_MAX = 6;
+export const TEAM_MEMBERS_MIN = 2;
+export const TEAM_MEMBERS_MAX = 4;
+/** Replies in a row, after one message from the user, before a team waits for them again (ADR 0022). */
+export const TEAM_TURNS_MAX = 6;
 
 /** A session in a project and the files or folders it owns (relative to the project, ADR 0016). */
 export interface ProjectOwner {
@@ -421,7 +421,7 @@ export interface SprocketEvent {
 /** One message in a Sprocket's chat. */
 export interface SprocketMessage {
   id: string;
-  /** The chat's Sprocket; in a group, the member that wrote it (the lead for the user's messages). */
+  /** The chat's Sprocket; in a team, the member that wrote it (the lead for the user's messages). */
   sprocketId: string;
   chatId: string;
   author: SprocketAuthor;

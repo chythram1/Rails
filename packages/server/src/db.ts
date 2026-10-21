@@ -78,7 +78,7 @@ addColumn("sprocket_messages", "activity", "TEXT");
 addColumn("sprocket_messages", "steps", "TEXT");
 /** On an event: the SprocketEvent, as JSON. */
 addColumn("sprocket_messages", "event", "TEXT");
-// Chats (ADR 0021): every Sprocket's direct chat, and the project chat of the project it's attached to. Group chats
+// Chats (ADR 0021): every Sprocket's direct chat, and the project chat of the project it's attached to. Team chats
 // will be another kind. A chat's messages are sprocket_messages with its chat_id.
 db.exec(`
   CREATE TABLE IF NOT EXISTS sprocket_chats (
@@ -94,7 +94,7 @@ db.exec(`
 `);
 addColumn("sprocket_messages", "chat_id", "TEXT");
 db.exec("CREATE INDEX IF NOT EXISTS sprocket_messages_by_chat ON sprocket_messages (chat_id, created_at)");
-// Group chats (ADR 0022): a name, the lead in sprocket_id, and the members (the lead too) in order. A message's
+// Team chats (ADR 0022): a name, the lead in sprocket_id, and the members (the lead too) in order. A message's
 // sprocket_id is the member that wrote it.
 addColumn("sprocket_chats", "name", "TEXT");
 db.exec(`
@@ -462,18 +462,18 @@ export const sprockets = {
     db.prepare("UPDATE sprockets SET core_memory = ? WHERE id = ?").run(text, id);
   },
   /**
-   * Delete it with its own chats. In its groups (ADR 0022) what it wrote stays; it leaves them, the next member
-   * leads where it led, and a group with nobody left goes.
+   * Delete it with its own chats. In its teams (ADR 0022) what it wrote stays; it leaves them, the next member
+   * leads where it led, and a team with nobody left goes.
    */
   remove(id: string): void {
-    db.prepare("DELETE FROM sprocket_messages WHERE chat_id IN (SELECT id FROM sprocket_chats WHERE sprocket_id = ? AND kind != 'group')").run(id);
-    db.prepare("DELETE FROM sprocket_chats WHERE sprocket_id = ? AND kind != 'group'").run(id);
-    const groups = (db.prepare("SELECT chat_id FROM sprocket_chat_members WHERE sprocket_id = ?").all(id) as { chat_id: string }[]).map((r) => r.chat_id);
+    db.prepare("DELETE FROM sprocket_messages WHERE chat_id IN (SELECT id FROM sprocket_chats WHERE sprocket_id = ? AND kind != 'team')").run(id);
+    db.prepare("DELETE FROM sprocket_chats WHERE sprocket_id = ? AND kind != 'team'").run(id);
+    const teams = (db.prepare("SELECT chat_id FROM sprocket_chat_members WHERE sprocket_id = ?").all(id) as { chat_id: string }[]).map((r) => r.chat_id);
     db.prepare("DELETE FROM sprocket_chat_members WHERE sprocket_id = ?").run(id);
-    for (const chatId of groups) {
+    for (const chatId of teams) {
       const [lead] = sprocketChats.members(chatId);
       if (lead) db.prepare("UPDATE sprocket_chats SET sprocket_id = ? WHERE id = ?").run(lead, chatId);
-      else sprocketChats.removeGroup(chatId);
+      else sprocketChats.removeTeam(chatId);
     }
     db.prepare("DELETE FROM suggestions WHERE sprocket_id = ?").run(id);
     db.prepare("DELETE FROM sprocket_usage WHERE sprocket_id = ?").run(id);
@@ -490,7 +490,7 @@ type ChatRow = {
   cleared_at: string | null;
   created_at: string;
 };
-/** A chat. `sprocketId` is the Sprocket that answers it: in a group, its lead. */
+/** A chat. `sprocketId` is the Sprocket that answers it: in a team, its lead. */
 export type StoredChat = { id: string; kind: SprocketChatKind; sprocketId: string; projectId?: string; name?: string; clearedAt?: string; createdAt: string };
 const toChat = (r: ChatRow): StoredChat => ({
   id: r.id,
@@ -517,21 +517,21 @@ export const sprocketChats = {
     db.prepare("DELETE FROM sprocket_messages WHERE chat_id = ?").run(id);
     db.prepare("UPDATE sprocket_chats SET cleared_at = ? WHERE id = ?").run(new Date().toISOString(), id);
   },
-  /** Group chats (ADR 0022), oldest first. */
-  groups(): StoredChat[] {
-    return (db.prepare("SELECT * FROM sprocket_chats WHERE kind = 'group' ORDER BY created_at, rowid").all() as ChatRow[]).map(toChat);
+  /** Team chats (ADR 0022), oldest first. */
+  teams(): StoredChat[] {
+    return (db.prepare("SELECT * FROM sprocket_chats WHERE kind = 'team' ORDER BY created_at, rowid").all() as ChatRow[]).map(toChat);
   },
-  /** A group's members' ids, the lead first. */
+  /** A team's members' ids, the lead first. */
   members(id: string): string[] {
     return (db.prepare("SELECT sprocket_id FROM sprocket_chat_members WHERE chat_id = ? ORDER BY position").all(id) as { sprocket_id: string }[]).map((r) => r.sprocket_id);
   },
-  createGroup(name: string, members: string[]): StoredChat {
+  createTeam(name: string, members: string[]): StoredChat {
     const id = randomUUID();
-    db.prepare("INSERT INTO sprocket_chats (id, kind, sprocket_id, name, created_at) VALUES (?, 'group', ?, ?, ?)").run(id, members[0], name, new Date().toISOString());
+    db.prepare("INSERT INTO sprocket_chats (id, kind, sprocket_id, name, created_at) VALUES (?, 'team', ?, ?, ?)").run(id, members[0], name, new Date().toISOString());
     this.setMembers(id, members);
     return this.get(id)!;
   },
-  updateGroup(id: string, name: string, members: string[]): void {
+  updateTeam(id: string, name: string, members: string[]): void {
     db.prepare("UPDATE sprocket_chats SET name = ?, sprocket_id = ? WHERE id = ?").run(name, members[0], id);
     this.setMembers(id, members);
   },
@@ -539,11 +539,11 @@ export const sprocketChats = {
     db.prepare("DELETE FROM sprocket_chat_members WHERE chat_id = ?").run(id);
     members.forEach((m, i) => db.prepare("INSERT INTO sprocket_chat_members (chat_id, sprocket_id, position) VALUES (?, ?, ?)").run(id, m, i));
   },
-  /** A group, its members and its messages. */
-  removeGroup(id: string): void {
+  /** A team, its members and its messages. */
+  removeTeam(id: string): void {
     db.prepare("DELETE FROM sprocket_messages WHERE chat_id = ?").run(id);
     db.prepare("DELETE FROM sprocket_chat_members WHERE chat_id = ?").run(id);
-    db.prepare("DELETE FROM sprocket_chats WHERE id = ? AND kind = 'group'").run(id);
+    db.prepare("DELETE FROM sprocket_chats WHERE id = ? AND kind = 'team'").run(id);
   },
 };
 
@@ -592,7 +592,7 @@ export const sprocketMessages = {
   ): SprocketMessage {
     const chat = sprocketChats.get(chatId);
     if (!chat) throw new Error(`No chat ${chatId}`);
-    // In a group, the member that wrote it; otherwise the chat's Sprocket.
+    // In a team, the member that wrote it; otherwise the chat's Sprocket.
     const m: SprocketMessage = { id: randomUUID(), sprocketId: sprocketId ?? chat.sprocketId, chatId, author, text, createdAt, ...(activity ? { activity } : {}), ...(event ? { event } : {}) };
     db.prepare("INSERT INTO sprocket_messages (id, sprocket_id, chat_id, author, text, created_at, activity, steps, event) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
       m.id,

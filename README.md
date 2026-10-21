@@ -37,7 +37,7 @@ Status:
 - Sprockets (ADR 0005, 0006): always-on agent characters that reply on your own model provider (API key
   or "Continue with ChatGPT"), attach to a project, follow a short description you write and see what every session
   in the project is doing (ADR 0007). Each has its own chat, a project's has the project chat (ADR 0021), and
-  group chats put two to four of them in one conversation, passing the turn by @mention (ADR 0022)
+  team chats put two to four of them in one conversation, passing the turn by @mention (ADR 0022)
 - A red dot when an agent needs you (a permission, a question) or its turn failed, and an amber mark when
   two sessions change the same files (ADR 0014)
 - Agent tools (ADR 0018): Claude Code and pi sessions can see what the other sessions in their project are doing,

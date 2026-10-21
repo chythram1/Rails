@@ -1,8 +1,8 @@
-// Group chats (ADR 0022): the user and two to four Sprockets, the first the lead. The user's message goes to the
+// Team chats (ADR 0022): the user and two to four Sprockets, the first the lead. The user's message goes to the
 // lead unless it @mentions members; a reply that @mentions others passes the turn to them. Only the user starts a
-// round, and a round stops after GROUP_TURNS_MAX turns, so Sprockets can't keep replying to each other. Runs
+// round, and a round stops after TEAM_TURNS_MAX turns, so Sprockets can't keep replying to each other. Runs
 // themselves are runs.ts's: this decides whose turn it is.
-import { GROUP_MEMBERS_MAX, GROUP_MEMBERS_MIN, GROUP_TURNS_MAX, type SprocketGroup, type SprocketGroupInput, type SprocketMessage } from "@rails/shared";
+import { TEAM_MEMBERS_MAX, TEAM_MEMBERS_MIN, TEAM_TURNS_MAX, type SprocketTeam, type SprocketTeamInput, type SprocketMessage } from "@rails/shared";
 import { sprocketChats, sprocketMessages, sprockets, suggestions, type StoredChat } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { onTurnEnded, requestReply, runningChat, userMessageTime } from "./runs.ts";
@@ -11,24 +11,24 @@ import { listeners } from "./util.ts";
 
 const MAX_NAME = 40;
 
-const groupChanges = listeners();
-/** A group was made, edited or deleted. */
-export const onGroupsChanged = groupChanges.on;
-const changed = groupChanges.emit;
+const teamChanges = listeners();
+/** A team was made, edited or deleted. */
+export const onTeamsChanged = teamChanges.on;
+const changed = teamChanges.emit;
 
-/** The turns still to come after the user's latest message in a group, and how many were taken. */
+/** The turns still to come after the user's latest message in a team, and how many were taken. */
 type Round = { queue: string[]; turns: number };
 const rounds = new Map<string, Round>();
-/** The member whose turn is going in each group, and the round it belongs to. */
+/** The member whose turn is going in each team, and the round it belongs to. */
 const active = new Map<string, { sprocketId: string; round: Round }>();
 
-function toGroup(chat: StoredChat): SprocketGroup {
+function toTeam(chat: StoredChat): SprocketTeam {
   const members = sprocketChats.members(chat.id);
   const last = sprocketMessages.last(chat.id);
   const replying = members.find((m) => runningChat(m) === chat.id);
   return {
     id: chat.id,
-    kind: "group",
+    kind: "team",
     name: chat.name ?? "",
     members,
     ...(replying ? { replying } : {}),
@@ -39,22 +39,22 @@ function toGroup(chat: StoredChat): SprocketGroup {
   };
 }
 
-function getGroup(id: string): StoredChat {
+function getTeam(id: string): StoredChat {
   const chat = sprocketChats.get(id);
-  if (chat?.kind !== "group") throw new ServiceError("Not found", 404);
+  if (chat?.kind !== "team") throw new ServiceError("Not found", 404);
   return chat;
 }
 
-/** A group from a request: a name, and two to four known Sprockets whose names @mentions can tell apart. */
-function parseGroup(body: Partial<SprocketGroupInput> | undefined): SprocketGroupInput {
+/** A team from a request: a name, and two to four known Sprockets whose names @mentions can tell apart. */
+function parseTeam(body: Partial<SprocketTeamInput> | undefined): SprocketTeamInput {
   const name = typeof body?.name === "string" ? body.name.trim() : "";
-  if (!name) throw new ServiceError("Give the group a name.", 400);
+  if (!name) throw new ServiceError("Give the team a name.", 400);
   if (name.length > MAX_NAME) throw new ServiceError(`Names can be at most ${MAX_NAME} characters.`, 400);
   const members = body?.members;
   if (!Array.isArray(members) || members.some((m) => typeof m !== "string")) throw new ServiceError("Members must be a list of Sprockets", 400);
-  if (members.length < GROUP_MEMBERS_MIN) throw new ServiceError("A group has at least two Sprockets.", 400);
-  if (members.length > GROUP_MEMBERS_MAX) throw new ServiceError("A group has at most four Sprockets.", 400);
-  if (new Set(members).size !== members.length) throw new ServiceError("A Sprocket can be in a group once.", 400);
+  if (members.length < TEAM_MEMBERS_MIN) throw new ServiceError("A team has at least two Sprockets.", 400);
+  if (members.length > TEAM_MEMBERS_MAX) throw new ServiceError("A team has at most four Sprockets.", 400);
+  if (new Set(members).size !== members.length) throw new ServiceError("A Sprocket can be in a team once.", 400);
   const names = new Set<string>();
   for (const id of members) {
     const s = sprockets.get(id);
@@ -65,45 +65,45 @@ function parseGroup(body: Partial<SprocketGroupInput> | undefined): SprocketGrou
   return { name, members };
 }
 
-export function listGroups(): SprocketGroup[] {
-  return sprocketChats.groups().map(toGroup);
+export function listTeams(): SprocketTeam[] {
+  return sprocketChats.teams().map(toTeam);
 }
 
-export function createGroup(body: Partial<SprocketGroupInput> | undefined): SprocketGroup {
-  const { name, members } = parseGroup(body);
-  const group = toGroup(sprocketChats.createGroup(name, members));
+export function createTeam(body: Partial<SprocketTeamInput> | undefined): SprocketTeam {
+  const { name, members } = parseTeam(body);
+  const team = toTeam(sprocketChats.createTeam(name, members));
   changed();
-  return group;
+  return team;
 }
 
-/** Rename a group or change its members; the first is the lead. Turns waiting for a member who left are dropped. */
-export function updateGroup(id: string, body: Partial<SprocketGroupInput> | undefined): SprocketGroup {
-  getGroup(id);
-  const { name, members } = parseGroup(body);
-  sprocketChats.updateGroup(id, name, members);
+/** Rename a team or change its members; the first is the lead. Turns waiting for a member who left are dropped. */
+export function updateTeam(id: string, body: Partial<SprocketTeamInput> | undefined): SprocketTeam {
+  getTeam(id);
+  const { name, members } = parseTeam(body);
+  sprocketChats.updateTeam(id, name, members);
   changed();
-  return toGroup(getGroup(id));
+  return toTeam(getTeam(id));
 }
 
-/** Delete a group and its chat; its members stay. Suggestions still waiting there expire, as when it's cleared. */
-export function deleteGroup(id: string): void {
-  getGroup(id);
+/** Delete a team and its chat; its members stay. Suggestions still waiting there expire, as when it's cleared. */
+export function deleteTeam(id: string): void {
+  getTeam(id);
   rounds.delete(id);
   expireInChat(id);
-  sprocketChats.removeGroup(id);
+  sprocketChats.removeTeam(id);
   changed();
 }
 
 /**
- * The renamed Sprocket `id` would share its new name with another member of one of its groups. @mentions couldn't
+ * The renamed Sprocket `id` would share its new name with another member of one of its teams. @mentions couldn't
  * tell them apart, so renaming is refused (ADR 0022).
  */
 export function nameClash(id: string, name: string): string | undefined {
-  for (const g of sprocketChats.groups()) {
+  for (const g of sprocketChats.teams()) {
     const members = sprocketChats.members(g.id);
     if (!members.includes(id)) continue;
     const twin = members.find((m) => m !== id && sprockets.get(m)?.name.toLowerCase() === name.toLowerCase());
-    if (twin) return `${name} is the name of another Sprocket in the group ${g.name}. Pick another.`;
+    if (twin) return `${name} is the name of another Sprocket in the team ${g.name}. Pick another.`;
   }
 }
 
@@ -131,7 +131,7 @@ export function mentioned(text: string, members: { id: string; name: string }[])
 const membersOf = (chatId: string) => sprocketChats.members(chatId).flatMap((id) => (sprockets.get(id) ? [{ id, name: sprockets.get(id)!.name }] : []));
 
 /**
- * The user wrote in a group: a new round, for the members they mention or else the lead. Turns still waiting from
+ * The user wrote in a team: a new round, for the members they mention or else the lead. Turns still waiting from
  * the last round are dropped; a turn going now finishes first.
  */
 export function startRound(chatId: string, text: string): void {
@@ -140,12 +140,12 @@ export function startRound(chatId: string, text: string): void {
   if (!active.has(chatId)) next(chatId);
 }
 
-/** Stop a group's round (its chat was cleared): the turn going now ends without passing on. */
+/** Stop a team's round (its chat was cleared): the turn going now ends without passing on. */
 export function endRound(chatId: string): void {
   rounds.delete(chatId);
 }
 
-/** Start the next turn of a group's round, if there's one and the round has turns left. */
+/** Start the next turn of a team's round, if there's one and the round has turns left. */
 function next(chatId: string): void {
   const round = rounds.get(chatId);
   if (!round) return;
@@ -153,9 +153,9 @@ function next(chatId: string): void {
   round.queue = round.queue.filter((id) => members.includes(id)); // members who left meanwhile
   const who = round.queue.shift();
   if (!who) return void rounds.delete(chatId);
-  if (round.turns >= GROUP_TURNS_MAX) {
+  if (round.turns >= TEAM_TURNS_MAX) {
     rounds.delete(chatId);
-    sprocketMessages.create(chatId, "notice", `Paused after ${GROUP_TURNS_MAX} replies in a row. Write to the group to go on.`, userMessageTime(chatId));
+    sprocketMessages.create(chatId, "notice", `Paused after ${TEAM_TURNS_MAX} replies in a row. Write to the team to go on.`, userMessageTime(chatId));
     changed();
     return;
   }
@@ -167,7 +167,7 @@ function next(chatId: string): void {
 // A member's turn ended: the members its reply mentions get theirs (unless the user wrote meanwhile), then the next.
 onTurnEnded((chatId: string, sprocketId: string, reply: SprocketMessage | undefined) => {
   const turn = active.get(chatId);
-  if (turn?.sprocketId !== sprocketId) return; // its run in another chat, or not a group
+  if (turn?.sprocketId !== sprocketId) return; // its run in another chat, or not a team
   active.delete(chatId);
   if (reply && rounds.get(chatId) === turn.round) {
     const others = membersOf(chatId).filter((m) => m.id !== sprocketId);
