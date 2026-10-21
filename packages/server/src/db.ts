@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { DecisionEntry, Handoff, Panel, PanelKind, Project, Sprocket, SprocketAuthor, SprocketEvent, SprocketLook, SprocketMessage, Suggestion } from "@rails/shared";
+import type { AgentProfile, AgentProfileInput, DecisionEntry, Handoff, Panel, PanelKind, PanelProfile, Project, SavedPrompt, Sprocket, SprocketAuthor, SprocketEvent, SprocketLook, SprocketMessage, Suggestion } from "@rails/shared";
 import { RAILS_HOME } from "./config.ts";
 
 const db = new DatabaseSync(join(RAILS_HOME, "rails.db"));
@@ -79,6 +79,27 @@ addColumn("sprocket_messages", "steps", "TEXT");
 /** On an event: the SprocketEvent, as JSON. */
 addColumn("sprocket_messages", "event", "TEXT");
 addColumn("panels", "bridge_token", "TEXT");
+/** The agent profile it started with (ADR 0018), as JSON: a PanelProfile. */
+addColumn("panels", "profile", "TEXT");
+db.exec(`
+  CREATE TABLE IF NOT EXISTS agent_profiles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS session_profiles (
+    session_id TEXT PRIMARY KEY,
+    agent_profile_id TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS saved_prompts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+`);
 db.exec(`
   CREATE TABLE IF NOT EXISTS session_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -193,13 +214,22 @@ export const projects = {
   },
 };
 
-type PanelRow = { id: string; project_id: string; kind: PanelKind; session_id: string | null; title: string; created_at: string };
+type PanelRow = {
+  id: string;
+  project_id: string;
+  kind: PanelKind;
+  session_id: string | null;
+  title: string;
+  profile: string | null;
+  created_at: string;
+};
 const toPanel = (r: PanelRow): Panel => ({
   id: r.id,
   projectId: r.project_id,
   kind: r.kind,
   sessionId: r.session_id ?? undefined,
   title: r.title,
+  ...(r.profile ? { profile: JSON.parse(r.profile) as PanelProfile } : {}),
   createdAt: r.created_at,
 });
 
@@ -220,12 +250,13 @@ export const panels = {
   },
   create(p: Omit<Panel, "id" | "createdAt">): Panel {
     const panel: Panel = { ...p, id: randomUUID(), createdAt: new Date().toISOString() };
-    db.prepare("INSERT INTO panels (id, project_id, kind, session_id, title, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(
+    db.prepare("INSERT INTO panels (id, project_id, kind, session_id, title, profile, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
       panel.id,
       panel.projectId,
       panel.kind,
       panel.sessionId ?? null,
       panel.title,
+      panel.profile ? JSON.stringify(panel.profile) : null,
       panel.createdAt,
     );
     return panel;
@@ -622,6 +653,70 @@ export const decisions = {
       ...(r.cost !== null ? { cost: r.cost } : {}),
       ...(r.error ? { error: r.error } : {}),
     }));
+  },
+};
+
+type AgentProfileRow = { id: string; name: string; json: string; created_at: string; updated_at: string };
+// Fields added since a row was saved get their empty value.
+const toAgentProfile = (r: AgentProfileRow): AgentProfile => ({ effort: "", isDefault: false, ...JSON.parse(r.json), id: r.id, name: r.name, createdAt: r.created_at, updatedAt: r.updated_at });
+/** Agent profiles (ADR 0018). Everything but the name is one JSON column: it's only ever read whole. */
+export const agentProfiles = {
+  list(): AgentProfile[] {
+    return (db.prepare("SELECT * FROM agent_profiles ORDER BY name COLLATE NOCASE").all() as AgentProfileRow[]).map(toAgentProfile);
+  },
+  get(id: string): AgentProfile | undefined {
+    const r = db.prepare("SELECT * FROM agent_profiles WHERE id = ?").get(id) as AgentProfileRow | undefined;
+    return r && toAgentProfile(r);
+  },
+  byName(name: string): AgentProfile | undefined {
+    const r = db.prepare("SELECT * FROM agent_profiles WHERE name = ? COLLATE NOCASE").get(name) as AgentProfileRow | undefined;
+    return r && toAgentProfile(r);
+  },
+  create(input: AgentProfileInput): AgentProfile {
+    const { name, ...rest } = input;
+    const now = new Date().toISOString();
+    const id = randomUUID();
+    db.prepare("INSERT INTO agent_profiles (id, name, json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run(id, name, JSON.stringify(rest), now, now);
+    return { ...input, id, createdAt: now, updatedAt: now };
+  },
+  update(id: string, input: AgentProfileInput): void {
+    const { name, ...rest } = input;
+    db.prepare("UPDATE agent_profiles SET name = ?, json = ?, updated_at = ? WHERE id = ?").run(name, JSON.stringify(rest), new Date().toISOString(), id);
+  },
+  remove(id: string): void {
+    db.prepare("DELETE FROM agent_profiles WHERE id = ?").run(id);
+    db.prepare("DELETE FROM session_profiles WHERE agent_profile_id = ?").run(id);
+  },
+  /** Which profile started a session, so resuming it can use the same one. */
+  forSession(sessionId: string): string | undefined {
+    return (db.prepare("SELECT agent_profile_id FROM session_profiles WHERE session_id = ?").get(sessionId) as { agent_profile_id: string } | undefined)?.agent_profile_id;
+  },
+  setForSession(sessionId: string, profileId: string): void {
+    db.prepare("INSERT INTO session_profiles (session_id, agent_profile_id) VALUES (?, ?) ON CONFLICT(session_id) DO UPDATE SET agent_profile_id = excluded.agent_profile_id").run(sessionId, profileId);
+  },
+};
+
+type SavedPromptRow = { id: string; name: string; text: string; created_at: string };
+const toSavedPrompt = (r: SavedPromptRow): SavedPrompt => ({ id: r.id, name: r.name, text: r.text, createdAt: r.created_at });
+/** Saved prompts (ADR 0018). */
+export const savedPrompts = {
+  list(): SavedPrompt[] {
+    return (db.prepare("SELECT * FROM saved_prompts ORDER BY name COLLATE NOCASE").all() as SavedPromptRow[]).map(toSavedPrompt);
+  },
+  get(id: string): SavedPrompt | undefined {
+    const r = db.prepare("SELECT * FROM saved_prompts WHERE id = ?").get(id) as SavedPromptRow | undefined;
+    return r && toSavedPrompt(r);
+  },
+  create(name: string, text: string): SavedPrompt {
+    const p: SavedPrompt = { id: randomUUID(), name, text, createdAt: new Date().toISOString() };
+    db.prepare("INSERT INTO saved_prompts (id, name, text, created_at) VALUES (?, ?, ?, ?)").run(p.id, p.name, p.text, p.createdAt);
+    return p;
+  },
+  update(id: string, name: string, text: string): void {
+    db.prepare("UPDATE saved_prompts SET name = ?, text = ? WHERE id = ?").run(name, text, id);
+  },
+  remove(id: string): void {
+    db.prepare("DELETE FROM saved_prompts WHERE id = ?").run(id);
   },
 };
 

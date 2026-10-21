@@ -103,9 +103,9 @@ export function Sidebar({ route }: { route: Route }) {
     await refreshProjects();
   };
 
-  const startPanel = async (p: Project, kind: PanelKind) => {
+  const startPanel = async (p: Project, kind: PanelKind, agentProfileId?: string) => {
     try {
-      await api.openPanel(p.id, { kind });
+      await api.openPanel(p.id, { kind, agentProfileId });
       navigate(href.project(p.id));
     } catch (e: any) {
       alert(e.message);
@@ -171,7 +171,7 @@ export function Sidebar({ route }: { route: Route }) {
                     align="right"
                     items={[{ label: "Remove", shortcut: "r", danger: true, onSelect: () => void remove(p) }]}
                   />
-                  <PanelMenu onPick={(kind) => void startPanel(p, kind)} />
+                  <PanelMenu onPick={(kind, agentProfileId) => void startPanel(p, kind, agentProfileId)} />
                 </span>
               </div>
               {isOpen && (

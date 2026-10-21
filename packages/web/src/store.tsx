@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import type { AttentionReason, PanelOverlap, Profile, ProfileChange, Project, ProviderInfo, SessionSummary } from "@rails/shared";
+import type { AgentProfile, AttentionReason, PanelOverlap, Profile, ProfileChange, Project, ProviderInfo, SavedPrompt, SessionSummary } from "@rails/shared";
 import { api } from "./api.ts";
 import { href, navigate } from "./router.ts";
 import { socket } from "./ws.ts";
@@ -7,6 +7,13 @@ import { socket } from "./ws.ts";
 interface Store {
   projects: Project[];
   providers: ProviderInfo[];
+  /** Agent profiles and saved prompts (ADR 0018), by name; null until loaded. */
+  agentProfiles: AgentProfile[] | null;
+  savedPrompts: SavedPrompt[] | null;
+  /** Why they couldn't be loaded, if they couldn't. */
+  customizeError: string;
+  /** Load them again now (e.g. right after creating one, before opening it). */
+  refreshCustomize(): Promise<void>;
   connected: boolean;
   /** The name and avatar at the foot of the sidebar; null until the socket first connects. */
   profile: Profile | null;
@@ -38,6 +45,9 @@ export const useStore = () => useContext(Ctx)!;
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [agentProfiles, setAgentProfiles] = useState<AgentProfile[] | null>(null);
+  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[] | null>(null);
+  const [customizeError, setCustomizeError] = useState("");
   const [connected, setConnected] = useState(socket.connected);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [busy, setBusy] = useState<Set<string>>(new Set());
@@ -60,13 +70,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     await Promise.all(list.map((p) => refreshSessions(p.id)));
   }, [refreshSessions]);
 
+  const refreshCustomize = useCallback(async () => {
+    try {
+      const [profiles, prompts] = await Promise.all([api.agentProfiles(), api.prompts()]);
+      setAgentProfiles(profiles);
+      setSavedPrompts(prompts);
+      setCustomizeError("");
+    } catch (e: any) {
+      setCustomizeError(e.message);
+    }
+  }, []);
+
   useEffect(() => {
     socket.connect();
     void refreshProjects();
+    void refreshCustomize();
     void api.providers().then(setProviders);
     const offConn = socket.onConnection((up) => {
       setConnected(up);
       if (!up) setBusy(new Set()); // unknown until the server sends it again
+      else void refreshCustomize(); // changes made while this device was away
     });
     const off = socket.on((m) => {
       // Opening or closing a panel changes which sessions are open.
@@ -79,6 +102,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setOverlaps(by);
       }
       if (m.type === "profile.changed") setProfile(m.profile); // on connect too
+      if (m.type === "customize.changed") void refreshCustomize();
     });
     // Pick up sessions started outside rails and new transcripts of freshly started panels.
     const poll = setInterval(() => projectsRef.current.forEach((p) => void refreshSessions(p.id)), 20_000);
@@ -87,7 +111,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       offConn();
       clearInterval(poll);
     };
-  }, [refreshProjects, refreshSessions]);
+  }, [refreshProjects, refreshSessions, refreshCustomize]);
 
   const openFolder = useCallback(async () => {
     setPicking(true);
@@ -123,6 +147,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value: Store = {
     projects,
     providers,
+    agentProfiles,
+    savedPrompts,
+    customizeError,
+    refreshCustomize,
     connected,
     profile,
     saveProfile,

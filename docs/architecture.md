@@ -75,6 +75,21 @@ packages/
   `suggestions.ts`, ADR 0010), shown under its message; when the user sends it, `bridge/deliver.ts` puts it into
   the session: Claude Code's message socket, the pi extension's long poll (`GET /bridge/<panelId>/pi/inbox`, confirmed with `POST …/pi/delivered`) or
   Codex's `thread/queue/add`. Suggestions expire as soon as their session moves on. A handoff (ADR 0015, `handoffs.ts`, planned by the Coordinator when the user asks) wakes it when its session ends a turn without a question, to draft the message for the other session; handoffs expire after 24 hours and are cancelled when either session ends. Owners (ADR 0016, `owners.ts`), recorded by the Coordinator with `set_owner`, route its requests; an edit to files another session owns wakes it like an overlap. Shell commands' edits count too (`shellEdits.ts`): Rails compares `git status` and file times at a command's start and end. Each run's usage goes in `sprocket_usage`. An overlap also wakes the Coordinator, for the session that changed the files second (batched over 15 s, once per pair and file per 30 minutes); it judges whether they clash and may draft a heads-up with `suggest_message`. A Coordinator's standing rules (ADR 0011) are in its prompt, numbered; a suggestion records the rule it followed. If the user picked a decision model, `decisions.ts` (ADR 0012) asks it about every turn end and unknown dialog in projects with a Coordinator, through pi-ai's `classify()`, and logs its answers next to Rails' own (`decisions` table, `GET /api/decisions`, `decisions.changed`). It may also wake the Coordinator (ADR 0013, `wakeFromModel` in `watches.ts`) for a question the rules missed, unless the session moved on meanwhile; `RAILS_DECISIONS=shadow` keeps it to judging.
+- **Agent profiles** (ADR 0018, `agentProfiles.ts`): saved ways to start Claude Code, made in Customize and
+  stored in SQLite (`agent_profiles`). `openPanel` adds the profile's flags after the bridge's (the one in
+  `agentProfileId`, else the session's own, else the agent's default; `launchProfile()`): `--model`, `--effort`, `--permission-mode`, `--append-system-prompt`, `--allowedTools` / `--disallowedTools`,
+  `--mcp-config <json>` (`--strict-mcp-config` for "Only these servers") and `--plugin-dir` for skills. The
+  plugin folder is made per panel (`RAILS_HOME/panel-plugins/<panelId>`: a `plugin.json` and links to each
+  skill's folder, `rails:<name>` in Claude Code) and deleted with the panel. `session_profiles` remembers which
+  profile started a session, so resuming it reapplies that profile. A panel keeps a copy of its profile's name,
+  model, effort and permission mode (`panels.profile`), which the board shows Sprockets. Skills (`skills.ts`) are found in the skill
+  library (`RAILS_HOME/skills`), `~/.claude/skills`, `~/.agents/skills` and each project's `.claude/skills` and
+  `.agents/skills`, reading only each `SKILL.md`'s front matter (cached by mtime and size). "Import from folder…"
+  copies a skill into the library through the native folder picker. Saved prompts (`savedPrompts.ts`,
+  `saved_prompts`) fill Home's composer and Sprocket chats, and Sprockets read them with `saved_prompts`. Changes
+  to either are broadcast as `customize.changed`. Routes: `GET/POST /api/agent-profiles`,
+  `PUT/DELETE /api/agent-profiles/:id`, `GET /api/agent-profiles/:id/panels` (where it's in use),
+  `GET/POST /api/prompts`, `PUT/DELETE /api/prompts/:id`, `GET /api/skills`, `POST /api/skills/import`.
 - **Persistence:** panels survive browser disconnects and server restarts (`tsx watch` included).
   On a reboot the tmux server is gone; the next workspace read drops panels whose tmux session no
   longer exists. Their transcripts remain, so sessions can be resumed from the sidebar.
@@ -127,11 +142,11 @@ packages/
 
 ## Provider support matrix
 
-| Provider | Discovery | Panels (new / resume) |
-| --- | --- | --- |
-| claude | ✅ `~/.claude/projects/*/*.jsonl` | ✅ `claude --session-id <uuid> [-- prompt]` / `claude --resume <id>` |
-| pi | ✅ `~/.pi/agent/sessions/*/*.jsonl` | ✅ `pi --session-id <uuid> [-- prompt]` / `pi --session <id>` |
-| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl` (checked with Codex 0.163) | ✅ `codex [-- prompt]` / `codex resume <id>`; a new panel learns its session id from Codex's daemon (ADR 0007) |
+| Provider | Discovery | Panels (new / resume) | Agent profiles (ADR 0018) |
+| --- | --- | --- | --- |
+| claude | ✅ `~/.claude/projects/*/*.jsonl` | ✅ `claude --session-id <uuid> [-- prompt]` / `claude --resume <id>` | ✅ model, effort, permission mode, instructions, tools, MCP servers, skills |
+| pi | ✅ `~/.pi/agent/sessions/*/*.jsonl` | ✅ `pi --session-id <uuid> [-- prompt]` / `pi --session <id>` | — |
+| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl` (checked with Codex 0.163) | ✅ `codex [-- prompt]` / `codex resume <id>`; a new panel learns its session id from Codex's daemon (ADR 0007) | — (any `-c` flag takes a panel off the daemon) |
 
 Every provider panel reports to the bridge (ADR 0007): Claude Code through hooks, pi through the Rails
 extension, Codex through its app-server daemon. Edits count for overlaps (ADR 0014) once they worked: Claude
@@ -163,12 +178,13 @@ Transcript format notes are in [providers.md](./providers.md).
 
 | Var | Default | Meaning |
 | --- | --- | --- |
-| `RAILS_HOME` | `~/.rails` | DB, config, `tmux.sock` and `tmux.conf` |
+| `RAILS_HOME` | `~/.rails` | DB, config, `tmux.sock`, `tmux.conf`, the skill library (`skills/`) and per-panel plugin folders (`panel-plugins/`) |
 | `RAILS_HOST` | `127.0.0.1` | bind address |
 | `RAILS_PORT` | `4317` | server port (Vite dev runs on 5173 and proxies to it) |
 | `RAILS_TOKEN` | generated | access token override |
 | `RAILS_DECISIONS` | — | `shadow`: the decision model only judges and logs, never wakes the Coordinator (for evaluating a model, ADR 0013) |
 | `CLAUDE_HOME` / `PI_HOME` / `CODEX_HOME` | `~/.claude`, `~/.pi/agent`, `~/.codex` | provider store roots |
+| `AGENTS_HOME` | `~/.agents` | where the user's agent-neutral skills live (`skills/`), read-only |
 
 Attach to a panel from a normal terminal: `tmux -S ~/.rails/tmux.sock ls`, then
 `tmux -S ~/.rails/tmux.sock attach -t p-<panelId>`.

@@ -70,7 +70,22 @@ export interface Panel {
   /** Provider session shown in this panel. Unknown for shells and for new Codex sessions. */
   sessionId?: string;
   title: string;
+  /** The agent profile it started with (ADR 0018), as it was then: editing the profile doesn't change a running panel. */
+  profile?: PanelProfile;
   createdAt: string;
+}
+
+/** What a panel records of the agent profile it started with. Sprockets see it on the board. */
+export type PanelProfile = Pick<AgentProfile, "id" | "name" | "model" | "effort" | "permissionMode">;
+
+/** A running panel started with an agent profile: where the profile is in use (Customize). */
+export interface ProfileUse {
+  panelId: string;
+  projectId: string;
+  projectName: string;
+  kind: PanelKind;
+  title: string;
+  sessionId?: string;
 }
 
 /** Body of "open a panel" (POST /api/projects/:id/panels). */
@@ -80,6 +95,11 @@ export interface OpenPanel {
   sessionId?: string;
   /** First message for a new agent session. */
   prompt?: string;
+  /**
+   * Start the agent with this agent profile (ADR 0018). Without one, a resumed session uses the profile it started
+   * with, and anything else the agent's default profile, if it has one.
+   */
+  agentProfileId?: string;
 }
 
 /** A project's panels plus the saved dockview layout (opaque to the server). */
@@ -443,6 +463,94 @@ export interface SignIn {
 // ---- WebSocket protocol ----------------------------------------------------
 // Each attached panel gets its own tmux client on the server, sized to that browser's terminal.
 
+// ---- agent profiles (ADR 0018) ----
+
+/** Where a skill was found: Rails' skill library, the user's own skill folders, or the project's. */
+export type SkillSource = "library" | "user" | "project";
+
+/** How a profile refers to a skill. A project skill resolves only in that project. */
+export interface SkillRef {
+  source: SkillSource;
+  name: string;
+}
+
+export interface SkillInfo {
+  ref: SkillRef;
+  description: string;
+  /** Claude Code only offers it as a slash command (`disable-model-invocation`); the model doesn't pick it. */
+  manual: boolean;
+  /** For a project skill: the names of the projects that have it (it loads only in those). */
+  projects?: string[];
+}
+
+/** Claude Code's `--permission-mode` choices (checked with 2.1.304). */
+export const PERMISSION_MODES = ["manual", "acceptEdits", "auto", "plan", "dontAsk", "bypassPermissions"] as const;
+export type PermissionMode = (typeof PERMISSION_MODES)[number];
+/** Claude Code's `--effort` levels (checked with 2.1.306). */
+export const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+export type Effort = (typeof EFFORTS)[number];
+
+export interface McpServer {
+  name: string;
+  type: "stdio" | "http" | "sse";
+  /** stdio */
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  /** http and sse */
+  url?: string;
+  headers?: Record<string, string>;
+}
+
+export const AGENT_PROFILE_NAME_MAX = 40;
+export const AGENT_PROFILE_DESCRIPTION_MAX = 200;
+export const AGENT_PROFILE_INSTRUCTIONS_MAX = 4000;
+export const TOOL_PATTERN_MAX = 200;
+
+/** The editable part of an agent profile. */
+export interface AgentProfileInput {
+  name: string;
+  description: string;
+  provider: ProviderId;
+  /** A model alias (`opus`) or id; empty means the agent's own default. */
+  model: string;
+  /** Empty means the agent's own default. */
+  effort: Effort | "";
+  /** Empty means the agent's own default. */
+  permissionMode: PermissionMode | "";
+  /** Added to the agent's system prompt. */
+  instructions: string;
+  skills: SkillRef[];
+  allowedTools: string[];
+  disallowedTools: string[];
+  mcpServers: McpServer[];
+  /** Use only these MCP servers, not the user's or the project's. */
+  mcpOnly: boolean;
+  /** Used when this agent starts without a profile picked. At most one per agent. */
+  isDefault: boolean;
+}
+
+export interface AgentProfile extends AgentProfileInput {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---- saved prompts (ADR 0018) ----
+
+export const SAVED_PROMPT_NAME_MAX = 60;
+export const SAVED_PROMPT_TEXT_MAX = 4000;
+
+/** A prompt the user keeps to start agents with: Home's composer and Sprocket chats fill one in. */
+export interface SavedPrompt {
+  id: string;
+  name: string;
+  text: string;
+  createdAt: string;
+}
+
+export type SavedPromptInput = Partial<Pick<SavedPrompt, "name" | "text">>;
+
 export type ClientMsg =
   /** `attachId` is unique per attach; output is tagged with it so a terminal can ignore a previous attach's. */
   | { type: "term.attach"; panelId: string; attachId: number; cols: number; rows: number }
@@ -472,4 +580,6 @@ export type ServerMsg =
   | { type: "models.signIn"; signIn: SignIn }
   /** The profile. Sent on connect and when it changes (possibly on another device). */
   | { type: "profile.changed"; profile: Profile }
+  /** Agent profiles or saved prompts changed (possibly on another device). */
+  | { type: "customize.changed" }
   | { type: "error"; message: string };

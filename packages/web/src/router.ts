@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 
 export type Route =
-  | { name: "home" }
+  /** Home. `promptId` asks it to fill in that saved prompt (Customize's "Use on Home"). */
+  | { name: "home"; promptId?: string }
   /** A project's workspace. `openKey` asks it to open (or focus) that session's panel. */
   | { name: "workspace"; projectId: string; openKey?: string }
   /** Sprockets (ADR 0005): the list, the creator (`new`), one Sprocket's chat or its settings. */
   | { name: "sprockets"; view: "list" | "new" | "chat" | "settings"; id?: string }
-  | { name: "customize" }
+  /** Customize (ADR 0018): agent profiles and saved prompts, or one of them open for editing. */
+  | { name: "customize"; view: "list" | "profile" | "prompt"; id?: string }
   | { name: "automate" };
 
 function parse(hash: string): Route {
@@ -19,19 +21,29 @@ function parse(hash: string): Route {
     if (parts[1]) return { name: "sprockets", view: "chat", id: parts[1] };
     return { name: "sprockets", view: "list" };
   }
-  if (parts[0] === "customize") return { name: "customize" };
+  if (parts[0] === "new" && parts[1]) return { name: "home", promptId: parts[1] };
+  if (parts[0] === "customize") {
+    if (parts[1] === "profiles" && parts[2]) return { name: "customize", view: "profile", id: parts[2] };
+    if (parts[1] === "prompts" && parts[2]) return { name: "customize", view: "prompt", id: parts[2] };
+    return { name: "customize", view: "list" };
+  }
   if (parts[0] === "automate") return { name: "automate" };
   return { name: "home" };
 }
 
 export const href = {
   home: () => "#/",
+  /** Home with a saved prompt filled in. */
+  homeWithPrompt: (promptId: string) => `#/new/${encodeURIComponent(promptId)}`,
   project: (projectId: string) => `#/p/${encodeURIComponent(projectId)}`,
   session: (projectId: string, key: string) => `#/p/${encodeURIComponent(projectId)}/s/${encodeURIComponent(key)}`,
   sprockets: () => "#/sprockets",
   newSprocket: () => "#/sprockets/new",
   sprocket: (id: string) => `#/sprockets/${encodeURIComponent(id)}`,
   sprocketSettings: (id: string) => `#/sprockets/${encodeURIComponent(id)}/settings`,
+  customize: () => "#/customize",
+  agentProfile: (id: string) => `#/customize/profiles/${encodeURIComponent(id)}`,
+  savedPrompt: (id: string) => `#/customize/prompts/${encodeURIComponent(id)}`,
 };
 
 export function navigate(to: string) {

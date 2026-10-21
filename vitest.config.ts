@@ -19,6 +19,7 @@ export default defineConfig({
       CLAUDE_HOME: join(home, "claude"),
       PI_HOME: join(home, "pi"),
       CODEX_HOME: join(home, "codex"),
+      AGENTS_HOME: join(home, "agents"),
     },
   },
 });

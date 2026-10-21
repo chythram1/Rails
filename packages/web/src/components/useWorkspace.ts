@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Panel, PanelKind, Workspace } from "@rails/shared";
+import type { OpenPanel, Panel, PanelKind, Workspace } from "@rails/shared";
 import { api } from "../api.ts";
 import { useStore } from "../store.tsx";
 import { socket } from "../ws.ts";
@@ -32,10 +32,10 @@ export function useWorkspace(projectId: string) {
 
   /** Open a new panel, or focus the panel an existing session is already open in. */
   const open = useCallback(
-    async (kind: PanelKind, sessionId?: string): Promise<Panel | undefined> => {
+    async (kind: PanelKind, opts: Pick<OpenPanel, "sessionId" | "agentProfileId"> = {}): Promise<Panel | undefined> => {
       setError("");
       try {
-        const panel = await api.openPanel(projectId, { kind, sessionId });
+        const panel = await api.openPanel(projectId, { kind, ...opts });
         await load();
         void refreshSessions(projectId);
         return panel;

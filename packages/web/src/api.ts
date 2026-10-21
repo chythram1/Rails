@@ -1,4 +1,6 @@
 import type {
+  AgentProfile,
+  AgentProfileInput,
   DecisionLog,
   GitStatus,
   ModelSettings,
@@ -8,15 +10,19 @@ import type {
   ProfileChange,
   Project,
   ProviderInfo,
+  ProfileUse,
   RecentFolder,
+  SavedPrompt,
+  SavedPromptInput,
   ServerInfo,
   SessionSummary,
-  Suggestion,
   SignIn,
+  SkillInfo,
   Sprocket,
   SprocketInput,
   SprocketMessage,
   SprocketSettings,
+  Suggestion,
   Workspace,
 } from "@rails/shared";
 
@@ -93,6 +99,20 @@ export const api = {
   dismissSuggestion: (id: string) => req<Suggestion>(`/api/suggestions/${enc(id)}/dismiss`, { method: "POST" }),
   cancelHandoff: (id: string) => req<{ ok: true }>(`/api/handoffs/${enc(id)}/cancel`, { method: "POST" }),
   clearOwner: (panelId: string) => req<{ ok: true }>(`/api/owners/${enc(panelId)}`, { method: "DELETE" }),
+  agentProfiles: () => req<AgentProfile[]>("/api/agent-profiles"),
+  createAgentProfile: (body: Partial<AgentProfileInput> = {}) => req<AgentProfile>("/api/agent-profiles", { method: "POST", body: JSON.stringify(body) }),
+  updateAgentProfile: (id: string, body: Partial<AgentProfileInput>) =>
+    req<AgentProfile>("/api/agent-profiles/" + enc(id), { method: "PUT", body: JSON.stringify(body) }),
+  deleteAgentProfile: (id: string) => req("/api/agent-profiles/" + enc(id), { method: "DELETE" }),
+  /** The running panels that started with this profile. */
+  profileUses: (id: string) => req<ProfileUse[]>(`/api/agent-profiles/${enc(id)}/panels`),
+  prompts: () => req<SavedPrompt[]>("/api/prompts"),
+  createPrompt: (body: SavedPromptInput = {}) => req<SavedPrompt>("/api/prompts", { method: "POST", body: JSON.stringify(body) }),
+  updatePrompt: (id: string, body: SavedPromptInput) => req<SavedPrompt>("/api/prompts/" + enc(id), { method: "PUT", body: JSON.stringify(body) }),
+  deletePrompt: (id: string) => req("/api/prompts/" + enc(id), { method: "DELETE" }),
+  skills: () => req<SkillInfo[]>("/api/skills"),
+  /** Opens the native folder picker on the server; null skill means the user cancelled. */
+  importSkill: () => req<{ skill: SkillInfo | null }>("/api/skills/import", { method: "POST" }),
   models: () => req<ModelSettings>("/api/models"),
   setDefaultModel: (model: string | null) => req("/api/models/default", { method: "PUT", body: JSON.stringify({ model }) }),
   setDecisionModel: (model: string | null) => req("/api/models/decisions", { method: "PUT", body: JSON.stringify({ model }) }),

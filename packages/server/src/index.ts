@@ -9,13 +9,14 @@ import { bodyLimit } from "hono/body-limit";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { WebSocketServer } from "ws";
 import { serverInfo, onSignedOutEverywhere, signOutEverywhere } from "./account.ts";
+import { createAgentProfile, deleteAgentProfile, listAgentProfiles, profileUses, updateAgentProfile } from "./agentProfiles.ts";
 import { accessToken, HOST, PORT } from "./config.ts";
 import { watchCodex } from "./bridge/codex.ts";
 import { piInbox } from "./bridge/deliver.ts";
 import { loadAttention, receive, tokenOk as bridgeTokenOk } from "./bridge/index.ts";
 import { panels, projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
-import type { OpenPanel, SprocketInput, SprocketSettings } from "@rails/shared";
+import type { OpenPanel, SavedPromptInput, SprocketInput, SprocketSettings } from "@rails/shared";
 import { closePanel, getWorkspace, openPanel, saveLayout } from "./panels.ts";
 import { ServiceError } from "./errors.ts";
 import { attachPickedFolder, attachProject, detachProject, getProject, listProjectSessions, recentFolders } from "./projects.ts";
@@ -29,6 +30,8 @@ import { startOverlaps } from "./overlaps.ts";
 import { cancelHandoff, startHandoffs } from "./handoffs.ts";
 import { clearOwner, startOwners } from "./owners.ts";
 import { startShellEdits } from "./shellEdits.ts";
+import { createSavedPrompt, deleteSavedPrompt, listSavedPrompts, updateSavedPrompt } from "./savedPrompts.ts";
+import { importSkill, listSkills } from "./skills.ts";
 import { dismissSuggestion, sendSuggestion, startSuggestions } from "./suggestions.ts";
 import { decisionLog, setDecisionModel, startDecisions } from "./decisions.ts";
 import { version as tmuxVersion } from "./tmux.ts";
@@ -213,6 +216,37 @@ app.delete("/api/models/sign-ins/:id", async (c) => {
   await cancelSignIn(c.req.param("id"));
   return c.json({ ok: true });
 });
+
+// ---- agent profiles, saved prompts and skills (ADR 0018) ----
+app.get("/api/agent-profiles", (c) => c.json(listAgentProfiles()));
+
+app.post("/api/agent-profiles", async (c) => c.json(createAgentProfile(await c.req.json<Record<string, unknown>>()), 201));
+
+app.put("/api/agent-profiles/:id", async (c) => c.json(updateAgentProfile(c.req.param("id"), await c.req.json<Record<string, unknown>>())));
+
+app.delete("/api/agent-profiles/:id", (c) => {
+  deleteAgentProfile(c.req.param("id"));
+  return c.json({ ok: true });
+});
+
+// The running panels that started with it.
+app.get("/api/agent-profiles/:id/panels", async (c) => c.json(await profileUses(c.req.param("id"))));
+
+app.get("/api/prompts", (c) => c.json(listSavedPrompts()));
+
+app.post("/api/prompts", async (c) => c.json(createSavedPrompt(await c.req.json<SavedPromptInput>()), 201));
+
+app.put("/api/prompts/:id", async (c) => c.json(updateSavedPrompt(c.req.param("id"), await c.req.json<SavedPromptInput>())));
+
+app.delete("/api/prompts/:id", (c) => {
+  deleteSavedPrompt(c.req.param("id"));
+  return c.json({ ok: true });
+});
+
+app.get("/api/skills", async (c) => c.json(await listSkills(projects.list())));
+
+// Opens the native folder picker on the server's screen (ADR 0004).
+app.post("/api/skills/import", async (c) => c.json({ skill: await importSkill() }));
 
 // ---- Sprockets (ADR 0005, 0006) ----
 app.get("/api/sprockets", (c) => c.json(listSprockets()));

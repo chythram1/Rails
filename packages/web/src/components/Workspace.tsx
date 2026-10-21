@@ -27,8 +27,8 @@ const MOBILE = "(max-width: 860px)";
 
 /** What the dockview tab / content / header components need from the workspace. */
 interface Ctx extends WorkspaceState {
-  /** Open a panel and place it in `group` (or the active group). */
-  openIn(kind: PanelKind, group?: DockviewGroupPanel): void;
+  /** Open a panel and place it in `group` (or the active group), with an agent profile if given (ADR 0018). */
+  openIn(kind: PanelKind, group?: DockviewGroupPanel, opts?: { agentProfileId?: string }): void;
   /** Whether the side panel is open. */
   sideOpen: boolean;
   /** Open the side panel (on Sprockets if a reply waits, else its last tab), or close it. */
@@ -61,9 +61,9 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
     return () => mq.removeEventListener("change", on);
   }, []);
 
-  const openIn = (kind: PanelKind, group?: DockviewGroupPanel, sessionId?: string) => {
+  const openIn = (kind: PanelKind, group?: DockviewGroupPanel, opts: { sessionId?: string; agentProfileId?: string } = {}) => {
     targetGroup.current = group;
-    void ws.open(kind, sessionId).then((p) => {
+    void ws.open(kind, opts).then((p) => {
       if (!p) return;
       // A session inside two projects (one folder nested in the other) has one panel, which may live in
       // the other project's workspace: go there and focus it.
@@ -76,7 +76,7 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
   useEffect(() => {
     if (!openKey) return;
     const { provider, id } = parseSessionKey(openKey);
-    openIn(provider, undefined, id);
+    openIn(provider, undefined, { sessionId: id });
     location.replace(href.project(projectId));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openKey, projectId]);
@@ -271,7 +271,7 @@ function PanelTab(props: IDockviewPanelHeaderProps) {
   if (!panel) return null;
   const title = ws.title(panel);
   return (
-    <div className="panel-tab" title={title}>
+    <div className="panel-tab" title={panel.profile && panel.profile.name !== title ? `${title} · ${panel.profile.name} profile` : title}>
       <PanelIcon kind={panel.kind} />
       <span className="truncate">{title}</span>
       <OverlapMark panelId={panel.id} />
@@ -295,7 +295,7 @@ function HeaderAdd(props: IDockviewHeaderActionsProps) {
   const ws = useWs();
   return (
     <div className="header-add">
-      <PanelMenu onPick={(kind) => ws.openIn(kind, props.group)} />
+      <PanelMenu onPick={(kind, agentProfileId) => ws.openIn(kind, props.group, { agentProfileId })} />
     </div>
   );
 }
@@ -348,7 +348,7 @@ function EmptyWorkspace(_: IWatermarkPanelProps) {
         <SideToggles />
       </div>
       <p className="muted">No panels open. Pick a session in the sidebar, or start something:</p>
-      <PanelMenu onPick={(kind) => ws.openIn(kind)} />
+      <PanelMenu onPick={(kind, agentProfileId) => ws.openIn(kind, undefined, { agentProfileId })} />
     </div>
   );
 }
@@ -384,7 +384,7 @@ function MobilePanels() {
             )}
           </div>
         ))}
-        <PanelMenu onPick={(kind) => void ws.open(kind).then((p) => p && setActiveId(p.id))} />
+        <PanelMenu onPick={(kind, agentProfileId) => void ws.open(kind, { agentProfileId }).then((p) => p && setActiveId(p.id))} />
         <span className="grow" />
         <SideToggles />
       </div>

@@ -28,7 +28,8 @@ Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
   the Node server (node-pty, `node:sqlite`, tmux) as it is; the native folder picker (ADR 0004) fits a desktop
   app well. An earlier idea, a Rust port with Tauri, is dropped unless a real need appears. Write an ADR
   when this starts.
-- **Customize:** agent profiles (model, system prompt, tools, permission mode), prompts, skills
+- **Customize, next parts:** agent profiles for Codex (`--profile`, which keeps the daemon) and pi, a default
+  agent profile per project, a Coordinator suggesting a new session with a profile and prompt
 - **Automate:** saved prompts on a schedule or trigger (PR opened, Slack mention), with run history
   (see the "Pinned automations" cards in `ref/style.png`)
 - **Custom harness:** Rails' own agent loop as an additional provider

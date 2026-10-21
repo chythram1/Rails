@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { IconCheck as Check } from "@tabler/icons-react";
 
-export type MenuItem = "separator" | MenuAction;
+export type MenuItem = "separator" | { heading: string } | MenuAction;
 
 interface MenuAction {
   label: string;
@@ -115,7 +115,7 @@ export function MenuButton({ label, title, icon, className, plain, align = "left
         return;
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const actions = items.filter((it): it is MenuAction => it !== "separator");
+      const actions = items.filter((it): it is MenuAction => it !== "separator" && !("heading" in it));
       const hit = actions.find((it) => it.shortcut?.toLowerCase() === e.key.toLowerCase());
       if (hit) {
         e.preventDefault();
@@ -145,9 +145,11 @@ export function MenuButton({ label, title, icon, className, plain, align = "left
           {items.map((item, i) =>
             item === "separator" ? (
               <div key={i} className="menu-sep" role="separator" />
+            ) : "heading" in item ? (
+              <div key={i} className="menu-heading" role="presentation">{item.heading}</div>
             ) : (
               <button
-                key={item.label}
+                key={`${i}:${item.label}`} // labels can repeat (an agent profile can share an agent's name)
                 role={item.checked === undefined ? "menuitem" : "menuitemradio"}
                 aria-checked={item.checked}
                 className={item.danger ? "danger" : undefined}

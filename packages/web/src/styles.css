@@ -503,6 +503,9 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .composer.compact textarea { flex: 1; font-size: 15px; padding: 11px 14px; min-height: 0; }
 .composer.compact .composer-row { height: auto; border-top: 0; }
 .composer.compact .send-btn { width: 44px; min-height: 44px; }
+/* A control beside the send block (the saved prompts), as tall as it. */
+.composer.compact .composer-controls { flex: none; }
+.composer.compact .composer-controls .icon-btn { width: 44px; height: 100%; min-height: 44px; }
 
 /* ---- workspace: terminal panels (dockview + xterm) ---- */
 .workspace { display: flex; flex-direction: column; height: 100%; min-height: 0; }
@@ -703,7 +706,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 @keyframes sp-swing { from { transform: rotate(calc(-2.5 * var(--sway, 3.5deg))); } to { transform: rotate(calc(2.5 * var(--sway, 3.5deg))); } }
 
 /* ---- Sprockets page: list column + chat or creator (components/sprockets) ---- */
-.sprockets { display: flex; height: 100%; min-height: 0; }
+.sprockets, .customize { display: flex; height: 100%; min-height: 0; }
 .sp-list { width: 272px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
 /* 52px like the sidebar's logo row; 7px of top padding centres the contents on the logo's line (y = 29). */
 .sp-list-head, .sp-head { display: flex; align-items: center; gap: 6px; height: 52px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
@@ -930,6 +933,58 @@ textarea.input.sp-grow { resize: none; overflow: hidden; }
 .sp-handoff-note { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .sp-owner-paths { margin: 0; font-family: var(--mono); font-size: 11.5px; line-height: 1.6; color: var(--text-2); overflow-wrap: anywhere; }
 .sp-rule-add textarea.input { width: 100%; resize: none; overflow: hidden; }
+/* ---- Customize: agent profiles and saved prompts (components/customize, ADR 0018), on the Sprockets page's list and header ---- */
+.sp-row.cz-new-row { width: 100%; margin-top: 10px; border: 0; background: none; color: var(--text-2); font-size: 14px; text-align: left; }
+.cz-list-note { margin: 0; padding: 4px 6px 8px; }
+.sp-group-title.cz-group-gap { margin-top: 18px; }
+.cz-uses { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.cz-uses a { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 0; font-size: 13px; color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; }
+textarea.input.cz-prompt-text { min-height: 200px; }
+.cz-intro { align-items: flex-start; max-width: 520px; text-align: left; }
+.cz-intro p { margin: 0; }
+.cz-intro-title { margin: -4px 0 0; font-size: 28px; line-height: 1.15; letter-spacing: -0.025em; }
+.cz-editor { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.cz-head-icon { width: 28px; height: 28px; }
+.cz-error { margin: 0; padding: 10px 20px; border-bottom: 1px solid var(--border); }
+.cz-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 26px 36px 48px; }
+/* The editor's groups, Settings' rows and headings in a column as wide as Settings' panel. */
+.cz-form { max-width: 680px; display: flex; flex-direction: column; gap: 36px; }
+.cz-field { padding: 14px 0; }
+.cz-field + .cz-field { border-top: 1px solid var(--border); }
+.cz-field-label { font-size: 13px; color: var(--text-2); }
+textarea.input.cz-instructions { width: 100%; min-height: 96px; max-height: 480px; overflow-y: auto; resize: none; line-height: 1.5; }
+.cz-warn, .set-text p.cz-warn { margin: 0; color: var(--red); font-size: 13px; }
+.cz-actions { display: flex; gap: 8px; margin-top: 12px; }
+.cz-end { gap: 0; }
+.cz-end > .set-intro { margin-top: 0; }
+/* Skills and MCP servers: ruled rows, the name and where it's from on top, then what it is. */
+.cz-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cz-item { display: flex; align-items: flex-start; gap: 4px; padding: 7px 3px 7px 11px; border: 1px solid var(--border-strong); background: var(--bg); }
+.cz-item-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cz-item-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; margin: 0; }
+.cz-item-name { flex: 0 1 auto; font-size: 14px; font-weight: 500; }
+.cz-source { flex: none; max-width: 50%; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.cz-item-desc { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cz-item-mono { margin: 0; font-family: var(--mono); font-size: 11.5px; line-height: 1.6; color: var(--text-2); overflow-wrap: anywhere; }
+.cz-mcp-form { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--border-strong); background: var(--bg); }
+.cz-mcp-form .input { width: 100%; }
+.cz-mcp-form textarea.input { resize: none; overflow: hidden; }
+/* "Choose skills": a square modal like the avatar picker. */
+.cz-dialog {
+  width: min(560px, calc(100vw - 32px)); max-height: min(720px, calc(100dvh - 32px)); padding: 0;
+  border: 1px solid var(--border-strong); border-radius: 0; background: var(--dialog); color: var(--text); box-shadow: var(--shadow-pop);
+}
+.cz-dialog::backdrop { background: rgb(0 0 0 / 0.4); }
+.cz-dialog form { display: flex; flex-direction: column; gap: 8px; padding: 24px 28px; max-height: inherit; }
+.cz-dialog h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.cz-dialog form > p { margin: 0; }
+.cz-picker-search { flex: none; margin-top: 8px; }
+.cz-picker-list { min-height: 120px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--border); }
+.cz-picker-list .menu-heading { margin: 0; }
+.cz-pick { display: flex; align-items: flex-start; gap: 10px; padding: 8px 14px; border-top: 1px solid var(--border); cursor: pointer; }
+.cz-pick input { flex: none; margin: 3px 0 0; accent-color: var(--blue); }
+.cz-dialog-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+
 /* On/off switch (Switch.tsx): a pill, green when on, the one round control besides dots and avatars. */
 .switch {
   flex: none; display: inline-flex; align-items: center; width: 36px; height: 20px; padding: 2px;
@@ -1046,7 +1101,7 @@ textarea.input.sp-grow { resize: none; overflow: hidden; }
   .avatar-btn:hover .avatar-edit { opacity: 1; }
   .sp-jump:hover { background: var(--hover); }
   .btn:hover:not(:disabled), button.chip:hover, .menu button:hover:not(:disabled), .dropdown.plain:hover:not(:disabled), .git-file:hover,
-  .sp-filter-btn:hover { background: var(--hover); }
+  .sp-filter-btn:hover, .cz-pick:hover { background: var(--hover); }
   .btn.primary:hover:not(:disabled), .send-btn:hover:not(:disabled) { background: var(--primary-hover); border-color: var(--primary-hover); }
   .segment:hover:not(:has(input:checked)) { background: var(--hover); }
   .switch[aria-checked="false"]:not(:disabled):hover { background: var(--muted); }
@@ -1069,7 +1124,7 @@ textarea.input.sp-grow { resize: none; overflow: hidden; }
   .main > .nav-toggle { display: inline-grid; }
   .mobile-tabs { padding-left: 48px; } /* room for the sidebar toggle */
   /* Sprockets: the list, or one Sprocket, never both. */
-  .sprockets.at-list .sp-main, .sprockets.at-detail .sp-list { display: none; }
+  .sprockets.at-list .sp-main, .sprockets.at-detail .sp-list, .customize.at-list .sp-main, .customize.at-detail .sp-list { display: none; }
   .sp-list { width: 100%; border-right: 0; }
   .sp-list-head, .sp-head { padding-left: 52px; } /* room for the sidebar toggle */
   .sp-back { display: inline-grid; }
@@ -1079,7 +1134,8 @@ textarea.input.sp-grow { resize: none; overflow: hidden; }
   .sp-panel-back { display: inline-grid; }
   .sp-panel .sp-panel-toggle { display: none; }
   .sp-panel-head { padding-left: 52px; } /* room for the sidebar toggle, as in the chat header */
-  .main:has(> .sprockets) > .nav-toggle { top: 14px; } /* on the Sprockets header's centre line */
+  .main:has(> :is(.sprockets, .customize)) > .nav-toggle { top: 14px; } /* on the Sprockets header's centre line */
+  .cz-body { padding: 20px 16px 32px; }
   .page { padding: 64px 16px 32px; }
   .home { padding-top: 72px; }
   .hero { font-size: 38px; margin-bottom: 24px; }

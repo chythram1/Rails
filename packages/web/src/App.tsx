@@ -7,6 +7,7 @@ import { SettingsContext } from "./components/settings/context.ts";
 import { SettingsDialog } from "./components/settings/SettingsDialog.tsx";
 import type { SettingsSection } from "./components/settings/search.ts";
 import { Sidebar } from "./components/Sidebar.tsx";
+import { CustomizePage } from "./components/customize/CustomizePage.tsx";
 import { SprocketsPage } from "./components/sprockets/SprocketsPage.tsx";
 import { Workspace } from "./components/Workspace.tsx";
 import { useRoute } from "./router.ts";
@@ -105,10 +106,10 @@ function Shell() {
           <button className="icon-btn nav-toggle" aria-label="Open sidebar" onClick={() => setNavOpen(true)}>
             <span aria-hidden>☰</span>
           </button>
-          {route.name === "home" && <Home />}
+          {route.name === "home" && <Home promptId={route.promptId} />}
           {route.name === "workspace" && <Workspace key={route.projectId} projectId={route.projectId} openKey={route.openKey} />}
           {route.name === "sprockets" && <SprocketsPage route={route} />}
-          {route.name === "customize" && <Placeholder title="Customize" body="Agent profiles, prompts, skills and tools will live here." />}
+          {route.name === "customize" && <CustomizePage route={route} />}
           {route.name === "automate" && <Placeholder title="Automate" body="Scheduled and triggered agent runs will live here." />}
         </main>
         {settings && (

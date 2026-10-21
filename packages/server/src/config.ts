@@ -24,8 +24,16 @@ export const decisionsInShadow = () => process.env.RAILS_DECISIONS === "shadow";
 export const CLAUDE_HOME = process.env.CLAUDE_HOME ?? join(home, ".claude");
 export const PI_HOME = process.env.PI_HOME ?? join(home, ".pi", "agent");
 export const CODEX_HOME = process.env.CODEX_HOME ?? join(home, ".codex");
+/** Agent-neutral home of the user's own skills (`~/.agents/skills`), read-only (ADR 0018). */
+export const AGENTS_HOME = process.env.AGENTS_HOME ?? join(home, ".agents");
+
+/** Rails' skill library (ADR 0018). */
+export const SKILLS_DIR = join(RAILS_HOME, "skills");
+/** Per-panel plugin folders that carry an agent profile's skills (ADR 0018). */
+export const PANEL_PLUGINS_DIR = join(RAILS_HOME, "panel-plugins");
 
 mkdirSync(RAILS_HOME, { recursive: true });
+mkdirSync(SKILLS_DIR, { recursive: true });
 
 interface ConfigFile {
   token: string;

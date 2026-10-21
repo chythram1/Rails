@@ -11,6 +11,8 @@ import { onOwnersChanged } from "./owners.ts";
 import { onDecisionsChanged } from "./decisions.ts";
 import { onModelsChanged, onSignIn } from "./models.ts";
 import { getProfile, onProfileChanged } from "./profile.ts";
+import { onAgentProfilesChanged } from "./agentProfiles.ts";
+import { onSavedPromptsChanged } from "./savedPrompts.ts";
 import { onActivity, onTyping } from "./runs.ts";
 import { onSprocketsChanged } from "./sprockets.ts";
 import * as tmux from "./tmux.ts";
@@ -36,6 +38,8 @@ export class TerminalHub {
     onDecisionsChanged(() => this.broadcast({ type: "decisions.changed" }));
     onSignIn((signIn) => this.broadcast({ type: "models.signIn", signIn }));
     onProfileChanged((profile) => this.broadcast({ type: "profile.changed", profile }));
+    onAgentProfilesChanged(() => this.broadcast({ type: "customize.changed" }));
+    onSavedPromptsChanged(() => this.broadcast({ type: "customize.changed" }));
     onAttention((list) => this.broadcast({ type: "panels.attention", panels: list }));
     onOverlaps((overlaps) => this.broadcast({ type: "panels.overlaps", overlaps }));
   }

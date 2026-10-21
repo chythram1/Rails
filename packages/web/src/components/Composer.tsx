@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { IconArrowUp as ArrowUp } from "@tabler/icons-react";
 
 interface Props {
@@ -10,11 +10,19 @@ interface Props {
   /** One line with the send button beside the text (chat threads), instead of the tall home box. */
   compact?: boolean;
   children?: ReactNode; // controls shown in the bottom row (selectors)
+  /** Put this text in the box (a saved prompt), replacing what's there. A new object each time. */
+  fill?: { text: string };
 }
 
-export function Composer({ placeholder, onSubmit, disabled, disabledReason, autoFocus, compact, children }: Props) {
+export function Composer({ placeholder, onSubmit, disabled, disabledReason, autoFocus, compact, children, fill }: Props) {
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!fill) return;
+    setText(fill.text);
+    ref.current?.focus();
+  }, [fill]);
 
   useLayoutEffect(() => {
     const el = ref.current;

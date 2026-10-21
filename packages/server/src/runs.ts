@@ -11,6 +11,7 @@ import { stepText, summarize, type Capability } from "./harness/capabilities.ts"
 import { codemodeTool, type CallRecord } from "./harness/codemode.ts";
 import { CORE_MEMORY_MAX, memoryCapability } from "./harness/memory.ts";
 import { projectCapabilities } from "./harness/project.ts";
+import { promptsCapability } from "./harness/prompts.ts";
 import { replyCapabilities } from "./harness/reply.ts";
 import { findModel, models } from "./models.ts";
 import { projectOwners } from "./owners.ts";
@@ -149,6 +150,7 @@ async function run(id: string) {
   const made: string[] = [];
   const capabilities = [
     memoryCapability(changed),
+    promptsCapability,
     ...(project ? projectCapabilities : []),
     ...(project && s.coordinator ? replyCapabilities(s.rules, (sid) => made.push(sid)) : []),
   ];

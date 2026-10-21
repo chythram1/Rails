@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "../api.ts";
+import { api, Unauthorized } from "../api.ts";
 
 export function Login({ onDone }: { onDone: () => void }) {
   const [token, setToken] = useState("");
@@ -9,8 +9,13 @@ export function Login({ onDone }: { onDone: () => void }) {
     try {
       await api.login(token.trim());
       onDone();
-    } catch {
-      setError("That token didn't work. Check the server log or ~/.rails/config.json.");
+    } catch (err) {
+      // Only a 401 means the token is wrong; show anything else (server down, cross-origin) as is.
+      setError(
+        err instanceof Unauthorized
+          ? "That token didn't work. Use the one in the server's startup log (make token prints it)."
+          : (err as Error).message,
+      );
     }
   };
   return (

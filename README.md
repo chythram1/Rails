@@ -37,6 +37,10 @@ Status:
 - Sprockets (ADR 0005, 0006): always-on agent characters that reply on your own model provider (API key
   or "Continue with ChatGPT"), attach to a project, follow a short description you write and see what every session
   in the project is doing (ADR 0007)
+- Agent profiles in Customize (ADR 0018): saved ways to start Claude Code (model, effort, instructions, permission
+  mode, tools, MCP servers and skills), picked from the `+` menu or on Home, with one default per agent; resuming a
+  session reapplies its profile
+- Saved prompts in Customize (ADR 0018), filled into Home's composer and Sprocket chats
 - A red dot when an agent needs you (a permission, a question) or its turn failed, and an amber mark when
   two sessions change the same files (ADR 0014)
 
