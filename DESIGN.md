@@ -487,7 +487,7 @@ Square by default (`rounded.none`): fields, buttons, icon buttons, menus and the
 
 ### Home and the composer
 - **Home:** an Eyebrow ("NEW CHAT") over the Display XL headline, then the composer, then "Add project" (a default button), all on the column's left edge.
-- **Composer** (`components/Composer.tsx`): a square box, like an editor, (`--field`, 1px `--border-strong`, `--border-focus` while focused) with the text on top and a 44px footer on a rule: the plain dropdowns, each with a rule on its right, and the send block at the right end (52px wide, a rule on its left, the Ink Button's colors; `--surface-2` with a muted arrow while there's nothing to send). The compact composer (chats) is one row: the text, then a 44px send block.
+- **Composer** (`components/Composer.tsx`): a square box, like an editor, (`--field`, 1px `--border-strong`, `--border-focus` while focused) with the text on top and a 44px footer on a rule: the plain dropdowns, each with a rule on its right, then the saved prompts (a 44px icon block, ruled the same way, opening a menu of them), and the send block at the right end (52px wide, a rule on its left, the Ink Button's colors; `--surface-2` with a muted arrow while there's nothing to send). The compact composer (chats) is one row: the text, then the saved prompts' 44px block and a 44px send block, each with a rule on its left.
 
 ### Chat (Sprockets)
 - The composer is 12px wider than the message column on each side, so its edges sit outside the text instead of on the edge where replies start and the user's bubbles end.
