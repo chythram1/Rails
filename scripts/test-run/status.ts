@@ -98,10 +98,11 @@ export function status(state: RunState, { lines = 4, advance = true } = {}): Sta
  * Look every 10 s until something needs the user, or `maxSec` passes. Every agent being idle only counts after
  * the first 15 s (a prompt just typed hasn't reached Rails yet). Prints the last look and everything new.
  */
-export async function watch(state: RunState, maxSec: number): Promise<string> {
+export async function watch(state: RunState, maxSec: number, tick?: () => Promise<void>): Promise<string> {
   const started = Date.now();
   const news: string[] = [];
   for (;;) {
+    await tick?.().catch(() => {});
     const s = status(state);
     news.push(...s.news);
     const now = Date.now();

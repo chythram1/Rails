@@ -39,6 +39,8 @@ export interface RunConfig {
   decisionModel?: string | null;
   sprocket: { name: string; model?: string; description?: string; rules?: string[] };
   agents: AgentConfig[];
+  /** Name each agent's session in Rails after the agent ("engine"), as a user would (ADR 0019). */
+  nameSessions?: boolean;
 }
 
 export interface RunState {
