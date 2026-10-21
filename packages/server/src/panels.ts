@@ -8,6 +8,7 @@ import { bridgeFlags } from "./bridge/wiring.ts";
 import { ServiceError } from "./errors.ts";
 import { getProject } from "./projects.ts";
 import { discovery, findSession, installed } from "./providers/index.ts";
+import { sessionName } from "./titles.ts";
 import * as tmux from "./tmux.ts";
 import { listeners } from "./util.ts";
 
@@ -58,6 +59,8 @@ function newCommand(kind: PanelKind, prompt: string | undefined): { argv: string
 const panelChanges = listeners<[projectId: string]>();
 export const onPanelsChanged = panelChanges.on;
 const changed = panelChanges.emit;
+/** For a session renamed (names.ts): browsers reload the panels and sessions, and so their titles. */
+export const panelsChanged = changed;
 
 /**
  * Codex picks a new session's id itself; the bridge learns it from Codex's daemon (bridge/codex.ts). It may move a
@@ -92,7 +95,10 @@ export async function getWorkspace(projectId: string): Promise<Workspace> {
   const running = await tmux.runningPanels();
   const list: Panel[] = [];
   for (const p of panels.list(projectId)) {
-    if (running.has(p.id)) list.push(p);
+    if (running.has(p.id)) {
+      const name = sessionName(p);
+      list.push(name ? { ...p, name } : p);
+    }
     else await removePanel(p);
   }
   return { panels: list, layout: layouts.get(projectId) };

@@ -10,6 +10,7 @@ import { panels, sessionEvents } from "../db.ts";
 import { isSecretPath, readProjectFile, READ_MAX_LINES, SEARCH_MAX_MATCHES, searchProject, withoutSecrets } from "../files.ts";
 import { gitDiff, gitDiffAll, gitLog, gitShow, gitStatus } from "../git.ts";
 import { conversation, findSession, sessionsFor } from "../providers/index.ts";
+import { sessionName } from "../titles.ts";
 import { listOf, type Capability, type RunContext } from "./capabilities.ts";
 
 const ACTIVITY = 25;
@@ -61,13 +62,13 @@ const project = (ctx: RunContext): Project => {
   return ctx.project;
 };
 
-/** The project's open agent panels, titled like the sidebar: by their session's title when discovery knows it. */
+/** The project's open agent panels, titled like the sidebar: by their name, else their session's title when discovery knows it. */
 async function openSessions(p: Project) {
   const titles = new Map((await sessionsFor(p.path).catch(() => [])).map((s) => [s.id, s.title]));
   return panels
     .list(p.id)
     .filter((panel) => panel.kind !== "shell")
-    .map((panel) => ({ ...panel, title: (panel.sessionId && titles.get(panel.sessionId)) || panel.title }));
+    .map((panel) => ({ ...panel, title: sessionName(panel) || (panel.sessionId && titles.get(panel.sessionId)) || panel.title }));
 }
 
 /** A session's transcript, if discovery has found it. */

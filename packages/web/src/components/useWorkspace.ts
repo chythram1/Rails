@@ -47,7 +47,7 @@ export function useWorkspace(projectId: string) {
   );
 
   const title = useCallback(
-    (p: Panel) => sessions[projectId]?.find((s) => s.id === p.sessionId)?.title ?? p.title,
+    (p: Panel) => p.name ?? sessions[projectId]?.find((s) => s.id === p.sessionId)?.title ?? p.title,
     [sessions, projectId],
   );
 

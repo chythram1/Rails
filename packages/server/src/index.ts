@@ -17,6 +17,7 @@ import { loadAttention, receive, tokenOk as bridgeTokenOk } from "./bridge/index
 import { panels, projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
 import type { OpenPanel, SprocketInput, SprocketSettings } from "@rails/shared";
+import { nameSession } from "./names.ts";
 import { closePanel, getWorkspace, openPanel, saveLayout } from "./panels.ts";
 import { ServiceError } from "./errors.ts";
 import { attachPickedFolder, attachProject, detachProject, getProject, listProjectSessions, recentFolders } from "./projects.ts";
@@ -169,6 +170,10 @@ app.post("/api/projects/pick", async (c) => c.json({ project: await attachPicked
 
 app.get("/api/projects/:id/sessions", async (c) =>
   c.json(await listProjectSessions(c.req.param("id"))),
+);
+
+app.put("/api/projects/:id/sessions/:key/name", async (c) =>
+  c.json(await nameSession(c.req.param("id"), c.req.param("key"), (await c.req.json<{ name?: unknown }>()).name)),
 );
 
 // ---- workspace: terminal panels (ADR 0003) ----

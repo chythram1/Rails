@@ -32,6 +32,9 @@ packages/
    session p-<panelId> ──▶ `claude --resume <id>` | `pi --session <id>` | `codex resume <id>` | $SHELL -l
 ```
 
+- **Titles:** a session shows the name the user gave it in Rails (ADR 0019, `names.ts`), else the agent's own title
+  (Claude Code's `custom-title` or `ai-title`, pi's `/name`, Codex's thread name in `session_index.jsonl`), else its
+  first prompt. `sessionTitle` in `titles.ts` is the one place that decides.
 - **History** lives in provider transcripts. Rails reads them for discovery (titles, dates, the sidebar)
   and, when a Sprocket asks, the end of one transcript (`session_conversation`, at most its last 1 MB). The
   agents write their own transcripts while they run in panels.
@@ -131,7 +134,7 @@ packages/
 | --- | --- | --- |
 | claude | ✅ `~/.claude/projects/*/*.jsonl` | ✅ `claude --session-id <uuid> [-- prompt]` / `claude --resume <id>` |
 | pi | ✅ `~/.pi/agent/sessions/*/*.jsonl` | ✅ `pi --session-id <uuid> [-- prompt]` / `pi --session <id>` |
-| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl` (checked with Codex 0.163) | ✅ `codex [-- prompt]` / `codex resume <id>`; a new panel learns its session id from Codex's daemon (ADR 0007) |
+| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl`, names from `~/.codex/session_index.jsonl` (checked with Codex 0.163) | ✅ `codex [-- prompt]` / `codex resume <id>`; a new panel learns its session id from Codex's daemon (ADR 0007) |
 
 Every provider panel reports to the bridge (ADR 0007): Claude Code through hooks, pi through the Rails
 extension, Codex through its app-server daemon. Edits count for overlaps (ADR 0014) once they worked: Claude

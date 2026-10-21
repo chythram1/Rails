@@ -11,6 +11,7 @@ import { Logo } from "./Logo.tsx";
 import { MenuButton } from "./Menu.tsx";
 import { PanelMenu } from "./PanelMenu.tsx";
 import { ProviderIcon } from "./ProviderIcon.tsx";
+import { RenameSession } from "./RenameSession.tsx";
 import { useOpenSettings } from "./settings/context.ts";
 
 const PAGE = 5;
@@ -252,14 +253,36 @@ function NavItem({ href, icon, label, rail, className }: { href: string; icon: R
  * red = it needs you (waiting for a permission or answer, or its turn failed).
  */
 function SessionRow({ s, projectId, active, busy, attention }: { s: SessionSummary; projectId: string; active: boolean; busy: boolean; attention?: AttentionReason }) {
+  const [renaming, setRenaming] = useState(false);
+  const link = useRef<HTMLAnchorElement>(null);
   const state = attention ? "attention" : busy ? "busy" : s.panelId ? "live" : "idle";
   const label = attention === "waiting" ? "needs you" : attention === "failed" ? "failed" : busy ? "working" : s.panelId ? "open in a panel" : undefined;
   return (
-    <a className={"session-row" + (active ? " active" : "")} href={href.session(projectId, s.key)} title={s.title}>
-      <span className={"dot " + state} role={label ? "img" : undefined} aria-label={label} />
-      <span className="truncate grow">{s.title}</span>
-      <ProviderIcon provider={s.provider} />
-      <span className="muted small session-time">{timeAgo(s.updatedAt)}</span>
-    </a>
+    // The menu sits over the time (which it hides while shown), outside the link: a button can't go in a link.
+    <div className="session-item">
+      <a ref={link} className={"session-row" + (active ? " active" : "")} href={href.session(projectId, s.key)} title={s.agentTitle ? `${s.title} (${s.agentTitle})` : s.title}>
+        <span className={"dot " + state} role={label ? "img" : undefined} aria-label={label} />
+        <span className="truncate grow">{s.title}</span>
+        <ProviderIcon provider={s.provider} />
+        <span className="muted small session-time">{timeAgo(s.updatedAt)}</span>
+      </a>
+      <span className="row-actions">
+        <MenuButton
+          label={`${s.title} actions`}
+          title="More"
+          icon={<EllipsisVertical size={16} />}
+          className="reveal"
+          align="right"
+          items={[{ label: "Rename…", shortcut: "r", onSelect: () => setRenaming(true) }]}
+        />
+      </span>
+      {renaming && (
+        <RenameSession
+          renaming={{ projectId, key: s.key, name: s.agentTitle ? s.title : undefined, agentTitle: s.agentTitle ?? s.title }}
+          onClose={() => setRenaming(false)}
+          returnFocus={() => link.current}
+        />
+      )}
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { sessionKey, type Project, type RecentFolder, type SessionSummary } from "@rails/shared";
-import { layouts, panels, projects } from "./db.ts";
+import { layouts, panels, projects, sessionNames } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { detachFromProject } from "./sprockets.ts";
 import { pickFolder } from "./picker.ts";
@@ -69,14 +69,18 @@ export async function listProjectSessions(projectId: string): Promise<SessionSum
   const project = getProject(projectId);
   const panelBySession = new Map(panels.list(projectId).map((p) => [p.sessionId, p.id]));
   const found = await sessionsFor(project.path);
-  return found.map((s) => ({
-    key: sessionKey(s.provider, s.id),
-    provider: s.provider,
-    id: s.id,
-    cwd: s.cwd,
-    title: s.title,
-    createdAt: s.createdAt,
-    updatedAt: s.updatedAt,
-    panelId: panelBySession.get(s.id),
-  }));
+  return found.map((s) => {
+    const name = sessionNames.get(s.provider, s.id);
+    return {
+      key: sessionKey(s.provider, s.id),
+      provider: s.provider,
+      id: s.id,
+      cwd: s.cwd,
+      title: name ?? s.title,
+      ...(name ? { agentTitle: s.title } : {}),
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt,
+      panelId: panelBySession.get(s.id),
+    };
+  });
 }

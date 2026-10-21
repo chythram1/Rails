@@ -19,6 +19,7 @@ import { shortTitle } from "../util.ts";
 import { SidePanel, type SideView } from "./SidePanel.tsx";
 import { useSprockets } from "./sprockets/useSprockets.ts";
 import { PanelIcon, PanelMenu } from "./PanelMenu.tsx";
+import { RenameSession, type Renaming } from "./RenameSession.tsx";
 import { onTabKeys } from "./tabKeys.ts";
 import { TerminalView } from "./TerminalView.tsx";
 import { useWorkspace, type WorkspaceState } from "./useWorkspace.ts";
@@ -267,11 +268,21 @@ function OverlapMark({ panelId }: { panelId: string }) {
 
 function PanelTab(props: IDockviewPanelHeaderProps) {
   const ws = useWs();
+  const { sessions } = useStore();
   const panel = usePanel(props.api.id);
+  const [renaming, setRenaming] = useState<Renaming>();
   if (!panel) return null;
   const title = ws.title(panel);
+  // Double-clicking an agent's tab renames its session (also in the session's menu in the sidebar).
+  const rename = () => {
+    // A double-click inside the open dialog reaches here too: React passes events up through its portal.
+    if (renaming || panel.kind === "shell" || !panel.sessionId) return;
+    const s = sessions[panel.projectId]?.find((x) => x.id === panel.sessionId);
+    setRenaming({ projectId: panel.projectId, key: sessionKey(panel.kind, panel.sessionId), name: panel.name, agentTitle: s?.agentTitle ?? s?.title ?? panel.title });
+  };
   return (
-    <div className="panel-tab" title={title}>
+    <div className="panel-tab" title={title} onDoubleClick={rename}>
+      {renaming && <RenameSession renaming={renaming} onClose={() => setRenaming(undefined)} />}
       <PanelIcon kind={panel.kind} />
       <span className="truncate">{title}</span>
       <OverlapMark panelId={panel.id} />

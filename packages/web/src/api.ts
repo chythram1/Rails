@@ -10,6 +10,7 @@ import type {
   ProviderInfo,
   RecentFolder,
   ServerInfo,
+  SessionKey,
   SessionSummary,
   Suggestion,
   SignIn,
@@ -72,6 +73,9 @@ export const api = {
   pickProject: () => req<{ project: Project | null }>("/api/projects/pick", { method: "POST" }),
   removeProject: (id: string) => req("/api/projects/" + enc(id), { method: "DELETE" }),
   sessions: (projectId: string) => req<SessionSummary[]>(`/api/projects/${enc(projectId)}/sessions`),
+  /** Name a session in Rails; an empty name clears it (names.ts). */
+  nameSession: (projectId: string, key: SessionKey, name: string) =>
+    req<{ title: string }>(`/api/projects/${enc(projectId)}/sessions/${enc(key)}/name`, { method: "PUT", body: JSON.stringify({ name }) }),
   workspace: (projectId: string) => req<Workspace>(`/api/projects/${enc(projectId)}/workspace`),
   openPanel: (projectId: string, body: OpenPanel) =>
     req<Panel>(`/api/projects/${enc(projectId)}/panels`, { method: "POST", body: JSON.stringify(body) }),

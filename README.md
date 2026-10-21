@@ -41,6 +41,8 @@ Status:
   two sessions change the same files (ADR 0014)
 - Agent tools (ADR 0018): Claude Code and pi sessions can see what the other sessions in their project are doing,
   and draft messages for them, which you read and send
+- Session names (ADR 0019): rename a session from its menu in the sidebar or by double-clicking its tab, and
+  Rails, the Coordinator and the agents call it by that name
 
 Docs: [architecture](docs/architecture.md) · [glossary](docs/CONTEXT.md) · [decisions](docs/adr) · [provider formats](docs/providers.md) · [roadmap](docs/roadmap.md)
 

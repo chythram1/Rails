@@ -351,7 +351,7 @@ Each token has a dark and a light value (front matter: `bg` and `light-bg`). Dar
 - **Surface** (`--surface`): menus and popovers (their edge sets them apart).
 - **Surface 2** (`--surface-2`): the selected row, the current page in the nav, user chat bubbles, gallery cards, insets.
 - **Hover** (`--hover`): hover on actions: menu items, buttons, icon buttons, files.
-- **Dialog** (`--dialog`): Settings and the avatar picker (black on dark).
+- **Dialog** (`--dialog`): Settings, the avatar picker and Rename session (black on dark).
 - **Field** (`--field`) and **Button** (`--btn`): the fill of inputs and of default buttons.
 - **Rule** (`--border`): between regions and rows. **Edge** (`--border-strong`): floating layers, cards, buttons, the composer. **Field Edge** (`--border-field`): inputs. **Field Focus** (`--border-focus`): a field's edge while focused or open.
 - **Ink** (`--text`), **Soft Ink** (`--text-2`, navigation, field labels, inactive tabs) and **Muted** (`--muted`, secondary text and every placeholder).
@@ -417,7 +417,7 @@ Depth comes from rules and tone, not shadow: regions are divided by 1px `--borde
 
 ### Shadow Vocabulary
 - **Popover** (`--shadow-pop`: `0 12px 32px rgb(0 0 0 / 0.5)` dark, `0 8px 24px rgb(0 0 0 / 0.08)` light): menus, dropdown lists, dialogs, the jump button, the Sprocket settings panel when it lies over the chat.
-- **Backdrop:** `rgb(0 0 0 / 0.5)` behind Settings and the mobile drawer, `0.4` behind the avatar picker.
+- **Backdrop:** `rgb(0 0 0 / 0.5)` behind Settings and the mobile drawer, `0.4` behind the avatar picker and Rename session.
 
 **The Edge Rule.** A floating layer always has its 1px edge as well as its shadow; nothing in the page flow gets a shadow.
 
@@ -470,12 +470,13 @@ Square by default (`rounded.none`): fields, buttons, icon buttons, menus and the
 
 ### Navigation
 - **Sidebar:** the logo (below) and the RAILS wordmark, then 38px nav items with 18px icons and `--text-2` labels. The current page gets `--surface-2`; hover is `--tint` with `--tint-ink`, so a hovered row never looks selected, and the current page keeps its gray under the pointer (it's where you are, not somewhere to go). The same holds for the open session, the shown Settings section and the open Sprocket. "PROJECTS" in Caps.
-- **Session rows:** status dot, title, provider logo, time (tabular). Dot colors: `--idle`, green live, amber working, red needs you, each with an `aria-label`.
+- **Session rows:** status dot, title, provider logo, time (tabular). Dot colors: `--idle`, green live, amber working, red needs you, each with an `aria-label`. A row's ⋮ menu ("Rename…") takes the time's place on hover or keyboard focus, like a project row's; on touch screens it's always there, after the time. A named session's tooltip adds the agent's title in brackets.
 - **Account row:** the profile's 28px avatar and name (500) with a chevron; an amber dot and "· Reconnecting…" only while the connection is down.
 
 ### Dialogs
 - Native `<dialog>` (focus trap, Escape, inert page), `--dialog`, square, a 1px `--border-strong` edge and the Popover shadow. Escape and a backdrop click close only the topmost dialog.
 - **Settings:** the left column starts with "× SETTINGS" (the close button and an Eyebrow), then the search field, then a tab per section (General, Providers, Models, Account) with a 17px icon: 6px rows, the chosen one `--surface-2` and 500. The right column starts with the section's title (Headline), then groups: a Caps heading on a rule, then rows. On phones it fills the screen: "× SETTINGS", search, then a single row of text-only tabs. A setting that needs another section links to it ("Connect a provider"), and focus moves to that section's tab.
+- **Rename session** (`RenameSession.tsx`, ADR 0019): the avatar picker's frame at 440px: the title, one muted line, one field (filled and selected; the agent's title as its placeholder), an error under it, then Cancel and Save. Enter saves, Escape cancels, and focus goes back to the session's row.
 - **Settings rows:** what it is (and why) on the left, the control on the right, a rule between rows; rows wrap under each other on phones. A row reached from search is marked in `--tint` for a moment.
 
 ### Home and the composer
@@ -499,7 +500,7 @@ Square by default (`rounded.none`): fields, buttons, icon buttons, menus and the
 - **Jump to latest:** a 32px square button (`--surface`, 1px `--border-strong`, Popover shadow) floats centered above the composer while more than 80px of the messages are hidden below the view.
 
 ### Terminal panels
-- Dockview themed from the tokens (`.dockview-theme-dark`'s variables, mapped in `styles.css`, so it follows either theme): tab strips on `--sidebar` sitting on a rule, tabs split by rules, the shown tab a square of `--bg` with a 2px bar under it (`--tint-ink` in the pane that has focus, `--border-strong` in the others). Panes share dockview's own 1px rule; its 4px drag handle sits on it. The terminal under each tab is `--term-bg` in both themes. Tab close buttons show on hover or on the shown tab.
+- Dockview themed from the tokens (`.dockview-theme-dark`'s variables, mapped in `styles.css`, so it follows either theme): tab strips on `--sidebar` sitting on a rule, tabs split by rules, the shown tab a square of `--bg` with a 2px bar under it (`--tint-ink` in the pane that has focus, `--border-strong` in the others). Panes share dockview's own 1px rule; its 4px drag handle sits on it. The terminal under each tab is `--term-bg` in both themes. Tab close buttons show on hover or on the shown tab. Double-clicking an agent's tab renames its session.
 - **Tab marks:** a 7px red dot after the title when the session needs the user: it waits for a permission or an answer, its turn failed, or a Sprocket has a reply ready for it. Each has its `aria-label` ("Needs you", "Turn failed", "A reply is ready in Sprockets"). Before it, a 13px amber warning icon while another session changed the same files in the last 30 minutes (ADR 0014); its `aria-label` and tooltip name the other session and up to three files.
 - **Side panel** (`SidePanel.tsx`): 400px on `--bg` beside the panes, with a 1px `--border` edge; on phones it covers the screen. One 30px toggle (a panel icon) at the right end of the top-right pane's tab bar opens and closes it (`aria-pressed`, pressed while open); it carries a 7px red dot while a reply waits, and then opens on Sprockets, else on the last tab. The panel's header is the same 36px `--sidebar` strip as the tab bars: two ruled tabs, **Sprockets** (with the red dot while a reply waits) and **Git**, 13px/500, the chosen one `--bg` with the `--tint-ink` bar, and close. Under it a 40px bar for the tab: the project's Sprocket (20px character, 13px name, a red dot while a reply waits) and an "Open in Sprockets" ↗; or the branch and refresh. Every row of tabs takes the arrow keys, Home and End, and only its selected tab is in the Tab order (`tabKeys.ts`). Git lists files (a Space Mono status code in its state color, `--surface-2` when chosen) over the diff in 12px Space Mono.
 

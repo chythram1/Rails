@@ -98,7 +98,8 @@ for future ideas, which aren't commitments. Reference screenshots for the look a
 | `packages/server/src/tmux.ts` | Everything tmux: private socket and config in `RAILS_HOME`, start/kill sessions, which panels are still running, `attach()` in a node-pty PTY, the cleaned environment. |
 | `packages/server/src/terminals.ts` | `TerminalHub`: one tmux client per (browser, panel), streams `term.*` messages, removes panels whose process exited (`panelEnded`), broadcasts `panels.changed`. |
 | `packages/server/src/db.ts` | SQLite via `node:sqlite` (write-ahead logging): projects, panels, layouts, Sprockets and their state. |
-| `packages/server/src/titles.ts` | `sessionTitle(panel)`: a session's title as the user sees it. Depends only on the database and discovery, so any service can use it without an import cycle. |
+| `packages/server/src/names.ts` | Session names (ADR 0019): the name the user gives a session in Rails (`nameSession`; `session_names` in the DB), shown instead of the agent's title. The web side is `RenameSession.tsx`, opened from a sidebar row's menu or a tab's double-click. |
+| `packages/server/src/titles.ts` | `sessionTitle(panel)`: a session's title as the user sees it (its Rails name first). Depends only on the database and discovery, so any service can use it without an import cycle. |
 | `packages/server/src/git.ts` | Read-only git status and diff through the git CLI. |
 | `packages/server/src/providers/` | One discovery adapter per provider (`scan`: cwd, title, dates from the head/tail of each transcript). `index.ts` holds the registry and `installed()`. |
 | `packages/web/src/components/Workspace.tsx` | The workspace: dockview layout (`Dock`), tabs, `+` menu, the side panel's toggles, and the one-panel-at-a-time mobile view. Data comes from `useWorkspace.ts`. |

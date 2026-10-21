@@ -170,6 +170,14 @@ db.exec(`
     cost REAL NOT NULL
   );
   CREATE INDEX IF NOT EXISTS sprocket_usage_by_sprocket ON sprocket_usage (sprocket_id);
+  -- The names the user gave sessions in Rails (names.ts), by session, so they outlive the panels.
+  CREATE TABLE IF NOT EXISTS session_names (
+    provider TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (provider, session_id)
+  );
 `);
 /** On a judgment: 1 when it woke the Coordinator itself (ADR 0013). */
 addColumn("decisions", "acted", "INTEGER NOT NULL DEFAULT 0");
@@ -725,6 +733,24 @@ export const handoffs = {
 };
 
 /** Which files or folders sessions own (ADR 0016). */
+/** The names the user gave sessions in Rails. */
+export const sessionNames = {
+  get(provider: string, sessionId: string): string | undefined {
+    return (db.prepare("SELECT name FROM session_names WHERE provider = ? AND session_id = ?").get(provider, sessionId) as { name: string } | undefined)?.name;
+  },
+  set(provider: string, sessionId: string, name: string): void {
+    db.prepare("INSERT INTO session_names (provider, session_id, name, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT (provider, session_id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at").run(
+      provider,
+      sessionId,
+      name,
+      new Date().toISOString(),
+    );
+  },
+  clear(provider: string, sessionId: string): void {
+    db.prepare("DELETE FROM session_names WHERE provider = ? AND session_id = ?").run(provider, sessionId);
+  },
+};
+
 export const owners = {
   list(projectId: string): { panelId: string; path: string }[] {
     return (db.prepare("SELECT panel_id, path FROM owners WHERE project_id = ? ORDER BY created_at, rowid").all(projectId) as { panel_id: string; path: string }[]).map(

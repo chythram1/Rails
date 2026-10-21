@@ -52,12 +52,18 @@ export interface SessionSummary {
   provider: ProviderId;
   id: string;
   cwd: string;
+  /** What Rails shows: the name the user gave it in Rails, else the agent's title. */
   title: string;
+  /** The agent's own title, when a name the user gave it in Rails replaces it. */
+  agentTitle?: string;
   createdAt: string;
   updatedAt: string;
   /** Id of the panel this session is open in, if any. */
   panelId?: string;
 }
+
+/** The longest name the user can give a session in Rails (a tab's or the sidebar's width). */
+export const SESSION_NAME_MAX = 40;
 
 /** Why a panel needs the user (ADR 0007): its agent waits for a permission or an answer, or its turn failed. */
 export type AttentionReason = "waiting" | "failed";
@@ -83,6 +89,8 @@ export interface Panel {
   /** Provider session shown in this panel. Unknown for shells and for new Codex sessions. */
   sessionId?: string;
   title: string;
+  /** The name the user gave its session in Rails (in a workspace only): browsers show it instead of any title. */
+  name?: string;
   createdAt: string;
 }
 
@@ -472,7 +480,7 @@ export type ClientMsg =
 
 export type ServerMsg =
   | { type: "term.data"; panelId: string; attachId: number; data: string }
-  /** A project's panels changed: opened, closed, or ended on their own (possibly on another device). */
+  /** A project's panels changed: opened, closed, ended on their own (possibly on another device), or one of its sessions was renamed. */
   | { type: "panels.changed"; projectId: string }
   /** Every busy panel (its agent is thinking or replying), across all projects. Sent on connect and on change. */
   | { type: "panels.busy"; panelIds: string[] }
