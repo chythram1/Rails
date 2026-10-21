@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { roomToSeat, seatOnSend, seatTop, spacerHeight } from "./threadScroll.ts";
+import { keepInSight, roomToSeat, seatOnSend, seatTop, spacerHeight } from "./threadScroll.ts";
 
 describe("thread scrolling", () => {
   it("seats a sent message at the top unless over half the view is already empty below the messages", () => {
@@ -28,5 +28,12 @@ describe("thread scrolling", () => {
     expect(spacerHeight(page, 2600)).toBe(0); // and past it
     expect(spacerHeight(null, 2600)).toBe(0);
     expect(roomToSeat(100, { viewport: 600, contentEnd: 2000 })).toBe(0); // already enough content below
+  });
+
+  it("keeps new replies in sight without passing the newest's top", () => {
+    const g = { scrollTop: 100, viewport: 500, contentEnd: 900 };
+    expect(keepInSight(700, g)).toBe(400); // short newest: its end at the bottom
+    expect(keepInSight(300, g)).toBe(284); // long newest: its top (with the gap) at the top
+    expect(keepInSight(50, g)).toBe(100); // never back up
   });
 });

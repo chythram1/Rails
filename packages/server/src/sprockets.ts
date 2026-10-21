@@ -156,7 +156,7 @@ export function sendMessage(chatId: string, rawText: unknown): SprocketMessage {
   if (text.length > MAX_MESSAGE) throw new ServiceError(`Messages can be at most ${MAX_MESSAGE} characters.`, 400);
   const message = sprocketMessages.create(chatId, "user", text, userMessageTime(chatId));
   changed();
-  if (chat.kind === "team") startRound(chatId, text);
+  if (chat.kind === "team") startRound(chatId, text, message.id);
   else requestReply(chatId);
   return message;
 }

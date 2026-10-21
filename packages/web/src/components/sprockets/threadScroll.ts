@@ -5,9 +5,10 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "re
 // - Sending "seats" the new message at the top of the thread with room reserved below it for the reply,
 //   unless more than half the visible area is already empty below the conversation: then the reply has
 //   room where it is and nothing moves.
-// - The reserved room (a spacer after the messages) shrinks as the reply grows, so nothing jumps; a long
-//   reply streams on below the fold rather than dragging the view along. Once the room is out of view
-//   (the user scrolled up) and no reply is being written, it's dropped.
+// - The reserved room (a spacer after the messages) shrinks as replies come in, so nothing jumps. Once they
+//   outgrow it (a team's round, a long reply), the view moves on with each new one, never past the top of the
+//   newest, until the user scrolls themselves. Once the room is out of view (the user scrolled up) and no
+//   reply is being written, it's dropped.
 
 /** Positions in the thread's scroll coordinates. `contentEnd` is where the messages end (the spacer's top). */
 export interface ThreadGeo {
@@ -36,6 +37,9 @@ export const roomToSeat = (top: number, g: Pick<ThreadGeo, "viewport" | "content
 /** Space left above a seated message. */
 const GAP = 16;
 
+/** Where the view goes to keep new replies in sight: their end at the bottom, unless the newest begins above that. */
+export const keepInSight = (newestTop: number, g: ThreadGeo): number => Math.max(g.scrollTop, Math.min(g.contentEnd - g.viewport, newestTop - GAP));
+
 /** Where the view goes to seat a sent message at `sentTop`: just above it, or the very top for the chat's first
  *  message, so the line that says where the chat begins isn't cut off. */
 export const seatTop = (sentTop: number, first: boolean): number => (first ? 0 : Math.max(0, sentTop - GAP));
@@ -61,6 +65,8 @@ export function useThreadScroll(
   /** At the very bottom with nothing reserved: new messages keep the view there. Opening a chat starts so. */
   const following = useRef(true);
   const sending = useRef<"seat" | "stay" | null>(null);
+  /** Since the user's last send, until they scroll themselves: new replies are kept in sight. */
+  const tracking = useRef(false);
   /** A glide is moving the view (its scroll events aren't the user's). */
   const gliding = useRef(false);
   const stopGlide = useRef<() => void>(() => {});
@@ -133,6 +139,12 @@ export function useThreadScroll(
     sending.current = null;
     settle(geo()!, !sent); // measured again: seating may have just moved the view
     if (following.current) el.scrollTop = el.scrollHeight;
+    else if (tracking.current && !sent && !gliding.current) {
+      const now = geo()!;
+      const newest = [...el.querySelectorAll<HTMLElement>(".sp-message:not(.sp-watching)")].at(-1);
+      const top = keepInSight(newest?.offsetTop ?? now.contentEnd, now);
+      if (top > now.scrollTop + 1) glide(el, top);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, changes);
 
@@ -145,9 +157,18 @@ export function useThreadScroll(
       if (!gliding.current) following.current = !page.current && el.scrollHeight - el.clientHeight - el.scrollTop <= 2;
       settle(g);
     };
+    // The user scrolling themselves (not a glide) ends keeping replies in sight.
+    const own = () => (tracking.current = false);
+    const keys = (e: KeyboardEvent) => ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(e.key) && own();
     el.addEventListener("scroll", onScroll, { passive: true });
+    el.addEventListener("wheel", own, { passive: true });
+    el.addEventListener("touchmove", own, { passive: true });
+    el.addEventListener("keydown", keys);
     return () => {
       el.removeEventListener("scroll", onScroll);
+      el.removeEventListener("wheel", own);
+      el.removeEventListener("touchmove", own);
+      el.removeEventListener("keydown", keys);
       stopGlide.current();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -156,6 +177,7 @@ export function useThreadScroll(
   const onSend = () => {
     const g = geo();
     following.current = false;
+    tracking.current = true;
     if (!g) return;
     if (seatOnSend(g)) sending.current = "seat";
     else {

@@ -10,27 +10,56 @@ message, and how Sprockets keep from replying to each other without end.
 Decisions:
 - **A team** has a name and two to four Sprockets, attached to a project or not. The first is its **lead** (★).
   A Sprocket can be in any number of teams, and teams belong to no project. There can be any number of teams.
-- **Who answers.** The user's message goes to the lead, unless it @mentions members ("@Doc Keeper"): then they
-  answer, in the order they're mentioned. A reply that @mentions other members passes the turn to them, after it.
-  A Sprocket mentioning itself, or someone already waiting their turn, changes nothing. A mention is the member's
-  name after `@`, so two members of a team can't share a name.
+- **Who answers.** The user's message goes to the members it's for, in the order it names them:
+  - those it @mentions ("@Doc Keeper", or the start of just one member's name, "@Doc");
+  - without a mention, those the **decision model** (ADR 0012, Settings → Models) says it's for: one yes-or-no
+    question per member, with the team, the last 8 messages and the new one (it's for them if it names them,
+    speaks to everyone, follows up on what they said last, or asks about their role). Those at 0.6 or more
+    answer when the message asks several (names them, or everyone); otherwise only the likeliest, so two members
+    whose roles both fit don't say the same thing. If none reach 0.6, the likeliest. A first evaluation on Jev got 14 of 16 test messages right in about 0.1 s.
+    With a mention, the model may still add members the message clearly names without one ("@Doc and Scout,
+    …"). The user's message is in the team's chat at once; Rails says it's `routing` while the model judges
+    (at most 6 s);
+  - with no decision model, or when it fails: Rails' rules. The members it names, everyone when it says so
+    ("everyone", "all of you"), the member whose last reply asked the user something, or else the lead.
+  The user wanted the lead to read every message and decide; the decision model does that job in a tenth of a
+  second, where a run of the lead would take seconds and cost one more reply each time.
+- **Passing the turn.** A reply that @mentions other members, or asks one a question by name ("Pixel, what would
+  you ship?", "Agreed, Scout?", as models tend to write), passes the turn to them, after it. The lead has
+  priority: mentioned with others, or by a reply while others wait, it goes first. A team shows whose turns are
+  coming (`waiting`), so the chat can show them. A Sprocket mentioning itself, or someone already waiting their
+  turn, changes nothing. Two members of a team can't share a name.
+  Members are told to write @Name for every teammate they want an answer from (a question, a task, a hello that
+  expects one back), and a plain name only when they don't. Models forget to hand the turn back in a conversation
+  the user asked for ("talk about it for 8 turns"), so each member's run ends with a note from Rails (not saved):
+  the user's latest message, how many replies came since, and to end with an @mention and a question while what
+  the user asked for isn't done. Rails doesn't otherwise guess who a reply is for: a decision model once judged
+  that after every reply that passed the turn to no one, but the decision model is optional, and a rule the
+  members follow is simpler and the same with or without one.
 - **No endless replies.** Only the user starts a **round**: events never land in a team. A round ends when a
-  reply mentions nobody, or after 6 turns. Rails then says it paused, and the user's next message starts a new
+  reply mentions nobody, or after 10 turns (so an 8-turn conversation fits). Rails then says it paused, and the user's next message starts a new
   round. A new message from the user also replaces the turns still waiting in a round, once the reply being
   written is saved. A team has one reply going at a time, and the hourly limit per Sprocket (ADR 0006) counts
   every turn.
 - **Runs.** A member's run reads the team's last 40 messages: its own replies as its own, the user's as theirs,
-  and the other members' marked with their names. Only its own tool steps are replayed (ADR 0008). Its
-  instructions name the team and its members (the lead marked, the start of each one's description), and say how
-  mentions work and that Rails stops after 6 turns. A Sprocket answers one chat at a time (ADR 0021), so a member
+  and the other members' marked with their names in brackets (a reply that starts with its own name that way, as
+  models copy it, has it taken off). Only its own tool steps are replayed (ADR 0008). Its instructions name the
+  team and its members (the lead marked, the start of each one's description), say how Rails picks who answers,
+  to talk as one person in a group chat (its own role, not repeating the others), that only an @mention hands a
+  teammate the turn (and when to use one: asking, handing over work, a discussion the user asked for, not thanks
+  or relaying what the user already asked), and that Rails stops after 10 turns. The lead is told it takes what's
+  for the team in general and hands on what fits another member better. A Sprocket answers one chat at a time (ADR 0021), so a member
   busy elsewhere takes its turn when it's done.
 - **Tools** are those of the member's direct chat (ADR 0021): its project's board, files and git, `project_chat`,
   its memory and, for a Coordinator, drafts for its own project's sessions, shown under its message.
 - **Where they show.** The Sprockets page lists teams first, under a "Teams" heading: the members' characters
   overlapping, the name, and the last line with who wrote it. The list's New button (beside the search) makes a
-  Sprocket or a team: a dialog with the name and four member slots, the first one the lead's. The chat's `…` menu
-  edits the team, clears its chat (ADR 0021) or deletes it. Typing `@` in a team's composer suggests the members
-  whose names fit what follows it.
+  Sprocket or a team: a dialog with the name and four member slots, the first one the lead's. Once made, a team is
+  changed (name, members, lead) or deleted in its settings panel, as a Sprocket is; the chat's `…` menu clears its
+  chat (ADR 0021). Typing `@` in a team's composer suggests the members whose names fit what follows it, and
+  mentions of members read as chips. Each member's run of replies has its name over it and its face at its foot.
+  A member's face pops up at the bottom left once Rails knows it answers (never while Rails works out who), in
+  turn order, and the one writing turns into dots.
 - **Characters in the list stand still.** A team's row shows several faces, so a list of them blinking and bobbing
   is too busy; the gallery, the chats and the creator keep their motion.
 - **When Sprockets go.** Deleting a Sprocket takes it out of its teams. Its messages there stay, shown as a deleted
@@ -42,7 +71,11 @@ Decisions:
   `/api/chats/:id/messages`.
 
 Consequences:
-- One message to a team can cost up to 6 runs; the user sees each one as it's written.
+- One message to a team can cost up to 10 runs; the user sees each one once it's written.
+- With a decision model, a team's latest messages go to its provider as well as the model's; Settings → Models
+  says so.
+- Who answers the user is a judgment, so it can be wrong; an @mention always reaches who it names. A member that
+  forgets the @ ends the round; the user picks it up from there.
 - Sprockets pass work along by name, which the user can follow in the chat, rather than through a hidden tool.
 - A team can't wake on Rails' events or hold a Coordinator's events; those stay in project chats, which a member
   reads with `project_chat`.

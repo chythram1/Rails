@@ -93,7 +93,8 @@ describe("runs", () => {
     sendMessage(directChat(s.id), "did you check?");
     await idle();
     // The faux model gets the system prompt as a message of its own.
-    expect(seen).toEqual(["system", "user", "assistant", "toolResult: the board says: all idle", "assistant", "user"]);
+    // The last one is Rails' reminder of how to write (not saved).
+    expect(seen).toEqual(["system", "user", "assistant", "toolResult: the board says: all idle", "assistant", "user", "user"]);
   });
 
   it("doesn't let a run put back the store of a project the Sprocket left while it ran", async () => {

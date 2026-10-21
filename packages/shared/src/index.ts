@@ -309,6 +309,10 @@ export interface SprocketTeam extends SprocketChatInfo {
   members: string[];
   /** The member writing a reply there now, if one is. */
   replying?: string;
+  /** Members whose turns are coming in this round, in order (the lead goes first, ADR 0022). */
+  waiting: string[];
+  /** Rails is working out who the user's latest message is for (the decision model is judging it). */
+  routing?: boolean;
   createdAt: string;
 }
 
@@ -322,7 +326,45 @@ export interface SprocketTeamInput {
 export const TEAM_MEMBERS_MIN = 2;
 export const TEAM_MEMBERS_MAX = 4;
 /** Replies in a row, after one message from the user, before a team waits for them again (ADR 0022). */
-export const TEAM_TURNS_MAX = 6;
+export const TEAM_TURNS_MAX = 10;
+
+/** An @mention of a team member in a message (ADR 0022): where it is, and the member's index in the names given. */
+export interface MentionSpan {
+  start: number;
+  end: number;
+  member: number;
+}
+
+const WORD = /[\p{L}\p{N}_]/u;
+
+/**
+ * The @mentions of team members in `text`, in order: "@" and a member's whole name, in any case and not the start
+ * of a longer word (longer names first, so "@Doc Keeper" isn't "@Doc"), or the start of a word of just one member's
+ * name ("@Doc", "@keep", "@pix"; two letters at least). An "@" inside a word (an email address) isn't one.
+ */
+export function findMentions(text: string, names: string[]): MentionSpan[] {
+  const lower = text.toLowerCase();
+  const byLength = names.map((name, member) => ({ name: name.toLowerCase(), member })).sort((a, b) => b.name.length - a.name.length);
+  const found: MentionSpan[] = [];
+  for (let at = lower.indexOf("@"); at >= 0; at = lower.indexOf("@", at + 1)) {
+    if (at > 0 && WORD.test(text[at - 1])) continue;
+    const rest = lower.slice(at + 1);
+    const whole = byLength.find((n) => n.name && rest.startsWith(n.name) && !WORD.test(rest[n.name.length] ?? ""));
+    if (whole) {
+      found.push({ start: at, end: at + 1 + whole.name.length, member: whole.member });
+      at += whole.name.length;
+      continue;
+    }
+    const word = /^[\p{L}\p{N}_]{2,}/u.exec(rest)?.[0];
+    if (!word) continue;
+    const fits = byLength.filter((n) => n.name.split(/[^\p{L}\p{N}_]+/u).some((w) => w.startsWith(word)));
+    if (fits.length === 1) {
+      found.push({ start: at, end: at + 1 + word.length, member: fits[0].member });
+      at += word.length;
+    }
+  }
+  return found;
+}
 
 /** A session in a project and the files or folders it owns (relative to the project, ADR 0016). */
 export interface ProjectOwner {

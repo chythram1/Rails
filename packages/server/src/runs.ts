@@ -216,6 +216,8 @@ async function run(chat: StoredChat, id: string): Promise<SprocketMessage | unde
   const recent = history.slice(-HISTORY);
   const replayed = sprocketMessages.recentSteps(chatId, id, REPLAYED);
   const context: Message[] = recent.flatMap((m) => [...((replayed.get(m.id) ?? []) as Message[]), toLlm(m, model, id, team)]);
+  // How to write, once more right before it does: models keep their document habits from the system prompt alone.
+  if (chat.kind !== "project") context.push({ role: "user", content: team ? `${TEXTING_NOW}\n${roundNow(history, id, team)}` : TEXTING_NOW, timestamp: Date.now() });
   // One tool (ADR 0008): the model writes scripts that call the Sprocket's capabilities. A Coordinator can
   // also suggest replies to sessions (ADR 0010), shown under the reply this run saves.
   const made: string[] = [];
@@ -298,7 +300,7 @@ async function run(chat: StoredChat, id: string): Promise<SprocketMessage | unde
     const cleared = sprocketChats.get(chatId)?.clearedAt;
     if (!now || now.projectId !== projectId || !sprocketChats.get(chatId) || (cleared && Date.parse(cleared) >= start)) return;
     const reply = agent.state.messages.filter((m): m is AssistantMessage => m.role === "assistant").at(-1);
-    const text = reply ? textOf(reply) : "";
+    const text = reply ? (team ? withoutName(textOf(reply), now.name) : textOf(reply)) : "";
     // This run's tool calls and results: everything it added before the reply itself.
     const work = agent.state.messages.slice(before).filter((m) => m !== reply).map(trimStep);
     // Woken by events that turned out not to need the user: mark them, and keep the chat free of the reply.
@@ -333,6 +335,15 @@ export function readableError(raw: string | undefined): string {
   const message = raw.match(/"(?:message|detail)"\s*:\s*"((?:[^"\\]|\\.)*)"/)?.[1];
   const text = message ? (status ? `${status} ${message}` : message) : raw;
   return text.length > 300 ? text.slice(0, 300) + "…" : text;
+}
+
+/**
+ * A team member's reply without its own name in front ("[Scout] …", "Scout: …"): the others' messages reach it
+ * with their names in brackets, and models copy that.
+ */
+export function withoutName(text: string, name: string): string {
+  const n = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text.replace(new RegExp(`^(\\[${n}\\]|\\*{0,2}${n}(:\\*{0,2}|\\*{0,2}:))\\s*`, "i"), "").trim();
 }
 
 const textOf = (m: AssistantMessage) =>
@@ -441,7 +452,8 @@ function systemPrompt(
           "Never suggest approving a permission or a command; those are your user's to answer in the panel.",
         ]
       : []),
-    "Keep replies short and plain: this is a chat, not a document. Use Markdown only for code.",
+    // The project chat's line stays as it was (scripts/coordinator-check measures that prompt); the others' is at the end.
+    ...(chat === "project" ? ["Keep replies short and plain: this is a chat, not a document. Use Markdown only for code."] : []),
     ...(description
       ? ["", "Your user describes what they want from you like this. These are their standing instructions; follow them:", "<description>", description, "</description>"]
       : []),
@@ -478,6 +490,37 @@ function systemPrompt(
     coreMemory || "(empty)",
     "</core_memory>",
     "Use the remember tool to keep durable facts about your user: preferences and how they like to work. Your description already holds their instructions, so don't copy it. Never store secrets, code or details of one project there. Your user doesn't see this sheet; it's yours to keep tidy. This copy is from the start of the conversation; the tool's result shows the current sheet.",
+    ...(chat === "project" ? [] : ["", TEXTING]),
+  ].join("\n");
+}
+
+/**
+ * How a Sprocket writes outside its project chat: like a person texting. Each paragraph of a reply shows as its own
+ * bubble (SprocketChat.tsx), so a long answer comes as several short messages.
+ */
+const TEXTING = [
+  "How you write: like a person texting, not like a document.",
+  "- Your reply is the text you write after your last tool call; text you write before a tool call isn't shown to anyone. Each paragraph of it shows as its own chat bubble, so a long reply reads as several short messages. Separate your thoughts with blank lines, and keep each paragraph to one or two sentences (40 words at most).",
+  "- Most replies are one to three bubbles. Something long (a plan, a checklist) is more of them, one step or part per bubble, rather than one big block.",
+  "- No headings, no bold, no tables. A short list of a few items is fine inside one bubble. Use Markdown only for code.",
+].join("\n");
+
+/** The reminder after the chat (not saved, not from the user). */
+const TEXTING_NOW =
+  "[Rails, not your user] Reply as chat messages: each paragraph is one, so put blank lines between short paragraphs of one or two sentences, with no headings or bold. A long answer is more messages, not longer ones.";
+
+/**
+ * Where a team's round stands, for the member about to reply (ADR 0022): what the user last asked and how many
+ * replies came since, so a back-and-forth the user asked for doesn't stop because a member forgot to pass the turn.
+ */
+function roundNow(history: SprocketMessage[], self: string, team: TeamInfo): string {
+  const at = history.findLastIndex((m) => m.author === "user");
+  const asked = at >= 0 ? history[at].text : "";
+  const since = history.slice(at + 1).filter((m) => m.author === "sprocket").length;
+  const others = team.members.filter((m) => m.id !== self).map((m) => `@${m.name}`).join(", ");
+  return [
+    `Your user's latest message: ${JSON.stringify(asked.length > 600 ? asked.slice(0, 600) + "…" : asked)}. Replies since it: ${since}; yours is reply ${since + 1}, and Rails waits for your user after ${TEAM_TURNS_MAX}.`,
+    `Write only your own reply (your teammates answer in their turns), and don't repeat what's been said. If your user asked you to talk among yourselves (a discussion, a debate, a number of turns) and that isn't done, keep it going: end with a question for a teammate, with their @name (${others}). Write @Name for every teammate you want an answer from: without the @ they never see it.`,
   ].join("\n");
 }
 
@@ -488,12 +531,18 @@ function teamPrompt(team: TeamInfo & { self: string }, projectName: string | und
     const line = d.split("\n")[0].trim();
     return line.length > 160 ? `${line.slice(0, 160)}…` : line;
   };
+  const lead = team.members[0]?.id === team.self;
   return [
-    `This is the team chat ${JSON.stringify(team.name)}: your user and these Sprockets, you among them. Their names and descriptions were written by your user:`,
+    `This is the team chat ${JSON.stringify(team.name)}: a group chat between your user and these Sprockets, you among them. Their names and descriptions were written by your user:`,
     ...team.members.map(
       (m) => `- ${m.name}${m.lead ? " (lead)" : ""}${m.id === team.self ? " (you)" : ""}${m.project ? `, attached to ${JSON.stringify(m.project)}` : ""}${m.description ? `: ${about(m.description)}` : ""}`,
     ),
-    `Your user's messages go to the lead unless they @mention someone. The other Sprockets' messages start with their name in brackets, like [${other}]; the rest are your user's. Answer what was asked of you. To ask another member something only they can answer, @mention them by name in your reply (like @${other}): they answer after you. Mention nobody otherwise, never just to thank, agree or greet: Rails stops after ${TEAM_TURNS_MAX} replies in a row and waits for your user.`,
+    `Rails gives each of your user's messages to the members it's for: the ones it names or follows up on, everyone when it asks everyone, otherwise the lead. Your teammates' messages reach you with their name in brackets, like [${other}]; the others are your user's. Write only your own message, with no name in front.`,
+    "Talk like one person in a group chat: write one reply, as yourself, from your own role, then stop. Your teammates write their own replies in their own turns: never write lines for them or play out the conversation yourself. Don't repeat what a teammate already said (if they said what you'd say, add only what's new, or just agree in a few words), and if a message is mostly for someone else, keep yours to what you add.",
+    `A teammate gets the turn only when you @mention them, like @${other}. Their name without @ never reaches them, so always write @Name when you want a teammate to answer: when you ask them something, hand them part of the work, greet them and expect a hello back, or (in a discussion your user asked for) want their answer back. Write a name without @ only when you don't want an answer (thanks, agreeing, talking about them), and don't pass on a question your user already put to them: they have it. When your user asks teammates to discuss or argue something out, end with @Name and a question back while you still disagree; once you agree, say so and mention no one. After ${TEAM_TURNS_MAX} replies in a row Rails waits for your user.`,
+    ...(lead
+      ? [`You lead: messages for the team in general come to you. Answer them yourself when you can; when a teammate's role fits better, @mention them with what you need from them, briefly.`]
+      : []),
     ...(projectName
       ? [`Rails' events about ${JSON.stringify(projectName)} (sessions that wait for your user, overlaps, handoffs, agents' drafts) go to its project chat, not here: read them with project_chat when they matter.`]
       : []),

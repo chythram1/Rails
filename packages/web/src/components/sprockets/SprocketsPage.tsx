@@ -6,6 +6,7 @@ import { useStore } from "../../store.tsx";
 import { timeAgo } from "../../util.ts";
 import { MenuButton } from "../Menu.tsx";
 import { TeamDialog } from "./TeamDialog.tsx";
+import { TeamSettings } from "./TeamSettings.tsx";
 import { TeamFace } from "./TeamFace.tsx";
 import { Sprocket, VIEW } from "./Sprocket.tsx";
 import { SprocketChat } from "./SprocketChat.tsx";
@@ -33,8 +34,9 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
   // A filter for a heading that's gone (its last Sprocket moved or was deleted) shows everything again.
   const shownFilter = filter === "all" || (filter === "teams" ? chats.length > 0 : groupSprockets(list, projects).some((g) => g.key === filter)) ? filter : "all";
 
-  const current = route.id && route.view !== "team" ? list.find((s) => s.id === route.id) : undefined;
-  const team = route.view === "team" ? chats.find((g) => g.id === route.id) : undefined;
+  const onTeam = route.view === "team" || route.view === "teamSettings";
+  const current = route.id && !onTeam ? list.find((s) => s.id === route.id) : undefined;
+  const team = onTeam ? chats.find((g) => g.id === route.id) : undefined;
   const lead = team && list.find((s) => s.id === team.members[0]);
   const creating = route.view === "new" || (route.view === "list" && list.length === 0);
   let main;
@@ -56,11 +58,12 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
   } else if (team && lead) {
     main = (
       <div key={team.id} className="sp-detail">
-        <SprocketChat sprocket={lead} chat={team} panelOpen={false} team={{ info: team, all: list }} />
+        <SprocketChat sprocket={lead} chat={team} panelOpen={route.view === "teamSettings"} team={{ info: team, all: list }} />
+        {route.view === "teamSettings" && <TeamSettings team={team} all={list} />}
       </div>
     );
   } else if (route.id) {
-    main = <p className="sp-placeholder muted">This {route.view === "team" ? "team" : "one"} doesn't exist anymore. It may have been deleted on another device.</p>;
+    main = <p className="sp-placeholder muted">This {onTeam ? "team" : "one"} doesn't exist anymore. It may have been deleted on another device.</p>;
   } else {
     main = <Gallery list={list} />;
   }
