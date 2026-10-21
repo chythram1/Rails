@@ -213,7 +213,7 @@ describe("runs", () => {
       await reply(s.id, "look");
       expect(authors(s.id).at(-1)).toBe("sprocket: Done.");
       expect(ran).toBe(1); // the script's result is still there, once, and no failed reply in between
-      expect(sprocketMessages.recentSteps(directChat(s.id), 1).values().next().value?.filter((m: any) => m.role === "assistant" && m.stopReason === "error")).toEqual([]);
+      expect(sprocketMessages.recentSteps(directChat(s.id), s.id, 1).values().next().value?.filter((m: any) => m.role === "assistant" && m.stopReason === "error")).toEqual([]);
     });
 
     it("doesn't try again for a Sprocket deleted meanwhile", async () => {

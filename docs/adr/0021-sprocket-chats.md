@@ -1,6 +1,6 @@
 # ADR 0021: A direct chat per Sprocket, and a chat per project
 
-Status: accepted (changes the one chat of ADR 0005, 0006 and 0009; group chats come in a later ADR).
+Status: accepted (changes the one chat of ADR 0005, 0006 and 0009; group chats are ADR 0022).
 
 A Sprocket had one chat. For a Coordinator that chat held everything: what the user asked it, Rails' events
 (sessions that wait, overlaps, handoffs, agents' messages) and the suggestion cards under them. A question like
@@ -14,9 +14,9 @@ Decisions:
   can write in both. A later ADR adds **group chats** (several Sprockets with the user, many of them); the storage
   is built for that: chats are rows (`sprocket_chats`: id, kind, the Sprocket that answers, the project for a
   project chat, when it was last cleared), and messages carry their chat's id.
-- **Where they show.** The workspace's side panel shows the project chat. The Sprockets page lists, under each
-  project's heading, its project chat and then its Sprocket's direct chat; unattached Sprockets (General) have
-  their direct chat only.
+- **Where they show.** The workspace's side panel shows the project chat. The Sprockets page lists each Sprocket
+  once, under its project's heading; an attached one opens on its project chat, with its direct chat as a tab
+  beside it in the chat's header. Unattached Sprockets (General) have their direct chat only.
 - **Runs are per chat.** A run reads its own chat: its last 40 messages and the tool steps of its last 3 replies
   (ADR 0008), and its instructions say which chat it's in. A Sprocket answers one chat at a time, since its core
   memory and codemode store are shared; a request from another chat waits for the run to end. The hourly limit

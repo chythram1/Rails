@@ -175,7 +175,7 @@ export class World {
       attachment: !!s.attachment,
     }));
     const replies = after.filter((m) => m.author === "sprocket");
-    const steps = sprocketMessages.recentSteps(projectChat(this.coordinator.id), 3);
+    const steps = sprocketMessages.recentSteps(projectChat(this.coordinator.id), this.coordinator.id, 3);
     return {
       reply: replies.map((m) => m.text).join("\n\n"),
       activity: replies.map((m) => m.activity ?? "").filter(Boolean).join("; "),

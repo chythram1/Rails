@@ -1,10 +1,12 @@
-import { Fragment, useMemo, useState } from "react";
-import { IconChevronDown as ChevronDown, IconFilter as Filter, IconFolder as Folder, IconPlus as Plus, IconSearch as Search } from "@tabler/icons-react";
-import type { Project, Sprocket as SprocketData, SprocketChatInfo } from "@rails/shared";
+import { useMemo, useState } from "react";
+import { IconChevronDown as ChevronDown, IconEdit as Compose, IconFilter as Filter, IconPlus as Plus, IconSearch as Search, IconUsersPlus as UsersPlus } from "@tabler/icons-react";
+import type { Project, Sprocket as SprocketData, SprocketChatInfo, SprocketGroup } from "@rails/shared";
 import { href, navigate, type Route } from "../../router.ts";
 import { useStore } from "../../store.tsx";
 import { timeAgo } from "../../util.ts";
 import { MenuButton } from "../Menu.tsx";
+import { GroupDialog } from "./GroupDialog.tsx";
+import { GroupFace } from "./GroupFace.tsx";
 import { Sprocket, VIEW } from "./Sprocket.tsx";
 import { SprocketChat } from "./SprocketChat.tsx";
 import { SprocketCreator } from "./SprocketCreator.tsx";
@@ -16,20 +18,24 @@ type SprocketsRoute = Extract<Route, { name: "sprockets" }>;
 
 /**
  * Sprockets (ADR 0005): a list of the user's Sprockets beside the selected chat, or the creator. A Sprocket's own chat
- * opens from its row; an attached one's project chat (ADR 0021) from the row above it, under the project's heading.
- * On small screens only one of the two shows at a time.
+ * row opens its chats: an attached one's project chat (ADR 0021) first, with its direct chat a tab away. Group chats
+ * (ADR 0022) come first, under Groups. On small screens only one of the two shows at a time.
  */
 export function SprocketsPage({ route }: { route: SprocketsRoute }) {
-  const { list, error } = useSprockets();
+  const { list, groups: chats, error } = useSprockets();
   const { projects } = useStore();
-  /** Which group the list shows: all, a project's id, or "general" (unattached). */
+  /** Which part of the list shows: all, "groups" (group chats), a project's id, or "general" (unattached). */
   const [filter, setFilter] = useState("all");
+  /** The New group dialog (from the list's New menu). */
+  const [makingGroup, setMakingGroup] = useState(false);
 
   if (!list) return error ? <p className="error pad" role="alert">{error}</p> : null;
-  // A filter for a group that's gone (its last Sprocket moved or was deleted) shows everything again.
-  const shownFilter = filter === "all" || groupSprockets(list, projects).some((g) => g.key === filter) ? filter : "all";
+  // A filter for a heading that's gone (its last Sprocket moved or was deleted) shows everything again.
+  const shownFilter = filter === "all" || (filter === "groups" ? chats.length > 0 : groupSprockets(list, projects).some((g) => g.key === filter)) ? filter : "all";
 
-  const current = route.id ? list.find((s) => s.id === route.id) : undefined;
+  const current = route.id && route.view !== "group" ? list.find((s) => s.id === route.id) : undefined;
+  const group = route.view === "group" ? chats.find((g) => g.id === route.id) : undefined;
+  const lead = group && list.find((s) => s.id === group.members[0]);
   const creating = route.view === "new" || (route.view === "list" && list.length === 0);
   let main;
   if (creating) {
@@ -47,16 +53,39 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
         {panel && <SprocketSettings sprocket={current} all={list} onProjectChat={onProject} />}
       </div>
     );
+  } else if (group && lead) {
+    main = (
+      <div key={group.id} className="sp-detail">
+        <SprocketChat sprocket={lead} chat={group} panelOpen={false} group={{ info: group, all: list }} />
+      </div>
+    );
   } else if (route.id) {
-    main = <p className="sp-placeholder muted">This one doesn't exist anymore. It may have been deleted on another device.</p>;
+    main = <p className="sp-placeholder muted">This {route.view === "group" ? "group" : "one"} doesn't exist anymore. It may have been deleted on another device.</p>;
   } else {
     main = <Gallery list={list} />;
   }
 
   return (
     <div className={"sprockets " + (route.view === "list" && !creating ? "at-list" : "at-detail")}>
-      <SprocketList list={list} projects={projects} filter={shownFilter} onFilter={setFilter} activeId={route.id} activeProject={!!route.project} />
+      <SprocketList
+        list={list}
+        chats={chats}
+        projects={projects}
+        filter={shownFilter}
+        onFilter={setFilter}
+        onNewGroup={() => setMakingGroup(true)}
+        activeId={route.id}
+      />
       <section className="sp-main">{main}</section>
+      {makingGroup && (
+        <GroupDialog
+          all={list}
+          projects={projects}
+          onSaved={(g) => navigate(href.group(g.id))}
+          onClose={() => setMakingGroup(false)}
+          returnFocus={() => document.querySelector<HTMLElement>(".sp-new-btn")}
+        />
+      )}
     </div>
   );
 }
@@ -64,21 +93,36 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
 /**
  * The list column. Its header is a search field; under it, always there so
  * nothing shifts when a group appears, a filter menu named after what it shows: All Sprockets, each project with
- * Sprockets, General. Rows are grouped by project under small headings. New Sprockets are made from the gallery
- * (and, on phones, a row at the end of the list).
+ * Sprockets, General. Rows are grouped by project under small headings, after the group chats (ADR 0022): one row per
+ * Sprocket, one per group. The New button beside the search makes either. Characters here stand still: a list of
+ * faces moving at once is too busy, and a group's row has several.
  */
-function SprocketList(props: { list: SprocketData[]; projects: Project[]; filter: string; onFilter(key: string): void; activeId?: string; activeProject: boolean }) {
-  const { list, projects, filter, onFilter, activeId, activeProject } = props;
+function SprocketList(props: {
+  list: SprocketData[];
+  chats: SprocketGroup[];
+  projects: Project[];
+  filter: string;
+  onFilter(key: string): void;
+  onNewGroup(): void;
+  activeId?: string;
+}) {
+  const { list, chats, projects, filter, onFilter, onNewGroup, activeId } = props;
   const [query, setQuery] = useState("");
   const all = useMemo(() => groupSprockets(list, projects), [list, projects]);
+  const nameOf = (id: string) => list.find((s) => s.id === id)?.name;
+  const q = query.trim().toLowerCase();
+  const said = (c?: SprocketChatInfo) => !!c?.lastMessage?.text.toLowerCase().includes(q);
   const groups = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const said = (c?: SprocketChatInfo) => !!c?.lastMessage?.text.toLowerCase().includes(q);
     const projectName = (s: SprocketData) => projects.find((p) => p.id === s.projectId)?.name.toLowerCase() ?? "";
     const match = (s: SprocketData) => !q || s.name.toLowerCase().includes(q) || projectName(s).includes(q) || said(s.direct) || said(s.projectChat);
-    return groupSprockets(list.filter(match), projects, filter);
-  }, [list, projects, filter, query]);
-  const shownName = filter === "all" ? "All Sprockets" : all.find((g) => g.key === filter)?.title;
+    return filter === "groups" ? [] : groupSprockets(list.filter(match), projects, filter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list, projects, filter, q]);
+  // Group chats, the most recently active first.
+  const shownChats = (filter === "all" || filter === "groups" ? chats : [])
+    .filter((g) => !q || g.name.toLowerCase().includes(q) || g.members.some((m) => nameOf(m)?.toLowerCase().includes(q)) || said(g))
+    .sort((a, b) => (b.lastMessage?.createdAt ?? b.createdAt).localeCompare(a.lastMessage?.createdAt ?? a.createdAt));
+  const shownName = filter === "all" ? "All Sprockets" : filter === "groups" ? "Groups" : all.find((g) => g.key === filter)?.title;
   return (
     <aside className="sp-list" aria-labelledby="sp-list-title">
       <h1 id="sp-list-title" className="sr-only">Sprockets</h1>
@@ -87,6 +131,17 @@ function SprocketList(props: { list: SprocketData[]; projects: Project[]; filter
           <Search size={15} aria-hidden />
           <input type="search" placeholder="Search" aria-label="Search Sprockets" value={query} onChange={(e) => setQuery(e.target.value)} />
         </label>
+        <MenuButton
+          label="New"
+          title="New Sprocket or group"
+          icon={<Compose size={18} />}
+          className="sp-new-btn"
+          align="right"
+          items={[
+            { label: "New Sprocket", icon: <Plus size={16} />, onSelect: () => navigate(href.newSprocket()) },
+            { label: "New group", icon: <UsersPlus size={16} />, disabled: list.length < 2, note: list.length < 2 ? "Needs two Sprockets" : undefined, onSelect: onNewGroup },
+          ]}
+        />
       </div>
       <div className="sp-filter">
         <MenuButton
@@ -103,72 +158,80 @@ function SprocketList(props: { list: SprocketData[]; projects: Project[]; filter
           }
           items={[
             { label: "All Sprockets", checked: filter === "all", onSelect: () => onFilter("all") },
-            ...(all.length ? ["separator" as const] : []),
+            ...(all.length || chats.length ? ["separator" as const] : []),
+            ...(chats.length ? [{ label: "Groups", checked: filter === "groups", onSelect: () => onFilter("groups") }] : []),
             ...all.map((g) => ({ label: g.title, checked: filter === g.key, onSelect: () => onFilter(g.key) })),
           ]}
         />
       </div>
       {list.length === 0 ? (
         <p className="muted small pad">Your first one will show up here.</p>
-      ) : groups.length === 0 ? (
+      ) : groups.length === 0 && shownChats.length === 0 ? (
         <p className="muted small pad">No matches</p>
       ) : (
         <div className="sp-groups">
+          {shownChats.length > 0 && (
+            <section className="sp-group" aria-labelledby="sp-group-chats">
+              <h2 id="sp-group-chats" className="sp-group-title">Groups</h2>
+              <ul className="sp-rows">
+                {shownChats.map((g) => (
+                  <li key={g.id}>
+                    <GroupRow group={g} list={list} active={g.id === activeId} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {groups.map((g) => (
             <section key={g.key} className="sp-group" aria-labelledby={`sp-group-${g.key}`}>
               <h2 id={`sp-group-${g.key}`} className="sp-group-title truncate" title={g.title}>{g.title}</h2>
               <ul className="sp-rows">
                 {g.list.map((s) => (
-                  <Fragment key={s.id}>
-                    {s.projectChat && (
-                      <li>
-                        <ProjectChatRow sprocket={s} chat={s.projectChat} project={g.title} active={s.id === activeId && activeProject} />
-                      </li>
-                    )}
-                    <li>
-                      <SprocketRow sprocket={s} active={s.id === activeId && !(activeProject && s.projectChat)} />
-                    </li>
-                  </Fragment>
+                  <li key={s.id}>
+                    <SprocketRow sprocket={s} active={s.id === activeId} />
+                  </li>
                 ))}
               </ul>
             </section>
           ))}
-          <a className="sp-row sp-new-row" href={href.newSprocket()}>
-            <span className="sp-new-icon" aria-hidden>
-              <Plus size={18} />
-            </span>
-            New Sprocket
-          </a>
         </div>
       )}
     </aside>
   );
 }
 
-/** A Sprocket's own chat in the list, by its character and name. */
+/**
+ * A Sprocket in the list, by its character and name. It opens its project chat when it has one (ADR 0021), its
+ * direct chat otherwise; the line under its name is the newer of the two, and the dot shows replies waiting in either.
+ */
 function SprocketRow({ sprocket: s, active }: { sprocket: SprocketData; active: boolean }) {
+  const chats = [s.direct, ...(s.projectChat ? [s.projectChat] : [])];
+  const newest = chats.reduce((a, b) => ((b.lastMessage?.createdAt ?? "") > (a.lastMessage?.createdAt ?? "") ? b : a));
+  const shown: SprocketChatInfo = { ...newest, running: chats.some((c) => c.running), pending: chats.reduce((n, c) => n + c.pending, 0) };
   return (
-    <a className="sp-row" href={href.sprocket(s.id)} title={s.name} aria-current={active ? "page" : undefined}>
-      <Sprocket look={s.look} size={36} seed={s.id} />
-      <RowText name={s.name} chat={s.direct} />
+    <a className="sp-row" href={href.sprocket(s.id, !!s.projectChat)} title={s.name} aria-current={active ? "page" : undefined}>
+      <Sprocket look={s.look} size={36} seed={s.id} still />
+      <RowText name={s.name} chat={shown} />
     </a>
   );
 }
 
-/** A project's chat (ADR 0021), above its Sprocket's row: the project's folder and name, then the chat's last line. */
-function ProjectChatRow({ sprocket: s, chat, project, active }: { sprocket: SprocketData; chat: SprocketChatInfo; project: string; active: boolean }) {
+/** A group chat (ADR 0022): its members' characters (the lead in front), its name, and the last line with who wrote it. */
+function GroupRow({ group: g, list, active }: { group: SprocketGroup; list: SprocketData[]; active: boolean }) {
+  const members = g.members.flatMap((m) => list.find((s) => s.id === m) ?? []);
   return (
-    <a className="sp-row" href={href.sprocket(s.id, true)} title={`${project}'s chat with ${s.name}`} aria-current={active ? "page" : undefined}>
-      <span className="sp-chat-icon" aria-hidden>
-        <Folder size={18} />
-      </span>
-      <RowText name={project} chat={chat} />
+    <a className="sp-row" href={href.group(g.id)} title={`${g.name}: ${members.map((m) => m.name).join(", ")}`} aria-current={active ? "page" : undefined}>
+      <GroupFace looks={members} size={36} />
+      <RowText name={g.name} chat={g} nameOf={(id) => list.find((s) => s.id === id)?.name} />
     </a>
   );
 }
 
-/** A chat's name, when it was last active (nothing while it's empty, as after Clear), its last line and a dot while a reply waits. */
-function RowText({ name, chat }: { name: string; chat: SprocketChatInfo }) {
+/**
+ * A chat's name, when it was last active (nothing while it's empty, as after Clear), its last line and a dot while a
+ * reply waits. In a group, `nameOf` names who wrote the last line.
+ */
+function RowText({ name, chat, nameOf }: { name: string; chat: SprocketChatInfo; nameOf?(id: string): string | undefined }) {
   return (
     <span className="sp-row-text">
       <span className="sp-row-top">
@@ -176,7 +239,7 @@ function RowText({ name, chat }: { name: string; chat: SprocketChatInfo }) {
         {chat.lastMessage && <span className="muted small session-time">{timeAgo(chat.lastMessage.createdAt)}</span>}
       </span>
       <span className="sp-row-bottom">
-        <span className="muted small truncate">{preview(chat)}</span>
+        <span className="muted small truncate">{preview(chat, nameOf)}</span>
         {chat.pending > 0 && <span className="tab-attention" role="img" aria-label={chat.pending > 1 ? `${chat.pending} replies ready` : "A reply is ready"} />}
       </span>
     </span>
@@ -230,11 +293,12 @@ function NewArt() {
   );
 }
 
-/** The list's one-line preview of a chat. */
-function preview(chat: SprocketChatInfo): string {
+/** The list's one-line preview of a chat; in a group, `nameOf` names the member that wrote it. */
+function preview(chat: SprocketChatInfo, nameOf?: (id: string) => string | undefined): string {
   if (chat.running) return "Replying…";
   const m = chat.lastMessage;
   if (!m) return "No messages yet";
   if (m.event) return `${m.event.title}: ${m.event.questions?.[0]?.question ?? m.text}`;
-  return m.author === "user" ? `You: ${m.text}` : m.text;
+  if (m.author === "user") return `You: ${m.text}`;
+  return nameOf && m.author === "sprocket" ? `${nameOf(m.sprocketId) ?? "A deleted Sprocket"}: ${m.text}` : m.text;
 }

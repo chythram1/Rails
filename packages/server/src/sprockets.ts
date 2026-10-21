@@ -20,6 +20,7 @@ import {
 } from "@rails/shared";
 import { handoffs, projects, sprocketChats, sprocketMessages, sprockets, suggestions, usage, type StoredChat } from "./db.ts";
 import { ServiceError } from "./errors.ts";
+import { endRound, nameClash, onGroupsChanged, startRound } from "./groupChats.ts";
 import { settleHandoffs } from "./handoffs.ts";
 import { projectOwners } from "./owners.ts";
 import { findModel } from "./models.ts";
@@ -36,6 +37,7 @@ export const onSprocketsChanged = sprocketChanges.on;
 const changed = sprocketChanges.emit;
 onRunsChanged(changed);
 onSuggestionsChanged(changed);
+onGroupsChanged(changed);
 
 const isOneOf = <T extends string>(list: readonly T[], v: unknown): v is T => list.includes(v as T);
 
@@ -106,12 +108,14 @@ export function createSprocket(body: Partial<SprocketInput> | undefined): Sprock
 export function updateSprocket(id: string, body: Partial<SprocketInput> | undefined): Sprocket {
   getSprocket(id);
   const { name, look } = parseInput(body);
+  const clash = nameClash(id, name);
+  if (clash) throw new ServiceError(clash, 409);
   sprockets.update(id, name, look);
   changed();
   return getSprocket(id);
 }
 
-/** Delete a Sprocket, its chats and their messages. */
+/** Delete a Sprocket, its chats and their messages. It leaves its groups, where what it wrote stays (ADR 0022). */
 export function deleteSprocket(id: string): void {
   getSprocket(id);
   sprockets.remove(id);
@@ -144,15 +148,16 @@ export function listMessages(chatId: string): SprocketMessage[] {
   return sprocketMessages.list(chatId);
 }
 
-/** Store the user's message in a chat and ask its Sprocket to reply there. */
+/** Store the user's message in a chat and ask its Sprocket to reply there (in a group, whoever's turn it is). */
 export function sendMessage(chatId: string, rawText: unknown): SprocketMessage {
-  getChat(chatId);
+  const chat = getChat(chatId);
   const text = typeof rawText === "string" ? rawText.trim() : "";
   if (!text) throw new ServiceError("Message is empty", 400);
   if (text.length > MAX_MESSAGE) throw new ServiceError(`Messages can be at most ${MAX_MESSAGE} characters.`, 400);
   const message = sprocketMessages.create(chatId, "user", text, userMessageTime(chatId));
   changed();
-  requestReply(chatId);
+  if (chat.kind === "group") startRound(chatId, text);
+  else requestReply(chatId);
   return message;
 }
 
@@ -162,6 +167,7 @@ export function sendMessage(chatId: string, rawText: unknown): SprocketMessage {
  */
 export function clearChat(chatId: string): void {
   getChat(chatId);
+  endRound(chatId);
   expireInChat(chatId);
   sprocketChats.clear(chatId);
   changed();

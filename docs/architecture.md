@@ -102,7 +102,9 @@ packages/
 - **Sprockets** (ADR 0005, 0006): `sprockets.ts` stores Sprockets, their chats and settings (project, model,
   description, whether it's its project's Coordinator; core memory stays internal) in SQLite and broadcasts `sprockets.changed`.
   Each has its direct chat, and an attached one its project's chat, where events land (ADR 0021, `sprocket_chats`;
-  `GET`/`POST /api/chats/:id/messages`, `DELETE` to clear). A user message (or, for a Coordinator, an event) starts a run in that chat (`runs.ts`), one chat at a time per Sprocket: a
+  `GET`/`POST /api/chats/:id/messages`, `DELETE` to clear). Group chats (ADR 0022, `groupChats.ts`, `/api/groups`) hold two to four
+  Sprockets: the user's message goes to the lead or the members it @mentions, a reply's mentions pass the turn on, and a round stops
+  after 6 turns. A user message (or, for a Coordinator, an event) starts a run in that chat (`runs.ts`), one chat at a time per Sprocket: a
   pi-agent-core loop on the Sprocket's model, streamed to browsers as `sprockets.typing`, capped at 12 model
   calls, 30 runs per Sprocket per hour and 2 runs at once. Its one tool is codemode (ADR 0008,
   `harness/codemode.ts`): scripts run in pi's QuickJS sandbox and call the Sprocket's capabilities (`harness/`:

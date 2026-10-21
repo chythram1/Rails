@@ -550,6 +550,14 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .composer-controls > .composer-prompts { width: 44px; height: 100%; border-right: 1px solid var(--border); }
 .composer.compact .composer-controls > .composer-prompts { height: auto; border-right: 0; border-left: 1px solid var(--border); }
 .composer-prompts:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+/* @mention suggestions (a group chat's members, ADR 0022): a menu-like list just above the composer's left edge. */
+.composer { position: relative; }
+.mention-list {
+  position: absolute; left: -1px; bottom: calc(100% + 6px); z-index: 50; min-width: 220px; max-width: min(320px, 100%); margin: 0; padding: 0; list-style: none;
+  background: var(--surface); border: 1px solid var(--border-strong); box-shadow: var(--shadow-pop);
+}
+.mention-list li { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 6px 14px; font-size: 14px; cursor: pointer; }
+.mention-list li[aria-selected="true"] { background: var(--hover); box-shadow: inset 2px 0 0 var(--blue); }
 
 /* ---- workspace: terminal panels (dockview + xterm) ---- */
 .workspace { display: flex; flex-direction: column; height: 100%; min-height: 0; }
@@ -787,7 +795,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-list { width: 272px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
 /* 52px like the sidebar's logo row; 7px of top padding centres the contents on the logo's line (y = 29). */
 .sp-list-head, .sp-head { display: flex; align-items: center; gap: 6px; height: 52px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
-.sp-list-head { padding: 7px 10px 0 12px; }
+.sp-list-head { padding: 7px 8px 0 12px; }
 .sp-search {
   flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px;
   border: 1px solid var(--border-field); background: var(--field); color: var(--muted);
@@ -809,11 +817,9 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-groups { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 6px 6px; }
 .sp-group-title { margin: 0; padding: 12px 6px 6px; }
 .sp-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
-/* Phones have no gallery, so the list ends with a way to make one. */
-.sp-row.sp-new-row { display: none; margin-top: 10px; color: var(--text-2); font-size: 14px; }
-.sp-new-icon { display: grid; place-items: center; width: 36px; height: 36px; background: var(--surface-2); color: var(--text); flex-shrink: 0; }
-/* A project chat's row (ADR 0021): the project's folder on the same tile, muted, so the Sprocket's face below stays the one character. */
-.sp-chat-icon { display: grid; place-items: center; width: 36px; height: 36px; background: var(--surface-2); color: var(--muted); flex-shrink: 0; }
+/* A group's picture (ADR 0022, GroupFace.tsx): its members standing still in one character's box, the lead in front. */
+.sp-face { position: relative; display: block; flex-shrink: 0; }
+.sp-face > span { position: absolute; line-height: 0; }
 .sp-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 6px; border-radius: var(--row-r); }
 .sp-row[aria-current="page"] { background: var(--surface-2); }
 .sp-row-text { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 14px; }
@@ -831,6 +837,13 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-head h2 { font-size: 15px; font-weight: 600; }
 /* A project chat's header: the project's name, then the Sprocket that answers there. */
 .sp-head-sub { margin-left: 4px; color: var(--muted); font-weight: 400; }
+/* An attached Sprocket's two chats (ADR 0021) as tabs after its name, underlined at the header's foot when shown. */
+.sp-chat-tabs { display: flex; flex-shrink: 0; align-self: stretch; margin: -7px 0 0 6px; }
+.sp-chat-tab { display: flex; align-items: center; gap: 6px; max-width: 160px; padding: 7px 10px 0; color: var(--muted); font-size: 13px; }
+@media (max-width: 860px) { .sp-head:has(.sp-chat-tabs) > .sprocket { display: none; } .sp-chat-tabs { margin-left: 0; } .sp-chat-tab { max-width: 96px; padding: 7px 8px 0; } }
+.sp-chat-tab[aria-current="page"] { color: var(--text); box-shadow: inset 0 -2px 0 var(--tint-ink); }
+.sp-chat-tab:focus-visible { outline-offset: -2px; }
+.sp-chat-tab:hover:not([aria-current="page"]) { color: var(--text-2); }
 /* The chat's … menu is a plain icon button wherever it sits (the chat header, the side panel's bar). */
 .chat-menu { display: contents; }
 .sp-back { display: none; }
@@ -1047,6 +1060,21 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 }
 /* The run log above a reply: what the Sprocket looked at or did for it. */
 .sp-steps { margin: 0 0 4px; color: var(--muted); font-size: 13px; text-wrap: pretty; }
+/* In a group (ADR 0022), a member's character and name head its replies. */
+.sp-author { display: flex; align-items: center; gap: 6px; margin: 0 0 2px; color: var(--text-2); font-size: 13px; font-weight: 500; }
+.sp-intro-members { list-style: none; margin: 0 0 6px; padding: 0; display: flex; justify-content: center; gap: 20px; }
+.sp-intro-members li { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+/* The New group dialog's member slots: two to a row, filled ones ruled, empty ones dashed. The lead's carries a star. */
+.sp-slots-label { margin: 18px 0 8px; }
+.sp-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sp-slot { display: flex; align-items: center; gap: 10px; min-width: 0; height: 52px; padding: 0 12px; border: 1px solid var(--border-strong); font-size: 14px; text-align: left; }
+.sp-slot:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.sp-slot[aria-expanded="true"] { background: var(--hover); }
+.sp-slot.empty { justify-content: center; gap: 6px; border-style: dashed; color: var(--muted); }
+.sp-slot.empty.idle { border-color: var(--border); }
+.sp-slot-face { position: relative; line-height: 0; flex-shrink: 0; }
+.sp-lead-badge { position: absolute; right: -5px; bottom: -1px; display: grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: var(--dialog); border: 1px solid var(--border-strong); color: var(--text); }
+.sp-slot-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
 .sp-thinking { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; color: var(--muted); font-size: 15px; }
 /* The composer is 12px wider than the message column on each side, so its edges sit outside the text
    rather than right on the edge where replies start and the user's bubbles end. */
@@ -1144,6 +1172,7 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
   a:is(.sp-card):hover { background: var(--tint); }
   .sp-card:hover .muted { color: var(--tint-ink); }
   .sp-card-new:hover { border-color: var(--tint-ink); }
+  .sp-slot:not(.idle):hover { background: var(--hover); }
   .sp-card-new:hover .sp-new-plus { fill: var(--tint-ink); }
   .thumb .sp-pick:hover { background: var(--hover); }
   .settings-field a:hover, .sp-event-open:hover, button.link:hover { text-decoration-thickness: 2px; }
@@ -1181,7 +1210,6 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
   .sp-list { width: 100%; border-right: 0; }
   .sp-list-head, .sp-head { padding-left: 52px; } /* room for the sidebar toggle */
   .sp-back { display: inline-grid; }
-  .sp-row.sp-new-row { display: flex; }
   /* Phones: the panel is the whole screen, with a back arrow instead of the toggle. */
   .sp-panel { width: 100%; box-shadow: none; }
   .sp-panel-back { display: inline-grid; }

@@ -21,6 +21,8 @@ import type {
   Suggestion,
   SignIn,
   Sprocket,
+  SprocketGroup,
+  SprocketGroupInput,
   SprocketInput,
   SprocketMessage,
   SprocketSettings,
@@ -106,7 +108,12 @@ export const api = {
   createSprocket: (body: SprocketInput) => req<Sprocket>("/api/sprockets", { method: "POST", body: JSON.stringify(body) }),
   updateSprocket: (id: string, body: SprocketInput) => req<Sprocket>("/api/sprockets/" + enc(id), { method: "PUT", body: JSON.stringify(body) }),
   deleteSprocket: (id: string) => req("/api/sprockets/" + enc(id), { method: "DELETE" }),
-  /** A Sprocket's direct chat or its project's chat (ADR 0021), by the chat's id. */
+  /** Group chats (ADR 0022). */
+  groups: () => req<SprocketGroup[]>("/api/groups"),
+  createGroup: (body: SprocketGroupInput) => req<SprocketGroup>("/api/groups", { method: "POST", body: JSON.stringify(body) }),
+  updateGroup: (id: string, body: SprocketGroupInput) => req<SprocketGroup>("/api/groups/" + enc(id), { method: "PUT", body: JSON.stringify(body) }),
+  deleteGroup: (id: string) => req("/api/groups/" + enc(id), { method: "DELETE" }),
+  /** A Sprocket's direct chat, its project's chat (ADR 0021) or a group's (ADR 0022), by the chat's id. */
   chatMessages: (chatId: string) => req<SprocketMessage[]>(`/api/chats/${enc(chatId)}/messages`),
   sendChatMessage: (chatId: string, text: string) =>
     req<SprocketMessage>(`/api/chats/${enc(chatId)}/messages`, { method: "POST", body: JSON.stringify({ text }) }),

@@ -7,9 +7,9 @@ export type Route =
   | { name: "workspace"; projectId: string; openKey?: string }
   /**
    * Sprockets (ADR 0005): the list, the creator (`new`), one Sprocket's chat or its settings beside it. The chat is its
-   * direct chat, or with `project` its project's chat (ADR 0021).
+   * direct chat, or with `project` its project's chat (ADR 0021). `group` is a group chat (ADR 0022), by its id.
    */
-  | { name: "sprockets"; view: "list" | "new" | "chat" | "settings"; id?: string; project?: boolean }
+  | { name: "sprockets"; view: "list" | "new" | "chat" | "settings" | "group"; id?: string; project?: boolean }
   /** Customize (ADR 0020): agent profiles and saved prompts, or one of them open for editing. */
   | { name: "customize"; view: "list" | "profile" | "prompt"; id?: string }
   | { name: "automate" };
@@ -20,6 +20,7 @@ function parse(hash: string): Route {
   if (parts[0] === "p" && parts[1]) return { name: "workspace", projectId: parts[1] };
   if (parts[0] === "sprockets") {
     if (parts[1] === "new") return { name: "sprockets", view: "new" };
+    if (parts[1] === "groups" && parts[2]) return { name: "sprockets", view: "group", id: parts[2] };
     const project = parts[2] === "project";
     const rest = project ? parts[3] : parts[2];
     if (parts[1] && rest === "settings") return { name: "sprockets", view: "settings", id: parts[1], ...(project ? { project } : {}) };
@@ -46,6 +47,7 @@ export const href = {
   newSprocket: () => "#/sprockets/new",
   /** A Sprocket's direct chat, or (`project`) its project's chat. */
   sprocket: (id: string, project = false) => `#/sprockets/${encodeURIComponent(id)}${project ? "/project" : ""}`,
+  group: (id: string) => `#/sprockets/groups/${encodeURIComponent(id)}`,
   sprocketSettings: (id: string, project = false) => `#/sprockets/${encodeURIComponent(id)}${project ? "/project" : ""}/settings`,
   customize: () => "#/customize",
   profile: (id: string) => `#/customize/profiles/${encodeURIComponent(id)}`,
