@@ -1,12 +1,12 @@
 import { fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall } from "@earendil-works/pi-ai";
 import { SPROCKET_DESCRIPTION_MAX } from "@rails/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { projects, settings, sprockets } from "./db.ts";
+import { projects, settings, sprocketRuns, sprockets } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { CORE_MEMORY_MAX, editMemory } from "./harness/memory.ts";
-import { idle, isRunning, onActivity, onTyping, readableError, REQUEST_TIMEOUT_MS, RETRY_MS } from "./runs.ts";
+import { askedTeammates, idle, isRunning, onActivity, onTyping, readableError, REQUEST_TIMEOUT_MS, resumeRuns, RETRY_MS, textOf } from "./runs.ts";
 import { sprocketMessages } from "./db.ts";
-import { createSprocket, deleteSprocket, detachFromProject, listMessages, listSprockets, sendMessage, updateSettings } from "./sprockets.ts";
+import { createSprocket, deleteSprocket, detachFromProject, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
 
 // A scripted model stands in for a real provider.
 const faux = fauxProvider();
@@ -14,7 +14,7 @@ models.setProvider(faux.provider);
 const ref = refOf(faux.getModel());
 const look = { character: "bean", color: "teal", accessory: "none" } as const;
 
-const authors = (id: string) => listMessages(id).map((m) => `${m.author}: ${m.text}`);
+const authors = (id: string) => listMessages(directChat(id)).map((m) => `${m.author}: ${m.text}`);
 const sprocket = () => createSprocket({ name: "Helper", look });
 
 beforeEach(() => settings.set("defaultModel", ref));
@@ -23,7 +23,7 @@ describe("runs", () => {
   it("replies to a message with the default model", async () => {
     const s = sprocket();
     faux.setResponses([fauxAssistantMessage("Hi! How can I help?")]);
-    sendMessage(s.id, "hello");
+    sendMessage(directChat(s.id), "hello");
     await idle();
     expect(authors(s.id)).toEqual(["user: hello", "sprocket: Hi! How can I help?"]);
     expect(listSprockets().find((x) => x.id === s.id)!.running).toBe(false);
@@ -33,9 +33,9 @@ describe("runs", () => {
     const s = sprocket();
     expect(listSprockets().find((x) => x.id === s.id)!.usage).toEqual({ runs: 0, tokens: 0, cost: 0 });
     faux.setResponses([fauxAssistantMessage("One."), fauxAssistantMessage("Two.")]);
-    sendMessage(s.id, "hello");
+    sendMessage(directChat(s.id), "hello");
     await idle();
-    sendMessage(s.id, "again");
+    sendMessage(directChat(s.id), "again");
     await idle();
     const { runs, tokens, cost } = listSprockets().find((x) => x.id === s.id)!.usage;
     expect([runs, cost]).toEqual([2, 0]);
@@ -45,9 +45,9 @@ describe("runs", () => {
   it("streams the reply while it's written", async () => {
     const s = sprocket();
     const seen: (string | null)[] = [];
-    onTyping((id, text) => id === s.id && seen.push(text));
+    onTyping((id, _chat, text) => id === s.id && seen.push(text));
     faux.setResponses([fauxAssistantMessage("A longer reply that streams in several pieces.")]);
-    sendMessage(s.id, "hi");
+    sendMessage(directChat(s.id), "hi");
     await idle();
     expect(seen.at(-1)).toBeNull(); // typing ends with null
   });
@@ -55,7 +55,7 @@ describe("runs", () => {
   it("explains instead of replying when there's no model", async () => {
     settings.set("defaultModel", null);
     const s = sprocket();
-    sendMessage(s.id, "hello");
+    sendMessage(directChat(s.id), "hello");
     await idle();
     expect(authors(s.id)).toEqual(["user: hello", "notice: Pick a model first: connect a provider in Settings → Providers."]);
   });
@@ -67,14 +67,14 @@ describe("runs", () => {
       fauxAssistantMessage("Got it."),
     ]);
     const steps: (string | null)[] = [];
-    onActivity((sprocketId, step) => sprocketId === s.id && steps.push(step));
-    sendMessage(s.id, "keep it short from now on");
+    onActivity((sprocketId, _chat, step) => sprocketId === s.id && steps.push(step));
+    sendMessage(directChat(s.id), "keep it short from now on");
     await idle();
     expect(sprockets.get(s.id)!.coreMemory).toBe("Prefers short answers.");
     expect(authors(s.id).at(-1)).toBe("sprocket: Got it.");
     // The run log: the step while it ran, then what the reply did, saved with it.
     expect(steps).toEqual(["Updating its memory", null, null]);
-    expect(listMessages(s.id).at(-1)!.activity).toBe("Updated its memory");
+    expect(listMessages(directChat(s.id)).at(-1)!.activity).toBe("Updated its memory");
   });
 
   it("shows the model the tool work behind its recent replies, so it knows what it looked at", async () => {
@@ -88,12 +88,48 @@ describe("runs", () => {
         return fauxAssistantMessage("Yes, I checked the board.");
       },
     ]);
-    sendMessage(s.id, "what's going on?");
+    sendMessage(directChat(s.id), "what's going on?");
     await idle();
-    sendMessage(s.id, "did you check?");
+    sendMessage(directChat(s.id), "did you check?");
     await idle();
     // The faux model gets the system prompt as a message of its own.
-    expect(seen).toEqual(["system", "user", "assistant", "toolResult: the board says: all idle", "assistant", "user"]);
+    // The last one is Rails' reminder of how to write (not saved).
+    expect(seen).toEqual(["system", "user", "assistant", "toolResult: the board says: all idle", "assistant", "user", "user"]);
+  });
+
+  it("posts each text a run writes as its own message outside a project chat, and only its last text in one", async () => {
+    const look = (code: string) => fauxAssistantMessage([fauxText("Let me look."), fauxToolCall("codemode", { code })], { stopReason: "toolUse" });
+    const s = sprocket();
+    let posted: string[] = [];
+    faux.setResponses([
+      (c) => {
+        posted = []; // nothing posted before the run's first model call ends
+        return look('text("idle")');
+      },
+      () => {
+        // The first text is in the chat while the run goes on.
+        posted = authors(s.id);
+        return fauxAssistantMessage("All idle.");
+      },
+    ]);
+    sendMessage(directChat(s.id), "what's going on?");
+    await idle();
+    expect(posted.at(-1)).toBe("sprocket: Let me look.");
+    expect(authors(s.id).slice(-2)).toEqual(["sprocket: Let me look.", "sprocket: All idle."]);
+
+    const p = projects.create("app", "/work/reply-" + s.id);
+    updateSettings(s.id, { projectId: p.id });
+    faux.setResponses([look('text("idle")'), fauxAssistantMessage("All idle.")]);
+    sendMessage(projectChat(s.id), "what's going on?");
+    await idle();
+    expect(listMessages(projectChat(s.id)).at(-1)?.text).toBe("All idle.");
+  });
+
+  it("drops a message's commentary when it has a final answer, as its draft", () => {
+    const block = (text: string, phase?: string) => ({ type: "text" as const, text, ...(phase ? { textSignature: JSON.stringify({ v: 1, id: "m", phase }) } : {}) });
+    expect(textOf({ content: [block("Draft answer.", "commentary"), block("Answer.", "final_answer")] })).toBe("Answer.");
+    expect(textOf({ content: [block("On it.", "commentary")] })).toBe("On it.");
+    expect(textOf({ content: [block("One."), block("Two.")] })).toBe("One.\n\nTwo.");
   });
 
   it("doesn't let a run put back the store of a project the Sprocket left while it ran", async () => {
@@ -107,7 +143,7 @@ describe("runs", () => {
       },
       fauxAssistantMessage("Done."),
     ]);
-    sendMessage(s.id, "look around");
+    sendMessage(directChat(s.id), "look around");
     await idle();
     expect(sprockets.codemodeStore(s.id)).toEqual({});
   });
@@ -116,7 +152,7 @@ describe("runs", () => {
     const s = sprocket();
     const loop = fauxAssistantMessage([fauxToolCall("codemode", { code: 'text("still looking")' })], { stopReason: "toolUse" });
     faux.setResponses(Array.from({ length: 20 }, () => loop));
-    sendMessage(s.id, "go");
+    sendMessage(directChat(s.id), "go");
     await idle();
     expect(authors(s.id).at(-1)).toBe("notice: Stopped after 12 steps.");
   });
@@ -124,7 +160,7 @@ describe("runs", () => {
   it("reports model errors as a notice", async () => {
     const s = sprocket();
     faux.setResponses([fauxAssistantMessage([fauxText("")], { stopReason: "error", errorMessage: "Incorrect API key provided." })]);
-    sendMessage(s.id, "hello");
+    sendMessage(directChat(s.id), "hello");
     await idle();
     expect(authors(s.id).at(-1)).toBe("notice: The model returned an error: Incorrect API key provided.");
   });
@@ -144,7 +180,7 @@ describe("runs", () => {
 
     /** Send a message and let the run finish, skipping the wait before a retry. */
     async function reply(id: string, text: string) {
-      sendMessage(id, text);
+      sendMessage(directChat(id), text);
       while (isRunning(id)) {
         if (vi.isFakeTimers() && vi.getTimerCount()) await vi.advanceTimersByTimeAsync(RETRY_MS);
         await new Promise((r) => setImmediate(r));
@@ -157,7 +193,7 @@ describe("runs", () => {
       for (const error of [DROPPED, BUSY]) {
         const s = sprocket();
         const steps: (string | null)[] = [];
-        onActivity((id, step) => id === s.id && steps.push(step));
+        onActivity((id, _chat, step) => id === s.id && steps.push(step));
         faux.setResponses([failure(error), fauxAssistantMessage("Here it is.")]);
         await reply(s.id, "hello");
         expect(authors(s.id)).toEqual(["user: hello", "sprocket: Here it is."]); // no notice
@@ -213,7 +249,7 @@ describe("runs", () => {
       await reply(s.id, "look");
       expect(authors(s.id).at(-1)).toBe("sprocket: Done.");
       expect(ran).toBe(1); // the script's result is still there, once, and no failed reply in between
-      expect(sprocketMessages.recentSteps(s.id, 1).values().next().value?.filter((m: any) => m.role === "assistant" && m.stopReason === "error")).toEqual([]);
+      expect(sprocketMessages.recentSteps(directChat(s.id), s.id, 1).values().next().value?.filter((m: any) => m.role === "assistant" && m.stopReason === "error")).toEqual([]);
     });
 
     it("doesn't try again for a Sprocket deleted meanwhile", async () => {
@@ -234,29 +270,96 @@ describe("runs", () => {
   it("drops the reply of a Sprocket deleted while it was replying", async () => {
     const s = sprocket();
     faux.setResponses([fauxAssistantMessage("too late")]);
-    sendMessage(s.id, "hello");
+    const chat = directChat(s.id);
+    sendMessage(chat, "hello");
     deleteSprocket(s.id);
     await idle();
-    expect(sprocketMessages.list(s.id)).toEqual([]);
+    expect(sprocketMessages.list(chat)).toEqual([]);
+  });
+
+  it("asks with options, waits, and takes the answer as the user's next message (ADR 0023)", async () => {
+    const s = sprocket();
+    faux.setResponses([
+      fauxAssistantMessage([fauxText("Two ways to go."), fauxToolCall("codemode", { code: 'await tools.ask_user({ question: "Which?", options: ["Fast", "Safe"] })' })], {
+        stopReason: "toolUse",
+      }),
+      fauxAssistantMessage("Not reached: the run ends with the question."),
+    ]);
+    sendMessage(directChat(s.id), "help me pick");
+    await idle();
+    const asked = listMessages(directChat(s.id)).at(-1)!;
+    expect(authors(s.id)).toEqual(["user: help me pick", "sprocket: Two ways to go.", "sprocket: Which?"]);
+    expect(asked.ask).toEqual({ question: "Which?", options: ["Fast", "Safe"] });
+    expect(sprocketRuns.list(["waiting"], directChat(s.id))).toHaveLength(1);
+
+    let seen = "";
+    faux.setResponses([(c) => ((seen = JSON.stringify(c.messages)), fauxAssistantMessage("Safe it is."))]);
+    sendMessage(directChat(s.id), "Safe");
+    await idle();
+    expect(listMessages(directChat(s.id)).find((m) => m.id === asked.id)?.ask?.answer).toBe("Safe");
+    expect(seen).toContain("options: Fast | Safe");
+    expect(authors(s.id).at(-1)).toBe("sprocket: Safe it is.");
+    expect(sprocketRuns.list(["waiting"], directChat(s.id))).toHaveLength(0);
+  });
+
+  it("posts messages it sends with send_message right away, and its reply after them", async () => {
+    const s = sprocket();
+    faux.setResponses([
+      fauxAssistantMessage([fauxToolCall("codemode", { code: 'await tools.send_message({ text: "One." }); await tools.send_message({ text: "Two." })' })], { stopReason: "toolUse" }),
+      fauxAssistantMessage("And that's all."),
+    ]);
+    sendMessage(directChat(s.id), "send me two messages");
+    await idle();
+    expect(authors(s.id)).toEqual(["user: send me two messages", "sprocket: One.", "sprocket: Two.", "sprocket: And that's all."]);
+  });
+
+  it("says when a restart cut a run off, and starts the runs still queued", async () => {
+    const s = sprocket();
+    const chat = directChat(s.id);
+    sprocketMessages.create(chat, "user", "are you there?");
+    const cut = sprocketRuns.create({ chatId: chat, sprocketId: s.id, trigger: "user" });
+    sprocketRuns.setStatus(cut.id, "running"); // as the last server left it
+    sprocketRuns.create({ chatId: chat, sprocketId: s.id, trigger: "user" }); // and one it had queued
+    faux.setResponses([fauxAssistantMessage("Back.")]);
+    resumeRuns();
+    await idle();
+    expect(sprocketRuns.get(cut.id)?.status).toBe("failed");
+    expect(authors(s.id)).toEqual(["user: are you there?", "notice: Helper was cut off: Rails restarted while it was replying.", "sprocket: Back."]);
   });
 
   it("answers messages that arrive while it's replying", async () => {
     const s = sprocket();
     faux.setResponses([fauxAssistantMessage("first"), fauxAssistantMessage("second")]);
-    sendMessage(s.id, "one");
-    sendMessage(s.id, "two");
+    sendMessage(directChat(s.id), "one");
+    sendMessage(directChat(s.id), "two");
     await idle();
-    expect(authors(s.id)).toEqual(["user: one", "sprocket: first", "user: two", "sprocket: second"]);
+    // Each message is dated when it's posted: "two" came in while "first" was being written.
+    expect(authors(s.id)).toEqual(["user: one", "user: two", "sprocket: first", "sprocket: second"]);
+  });
+});
+
+describe("askedTeammates", () => {
+  const team = [{ name: "Fred" }, { name: "Doc Keeper" }, { name: "Pam" }];
+  it("finds teammates a message asks something or gives something to do, not ones it only mentions", () => {
+    const asks = (t: string) => askedTeammates(t, team);
+    expect(asks("Fred, what do you think?")).toEqual(["Fred"]);
+    expect(asks("Here's my draft. What do you think, Fred?")).toEqual(["Fred"]);
+    expect(asks("Doc Keeper, draft step 2.")).toEqual(["Doc Keeper"]);
+    expect(asks("**Pam:** your take on the colours")).toEqual(["Pam"]);
+    expect(asks("@Pam can you check it?")).toEqual(["Pam"]);
+    expect(asks("Thanks Fred!")).toEqual([]);
+    expect(asks("I agree with Fred. Nice work.")).toEqual([]);
+    expect(asks("Frederick, are you there?")).toEqual([]);
   });
 });
 
 describe("settings", () => {
-  it("moving to another project deletes the chat but keeps the description and core memory", async () => {
+  it("moving to another project keeps the direct chat, the description and core memory (ADR 0021)", async () => {
     const s = sprocket();
     const p = projects.create("app", "/work/app-" + s.id);
     updateSettings(s.id, { description: "Watch the PRs." });
     sprockets.setCoreMemory(s.id, "Likes tea.");
-    sendMessage(s.id, "hello");
+    sendMessage(directChat(s.id), "hello");
     faux.setResponses([fauxAssistantMessage("hi")]);
     await idle();
     const moved = updateSettings(s.id, { projectId: p.id });
@@ -264,19 +367,20 @@ describe("settings", () => {
     expect(moved.description).toBe("Watch the PRs.");
     expect(sprockets.get(s.id)!.coreMemory).toBe("Likes tea.");
     expect("coreMemory" in moved).toBe(false); // internal: never sent to browsers
-    expect(listMessages(s.id)).toEqual([]);
+    expect(authors(s.id)).toEqual(["user: hello", "sprocket: hi"]);
+    expect(listMessages(projectChat(s.id))).toEqual([]); // and a new, empty project chat
   });
 
   it("changes nothing when any field is invalid", async () => {
     const s = sprocket();
     const p = projects.create("other", "/work/other-" + s.id);
-    sendMessage(s.id, "keep me");
+    sendMessage(directChat(s.id), "keep me");
     faux.setResponses([fauxAssistantMessage("ok")]);
     await idle();
     expect(() => updateSettings(s.id, { projectId: p.id, model: "nope/nope" })).toThrow("Unknown model");
     expect(() => updateSettings(s.id, { projectId: p.id, description: "x".repeat(SPROCKET_DESCRIPTION_MAX + 1) })).toThrow("at most");
     expect(listSprockets().find((x) => x.id === s.id)!.projectId).toBeUndefined();
-    expect(listMessages(s.id).map((m) => m.text)).toEqual(["keep me", "ok"]);
+    expect(listMessages(directChat(s.id)).map((m) => m.text)).toEqual(["keep me", "ok"]);
   });
 
   it("validates project, model and description", () => {

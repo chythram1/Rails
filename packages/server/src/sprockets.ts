@@ -1,6 +1,7 @@
-// Sprockets: always-on agents (ADR 0005, 0006): their look, name, chat and settings. A Sprocket is
-// attached to at most one project; moving it (or detaching it) deletes the chat it had there, while its
-// name, look, description and core memory stay. Replies are written by runs.ts. Core memory is the
+// Sprockets: always-on agents (ADR 0005, 0006): their look, name, chats and settings. A Sprocket is
+// attached to at most one project. It has its direct chat, and while it's attached its project's chat, where Rails'
+// events land (ADR 0021); moving it (or detaching it) deletes that project chat, while its direct chat, name, look,
+// description and core memory stay. Replies are written by runs.ts. Core memory is the
 // Sprocket's own (it edits it with the remember tool) and never leaves the server.
 import {
   SPROCKET_ACCESSORIES,
@@ -13,16 +14,18 @@ import {
   type SprocketEvent,
   type SprocketInput,
   type SprocketLook,
+  type SprocketChatInfo,
   type SprocketMessage,
   type SprocketSettings,
 } from "@rails/shared";
-import { handoffs, projects, sprocketMessages, sprockets, suggestions, usage } from "./db.ts";
+import { handoffs, projects, sprocketChats, sprocketMessages, sprockets, suggestions, usage, type StoredChat } from "./db.ts";
 import { ServiceError } from "./errors.ts";
+import { endRound, nameClash, onTeamsChanged, startRound } from "./teams.ts";
 import { settleHandoffs } from "./handoffs.ts";
 import { projectOwners } from "./owners.ts";
 import { findModel } from "./models.ts";
-import { isRunning, onRunsChanged, requestReply, userMessageTime } from "./runs.ts";
-import { onSuggestionsChanged } from "./suggestions.ts";
+import { answerWaiting, isRunning, onRunsChanged, requestReply, runningChat, userMessageTime } from "./runs.ts";
+import { expireInChat, onSuggestionsChanged } from "./suggestions.ts";
 import { listeners } from "./util.ts";
 
 const MAX_NAME = 40;
@@ -34,6 +37,7 @@ export const onSprocketsChanged = sprocketChanges.on;
 const changed = sprocketChanges.emit;
 onRunsChanged(changed);
 onSuggestionsChanged(changed);
+onTeamsChanged(changed);
 
 const isOneOf = <T extends string>(list: readonly T[], v: unknown): v is T => list.includes(v as T);
 
@@ -64,7 +68,13 @@ function parseInput(body: Partial<SprocketInput> | undefined): SprocketInput {
   return { name, look: parseLook(body?.look) };
 }
 
+function chatInfo(chat: StoredChat): SprocketChatInfo {
+  const last = sprocketMessages.last(chat.id);
+  return { id: chat.id, kind: chat.kind, running: runningChat(chat.sprocketId) === chat.id, pending: suggestions.pendingIn(chat.id), ...(last ? { lastMessage: last } : {}) };
+}
+
 function withLook({ coreMemory: _internal, ...row }: ReturnType<typeof sprockets.list>[number]): Sprocket {
+  const project = sprocketChats.of(row.id, "project");
   return {
     ...row,
     look: repairLook(row.look),
@@ -73,7 +83,8 @@ function withLook({ coreMemory: _internal, ...row }: ReturnType<typeof sprockets
     owners: row.projectId ? projectOwners(row.projectId) : [],
     usage: usage.total(row.id),
     running: isRunning(row.id),
-    lastMessage: sprocketMessages.last(row.id),
+    direct: chatInfo(sprocketChats.of(row.id, "direct")!),
+    ...(project ? { projectChat: chatInfo(project) } : {}),
   };
 }
 
@@ -97,12 +108,14 @@ export function createSprocket(body: Partial<SprocketInput> | undefined): Sprock
 export function updateSprocket(id: string, body: Partial<SprocketInput> | undefined): Sprocket {
   getSprocket(id);
   const { name, look } = parseInput(body);
+  const clash = nameClash(id, name);
+  if (clash) throw new ServiceError(clash, 409);
   sprockets.update(id, name, look);
   changed();
   return getSprocket(id);
 }
 
-/** Delete a Sprocket and its messages. */
+/** Delete a Sprocket, its chats and their messages. It leaves its teams, where what it wrote stays (ADR 0022). */
 export function deleteSprocket(id: string): void {
   getSprocket(id);
   sprockets.remove(id);
@@ -110,31 +123,69 @@ export function deleteSprocket(id: string): void {
   changed();
 }
 
-export function listMessages(sprocketId: string): SprocketMessage[] {
-  getSprocket(sprocketId);
-  return sprocketMessages.list(sprocketId);
+function getChat(chatId: string): StoredChat {
+  const chat = sprocketChats.get(chatId);
+  if (!chat) throw new ServiceError("Not found", 404);
+  return chat;
 }
 
-/** Store the user's message to a Sprocket and ask it to reply. */
-export function sendMessage(sprocketId: string, rawText: unknown): SprocketMessage {
+/** A Sprocket's direct chat (ADR 0021): every Sprocket has one. */
+export function directChat(sprocketId: string): string {
   getSprocket(sprocketId);
+  return sprocketChats.of(sprocketId, "direct")!.id;
+}
+
+/** The chat of the project a Sprocket is attached to. */
+export function projectChat(sprocketId: string): string {
+  getSprocket(sprocketId);
+  const chat = sprocketChats.of(sprocketId, "project");
+  if (!chat) throw new ServiceError("It isn't attached to a project.", 404);
+  return chat.id;
+}
+
+export function listMessages(chatId: string): SprocketMessage[] {
+  getChat(chatId);
+  return sprocketMessages.list(chatId);
+}
+
+/** Store the user's message in a chat and ask its Sprocket to reply there (in a team, whoever's turn it is). */
+export function sendMessage(chatId: string, rawText: unknown): SprocketMessage {
+  const chat = getChat(chatId);
   const text = typeof rawText === "string" ? rawText.trim() : "";
   if (!text) throw new ServiceError("Message is empty", 400);
   if (text.length > MAX_MESSAGE) throw new ServiceError(`Messages can be at most ${MAX_MESSAGE} characters.`, 400);
-  const message = sprocketMessages.create(sprocketId, "user", text, userMessageTime(sprocketId));
+  const message = sprocketMessages.create(chatId, "user", text, userMessageTime(chatId));
   changed();
-  requestReply(sprocketId);
+  if (chat.kind === "team") startRound(chatId, text, message.id);
+  else {
+    answerWaiting(chatId, text); // a question with options it asked here (ADR 0023)
+    requestReply(chatId, undefined, { trigger: "user", sourceId: message.id });
+  }
   return message;
 }
 
 /**
- * A session in a Coordinator's project waits for the user (watches.ts): put it in the chat and wake the Coordinator.
- * With `wake: false` (an agent's draft, ADR 0018) it only goes in the chat: the Coordinator reads it when it next runs.
+ * Start a chat over (ADR 0021): its messages go, and suggestions that waited under them expire. The Sprocket's core
+ * memory, handoffs and owners stay; a reply it was writing there is dropped.
+ */
+export function clearChat(chatId: string): void {
+  getChat(chatId);
+  endRound(chatId);
+  expireInChat(chatId);
+  sprocketChats.clear(chatId);
+  changed();
+}
+
+/**
+ * A session in a Coordinator's project waits for the user (watches.ts): put it in the project chat and wake the
+ * Coordinator there. With `wake: false` (an agent's draft, ADR 0018) it only goes in the chat: the Coordinator reads
+ * it when it next runs there.
  */
 export function postEvent(sprocketId: string, event: SprocketEvent, text: string, { wake = true } = {}): SprocketMessage {
-  const message = sprocketMessages.create(sprocketId, "event", text, userMessageTime(sprocketId), { event });
+  const chatId = projectChat(sprocketId);
+  const message = sprocketMessages.create(chatId, "event", text, userMessageTime(chatId), { event });
   changed();
-  if (wake) requestReply(sprocketId);
+  if (wake) requestReply(chatId, undefined, { trigger: "event", sourceId: message.id });
   return message;
 }
 

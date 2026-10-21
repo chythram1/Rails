@@ -1,6 +1,7 @@
 # ADR 0006: Sprockets run, on the user's own model providers
 
-Status: accepted (stage 2, part 1: replies, models, projects, description and core memory).
+Status: accepted (stage 2, part 1: replies, models, projects, description and core memory). ADR 0023 keeps runs as
+rows and lets one post several messages outside the project chat.
 
 ADR 0005 gave Sprockets a look and a chat that nobody answered. Sprockets are meant to be project-first:
 each one helps with one project, and later acts as a coordination layer between that project's agent
@@ -47,13 +48,17 @@ Decisions:
   cost nothing. Messages sent during a run get their own run afterwards. Replies stream to every device
   (`sprockets.typing`), and Rails' own notices (no model, model errors, guard stops) show in the chat.
 - **A failure that may pass is tried once more.** A provider gets 90 s to start answering, not to finish (unset,
-  a hung request waited 5 minutes for Node's own limit). When a call fails in a way pi-ai calls transient (a dropped
+  a hung request waited 5 minutes for Node's own limit). A request that hears nothing back at all for 20 s is
+  dropped and sent again, twice at most (`resend.ts`): replies start in a few seconds, but in testing about one in
+  fifteen team replies took 70 to 110 s, as a request that heard nothing until the 90 s limit and then waited
+  the 15 s retry would, holding the team's round with it. When a call fails in a way pi-ai calls transient (a dropped
   connection, a busy provider, a timeout), the run waits 15 s and goes on from where it was, without the failed
   call, so work it already did isn't repeated. Once only, and never for a usage limit, which won't pass in
   seconds; the notice shows then. Test run 3 lost five Coordinator replies to such failures, unanswered until
   the user asked again.
 - **One project per Sprocket**, any number of Sprockets per project. Moving a Sprocket to another project,
   or detaching it, deletes its chat (it belonged to that project). Removing a project detaches its Sprockets.
+  (Changed by ADR 0021: it deletes the project's chat, and the Sprocket's direct chat stays.)
 - **A description and a core memory**, both staying with a Sprocket wherever it goes:
   - the **description** (at most 500 characters) is the user's standing instructions for it, like a small
     AGENTS.md or Muse's and Hermes' identity files. The user writes it in the Sprocket's settings; every run

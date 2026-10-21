@@ -275,10 +275,96 @@ export interface Sprocket {
   owners: ProjectOwner[];
   /** What its runs have used so far: tokens, and cost where the provider reports one (not on a ChatGPT plan). */
   usage: { runs: number; tokens: number; cost: number };
-  /** True while it's working on a reply. */
+  /** True while it's working on a reply, in any of its chats. */
   running: boolean;
-  /** The newest message in its chat, for the list preview. */
+  /** Its direct chat: the user and the Sprocket (ADR 0021). */
+  direct: SprocketChatInfo;
+  /** Its project's chat, where Rails' events land, while it's attached (ADR 0021). */
+  projectChat?: SprocketChatInfo;
+}
+
+/** A Sprocket's own chat with the user, its project's chat (ADR 0021), or a team of Sprockets' (ADR 0022). */
+export type SprocketChatKind = "direct" | "project" | "team";
+
+/** A chat as the Sprocket list shows it. */
+export interface SprocketChatInfo {
+  id: string;
+  kind: SprocketChatKind;
+  /** True while the Sprocket (in a team, one of its members) is writing a reply in this chat. */
+  running: boolean;
+  /** Suggestions under its replies that wait for the user. */
+  pending: number;
+  /** The newest message, for the list preview. */
   lastMessage?: SprocketMessage;
+}
+
+/**
+ * A team chat (ADR 0022): the user and two to four Sprockets. The user's messages go to the members they
+ * @mention, else to whoever asked them something, else to the lead; a member gives a teammate the turn with
+ * pass_turn (ADR 0023).
+ */
+export interface SprocketTeam extends SprocketChatInfo {
+  kind: "team";
+  name: string;
+  /** Its members' ids, the lead first. */
+  members: string[];
+  /** The member writing a reply there now, if one is. */
+  replying?: string;
+  /** Members whose turns are queued, in order (ADR 0023). */
+  waiting: string[];
+  /** Rails is working out who the user's latest message is for (the decision model is judging it). */
+  routing?: boolean;
+  createdAt: string;
+}
+
+/** A team as the user makes or edits it. */
+export interface SprocketTeamInput {
+  name: string;
+  /** Two to four Sprockets with different names, the lead first. */
+  members: string[];
+}
+
+export const TEAM_MEMBERS_MIN = 2;
+export const TEAM_MEMBERS_MAX = 4;
+/** Passes of the turn in a row, after one message from the user, before a team waits for them again (ADR 0023). */
+export const TEAM_TURNS_MAX = 10;
+
+/** An @mention of a team member in a message (ADR 0022): where it is, and the member's index in the names given. */
+export interface MentionSpan {
+  start: number;
+  end: number;
+  member: number;
+}
+
+const WORD = /[\p{L}\p{N}_]/u;
+
+/**
+ * The @mentions of team members in `text`, in order: "@" and a member's whole name, in any case and not the start
+ * of a longer word (longer names first, so "@Doc Keeper" isn't "@Doc"), or the start of a word of just one member's
+ * name ("@Doc", "@keep", "@pix"; two letters at least). An "@" inside a word (an email address) isn't one.
+ */
+export function findMentions(text: string, names: string[]): MentionSpan[] {
+  const lower = text.toLowerCase();
+  const byLength = names.map((name, member) => ({ name: name.toLowerCase(), member })).sort((a, b) => b.name.length - a.name.length);
+  const found: MentionSpan[] = [];
+  for (let at = lower.indexOf("@"); at >= 0; at = lower.indexOf("@", at + 1)) {
+    if (at > 0 && WORD.test(text[at - 1])) continue;
+    const rest = lower.slice(at + 1);
+    const whole = byLength.find((n) => n.name && rest.startsWith(n.name) && !WORD.test(rest[n.name.length] ?? ""));
+    if (whole) {
+      found.push({ start: at, end: at + 1 + whole.name.length, member: whole.member });
+      at += whole.name.length;
+      continue;
+    }
+    const word = /^[\p{L}\p{N}_]{2,}/u.exec(rest)?.[0];
+    if (!word) continue;
+    const fits = byLength.filter((n) => n.name.split(/[^\p{L}\p{N}_]+/u).some((w) => w.startsWith(word)));
+    if (fits.length === 1) {
+      found.push({ start: at, end: at + 1 + word.length, member: fits[0].member });
+      at += word.length;
+    }
+  }
+  return found;
 }
 
 /** A session in a project and the files or folders it owns (relative to the project, ADR 0016). */
@@ -338,7 +424,19 @@ export interface SprocketInput {
  * Who wrote a chat message: the user, the Sprocket, Rails itself (setup hints and errors), or a session
  * event Rails woke a Coordinator with.
  */
-export type SprocketAuthor = "user" | "sprocket" | "notice" | "event";
+/** `pass`: a team member gave a teammate the turn (ADR 0023), shown as a line, not a bubble. */
+export type SprocketAuthor = "user" | "sprocket" | "notice" | "event" | "pass";
+
+/** A question a Sprocket asked the user (ADR 0023, ask_user). */
+export interface SprocketAsk {
+  question: string;
+  /** Answers to tap: none (an open question), or ASK_OPTIONS_MIN to ASK_OPTIONS_MAX. */
+  options: string[];
+  /** What the user answered (a tapped option, or the message they typed instead). */
+  answer?: string;
+}
+export const ASK_OPTIONS_MIN = 2;
+export const ASK_OPTIONS_MAX = 4;
 
 /** A question a session asked the user in a dialog (Claude Code's AskUserQuestion, a pi question tool). */
 export interface SessionQuestion {
@@ -378,7 +476,9 @@ export interface SprocketEvent {
 /** One message in a Sprocket's chat. */
 export interface SprocketMessage {
   id: string;
+  /** The chat's Sprocket; in a team, the member that wrote it (the lead for the user's messages). */
   sprocketId: string;
+  chatId: string;
   author: SprocketAuthor;
   text: string;
   createdAt: string;
@@ -388,6 +488,10 @@ export interface SprocketMessage {
   event?: SprocketEvent;
   /** On a Coordinator's reply: the replies it suggests sending to sessions. */
   suggestions?: Suggestion[];
+  /** On a pass line (author `pass`): the member given the turn. */
+  passTo?: string;
+  /** On a Sprocket's question to the user (ADR 0023): its options, and the answer once there is one. */
+  ask?: SprocketAsk;
 }
 
 /**
@@ -604,9 +708,9 @@ export type ServerMsg =
   /** Agent profiles or saved prompts changed (possibly on another device). */
   | { type: "customize.changed" }
   /** A Sprocket's reply so far, while it's being written; null when it's done. */
-  | { type: "sprockets.typing"; sprocketId: string; text: string | null }
+  | { type: "sprockets.typing"; sprocketId: string; chatId: string; text: string | null }
   /** While a Sprocket replies: the step it's on ("Reading src/api.ts"), and what it has done so far; null when done. */
-  | { type: "sprockets.activity"; sprocketId: string; step: string | null; summary: string | null }
+  | { type: "sprockets.activity"; sprocketId: string; chatId: string; step: string | null; summary: string | null }
   /** Providers, sign-ins or the default model changed. */
   | { type: "models.changed" }
   /** The fast decision model's shadow log has new judgments (ADR 0012). */

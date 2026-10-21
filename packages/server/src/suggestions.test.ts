@@ -10,7 +10,7 @@ import { receive } from "./bridge/index.ts";
 import { panels, projects, settings, suggestions } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
-import { createSprocket, listMessages, listSprockets, sendMessage, updateSettings } from "./sprockets.ts";
+import { createSprocket, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
 import { dismissSuggestion, sendSuggestion, startSuggestions, suggest } from "./suggestions.ts";
 
 const look = { character: "bell", color: "purple", accessory: "none" } as const;
@@ -47,9 +47,9 @@ function setup() {
 async function suggestThroughRun(leadId: string, panelId: string, reply: string, after = "Fix sidebar asks about the tests; I'd say yes.") {
   const code = `return await tools.suggest_reply({ session: ${JSON.stringify(panelId.slice(0, 8))}, reply: ${JSON.stringify(reply)} })`;
   faux.setResponses([fauxAssistantMessage([fauxToolCall("codemode", { code })], { stopReason: "toolUse" }), fauxAssistantMessage(after)]);
-  sendMessage(leadId, "what should I tell it?");
+  sendMessage(projectChat(leadId), "what should I tell it?");
   await idle();
-  return listMessages(leadId).at(-1)!;
+  return listMessages(projectChat(leadId)).at(-1)!;
 }
 
 describe("suggested replies", () => {
@@ -68,14 +68,14 @@ describe("suggested replies", () => {
     await expect(sendSuggestion(s.id, "again")).rejects.toThrow("already sent");
     // The session starting its next turn doesn't touch what was sent.
     receive(panel.id, "claude", "UserPromptSubmit", { prompt: "Yes, and run them too." });
-    expect(listMessages(lead.id).at(-1)!.suggestions![0].status).toBe("sent");
+    expect(listMessages(projectChat(lead.id)).at(-1)!.suggestions![0].status).toBe("sent");
   });
 
   it("expires a suggestion when the session moves on, and refuses to send it", async () => {
     const { lead, panel } = setup();
     const [s] = (await suggestThroughRun(lead.id, panel.id, "Yes.")).suggestions!;
     receive(panel.id, "claude", "UserPromptSubmit", { prompt: "never mind, I'll do it" });
-    expect(listMessages(lead.id).at(-1)!.suggestions![0].status).toBe("expired");
+    expect(listMessages(projectChat(lead.id)).at(-1)!.suggestions![0].status).toBe("expired");
     await expect(sendSuggestion(s.id, "Yes.")).rejects.toThrow("can't be sent anymore");
   });
 
@@ -84,7 +84,7 @@ describe("suggested replies", () => {
     const [s] = (await suggestThroughRun(lead.id, panel.id, "Yes.")).suggestions!;
     receive(panel.id, "claude", "PermissionRequest", { tool_name: "Bash" }); // (as if a turn had started unseen)
     await expect(sendSuggestion(s.id, "Yes.")).rejects.toThrow("waiting for you in its panel");
-    expect(listMessages(lead.id).at(-1)!.suggestions![0].status).toBe("expired");
+    expect(listMessages(projectChat(lead.id)).at(-1)!.suggestions![0].status).toBe("expired");
   });
 
   it("lets the user dismiss a suggestion", async () => {
@@ -104,7 +104,7 @@ describe("suggested replies", () => {
     expect(s.mode).toBe("answer");
     await expect(sendSuggestion(s.id, "Green")).rejects.toThrow("Answer it in the session's panel.");
     receive(panel.id, "claude", "PostToolUse", { tool_name: "AskUserQuestion", tool_input: {} }); // answered there
-    expect(listMessages(lead.id).at(-1)!.suggestions![0].status).toBe("expired");
+    expect(listMessages(projectChat(lead.id)).at(-1)!.suggestions![0].status).toBe("expired");
   });
 
   it("never suggests for a permission prompt, an extension's dialog or a working session", () => {
@@ -145,7 +145,7 @@ describe("suggested replies", () => {
     const { lead, panel } = setup();
     await suggestThroughRun(lead.id, panel.id, "Yes.");
     await suggestThroughRun(lead.id, panel.id, "Yes, but skip the e2e tests.");
-    const shown = listMessages(lead.id).flatMap((m) => m.suggestions ?? []);
+    const shown = listMessages(projectChat(lead.id)).flatMap((m) => m.suggestions ?? []);
     expect(shown.map((s) => [s.text, s.status])).toEqual([
       ["Yes.", "replaced"],
       ["Yes, but skip the e2e tests.", "pending"],
@@ -158,9 +158,9 @@ describe("suggested replies", () => {
     expect(() => updateSettings(helper.id, { projectId: project.id })).toThrow("Lead already looks after app. Detach it first.");
     // Unattached, it has no project and no capabilities to suggest with.
     faux.setResponses([fauxAssistantMessage("I'm not attached to a project.")]);
-    sendMessage(helper.id, "tell it yes");
+    sendMessage(directChat(helper.id), "tell it yes");
     await idle();
-    expect(listMessages(helper.id).at(-1)!.suggestions).toBeUndefined();
+    expect(listMessages(directChat(helper.id)).at(-1)!.suggestions).toBeUndefined();
     expect(listSprockets().find((s) => s.id === lead.id)!.coordinator).toBe(true);
   });
 
@@ -168,7 +168,7 @@ describe("suggested replies", () => {
     const { lead, panel } = setup();
     const reply = await suggestThroughRun(lead.id, panel.id, "Yes.", "");
     expect(reply.author).toBe("notice");
-    expect(listMessages(lead.id).some((m) => m.suggestions)).toBe(false);
+    expect(listMessages(projectChat(lead.id)).some((m) => m.suggestions)).toBe(false);
   });
 });
 
@@ -177,9 +177,9 @@ describe("messages the user asks for", () => {
   async function messageThroughRun(leadId: string, panelId: string, message: string) {
     const code = `return await tools.suggest_message({ session: ${JSON.stringify(panelId.slice(0, 8))}, message: ${JSON.stringify(message)} })`;
     faux.setResponses([fauxAssistantMessage([fauxToolCall("codemode", { code })], { stopReason: "toolUse" }), fauxAssistantMessage("Drafted it below.")]);
-    sendMessage(leadId, "tell it to stop and summarize");
+    sendMessage(projectChat(leadId), "tell it to stop and summarize");
     await idle();
-    return listMessages(leadId).at(-1)!;
+    return listMessages(projectChat(leadId)).at(-1)!;
   }
 
   it("drafts a message for a busy session, which goes into its queue when sent", async () => {
@@ -191,7 +191,7 @@ describe("messages the user asks for", () => {
     expect(s).toMatchObject({ mode: "message", status: "pending" });
     // It doesn't go stale while the session works.
     receive(panel.id, "claude", "PostToolUse", { tool_name: "Edit", tool_input: { file_path: "/work/a.ts" } });
-    expect(listMessages(lead.id).at(-1)!.suggestions![0].status).toBe("pending");
+    expect(listMessages(projectChat(lead.id)).at(-1)!.suggestions![0].status).toBe("pending");
     expect(await sendSuggestion(s.id, s.text)).toMatchObject({ status: "sent", queued: true });
     await new Promise((r) => setTimeout(r, 50));
     expect(JSON.parse(received.at(-1)!).message.content).toBe("From your user, sent with Rails:\nStop and summarize what you've done.");
@@ -201,10 +201,10 @@ describe("messages the user asks for", () => {
     const { lead, panel } = setup();
     const [s] = (await messageThroughRun(lead.id, panel.id, "Summarize.")).suggestions!;
     expect(await sendSuggestion(s.id, s.text)).toMatchObject({ status: "sent" });
-    expect(listMessages(lead.id).at(-1)!.suggestions![0].queued).toBeUndefined();
+    expect(listMessages(projectChat(lead.id)).at(-1)!.suggestions![0].queued).toBeUndefined();
     const [t] = (await messageThroughRun(lead.id, panel.id, "And then stop.")).suggestions!;
     receive(panel.id, "claude", "SessionEnd", {});
-    expect(listMessages(lead.id).at(-1)!.suggestions![0]).toMatchObject({ id: t.id, status: "expired", error: "The session ended." });
+    expect(listMessages(projectChat(lead.id)).at(-1)!.suggestions![0]).toMatchObject({ id: t.id, status: "expired", error: "The session ended." });
   });
 
   it("points the Coordinator to suggest_message when it tries to answer a session that isn't asking", () => {
@@ -243,11 +243,11 @@ describe("standing rules", () => {
       },
     ]);
     // Rules change while it runs: the number still means the rule it read.
-    sendMessage(lead.id, "what should I tell it?");
+    sendMessage(projectChat(lead.id), "what should I tell it?");
     updateSettings(lead.id, { rules: ["Always ask me first."] });
     await idle();
     expect(prompt).toContain("<rules>\\n1. Never agree to delete files.\\n2. If it asks whether to update tests, say yes.\\n</rules>");
-    expect(listMessages(lead.id).at(-1)!.suggestions![0].rule).toBe("If it asks whether to update tests, say yes.");
+    expect(listMessages(projectChat(lead.id)).at(-1)!.suggestions![0].rule).toBe("If it asks whether to update tests, say yes.");
     // Its words come back with the result, for a last look that the rule fits and was followed.
     expect(result).toContain('It cites rule 2: "If it asks whether to update tests, say yes." If that rule doesn\'t fit');
   });
@@ -264,10 +264,10 @@ describe("standing rules", () => {
         return fauxAssistantMessage("I'll leave the rule out.");
       },
     ]);
-    sendMessage(lead.id, "what should I tell it?");
+    sendMessage(projectChat(lead.id), "what should I tell it?");
     await idle();
     expect(result).toContain("There's no rule 3: you have 0.");
-    expect(listMessages(lead.id).at(-1)!.suggestions).toBeUndefined();
+    expect(listMessages(projectChat(lead.id)).at(-1)!.suggestions).toBeUndefined();
   });
 
   it("leaves rules out of other Sprockets' prompts", async () => {
@@ -280,7 +280,7 @@ describe("standing rules", () => {
         return fauxAssistantMessage("Hi.");
       },
     ]);
-    sendMessage(s.id, "hi");
+    sendMessage(directChat(s.id), "hi");
     await idle();
     expect(prompt).toContain("You are Helper");
     expect(prompt).not.toContain("<rules>");

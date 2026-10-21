@@ -5,7 +5,7 @@ import { receive } from "./bridge/index.ts";
 import { panels, projects, settings } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
-import { createSprocket, listMessages, listSprockets, updateSettings } from "./sprockets.ts";
+import { createSprocket, directChat, listMessages, projectChat, listSprockets, updateSettings } from "./sprockets.ts";
 import { admit, COOLDOWN_MS, GRACE_MS, looksLikeQuestion, startWatches, Watches, type Wake } from "./watches.ts";
 
 const look = { character: "cog", color: "green", accessory: "none" } as const;
@@ -215,10 +215,10 @@ describe("Coordinators", () => {
     receive(p.id, "claude", "Stop", { last_assistant_message: "Fixed it. Should I also update the tests?" });
     vi.advanceTimersByTime(GRACE_MS);
     vi.useRealTimers();
-    await vi.waitFor(() => expect(listMessages(s.id).length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(listMessages(projectChat(s.id)).length).toBeGreaterThan(0));
     await idle();
 
-    const [event, reply] = listMessages(s.id);
+    const [event, reply] = listMessages(projectChat(s.id));
     expect(event.author).toBe("event");
     expect(event.text).toBe("Fixed it. Should I also update the tests?");
     expect(event.event).toEqual({ panelId: p.id, kind: "claude", title: "Fix sidebar", sessionId: p.sessionId, what: "turn_end" });
@@ -242,12 +242,12 @@ describe("Coordinators", () => {
     receive(p.id, "pi", "agent_end", { text: "Done. Should I also clear the cache?" });
     vi.advanceTimersByTime(GRACE_MS);
     vi.useRealTimers();
-    await vi.waitFor(() => expect(listMessages(s.id).length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(listMessages(projectChat(s.id)).length).toBeGreaterThan(0));
     await idle();
 
     expect(prompt).toContain("[Rails event, not from your user]");
     expect(prompt).toContain('\\"Docs\\" (pi, id');
-    const list = listMessages(s.id);
+    const list = listMessages(projectChat(s.id));
     expect(list.map((m) => m.author)).toEqual(["event"]);
     expect(list[0].event?.quiet).toBe(true);
   });
@@ -263,10 +263,10 @@ describe("Coordinators", () => {
     receive(p.id, "pi", "agent_end", { text: "Done. Should I also clear the cache?" });
     vi.advanceTimersByTime(GRACE_MS);
     vi.useRealTimers();
-    await vi.waitFor(() => expect(listMessages(s.id).length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(listMessages(projectChat(s.id)).length).toBeGreaterThan(0));
     await idle();
 
-    const list = listMessages(s.id);
+    const list = listMessages(projectChat(s.id));
     expect(list.map((m) => m.author)).toEqual(["event"]);
     expect(list[0].event?.quiet).toBe(true);
   });
@@ -279,6 +279,6 @@ describe("Coordinators", () => {
     receive(p.id, "claude", "Stop", { last_assistant_message: "Should I go on?" });
     vi.advanceTimersByTime(GRACE_MS);
     vi.useRealTimers();
-    expect(listMessages(s.id)).toEqual([]);
+    expect(listMessages(directChat(s.id))).toEqual([]);
   });
 });

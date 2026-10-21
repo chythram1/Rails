@@ -75,7 +75,7 @@ packages/
   `panels.overlaps` (amber marks; `overlaps.ts`, ADR 0014). Attached Sprockets read the board through their capabilities (`harness/project.ts`).
   Recorded events also go to the watches (`watches.ts`, ADR 0009): when a session asks the user something (a
   dialog, or a turn that ends with a question) and nobody answers within 20 s, Rails puts an event in the
-  project's Coordinator's chat and starts a run. The Coordinator can suggest a reply (`suggest_reply`,
+  project's chat (ADR 0021) and starts the Coordinator's run there. The Coordinator can suggest a reply (`suggest_reply`,
   `suggestions.ts`, ADR 0010), shown under its message; when the user sends it, `bridge/deliver.ts` puts it into
   the session: Claude Code's message socket, the pi extension's long poll (`GET /bridge/<panelId>/pi/inbox`, confirmed with `POST …/pi/delivered`) or
   Codex's `thread/queue/add`. Suggestions expire as soon as their session moves on. A handoff (ADR 0015, `handoffs.ts`, planned by the Coordinator when the user asks) wakes it when its session ends a turn without a question, to draft the message for the other session; handoffs expire after 24 hours and are cancelled when either session ends. Owners (ADR 0016, `owners.ts`), recorded by the Coordinator with `set_owner`, route its requests; an edit to files another session owns wakes it like an overlap. Shell commands' edits count too (`shellEdits.ts`): Rails compares `git status` and file times at a command's start and end. Each run's usage goes in `sprocket_usage`. An overlap also wakes the Coordinator, for the session that changed the files second (batched over 15 s, once per pair and file per 30 minutes); it judges whether they clash and may draft a heads-up with `suggest_message`. A Coordinator's standing rules (ADR 0011) are in its prompt, numbered; a suggestion records the rule it followed. If the user picked a decision model, `decisions.ts` (ADR 0012) asks it about every turn end and unknown dialog in projects with a Coordinator, through pi-ai's `classify()`, and logs its answers next to Rails' own (`decisions` table, `GET /api/decisions`, `decisions.changed`). It may also wake the Coordinator (ADR 0013, `wakeFromModel` in `watches.ts`) for a question the rules missed, unless the session moved on meanwhile; `RAILS_DECISIONS=shadow` keeps it to judging.
@@ -97,12 +97,21 @@ packages/
   server stores it opaquely. The server's panel list is the source of truth: on load the client
   restores the layout, then adds panels missing from it and removes ones that were closed.
   `panels.changed` broadcasts keep other devices' panel lists current. Beside the panes, a side panel
-  (`SidePanel.tsx`) shows the project's Sprocket's chat (one per project, ADR 0016), its files (a tree with each file's git state, `tree.ts`) or Git; panels with a suggested reply waiting
+  (`SidePanel.tsx`) shows the project's chat with its Sprocket (one per project, ADR 0016, 0021), its files (a tree with each file's git state, `tree.ts`) or Git; panels with a suggested reply waiting
   (`Sprocket.pending`) get a mark on their tab.
 - **Sprockets** (ADR 0005, 0006): `sprockets.ts` stores Sprockets, their chats and settings (project, model,
-  description, whether it's its project's Coordinator; core memory stays internal) in SQLite and broadcasts `sprockets.changed`. A user message (or, for a Coordinator, an event) starts a run (`runs.ts`): a
+  description, whether it's its project's Coordinator; core memory stays internal) in SQLite and broadcasts `sprockets.changed`.
+  Each has its direct chat, and an attached one its project's chat, where events land (ADR 0021, `sprocket_chats`;
+  `GET`/`POST /api/chats/:id/messages`, `DELETE` to clear). Team chats (ADR 0022, `teams.ts`, `/api/teams`) hold two to four
+  Sprockets: the user's message goes to the members it @mentions (`@everyone` for all), else (a tapped option) to
+  whoever asked, else to whom the decision model picks, else to members whose questions wait, else the lead; members pass the
+  turn with `pass_turn` (ADR 0023, `harness/turns.ts`), back and forth too, at most 10 in a row, and one that asks a teammate
+  without passing is reminded once. Replies show a bubble per paragraph, one after another (`bubbles.ts`). Runs are rows
+  (`sprocket_runs`, ADR 0023): a user message, a pass or (for a Coordinator) an event queues one in that chat (`runs.ts`), one
+  chat at a time per Sprocket and one run at a time per chat; outside the project chat a run posts each text as its own message,
+  can `send_message` and can `ask_user`, with options to tap or none (its run then waits for the answer). Each run is a
   pi-agent-core loop on the Sprocket's model, streamed to browsers as `sprockets.typing`, capped at 12 model
-  calls, 30 runs per Sprocket per hour and 2 runs at once. Its one tool is codemode (ADR 0008,
+  calls (a request that hears nothing for 20 s is sent again, `resend.ts`), 30 runs per Sprocket per hour and 2 runs at once. Its one tool is codemode (ADR 0008,
   `harness/codemode.ts`): scripts run in pi's QuickJS sandbox and call the Sprocket's capabilities (`harness/`:
   memory; and for attached Sprockets the board, sessions, git and read-only files, `files.ts`). Each call's step goes
   to browsers as `sprockets.activity`, and the run's summary is saved on the reply (the run log). `models.ts` holds the model providers (pi-ai),

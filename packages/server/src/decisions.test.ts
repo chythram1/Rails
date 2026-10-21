@@ -5,7 +5,7 @@ import { panels, projects, settings, sprockets } from "./db.ts";
 import { ACT_ASKS, ACT_QUESTION, decisionLog, settled, setDecisionModel, setDecisionThreshold, startDecisions, toJudge, wakeFor } from "./decisions.ts";
 import { models, modelSettings, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
-import { createSprocket, listMessages, updateSettings } from "./sprockets.ts";
+import { createSprocket, listMessages, projectChat, updateSettings } from "./sprockets.ts";
 import { GRACE_MS, startWatches } from "./watches.ts";
 
 const look = { character: "lune", color: "teal", accessory: "none" } as const;
@@ -74,7 +74,7 @@ describe("the shadow log", () => {
     vi.useRealTimers();
     await vi.waitFor(() => expect(asked.length).toBe(1));
     const lead = sprockets.coordinatorOf(p.id)!;
-    await vi.waitFor(() => expect(listMessages(lead.id).map((m) => m.event?.what)).toContain("question")); // it did wake
+    await vi.waitFor(() => expect(listMessages(projectChat(lead.id)).map((m) => m.event?.what)).toContain("question")); // it did wake
     await idle();
     expect(decisionLog().entries.find((e) => e.panelId === panel.id)!.outcome).toBeUndefined();
   });
@@ -145,7 +145,7 @@ describe("the shadow log", () => {
     vi.useRealTimers();
     await settled();
     const lead = sprockets.coordinatorOf(p.id)!;
-    await vi.waitFor(() => expect(listMessages(lead.id).length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(listMessages(projectChat(lead.id)).length).toBeGreaterThan(0));
     await idle();
     const entry = decisionLog().entries.find((e) => e.panelId === panel.id)!;
     expect(entry).toMatchObject({ rails: "asks", answer: { label: "doesn't ask" }, outcome: "nothing needed" });
@@ -201,9 +201,9 @@ describe("the decision model waking the Coordinator (ADR 0013)", () => {
     await vi.waitFor(() => expect(decisionLog().entries.find((e) => e.panelId === panel.id)?.answer).toBeDefined());
     vi.advanceTimersByTime(GRACE_MS);
     vi.useRealTimers();
-    await vi.waitFor(() => expect(listMessages(lead.id).length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(listMessages(projectChat(lead.id)).length).toBeGreaterThan(0));
     await idle();
-    const [event, reply] = listMessages(lead.id);
+    const [event, reply] = listMessages(projectChat(lead.id));
     expect(event.event).toMatchObject({ what: "turn_end", byModel: true });
     expect(reply.text).toBe("It wants your take on the new name.");
     const entry = decisionLog().entries.find((e) => e.panelId === panel.id)!;
@@ -222,7 +222,7 @@ describe("the decision model waking the Coordinator (ADR 0013)", () => {
     await vi.waitFor(() => expect(decisionLog().entries.find((e) => e.panelId === panel.id)?.answer).toBeDefined());
     vi.advanceTimersByTime(GRACE_MS);
     vi.useRealTimers();
-    expect(listMessages(sprockets.coordinatorOf(p.id)!.id)).toEqual([]);
+    expect(listMessages(projectChat(sprockets.coordinatorOf(p.id)!.id))).toEqual([]);
   });
 
   it("doesn't act on a judgment the session has moved on from", async () => {
@@ -238,7 +238,7 @@ describe("the decision model waking the Coordinator (ADR 0013)", () => {
     await vi.waitFor(() => expect(decisionLog().entries.find((e) => e.panelId === panel.id)?.answer).toBeDefined());
     vi.advanceTimersByTime(GRACE_MS);
     vi.useRealTimers();
-    expect(listMessages(sprockets.coordinatorOf(p.id)!.id)).toEqual([]);
+    expect(listMessages(projectChat(sprockets.coordinatorOf(p.id)!.id))).toEqual([]);
     expect(decisionLog().entries.find((e) => e.panelId === panel.id)!.acted).toBeUndefined();
   });
 
@@ -259,9 +259,9 @@ describe("the decision model waking the Coordinator (ADR 0013)", () => {
     await vi.waitFor(() => expect(decisionLog().entries.find((e) => e.panelId === panel.id)?.answer).toBeDefined());
     vi.advanceTimersByTime(GRACE_MS);
     vi.useRealTimers();
-    await vi.waitFor(() => expect(listMessages(lead.id).length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(listMessages(projectChat(lead.id)).length).toBeGreaterThan(0));
     await idle();
-    expect(listMessages(lead.id)[0].event).toMatchObject({ what: "question", byModel: true });
+    expect(listMessages(projectChat(lead.id))[0].event).toMatchObject({ what: "question", byModel: true });
     expect(prompt).toContain("You can't suggest answers to dialogs Rails doesn't know");
   });
 });

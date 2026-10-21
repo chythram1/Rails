@@ -42,6 +42,8 @@ export interface CodemodeHooks {
   /** A call started, and ended (for the run log and the live "Thinking…" line). */
   onCallStart?(capability: Capability, args: unknown): void;
   onCallEnd?(capability: Capability, args: unknown, status: CallRecord["status"]): void;
+  /** True once a script ended the run's turn (pass_turn, ask_user; ADR 0023): no model call follows it. */
+  ends?(): boolean;
 }
 
 const params = Type.Object({ code: Type.String({ description: "Raw JavaScript source." }) });
@@ -148,6 +150,7 @@ export function codemodeTool(capabilities: Capability[], ctx: Omit<RunContext, "
         content: [{ type: "text", text: header + text }],
         details: { calls },
         ...(result.ok ? {} : { isError: true }),
+        ...(hooks.ends?.() ? { terminate: true } : {}),
       };
     },
   };

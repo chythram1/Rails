@@ -4,6 +4,7 @@ import { href } from "../router.ts";
 import { FilesPanel } from "./FilesPanel.tsx";
 import { GitPanel } from "./GitPanel.tsx";
 import { Sprocket } from "./sprockets/Sprocket.tsx";
+import { ChatMenu } from "./sprockets/ChatMenu.tsx";
 import { SprocketChat } from "./sprockets/SprocketChat.tsx";
 import { onTabKeys } from "./tabKeys.ts";
 
@@ -77,6 +78,7 @@ function SprocketView({ projectName, sprocket }: { projectName: string; sprocket
       </div>
     );
 
+  const chat = sprocket.projectChat;
   return (
     <>
       <div className="side-bar">
@@ -87,14 +89,17 @@ function SprocketView({ projectName, sprocket }: { projectName: string; sprocket
             <span className="tab-attention" role="img" aria-label={sprocket.pending.length > 1 ? `${sprocket.pending.length} replies waiting` : "1 reply waiting"} />
           )}
         </p>
-        <a className="icon-btn" href={href.sprocket(sprocket.id)} aria-label={`Open ${sprocket.name} in Sprockets`} title="Open in Sprockets">
+        {chat && <ChatMenu chatId={chat.id} name={sprocket.name} project={projectName} empty={!chat.lastMessage} />}
+        <a className="icon-btn" href={href.sprocket(sprocket.id, true)} aria-label={`Open ${projectName}'s chat in Sprockets`} title="Open in Sprockets">
           <ArrowUpRight size={16} />
         </a>
       </div>
-      {/* A fresh chat per Sprocket, as on the Sprockets page. */}
-      <div key={sprocket.id} className="side-chat">
-        <SprocketChat sprocket={sprocket} panelOpen={false} embedded />
-      </div>
+      {/* The project's chat (ADR 0021), fresh per chat, as on the Sprockets page. */}
+      {chat && (
+        <div key={chat.id} className="side-chat">
+          <SprocketChat sprocket={sprocket} chat={chat} panelOpen={false} embedded />
+        </div>
+      )}
     </>
   );
 }

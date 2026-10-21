@@ -5,8 +5,11 @@ export type Route =
   | { name: "home"; promptId?: string }
   /** A project's workspace. `openKey` asks it to open (or focus) that session's panel. */
   | { name: "workspace"; projectId: string; openKey?: string }
-  /** Sprockets (ADR 0005): the list, the creator (`new`), one Sprocket's chat or its settings. */
-  | { name: "sprockets"; view: "list" | "new" | "chat" | "settings"; id?: string }
+  /**
+   * Sprockets (ADR 0005): the list, the creator (`new`), one Sprocket's chat or its settings beside it. The chat is its
+   * direct chat, or with `project` its project's chat (ADR 0021). `team` is a team chat (ADR 0022), by its id.
+   */
+  | { name: "sprockets"; view: "list" | "new" | "chat" | "settings" | "team" | "teamSettings"; id?: string; project?: boolean }
   /** Customize (ADR 0020): agent profiles and saved prompts, or one of them open for editing. */
   | { name: "customize"; view: "list" | "profile" | "prompt"; id?: string }
   | { name: "automate" };
@@ -17,8 +20,11 @@ function parse(hash: string): Route {
   if (parts[0] === "p" && parts[1]) return { name: "workspace", projectId: parts[1] };
   if (parts[0] === "sprockets") {
     if (parts[1] === "new") return { name: "sprockets", view: "new" };
-    if (parts[1] && parts[2] === "settings") return { name: "sprockets", view: "settings", id: parts[1] };
-    if (parts[1]) return { name: "sprockets", view: "chat", id: parts[1] };
+    if (parts[1] === "teams" && parts[2]) return { name: "sprockets", view: parts[3] === "settings" ? "teamSettings" : "team", id: parts[2] };
+    const project = parts[2] === "project";
+    const rest = project ? parts[3] : parts[2];
+    if (parts[1] && rest === "settings") return { name: "sprockets", view: "settings", id: parts[1], ...(project ? { project } : {}) };
+    if (parts[1]) return { name: "sprockets", view: "chat", id: parts[1], ...(project ? { project } : {}) };
     return { name: "sprockets", view: "list" };
   }
   if (parts[0] === "new" && parts[1]) return { name: "home", promptId: parts[1] };
@@ -39,8 +45,11 @@ export const href = {
   session: (projectId: string, key: string) => `#/p/${encodeURIComponent(projectId)}/s/${encodeURIComponent(key)}`,
   sprockets: () => "#/sprockets",
   newSprocket: () => "#/sprockets/new",
-  sprocket: (id: string) => `#/sprockets/${encodeURIComponent(id)}`,
-  sprocketSettings: (id: string) => `#/sprockets/${encodeURIComponent(id)}/settings`,
+  /** A Sprocket's direct chat, or (`project`) its project's chat. */
+  sprocket: (id: string, project = false) => `#/sprockets/${encodeURIComponent(id)}${project ? "/project" : ""}`,
+  team: (id: string) => `#/sprockets/teams/${encodeURIComponent(id)}`,
+  teamSettings: (id: string) => `#/sprockets/teams/${encodeURIComponent(id)}/settings`,
+  sprocketSettings: (id: string, project = false) => `#/sprockets/${encodeURIComponent(id)}${project ? "/project" : ""}/settings`,
   customize: () => "#/customize",
   profile: (id: string) => `#/customize/profiles/${encodeURIComponent(id)}`,
   prompt: (id: string) => `#/customize/prompts/${encodeURIComponent(id)}`,

@@ -131,6 +131,7 @@ export function MenuButton({ label, title, icon, className, plain, align = "left
     <>
       <button
         ref={trigger}
+        type="button"
         className={[plain ? "" : "icon-btn", className].filter(Boolean).join(" ")}
         aria-label={label}
         title={title ?? label}
@@ -148,6 +149,7 @@ export function MenuButton({ label, title, icon, className, plain, align = "left
             ) : (
               <button
                 key={`${i}:${item.label}`}
+                type="button"
                 role={item.checked === undefined ? "menuitem" : "menuitemradio"}
                 aria-checked={item.checked}
                 className={item.danger ? "danger" : undefined}

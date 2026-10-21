@@ -32,8 +32,8 @@ export class TerminalHub {
     onHandoffsChanged(() => this.broadcast({ type: "sprockets.changed" })); // they show in the Coordinator's panel
     onOwnersChanged(() => this.broadcast({ type: "sprockets.changed" })); // so do owners
     onCustomizeChanged(() => this.broadcast({ type: "customize.changed" }));
-    onTyping((sprocketId, text) => this.broadcast({ type: "sprockets.typing", sprocketId, text }));
-    onActivity((sprocketId, step, summary) => this.broadcast({ type: "sprockets.activity", sprocketId, step, summary }));
+    onTyping((sprocketId, chatId, text) => this.broadcast({ type: "sprockets.typing", sprocketId, chatId, text }));
+    onActivity((sprocketId, chatId, step, summary) => this.broadcast({ type: "sprockets.activity", sprocketId, chatId, step, summary }));
     onModelsChanged(() => this.broadcast({ type: "models.changed" }));
     onDecisionsChanged(() => this.broadcast({ type: "decisions.changed" }));
     onSignIn((signIn) => this.broadcast({ type: "models.signIn", signIn }));

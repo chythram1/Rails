@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { AgentProfile, DecisionEntry, Handoff, Panel, PanelKind, Project, Sprocket, SprocketAuthor, SprocketEvent, SprocketLook, SprocketMessage, SavedPrompt, Suggestion } from "@rails/shared";
+import type { AgentProfile, DecisionEntry, Handoff, Panel, PanelKind, Project, Sprocket, SprocketAsk, SprocketAuthor, SprocketChatKind, SprocketEvent, SprocketLook, SprocketMessage, SavedPrompt, Suggestion } from "@rails/shared";
 import { RAILS_HOME } from "./config.ts";
 
 const db = new DatabaseSync(join(RAILS_HOME, "rails.db"));
@@ -78,6 +78,91 @@ addColumn("sprocket_messages", "activity", "TEXT");
 addColumn("sprocket_messages", "steps", "TEXT");
 /** On an event: the SprocketEvent, as JSON. */
 addColumn("sprocket_messages", "event", "TEXT");
+// Chats (ADR 0021): every Sprocket's direct chat, and the project chat of the project it's attached to. Team chats
+// will be another kind. A chat's messages are sprocket_messages with its chat_id.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sprocket_chats (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    sprocket_id TEXT NOT NULL,
+    project_id TEXT,
+    cleared_at TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS sprocket_chats_direct ON sprocket_chats (sprocket_id) WHERE kind = 'direct';
+  CREATE UNIQUE INDEX IF NOT EXISTS sprocket_chats_project ON sprocket_chats (sprocket_id) WHERE kind = 'project';
+`);
+addColumn("sprocket_messages", "chat_id", "TEXT");
+db.exec("CREATE INDEX IF NOT EXISTS sprocket_messages_by_chat ON sprocket_messages (chat_id, created_at)");
+// Team chats (ADR 0022): a name, the lead in sprocket_id, and the members (the lead too) in order. A message's
+// sprocket_id is the member that wrote it.
+addColumn("sprocket_chats", "name", "TEXT");
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sprocket_chat_members (
+    chat_id TEXT NOT NULL,
+    sprocket_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    PRIMARY KEY (chat_id, sprocket_id)
+  );
+  CREATE INDEX IF NOT EXISTS sprocket_chat_members_by_sprocket ON sprocket_chat_members (sprocket_id);
+`);
+// Runs (ADR 0023): one Sprocket's turn in one chat, queued until it can start. `trigger` is what asked for it
+// (user, pass or event), `source_id` the message that did, `from_id` the member who passed the turn and `hop` how
+// many passes led to it.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sprocket_runs (
+    id TEXT PRIMARY KEY,
+    chat_id TEXT NOT NULL,
+    sprocket_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    trigger TEXT NOT NULL,
+    source_id TEXT,
+    from_id TEXT,
+    hop INTEGER NOT NULL DEFAULT 0,
+    error TEXT,
+    created_at TEXT NOT NULL,
+    started_at TEXT,
+    ended_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS sprocket_runs_by_status ON sprocket_runs (status, created_at);
+  CREATE INDEX IF NOT EXISTS sprocket_runs_by_chat ON sprocket_runs (chat_id, status);
+`);
+addColumn("sprocket_messages", "run_id", "TEXT");
+/** On a pass line (author 'pass'): the member given the turn. */
+addColumn("sprocket_messages", "pass_to", "TEXT");
+/** On a question with options (ADR 0023): the SprocketAsk, as JSON. */
+addColumn("sprocket_messages", "ask", "TEXT");
+
+/**
+ * Every Sprocket has its direct chat and an attached one its project chat; messages from before chats go in one:
+ * an attached Sprocket's in its project chat, where its events were, an unattached one's in its direct chat.
+ */
+export function assignChats(): void {
+  const now = new Date().toISOString();
+  db.exec("BEGIN");
+  try {
+    const lacking = (kind: SprocketChatKind, where: string) =>
+      db.prepare(`SELECT id, project_id FROM sprockets WHERE ${where} AND id NOT IN (SELECT sprocket_id FROM sprocket_chats WHERE kind = ?)`).all(kind) as {
+        id: string;
+        project_id: string | null;
+      }[];
+    for (const r of lacking("direct", "1"))
+      db.prepare("INSERT INTO sprocket_chats (id, kind, sprocket_id, created_at) VALUES (?, 'direct', ?, ?)").run(randomUUID(), r.id, now);
+    for (const r of lacking("project", "project_id IS NOT NULL"))
+      db.prepare("INSERT INTO sprocket_chats (id, kind, sprocket_id, project_id, created_at) VALUES (?, 'project', ?, ?, ?)").run(randomUUID(), r.id, r.project_id, now);
+    db.exec(`
+      UPDATE sprocket_messages SET chat_id = (
+        SELECT c.id FROM sprocket_chats c JOIN sprockets s ON s.id = c.sprocket_id
+        WHERE c.sprocket_id = sprocket_messages.sprocket_id AND c.kind = CASE WHEN s.project_id IS NULL THEN 'direct' ELSE 'project' END
+      ) WHERE chat_id IS NULL
+    `);
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+}
+assignChats();
 addColumn("panels", "bridge_token", "TEXT");
 /** The agent profile it started with (ADR 0020), as JSON: a snapshot, since the profile may change later. */
 addColumn("panels", "profile", "TEXT");
@@ -329,7 +414,7 @@ type SprocketRow = {
   rules: string;
 };
 /** A stored Sprocket, with its internal core memory (never sent to browsers). */
-const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running" | "pending" | "handoffs" | "owners" | "usage"> & { look: unknown; coreMemory: string } => ({
+const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running" | "pending" | "handoffs" | "owners" | "usage" | "direct" | "projectChat"> & { look: unknown; coreMemory: string } => ({
   id: r.id,
   name: r.name,
   look: JSON.parse(r.look),
@@ -352,7 +437,9 @@ export const sprockets = {
   },
   create(name: string, look: SprocketLook) {
     const id = randomUUID();
-    db.prepare("INSERT INTO sprockets (id, name, look, created_at) VALUES (?, ?, ?, ?)").run(id, name, JSON.stringify(look), new Date().toISOString());
+    const now = new Date().toISOString();
+    db.prepare("INSERT INTO sprockets (id, name, look, created_at) VALUES (?, ?, ?, ?)").run(id, name, JSON.stringify(look), now);
+    db.prepare("INSERT INTO sprocket_chats (id, kind, sprocket_id, created_at) VALUES (?, 'direct', ?, ?)").run(randomUUID(), id, now);
     return this.get(id)!;
   },
   update(id: string, name: string, look: SprocketLook): void {
@@ -362,13 +449,17 @@ export const sprockets = {
     return (db.prepare("SELECT * FROM sprockets WHERE project_id = ? ORDER BY created_at").all(projectId) as SprocketRow[]).map(toSprocket);
   },
   /**
-   * Move to another project (or none). Its chat belongs to the old attachment, so it goes. Attached, it's the
-   * project's Coordinator (ADR 0016); the unique index keeps it to one per project.
+   * Move to another project (or none). The old project's chat goes, and its suggestions with it; the direct chat
+   * stays (ADR 0021). Attached, it's the project's Coordinator (ADR 0016), with a new project chat; the unique index
+   * keeps it to one per project.
    */
   setProject(id: string, projectId: string | null): void {
-    db.prepare("DELETE FROM sprocket_messages WHERE sprocket_id = ?").run(id);
+    db.prepare("DELETE FROM sprocket_messages WHERE chat_id IN (SELECT id FROM sprocket_chats WHERE sprocket_id = ? AND kind = 'project')").run(id);
+    db.prepare("DELETE FROM sprocket_chats WHERE sprocket_id = ? AND kind = 'project'").run(id);
     db.prepare("DELETE FROM suggestions WHERE sprocket_id = ?").run(id);
     db.prepare("UPDATE sprockets SET project_id = ?, codemode_store = '{}', coordinator = ? WHERE id = ?").run(projectId, projectId ? 1 : 0, id);
+    if (projectId)
+      db.prepare("INSERT INTO sprocket_chats (id, kind, sprocket_id, project_id, created_at) VALUES (?, 'project', ?, ?, ?)").run(randomUUID(), id, projectId, new Date().toISOString());
   },
   coordinatorOf(projectId: string) {
     const r = db.prepare("SELECT * FROM sprockets WHERE project_id = ? AND coordinator = 1").get(projectId) as SprocketRow | undefined;
@@ -396,69 +487,294 @@ export const sprockets = {
   setCoreMemory(id: string, text: string): void {
     db.prepare("UPDATE sprockets SET core_memory = ? WHERE id = ?").run(text, id);
   },
+  /**
+   * Delete it with its own chats. In its teams (ADR 0022) what it wrote stays; it leaves them, the next member
+   * leads where it led, and a team with nobody left goes.
+   */
   remove(id: string): void {
-    db.prepare("DELETE FROM sprocket_messages WHERE sprocket_id = ?").run(id);
+    db.prepare("DELETE FROM sprocket_messages WHERE chat_id IN (SELECT id FROM sprocket_chats WHERE sprocket_id = ? AND kind != 'team')").run(id);
+    db.prepare("DELETE FROM sprocket_chats WHERE sprocket_id = ? AND kind != 'team'").run(id);
+    const teams = (db.prepare("SELECT chat_id FROM sprocket_chat_members WHERE sprocket_id = ?").all(id) as { chat_id: string }[]).map((r) => r.chat_id);
+    db.prepare("DELETE FROM sprocket_chat_members WHERE sprocket_id = ?").run(id);
+    for (const chatId of teams) {
+      const [lead] = sprocketChats.members(chatId);
+      if (lead) db.prepare("UPDATE sprocket_chats SET sprocket_id = ? WHERE id = ?").run(lead, chatId);
+      else sprocketChats.removeTeam(chatId);
+    }
     db.prepare("DELETE FROM suggestions WHERE sprocket_id = ?").run(id);
+    db.prepare("DELETE FROM sprocket_runs WHERE sprocket_id = ? AND status IN ('queued', 'waiting')").run(id);
     db.prepare("DELETE FROM sprocket_usage WHERE sprocket_id = ?").run(id);
     db.prepare("DELETE FROM sprockets WHERE id = ?").run(id);
   },
 };
 
-type MessageRow = { id: string; sprocket_id: string; author: SprocketAuthor; text: string; created_at: string; activity: string | null; event: string | null };
+type ChatRow = {
+  id: string;
+  kind: SprocketChatKind;
+  sprocket_id: string;
+  project_id: string | null;
+  name: string | null;
+  cleared_at: string | null;
+  created_at: string;
+};
+/** A chat. `sprocketId` is the Sprocket that answers it: in a team, its lead. */
+export type StoredChat = { id: string; kind: SprocketChatKind; sprocketId: string; projectId?: string; name?: string; clearedAt?: string; createdAt: string };
+const toChat = (r: ChatRow): StoredChat => ({
+  id: r.id,
+  kind: r.kind,
+  sprocketId: r.sprocket_id,
+  ...(r.project_id ? { projectId: r.project_id } : {}),
+  ...(r.name ? { name: r.name } : {}),
+  ...(r.cleared_at ? { clearedAt: r.cleared_at } : {}),
+  createdAt: r.created_at,
+});
+
+/** Sprockets' chats (ADR 0021). They're made and deleted with their Sprocket and its attachment (`sprockets`). */
+export const sprocketChats = {
+  get(id: string): StoredChat | undefined {
+    const r = db.prepare("SELECT * FROM sprocket_chats WHERE id = ?").get(id) as ChatRow | undefined;
+    return r && toChat(r);
+  },
+  of(sprocketId: string, kind: SprocketChatKind): StoredChat | undefined {
+    const r = db.prepare("SELECT * FROM sprocket_chats WHERE sprocket_id = ? AND kind = ?").get(sprocketId, kind) as ChatRow | undefined;
+    return r && toChat(r);
+  },
+  /** Delete its messages, and note when (a reply started before then is dropped). */
+  clear(id: string): void {
+    db.prepare("DELETE FROM sprocket_messages WHERE chat_id = ?").run(id);
+    db.prepare("UPDATE sprocket_chats SET cleared_at = ? WHERE id = ?").run(new Date().toISOString(), id);
+  },
+  /** Team chats (ADR 0022), oldest first. */
+  teams(): StoredChat[] {
+    return (db.prepare("SELECT * FROM sprocket_chats WHERE kind = 'team' ORDER BY created_at, rowid").all() as ChatRow[]).map(toChat);
+  },
+  /** A team's members' ids, the lead first. */
+  members(id: string): string[] {
+    return (db.prepare("SELECT sprocket_id FROM sprocket_chat_members WHERE chat_id = ? ORDER BY position").all(id) as { sprocket_id: string }[]).map((r) => r.sprocket_id);
+  },
+  createTeam(name: string, members: string[]): StoredChat {
+    const id = randomUUID();
+    db.prepare("INSERT INTO sprocket_chats (id, kind, sprocket_id, name, created_at) VALUES (?, 'team', ?, ?, ?)").run(id, members[0], name, new Date().toISOString());
+    this.setMembers(id, members);
+    return this.get(id)!;
+  },
+  updateTeam(id: string, name: string, members: string[]): void {
+    db.prepare("UPDATE sprocket_chats SET name = ?, sprocket_id = ? WHERE id = ?").run(name, members[0], id);
+    this.setMembers(id, members);
+  },
+  setMembers(id: string, members: string[]): void {
+    db.prepare("DELETE FROM sprocket_chat_members WHERE chat_id = ?").run(id);
+    members.forEach((m, i) => db.prepare("INSERT INTO sprocket_chat_members (chat_id, sprocket_id, position) VALUES (?, ?, ?)").run(id, m, i));
+  },
+  /** A team, its members, its messages and its runs. */
+  removeTeam(id: string): void {
+    db.prepare("DELETE FROM sprocket_messages WHERE chat_id = ?").run(id);
+    db.prepare("DELETE FROM sprocket_runs WHERE chat_id = ?").run(id);
+    db.prepare("DELETE FROM sprocket_chat_members WHERE chat_id = ?").run(id);
+    db.prepare("DELETE FROM sprocket_chats WHERE id = ? AND kind = 'team'").run(id);
+  },
+};
+
+type MessageRow = {
+  id: string;
+  sprocket_id: string;
+  chat_id: string;
+  author: SprocketAuthor;
+  text: string;
+  created_at: string;
+  activity: string | null;
+  event: string | null;
+  pass_to: string | null;
+  ask: string | null;
+};
 const toMessage = (r: MessageRow): SprocketMessage => ({
   id: r.id,
   sprocketId: r.sprocket_id,
+  chatId: r.chat_id,
   author: r.author,
   text: r.text,
   createdAt: r.created_at,
   ...(r.activity ? { activity: r.activity } : {}),
   ...(r.event ? { event: JSON.parse(r.event) } : {}),
+  ...(r.pass_to ? { passTo: r.pass_to } : {}),
+  ...(r.ask ? { ask: JSON.parse(r.ask) } : {}),
 });
 
 export const sprocketMessages = {
-  /** A chat, with each reply's suggestions. */
-  list(sprocketId: string): SprocketMessage[] {
-    const byMessage = suggestions.byMessage(sprocketId);
-    return (db.prepare("SELECT * FROM sprocket_messages WHERE sprocket_id = ? ORDER BY created_at, rowid").all(sprocketId) as MessageRow[]).map((r) => {
+  /** A chat's messages, with each reply's suggestions. */
+  list(chatId: string): SprocketMessage[] {
+    if (!sprocketChats.get(chatId)) return [];
+    const byMessage = suggestions.byMessage(chatId);
+    return (db.prepare("SELECT * FROM sprocket_messages WHERE chat_id = ? ORDER BY created_at, rowid").all(chatId) as MessageRow[]).map((r) => {
       const m = toMessage(r);
       const list = byMessage.get(m.id);
       return list ? { ...m, suggestions: list } : m;
     });
   },
-  last(sprocketId: string): SprocketMessage | undefined {
-    const r = db.prepare("SELECT * FROM sprocket_messages WHERE sprocket_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(sprocketId) as MessageRow | undefined;
+  last(chatId: string): SprocketMessage | undefined {
+    const r = db.prepare("SELECT * FROM sprocket_messages WHERE chat_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(chatId) as MessageRow | undefined;
     return r && toMessage(r);
   },
   create(
-    sprocketId: string,
+    chatId: string,
     author: SprocketAuthor,
     text: string,
     createdAt = new Date().toISOString(),
-    { activity, steps, event }: { activity?: string; steps?: unknown[]; event?: SprocketEvent } = {},
+    {
+      activity,
+      steps,
+      event,
+      sprocketId,
+      runId,
+      passTo,
+      ask,
+    }: { activity?: string; steps?: unknown[]; event?: SprocketEvent; sprocketId?: string; runId?: string; passTo?: string; ask?: SprocketAsk } = {},
   ): SprocketMessage {
-    const m: SprocketMessage = { id: randomUUID(), sprocketId, author, text, createdAt, ...(activity ? { activity } : {}), ...(event ? { event } : {}) };
-    db.prepare("INSERT INTO sprocket_messages (id, sprocket_id, author, text, created_at, activity, steps, event) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(
+    const chat = sprocketChats.get(chatId);
+    if (!chat) throw new Error(`No chat ${chatId}`);
+    // In a team, the member that wrote it; otherwise the chat's Sprocket.
+    const m: SprocketMessage = {
+      id: randomUUID(),
+      sprocketId: sprocketId ?? chat.sprocketId,
+      chatId,
+      author,
+      text,
+      createdAt,
+      ...(activity ? { activity } : {}),
+      ...(event ? { event } : {}),
+      ...(passTo ? { passTo } : {}),
+      ...(ask ? { ask } : {}),
+    };
+    db.prepare(
+      "INSERT INTO sprocket_messages (id, sprocket_id, chat_id, author, text, created_at, activity, steps, event, run_id, pass_to, ask) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ).run(
       m.id,
       m.sprocketId,
+      m.chatId,
       m.author,
       m.text,
       m.createdAt,
       activity ?? null,
       steps?.length ? JSON.stringify(steps) : null,
       event ? JSON.stringify(event) : null,
+      runId ?? null,
+      passTo ?? null,
+      ask ? JSON.stringify(ask) : null,
     );
     return m;
+  },
+  /** Add tool steps to a message (a run's last message gets the steps after it, ADR 0023). */
+  addSteps(id: string, steps: unknown[]): void {
+    if (!steps.length) return;
+    const r = db.prepare("SELECT steps FROM sprocket_messages WHERE id = ?").get(id) as { steps: string | null } | undefined;
+    if (!r) return;
+    db.prepare("UPDATE sprocket_messages SET steps = ? WHERE id = ?").run(JSON.stringify([...(r.steps ? JSON.parse(r.steps) : []), ...steps]), id);
+  },
+  /** What a reply's run looked at or did ("Looked at the board"), once the run is done. */
+  setActivity(id: string, activity: string): void {
+    db.prepare("UPDATE sprocket_messages SET activity = ? WHERE id = ?").run(activity, id);
+  },
+  /** The question a run asked (ask_user), if it asked one: its message's id, and the question. */
+  askOf(runId: string): { id: string; ask: SprocketAsk } | undefined {
+    const r = db.prepare("SELECT id, ask FROM sprocket_messages WHERE run_id = ? AND ask IS NOT NULL").get(runId) as { id: string; ask: string } | undefined;
+    return r && { id: r.id, ask: JSON.parse(r.ask) };
+  },
+  /** Record the user's answer to a question with options. */
+  answer(id: string, answer: string): void {
+    db.prepare("UPDATE sprocket_messages SET ask = json_set(ask, '$.answer', ?) WHERE id = ? AND ask IS NOT NULL").run(answer, id);
   },
   /** Mark an event the Coordinator decided the user needn't hear about. */
   setQuiet(id: string): void {
     db.prepare("UPDATE sprocket_messages SET event = json_set(event, '$.quiet', json('true')) WHERE id = ? AND event IS NOT NULL").run(id);
   },
-  /** The stored tool steps of the `limit` latest replies of a Sprocket that have them, by message id. */
-  recentSteps(sprocketId: string, limit: number): Map<string, unknown[]> {
+  /** The stored tool steps of a Sprocket's `limit` latest replies in a chat that have them, by message id. */
+  recentSteps(chatId: string, sprocketId: string, limit: number): Map<string, unknown[]> {
     const rows = db
-      .prepare("SELECT id, steps FROM sprocket_messages WHERE sprocket_id = ? AND steps IS NOT NULL ORDER BY created_at DESC, rowid DESC LIMIT ?")
-      .all(sprocketId, limit) as { id: string; steps: string }[];
+      .prepare("SELECT id, steps FROM sprocket_messages WHERE chat_id = ? AND sprocket_id = ? AND steps IS NOT NULL ORDER BY created_at DESC, rowid DESC LIMIT ?")
+      .all(chatId, sprocketId, limit) as { id: string; steps: string }[];
     return new Map(rows.map((r) => [r.id, JSON.parse(r.steps)]));
+  },
+};
+
+export type RunStatus = "queued" | "running" | "waiting" | "done" | "failed" | "cancelled";
+export type RunTrigger = "user" | "pass" | "event";
+type RunRow = {
+  id: string;
+  chat_id: string;
+  sprocket_id: string;
+  status: RunStatus;
+  trigger: RunTrigger;
+  source_id: string | null;
+  from_id: string | null;
+  hop: number;
+  error: string | null;
+  created_at: string;
+  started_at: string | null;
+  ended_at: string | null;
+};
+/** A run (ADR 0023): one Sprocket's turn in one chat. */
+export type StoredRun = { id: string; chatId: string; sprocketId: string; status: RunStatus; trigger: RunTrigger; sourceId?: string; from?: string; hop: number; error?: string; createdAt: string };
+const toRun = (r: RunRow): StoredRun => ({
+  id: r.id,
+  chatId: r.chat_id,
+  sprocketId: r.sprocket_id,
+  status: r.status,
+  trigger: r.trigger,
+  ...(r.source_id ? { sourceId: r.source_id } : {}),
+  ...(r.from_id ? { from: r.from_id } : {}),
+  hop: r.hop,
+  ...(r.error ? { error: r.error } : {}),
+  createdAt: r.created_at,
+});
+
+export const sprocketRuns = {
+  create(r: { chatId: string; sprocketId: string; trigger: RunTrigger; sourceId?: string; from?: string; hop?: number }): StoredRun {
+    const id = randomUUID();
+    db.prepare("INSERT INTO sprocket_runs (id, chat_id, sprocket_id, status, trigger, source_id, from_id, hop, created_at) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?)").run(
+      id,
+      r.chatId,
+      r.sprocketId,
+      r.trigger,
+      r.sourceId ?? null,
+      r.from ?? null,
+      r.hop ?? 0,
+      new Date().toISOString(),
+    );
+    return this.get(id)!;
+  },
+  get(id: string): StoredRun | undefined {
+    const r = db.prepare("SELECT * FROM sprocket_runs WHERE id = ?").get(id) as RunRow | undefined;
+    return r && toRun(r);
+  },
+  /** Runs with one of `statuses`, oldest first; in one chat with `chatId`. */
+  list(statuses: RunStatus[], chatId?: string): StoredRun[] {
+    const marks = statuses.map(() => "?").join(", ");
+    const rows = chatId
+      ? db.prepare(`SELECT * FROM sprocket_runs WHERE status IN (${marks}) AND chat_id = ? ORDER BY created_at, rowid`).all(...statuses, chatId)
+      : db.prepare(`SELECT * FROM sprocket_runs WHERE status IN (${marks}) ORDER BY created_at, rowid`).all(...statuses);
+    return (rows as RunRow[]).map(toRun);
+  },
+  /** When a Sprocket's latest earlier run in a chat (not `exceptId`) that answered started (failed and cancelled ones didn't answer). */
+  lastStart(chatId: string, sprocketId: string, exceptId: string): string | undefined {
+    const r = db
+      .prepare(
+        "SELECT started_at FROM sprocket_runs WHERE chat_id = ? AND sprocket_id = ? AND id != ? AND started_at IS NOT NULL AND status IN ('done', 'waiting', 'running') ORDER BY started_at DESC LIMIT 1",
+      )
+      .get(chatId, sprocketId, exceptId) as { started_at: string } | undefined;
+    return r?.started_at;
+  },
+  setStatus(id: string, status: RunStatus, error?: string): void {
+    const now = new Date().toISOString();
+    if (status === "running") db.prepare("UPDATE sprocket_runs SET status = ?, started_at = ? WHERE id = ?").run(status, now, id);
+    else if (status === "queued" || status === "waiting") db.prepare("UPDATE sprocket_runs SET status = ? WHERE id = ?").run(status, id);
+    else db.prepare("UPDATE sprocket_runs SET status = ?, error = ?, ended_at = ? WHERE id = ?").run(status, error ?? null, now, id);
+  },
+  /** End a chat's runs with one of `statuses` (cancelled). Returns how many. */
+  cancel(chatId: string, statuses: RunStatus[]): number {
+    const marks = statuses.map(() => "?").join(", ");
+    return Number(
+      db.prepare(`UPDATE sprocket_runs SET status = 'cancelled', ended_at = ? WHERE chat_id = ? AND status IN (${marks})`).run(new Date().toISOString(), chatId, ...statuses).changes,
+    );
   },
 };
 
@@ -541,15 +857,29 @@ export const suggestions = {
     const r = db.prepare("SELECT * FROM suggestions WHERE id = ?").get(id) as SuggestionRow | undefined;
     return r && toSuggestion(r);
   },
-  /** A Sprocket's shown suggestions (those whose reply was saved), by reply. */
-  byMessage(sprocketId: string): Map<string, Suggestion[]> {
-    const rows = db.prepare("SELECT * FROM suggestions WHERE sprocket_id = ? AND message_id IS NOT NULL ORDER BY created_at, rowid").all(sprocketId) as SuggestionRow[];
+  /** The suggestions shown in a chat (those whose reply was saved), by reply. */
+  byMessage(chatId: string): Map<string, Suggestion[]> {
+    const rows = db
+      .prepare("SELECT s.* FROM suggestions s JOIN sprocket_messages m ON m.id = s.message_id WHERE m.chat_id = ? ORDER BY s.created_at, s.rowid")
+      .all(chatId) as SuggestionRow[];
     const map = new Map<string, Suggestion[]>();
     for (const r of rows) {
       const { sprocketId: _s, messageId: _m, ...s } = toSuggestion(r);
       map.set(r.message_id!, [...(map.get(r.message_id!) ?? []), s]);
     }
     return map;
+  },
+  /** Under a chat's replies: the ones that still wait (to expire when it's cleared), or how many wait for the user. */
+  waitingIn(chatId: string): string[] {
+    return (
+      db
+        .prepare("SELECT s.id FROM suggestions s JOIN sprocket_messages m ON m.id = s.message_id WHERE m.chat_id = ? AND s.status IN ('pending', 'failed')")
+        .all(chatId) as { id: string }[]
+    ).map((r) => r.id);
+  },
+  pendingIn(chatId: string): number {
+    const r = db.prepare("SELECT count(*) AS n FROM suggestions s JOIN sprocket_messages m ON m.id = s.message_id WHERE m.chat_id = ? AND s.status = 'pending'").get(chatId) as { n: number };
+    return Number(r.n);
   },
   /** Panels where a Sprocket's shown suggestions wait for the user. */
   pendingPanels(sprocketId: string): string[] {

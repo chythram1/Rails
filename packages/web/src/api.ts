@@ -21,6 +21,8 @@ import type {
   Suggestion,
   SignIn,
   Sprocket,
+  SprocketTeam,
+  SprocketTeamInput,
   SprocketInput,
   SprocketMessage,
   SprocketSettings,
@@ -106,9 +108,16 @@ export const api = {
   createSprocket: (body: SprocketInput) => req<Sprocket>("/api/sprockets", { method: "POST", body: JSON.stringify(body) }),
   updateSprocket: (id: string, body: SprocketInput) => req<Sprocket>("/api/sprockets/" + enc(id), { method: "PUT", body: JSON.stringify(body) }),
   deleteSprocket: (id: string) => req("/api/sprockets/" + enc(id), { method: "DELETE" }),
-  sprocketMessages: (id: string) => req<SprocketMessage[]>(`/api/sprockets/${enc(id)}/messages`),
-  sendSprocketMessage: (id: string, text: string) =>
-    req<SprocketMessage>(`/api/sprockets/${enc(id)}/messages`, { method: "POST", body: JSON.stringify({ text }) }),
+  /** Team chats (ADR 0022). */
+  teams: () => req<SprocketTeam[]>("/api/teams"),
+  createTeam: (body: SprocketTeamInput) => req<SprocketTeam>("/api/teams", { method: "POST", body: JSON.stringify(body) }),
+  updateTeam: (id: string, body: SprocketTeamInput) => req<SprocketTeam>("/api/teams/" + enc(id), { method: "PUT", body: JSON.stringify(body) }),
+  deleteTeam: (id: string) => req("/api/teams/" + enc(id), { method: "DELETE" }),
+  /** A Sprocket's direct chat, its project's chat (ADR 0021) or a team's (ADR 0022), by the chat's id. */
+  chatMessages: (chatId: string) => req<SprocketMessage[]>(`/api/chats/${enc(chatId)}/messages`),
+  sendChatMessage: (chatId: string, text: string) =>
+    req<SprocketMessage>(`/api/chats/${enc(chatId)}/messages`, { method: "POST", body: JSON.stringify({ text }) }),
+  clearChat: (chatId: string) => req(`/api/chats/${enc(chatId)}/messages`, { method: "DELETE" }),
   sprocketSettings: (id: string, body: SprocketSettings) =>
     req<Sprocket>(`/api/sprockets/${enc(id)}/settings`, { method: "PUT", body: JSON.stringify(body) }),
   sendSuggestion: (id: string, text: string) => req<Suggestion>(`/api/suggestions/${enc(id)}/send`, { method: "POST", body: JSON.stringify({ text }) }),

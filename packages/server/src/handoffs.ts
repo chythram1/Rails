@@ -10,7 +10,7 @@
 // (The capabilities use this module, so it doesn't import sprockets.ts, which imports the runs.)
 import { HANDOFF_NOTE_MAX, type Panel } from "@rails/shared";
 import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
-import { handoffs, panels, sessionEvents, sprocketMessages, sprockets, type StoredHandoff } from "./db.ts";
+import { handoffs, panels, sessionEvents, sprocketChats, sprocketMessages, sprockets, type StoredHandoff } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { sessionTitle } from "./titles.ts";
 import { listeners } from "./util.ts";
@@ -87,7 +87,9 @@ export function findHandoff(sprocketId: string, id: string): StoredHandoff {
 /** End a pending handoff, with a line in its Coordinator's chat when it didn't happen. False if it wasn't pending. */
 export function end(h: StoredHandoff, status: "done" | "cancelled" | "expired", why?: string): boolean {
   if (!handoffs.end(h.id, status)) return false;
-  if (why && sprockets.get(h.sprocketId)) sprocketMessages.create(h.sprocketId, "notice", `Handoff from \u201c${h.from.title}\u201d to \u201c${h.to.title}\u201d ${status}: ${why}`);
+  // In the project chat, with the handoff's events (ADR 0021).
+  const chat = sprocketChats.of(h.sprocketId, "project");
+  if (why && chat) sprocketMessages.create(chat.id, "notice", `Handoff from \u201c${h.from.title}\u201d to \u201c${h.to.title}\u201d ${status}: ${why}`);
   changes.emit();
   return true;
 }

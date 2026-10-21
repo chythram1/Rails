@@ -18,7 +18,7 @@ import { panels, projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
 import { listFolder, previewFile } from "./tree.ts";
 import { nameSession } from "./names.ts";
-import type { AgentProfileInput, OpenPanel, SavedPromptInput, SprocketInput, SprocketSettings } from "@rails/shared";
+import type { AgentProfileInput, OpenPanel, SavedPromptInput, SprocketTeamInput, SprocketInput, SprocketSettings } from "@rails/shared";
 import { createPrompt, createProfile, deletePrompt, deleteProfile, listPrompts, listProfiles, profileUses, updatePrompt, updateProfile as updateAgentProfile } from "./customize.ts";
 import { closePanel, getWorkspace, openPanel, saveLayout } from "./panels.ts";
 import { ServiceError } from "./errors.ts";
@@ -26,8 +26,10 @@ import { attachPickedFolder, attachProject, detachProject, getProject, listProje
 import { providerInfo } from "./providers/index.ts";
 import { getProfile, updateProfile } from "./profile.ts";
 import { cancelSignIn, modelSettings, removeCredential, setApiKey, setDefaultModel, startSignIn, submitSignInCode } from "./models.ts";
-import { createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets.ts";
+import { createTeam, deleteTeam, listTeams, updateTeam } from "./teams.ts";
+import { clearChat, createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets.ts";
 import { TerminalHub } from "./terminals.ts";
+import { resumeRuns } from "./runs.ts";
 import { startWatches } from "./watches.ts";
 import { startOverlaps } from "./overlaps.ts";
 import { cancelHandoff, startHandoffs } from "./handoffs.ts";
@@ -270,11 +272,29 @@ app.delete("/api/sprockets/:id", (c) => {
 
 app.put("/api/sprockets/:id/settings", async (c) => c.json(updateSettings(c.req.param("id"), await c.req.json<SprocketSettings>())));
 
-app.get("/api/sprockets/:id/messages", (c) => c.json(listMessages(c.req.param("id"))));
+// Team chats (ADR 0022): the user and two to four Sprockets. Their messages are a chat's, below.
+app.get("/api/teams", (c) => c.json(listTeams()));
 
-app.post("/api/sprockets/:id/messages", async (c) =>
+app.post("/api/teams", async (c) => c.json(createTeam(await c.req.json<Partial<SprocketTeamInput>>()), 201));
+
+app.put("/api/teams/:id", async (c) => c.json(updateTeam(c.req.param("id"), await c.req.json<Partial<SprocketTeamInput>>())));
+
+app.delete("/api/teams/:id", (c) => {
+  deleteTeam(c.req.param("id"));
+  return c.json({ ok: true });
+});
+
+// Chats (ADR 0021, 0022): a Sprocket's direct chat, its project's chat and teams, by chat id. DELETE clears one.
+app.get("/api/chats/:id/messages", (c) => c.json(listMessages(c.req.param("id"))));
+
+app.post("/api/chats/:id/messages", async (c) =>
   c.json(sendMessage(c.req.param("id"), (await c.req.json<{ text?: unknown }>()).text), 201),
 );
+
+app.delete("/api/chats/:id/messages", (c) => {
+  clearChat(c.req.param("id"));
+  return c.json({ ok: true });
+});
 
 // Replies a Coordinator suggests (ADR 0010): the user sends them (edited or not) or dismisses them.
 app.post("/api/suggestions/:id/send", async (c) => {
@@ -307,6 +327,7 @@ startOwners(); // owners go with their panels
 startShellEdits(); // files shell commands change count as edits too
 startSuggestions(); // suggested replies expire as their sessions move on
 startDecisions(); // the fast decision model judges in shadow, if the user picked one
+resumeRuns(); // Sprocket runs cut off by the last shutdown say so; queued ones start (ADR 0023)
 watchCodex(panels.all()); // Codex panels that survived a restart
 
 void tmuxVersion().then((v) => {

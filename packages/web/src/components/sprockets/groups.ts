@@ -8,7 +8,9 @@ export interface Group {
 }
 
 const GENERAL = "general";
-export const lastActive = (s: Sprocket) => s.lastMessage?.createdAt ?? s.createdAt;
+/** When it last spoke or was written to, in either of its chats. */
+export const lastActive = (s: Sprocket) =>
+  [s.direct.lastMessage?.createdAt, s.projectChat?.lastMessage?.createdAt, s.createdAt].filter((t): t is string => !!t).sort().at(-1)!;
 
 /**
  * Sprockets by project, in the sidebar's order, then General (unattached). In each, the Coordinator first,
