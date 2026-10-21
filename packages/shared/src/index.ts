@@ -115,6 +115,31 @@ export interface GitFile {
   status: string;
 }
 
+/** A file's state in git, for the file tree (porcelain codes, read): what changed since the last commit. */
+export type GitState = "modified" | "added" | "deleted" | "renamed" | "untracked" | "conflict";
+
+/** One entry of a folder in the file tree (the side panel's Files tab). */
+export interface FileEntry {
+  name: string;
+  /** From the project's folder, with `/`. */
+  path: string;
+  dir: boolean;
+  /** A file's state; for a folder, the strongest state of what it holds. None when unchanged. */
+  git?: GitState;
+  /** git ignores it (build output, dependencies, private files). */
+  ignored?: true;
+}
+
+export interface FolderListing {
+  path: string;
+  entries: FileEntry[];
+  /** It holds more entries than one listing shows. */
+  more: boolean;
+  isRepo: boolean;
+  /** Files git has as deleted in this folder (gone from the disk, so not among the entries). */
+  deleted: string[];
+}
+
 export interface GitStatus {
   isRepo: boolean;
   branch?: string;

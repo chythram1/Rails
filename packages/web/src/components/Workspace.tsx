@@ -312,13 +312,13 @@ function HeaderAdd(props: IDockviewHeaderActionsProps) {
 }
 
 /**
- * The side panel's toggle (SidePanel.tsx: Sprockets and Git). Desktop shows it once, at the right end of the
+ * The side panel's toggle (SidePanel.tsx: Sprockets, Files and Git). Desktop shows it once, at the right end of the
  * top-right pane's tab bar. It carries a dot while a reply waits in one of the project's Sprockets.
  */
 function SideToggles() {
   const { sideOpen, toggleSide, replyReady } = useWs();
   const ready = replyReady.size;
-  const label = `Sprockets and Git${ready ? ` (${ready > 1 ? `${ready} replies` : "1 reply"} waiting)` : ""}`;
+  const label = `Sprockets, files and Git${ready ? ` (${ready > 1 ? `${ready} replies` : "1 reply"} waiting)` : ""}`;
   return (
     <div className="side-toggles">
       <button className={"icon-btn" + (sideOpen ? " active" : "")} aria-label={label} aria-pressed={sideOpen} title={label} onClick={toggleSide}>

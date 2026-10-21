@@ -101,9 +101,10 @@ for future ideas, which aren't commitments. Reference screenshots for the look a
 | `packages/server/src/names.ts` | Session names (ADR 0019): the name the user gives a session in Rails (`nameSession`; `session_names` in the DB), shown instead of the agent's title. The web side is `RenameSession.tsx`, opened from a sidebar row's menu or a tab's double-click. |
 | `packages/server/src/titles.ts` | `sessionTitle(panel)`: a session's title as the user sees it (its Rails name first). Depends only on the database and discovery, so any service can use it without an import cycle. |
 | `packages/server/src/git.ts` | Read-only git status and diff through the git CLI. |
+| `packages/server/src/tree.ts` | The file tree (side panel's Files tab): one folder at a time with each entry's git state, and read-only previews (the secret policy of `files.ts`). |
 | `packages/server/src/providers/` | One discovery adapter per provider (`scan`: cwd, title, dates from the head/tail of each transcript). `index.ts` holds the registry and `installed()`. |
 | `packages/web/src/components/Workspace.tsx` | The workspace: dockview layout (`Dock`), tabs, `+` menu, the side panel's toggles, and the one-panel-at-a-time mobile view. Data comes from `useWorkspace.ts`. |
-| `packages/web/src/components/SidePanel.tsx` | The panel beside a workspace, behind one toggle: tabs for the project's Sprockets' chats (where suggested replies wait) and Git (`GitPanel.tsx`). Rows of tabs take arrow keys through `tabKeys.ts`. |
+| `packages/web/src/components/SidePanel.tsx` | The panel beside a workspace, behind one toggle: tabs for the project's Sprockets' chats (where suggested replies wait), Files (`FilesPanel.tsx`) and Git (`GitPanel.tsx`). Rows of tabs take arrow keys through `tabKeys.ts`. |
 | `packages/web/src/components/FolderMenu.tsx` | The Add project menu: search + recent agent folders + "Open folder…" (native picker). Popover placement comes from `usePopover` in `Menu.tsx`. |
 | `packages/server/src/sprockets.ts` | Sprocket services (ADR 0005, 0006): create/rename/delete, settings (project, model, description, Coordinator) and messages. Core memory is internal (`runs.ts`, never sent to browsers). Emits `onSprocketsChanged`. |
 | `packages/server/src/runs.ts` | Sprocket runs (ADR 0006): one bounded pi-agent-core loop per reply, the runaway guards, the `remember` tool. |

@@ -1,5 +1,6 @@
 import type {
   DecisionLog,
+  FolderListing,
   GitStatus,
   ModelSettings,
   OpenPanel,
@@ -83,6 +84,8 @@ export const api = {
   saveLayout: (projectId: string, layout: unknown) =>
     req(`/api/projects/${enc(projectId)}/layout`, { method: "PUT", body: JSON.stringify({ layout }) }),
   git: (projectId: string) => req<GitStatus>(`/api/projects/${enc(projectId)}/git`),
+  files: (projectId: string, dir: string) => req<FolderListing>(`/api/projects/${enc(projectId)}/files?dir=${enc(dir)}`),
+  fileText: (projectId: string, path: string) => req<{ text: string; cut: boolean }>(`/api/projects/${enc(projectId)}/files/content?path=${enc(path)}`),
   diff: (projectId: string, path: string) => req<string>(`/api/projects/${enc(projectId)}/git/diff?path=${enc(path)}`),
   sprockets: () => req<Sprocket[]>("/api/sprockets"),
   createSprocket: (body: SprocketInput) => req<Sprocket>("/api/sprockets", { method: "POST", body: JSON.stringify(body) }),

@@ -16,6 +16,7 @@ import { piInbox } from "./bridge/deliver.ts";
 import { loadAttention, receive, tokenOk as bridgeTokenOk } from "./bridge/index.ts";
 import { panels, projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
+import { listFolder, previewFile } from "./tree.ts";
 import type { OpenPanel, SprocketInput, SprocketSettings } from "@rails/shared";
 import { nameSession } from "./names.ts";
 import { closePanel, getWorkspace, openPanel, saveLayout } from "./panels.ts";
@@ -191,6 +192,10 @@ app.put("/api/projects/:id/layout", async (c) => {
   saveLayout(c.req.param("id"), (await c.req.json<{ layout: unknown }>()).layout);
   return c.json({ ok: true });
 });
+
+// ---- the file tree (read-only) ----
+app.get("/api/projects/:id/files", async (c) => c.json(await listFolder(getProject(c.req.param("id")).path, c.req.query("dir") ?? "")));
+app.get("/api/projects/:id/files/content", async (c) => c.json(await previewFile(getProject(c.req.param("id")).path, c.req.query("path") ?? "")));
 
 // ---- git (read-only) ----
 app.get("/api/projects/:id/git", async (c) => c.json(await gitStatus(getProject(c.req.param("id")).path)));
