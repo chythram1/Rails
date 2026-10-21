@@ -21,6 +21,8 @@ export default function railsBridge(pi: any) {
       headers: { Authorization: `Bearer ${token}` },
       exposure: "direct",
       description: "Rails: the other coding sessions in this project",
+      // Seconds for one call (pi's default is 60): wait_for waits up to 100 (TOOL_TIMEOUT_MS in wiring.ts).
+      timeout: 150,
     });
   } catch {
     // no agent tools

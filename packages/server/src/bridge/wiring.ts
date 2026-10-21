@@ -13,6 +13,12 @@ import { fileURLToPath } from "node:url";
 import type { PanelKind } from "@rails/shared";
 import { PORT } from "../config.ts";
 
+/**
+ * The agents' limit for one call of Rails' agent tools (Claude Code's `timeout` in ms; pi's in seconds, in
+ * pi/rails.ts): above wait_for's 100 seconds (WAIT_MS in agentTools.ts). pi's own default is 60 s.
+ */
+export const TOOL_TIMEOUT_MS = 150_000;
+
 const PI_EXTENSION = join(dirname(fileURLToPath(import.meta.url)), "pi", "rails.ts");
 
 const CLAUDE_HOOKS = ["UserPromptSubmit", "PostToolUse", "PermissionRequest", "Notification", "Stop", "StopFailure", "SessionEnd"] as const;
@@ -58,7 +64,8 @@ function claudeSettings(panelId: string): string {
  */
 function claudeMcp(panelId: string): string {
   const url = `http://127.0.0.1:${PORT}/bridge/${panelId}/mcp`;
-  return JSON.stringify({ mcpServers: { rails: { type: "http", url, headers: { Authorization: "Bearer ${RAILS_PANEL_TOKEN}" } } } });
+  // `timeout` (ms) is Claude Code's limit for one tool call: wait_for waits up to 100 seconds.
+  return JSON.stringify({ mcpServers: { rails: { type: "http", url, headers: { Authorization: "Bearer ${RAILS_PANEL_TOKEN}" }, timeout: TOOL_TIMEOUT_MS } } });
 }
 
 /** Flags that wire an agent to the bridge, inserted right after its program name. */

@@ -8,7 +8,8 @@ import { timingSafeEqual } from "node:crypto";
 export function listeners<Args extends unknown[] = []>() {
   const fns = new Set<(...args: Args) => void>();
   return {
-    on: (fn: (...args: Args) => void) => void fns.add(fn),
+    /** Returns a function that removes `fn` again. */
+    on: (fn: (...args: Args) => void) => (fns.add(fn), () => void fns.delete(fn)),
     emit: (...args: Args) => fns.forEach((fn) => fn(...args)),
   };
 }

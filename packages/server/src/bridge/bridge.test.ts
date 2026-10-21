@@ -9,6 +9,7 @@ import { bridgeFlags } from "./wiring.ts";
 import { fromClaude, fromCodex, fromPi } from "./events.ts";
 import { attentionList, bridgeEnv, cardOf, receive, tokenOk } from "./index.ts";
 import { projectCapabilities } from "../harness/project.ts";
+import { WAIT_MS } from "../agentTools.ts";
 
 // Payloads as Claude Code 2.1.302, pi 1.3 (through pi/rails.ts) and Codex 0.163 sent them in the
 // experiments (scratch notes; trimmed).
@@ -77,6 +78,7 @@ describe("wiring", () => {
     const server = JSON.parse(flags[at + 1]).mcpServers.rails;
     expect(server).toMatchObject({ type: "http", headers: { Authorization: "Bearer ${RAILS_PANEL_TOKEN}" } });
     expect(server.url).toMatch(/\/bridge\/p1\/mcp$/);
+    expect(server.timeout).toBeGreaterThan(WAIT_MS); // a whole wait_for fits
     // --mcp-config takes several values: a flag must follow it, or it would swallow the session id or the prompt.
     expect(flags[at + 2]).toMatch(/^--/);
   });

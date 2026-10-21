@@ -91,7 +91,8 @@ const fromPanel = (c: Context, panelId: string) =>
 app.post("/bridge/:panelId/mcp", bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({}, 413) }), async (c) => {
   const panelId = c.req.param("panelId");
   if (!fromPanel(c, panelId)) return c.json({ error: "Unauthorized" }, 401);
-  const reply = await mcpRequest(panelId, await c.req.json().catch(() => null));
+  // The request's signal ends a wait_for when the agent gives up on the call (interrupted, or its time ran out).
+  const reply = await mcpRequest(panelId, await c.req.json().catch(() => null), c.req.raw.signal);
   return reply ? c.json(reply) : c.body(null, 202);
 });
 app.get("/bridge/:panelId/mcp", (c) => c.body(null, 405));

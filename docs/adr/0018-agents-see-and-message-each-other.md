@@ -1,7 +1,7 @@
 # ADR 0018: Agents see and message each other
 
-Status: accepted in part (builds on ADR 0007, 0010, 0015 and 0016). `neighbours` and `message` are built for
-Claude Code and pi (`agentTools.ts`); `wait_for` is still proposed.
+Status: accepted (builds on ADR 0007, 0010, 0015 and 0016). `neighbours`, `message` and `wait_for` are built for
+Claude Code and pi (`agentTools.ts`); Codex has none yet.
 
 Today a project's sessions know nothing of each other: only the Coordinator sees across them, and everything that
 passes between them is a draft the Coordinator writes. The second test run showed both halves of the cost. The
@@ -56,10 +56,18 @@ Decisions (proposed):
     - at once, if it ended, its panel closed, or the panel moved on to another session (a wait follows the
       session, not the panel, as handoffs do, ADR 0015): which of these;
     - otherwise when it next ends a turn, stops, fails or waits for the user, with that status and its last reply;
-    - or after 2 minutes with "still working", so the agent can call again. Two minutes stays under the agents'
-      tool timeouts (for Claude Code Rails sets the server's `timeout` in the config it passes, as Claude Code's
-      MCP docs describe; pi's tools have none).
+    - or after 100 seconds with "still working", so the agent can call again.
     Each result also lists the files the session changed while the agent waited.
+    As built: both agents limit one MCP call, so Rails sets the limit to 150 s in the config it passes (Claude
+    Code's per-server `timeout` in ms; pi's `timeout` in seconds, whose default of 60 would have cut a wait
+    short). The wait is 100 s, not 2 minutes: Claude Code moves an MCP call that's still running after 120 s to
+    the background and notifies it later (2.1.305), which left a stale "still working" arriving after a second
+    call had already answered. An agent can end its turn saying it will carry on by itself (Claude Code does once
+    a background command finishes), so `next: true` waits for the next turn even when the session isn't working,
+    and the idle answer says so. Two sessions can't wait for each other: the second call answers at once that the
+    other is waiting for it. The wait ends if the agent gives up on the call (its HTTP request closes). Checked
+    with Claude Code 2.1.305 and pi 1.3: pi called it unasked when told to wait for the engine session and got the
+    finished turn after 79 s; Claude called it, got "still working" at 100 s, called again and got the result.
 - **Wiring, by flags only** (the invariant of ADR 0007):
   - Claude Code: `--mcp-config` with an HTTP server at `/bridge/<panel>/mcp` and `Authorization: Bearer
     ${RAILS_PANEL_TOKEN}`. Checked with 2.1.304: a server added this way connects without an approval prompt,

@@ -144,7 +144,8 @@ three). Files changed by shell commands count too (ADR 0016).
 Agent tools (ADR 0018): Claude Code and pi panels get Rails' MCP server at `/bridge/<panel>/mcp`, behind the
 panel's token (`agentTools.ts`): Claude Code from `--mcp-config`, pi from the Rails extension. `neighbours` shows an
 agent the other sessions in its project; `message` drafts a message for one of them, which waits in the
-Coordinator's chat until the user sends it (no model runs). Codex panels get none (it would need the user's config
+Coordinator's chat until the user sends it (no model runs); `wait_for` waits, up to 100 seconds a call, until
+another session ends its turn, stops, fails or needs its user. Codex panels get none (it would need the user's config
 or a `-c` flag), but they receive messages.
 
 A provider is only offered when its CLI is on the server's `PATH` (`ProviderInfo.installed`).
