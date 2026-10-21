@@ -1,10 +1,10 @@
 import { fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall } from "@earendil-works/pi-ai";
 import { SPROCKET_DESCRIPTION_MAX } from "@rails/shared";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projects, settings, sprockets } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { CORE_MEMORY_MAX, editMemory } from "./harness/memory.ts";
-import { idle, onActivity, onTyping, readableError } from "./runs.ts";
+import { idle, isRunning, onActivity, onTyping, readableError, REQUEST_TIMEOUT_MS, RETRY_MS } from "./runs.ts";
 import { sprocketMessages } from "./db.ts";
 import { createSprocket, deleteSprocket, detachFromProject, listMessages, listSprockets, sendMessage, updateSettings } from "./sprockets.ts";
 
@@ -123,10 +123,112 @@ describe("runs", () => {
 
   it("reports model errors as a notice", async () => {
     const s = sprocket();
-    faux.setResponses([fauxAssistantMessage([fauxText("")], { stopReason: "error", errorMessage: "rate limited" })]);
+    faux.setResponses([fauxAssistantMessage([fauxText("")], { stopReason: "error", errorMessage: "Incorrect API key provided." })]);
     sendMessage(s.id, "hello");
     await idle();
-    expect(authors(s.id).at(-1)).toBe("notice: The model returned an error: rate limited");
+    expect(authors(s.id).at(-1)).toBe("notice: The model returned an error: Incorrect API key provided.");
+  });
+
+  describe("when the provider fails", () => {
+    /** The provider fails, and the clock goes fake from here, so the wait before a retry can be skipped. */
+    const failure = (errorMessage: string) => () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      return fauxAssistantMessage([fauxText("")], { stopReason: "error", errorMessage });
+    };
+    afterEach(() => vi.useRealTimers());
+    // Run 3's failures, as pi-ai reports them.
+    const DROPPED = "Connection error.";
+    const BUSY = 'OpenAI API error (503): {"error":{"message":"The ChatGPT user is temporarily unavailable. Please try again later."}}';
+    const HUNG = "Request timed out.";
+    const LIMIT = 'OpenAI API error (429): {"error":{"code":"subscription_sharing_usage_limit_exceeded","message":"The ChatGPT user has reached their Subscription Sharing usage limit."}}';
+
+    /** Send a message and let the run finish, skipping the wait before a retry. */
+    async function reply(id: string, text: string) {
+      sendMessage(id, text);
+      while (isRunning(id)) {
+        if (vi.isFakeTimers() && vi.getTimerCount()) await vi.advanceTimersByTimeAsync(RETRY_MS);
+        await new Promise((r) => setImmediate(r));
+      }
+      vi.useRealTimers();
+      await idle();
+    }
+
+    it("tries once more after a dropped connection or a busy provider, and replies", async () => {
+      for (const error of [DROPPED, BUSY]) {
+        const s = sprocket();
+        const steps: (string | null)[] = [];
+        onActivity((id, step) => id === s.id && steps.push(step));
+        faux.setResponses([failure(error), fauxAssistantMessage("Here it is.")]);
+        await reply(s.id, "hello");
+        expect(authors(s.id)).toEqual(["user: hello", "sprocket: Here it is."]); // no notice
+        expect(steps).toContain("Trying the model again");
+      }
+    });
+
+    it("gives up on a request the provider doesn't answer, then tries once more", async () => {
+      const s = sprocket();
+      let timeout: number | undefined;
+      faux.setResponses([
+        (_context, options) => {
+          timeout = options?.timeoutMs;
+          return failure(HUNG)();
+        },
+        fauxAssistantMessage("Here it is."),
+      ]);
+      await reply(s.id, "hello");
+      expect(timeout).toBe(REQUEST_TIMEOUT_MS);
+      expect(REQUEST_TIMEOUT_MS).toBeLessThan(5 * 60_000); // what a hung request waited in run 3
+      expect(authors(s.id)).toEqual(["user: hello", "sprocket: Here it is."]);
+    });
+
+    it("tries only once, then reports the error", async () => {
+      const s = sprocket();
+      faux.setResponses([failure(DROPPED), failure(DROPPED), fauxAssistantMessage("never")]);
+      await reply(s.id, "hello");
+      expect(authors(s.id)).toEqual(["user: hello", "notice: The model returned an error: Connection error."]);
+      expect(faux.getPendingResponseCount()).toBe(1);
+      faux.setResponses([]);
+    });
+
+    it("doesn't retry a usage limit, which won't pass in seconds", async () => {
+      const s = sprocket();
+      faux.setResponses([failure(LIMIT), fauxAssistantMessage("never")]);
+      await reply(s.id, "hello");
+      expect(authors(s.id).at(-1)).toBe("notice: The model returned an error: 429 The ChatGPT user has reached their Subscription Sharing usage limit.");
+      expect(faux.getPendingResponseCount()).toBe(1);
+      faux.setResponses([]);
+    });
+
+    it("goes on from where the run was, so work it did isn't done again", async () => {
+      const s = sprocket();
+      let ran = 0;
+      faux.setResponses([
+        fauxAssistantMessage([fauxToolCall("codemode", { code: "text('looked')" })], { stopReason: "toolUse" }),
+        failure(DROPPED),
+        (context) => {
+          ran = context.messages.filter((m) => m.role === "toolResult").length;
+          return fauxAssistantMessage("Done.");
+        },
+      ]);
+      await reply(s.id, "look");
+      expect(authors(s.id).at(-1)).toBe("sprocket: Done.");
+      expect(ran).toBe(1); // the script's result is still there, once, and no failed reply in between
+      expect(sprocketMessages.recentSteps(s.id, 1).values().next().value?.filter((m: any) => m.role === "assistant" && m.stopReason === "error")).toEqual([]);
+    });
+
+    it("doesn't try again for a Sprocket deleted meanwhile", async () => {
+      const s = sprocket();
+      faux.setResponses([
+        () => {
+          deleteSprocket(s.id);
+          return failure(DROPPED)();
+        },
+        fauxAssistantMessage("never"),
+      ]);
+      await reply(s.id, "hello");
+      expect(faux.getPendingResponseCount()).toBe(1);
+      faux.setResponses([]);
+    });
   });
 
   it("drops the reply of a Sprocket deleted while it was replying", async () => {

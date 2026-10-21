@@ -1,9 +1,11 @@
 // Sprocket runs (ADR 0006): when the user writes to a Sprocket, or Rails wakes a Coordinator because a
 // session waits for the user (watches.ts), one bounded agent run writes its reply. Nothing runs otherwise:
 // idle Sprockets cost nothing. Runs are capped (steps per run, runs per
-// hour) so a bug can't loop and burn the user's provider quota; spending itself is the user's to manage.
+// hour) so a bug can't loop and burn the user's provider quota; spending itself is the user's to manage. A
+// provider failure that may pass (a dropped connection, a busy provider, a request it never answered) is tried
+// once more.
 import { Agent } from "@earendil-works/pi-agent-core";
-import type { Api, AssistantMessage, Message, Model } from "@earendil-works/pi-ai";
+import { isRetryableAssistantError, type Api, type AssistantMessage, type Message, type Model } from "@earendil-works/pi-ai";
 import type { Handoff, SprocketMessage } from "@rails/shared";
 import { AGENT } from "./bridge/board.ts";
 import { handoffs, panels, projects, settings, sprocketMessages, sprockets, suggestions, usage } from "./db.ts";
@@ -33,6 +35,17 @@ const REPLAYED = 3;
 const STEP_RESULT_CHARS = 6000;
 /** How often a reply in progress is sent to browsers. */
 const TYPING_MS = 120;
+/**
+ * How long a provider gets to start answering a request: the OpenAI and Anthropic SDKs (and Mistral's) stop
+ * waiting once the reply starts, so a long reply isn't cut; Google's ignores it. Unset, a request that hung waited
+ * 5 minutes for Node's own limit.
+ */
+export const REQUEST_TIMEOUT_MS = 90_000;
+/**
+ * The wait before trying the model again after a provider failure that may pass (pi-ai tells which). The run keeps
+ * its place among the MAX_ACTIVE meanwhile, so it's short.
+ */
+export const RETRY_MS = 15_000;
 
 const running = new Set<string>();
 /** Sprockets that got new messages while their run was going: they reply again afterwards. */
@@ -181,7 +194,7 @@ async function run(id: string) {
       tools: [code],
       messages: context,
     },
-    streamFn: models.streamSimple.bind(models),
+    streamFn: (m, c, options) => models.streamSimple(m, c, { ...options, timeoutMs: REQUEST_TIMEOUT_MS }),
     sessionId: id,
   });
 
@@ -199,6 +212,16 @@ async function run(id: string) {
   const projectId = s.projectId;
   try {
     await agent.continue();
+    // Once more after a failure that may pass, from where the run was: the failed call goes, the work before it
+    // stays (a script that ran isn't run again, a handoff it carried out keeps its draft). Not a usage limit.
+    const failed = agent.state.messages.at(-1);
+    if (failed?.role === "assistant" && isRetryableAssistantError(failed as AssistantMessage)) {
+      agent.state.messages = agent.state.messages.slice(0, -1);
+      activityChanges.emit(id, "Trying the model again", summarize(capabilities, done) ?? null);
+      await new Promise((r) => setTimeout(r, RETRY_MS));
+      const now = sprockets.get(id); // deleted or moved meanwhile: save() drops the reply, so don't ask for one
+      if (now && now.projectId === projectId) await agent.continue();
+    }
     save();
   } finally {
     suggestions.drop(made); // a run that saved no reply: its suggestions would have nothing to show under
