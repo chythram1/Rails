@@ -6,7 +6,8 @@ import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-work
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { CodexWatcher } from "./bridge/codex.ts";
 import { PiInbox, piInbox } from "./bridge/deliver.ts";
-import { receive } from "./bridge/index.ts";
+import { receive, record } from "./bridge/index.ts";
+import { fromCodex } from "./bridge/events.ts";
 import { panels, projects, settings, sprocketMessages, suggestions } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
@@ -425,5 +426,50 @@ describe("answering pi dialogs (ADR 0027)", () => {
     const t = shownDraft(lead.id, lead.id, other, "Old", "Blue");
     expect(t.dialog).toBeUndefined();
     await expect(sendSuggestion(t.id, undefined)).rejects.toThrow("Answer it in the session's panel.");
+  });
+});
+
+describe("answering Codex's questions (ADR 0027)", () => {
+  const ask = (turnId: string) =>
+    fromCodex("item/completed", {
+      threadId: "t1",
+      turnId,
+      item: { type: "agentMessage", delivery: "async", text: "Dark or light?", questions: [{ title: "Dark or light theme for the HUD?", options: ["Dark", "Light"] }] },
+    });
+
+  it("reads a question Codex asks while its turn goes on", () => {
+    expect(ask("turn-1")).toEqual([
+      { kind: "waiting", reason: "question", questions: [{ question: "Dark or light theme for the HUD?", options: ["Dark", "Light"] }], dialog: { id: "turn-1", kind: "steer", options: ["Dark", "Light"] } },
+    ]);
+    // An ordinary final message isn't a question.
+    expect(fromCodex("item/completed", { item: { type: "agentMessage", text: "Done.", questions: null } })).toEqual([]);
+  });
+
+  it("keeps the answer while Codex works on, and drafts it as the option's label or the text", () => {
+    const { lead, project } = setup();
+    const codex = panels.create({ projectId: project.id, kind: "codex", title: "Gameplay", sessionId: `t-${Math.random()}` });
+    record(codex.id, ask("turn-1"));
+    const s = suggest(lead.id, codex, "Gameplay", "dark");
+    expect(s).toMatchObject({ mode: "answer", dialog: { id: "turn-1", text: "Dark" } });
+    record(codex.id, [{ kind: "tool", tool: "shell", files: [], edit: false, command: "sleep 60" }]); // it waits by working
+    expect(suggestions.get(s.id)!.status).toBe("pending");
+    const t = suggest(lead.id, codex, "Gameplay", "Dark, with brass accents");
+    expect(t.dialog).toEqual({ id: "turn-1", text: "Dark, with brass accents" });
+    record(codex.id, [{ kind: "prompt", text: "Light" }]); // answered in the panel
+    expect(suggestions.get(t.id)!.status).toBe("expired");
+  });
+
+  it("steers the question's turn, or sends the answer as the next message once the turn is over", async () => {
+    const sent: any[] = [];
+    const watcher = new CodexWatcher((m) => sent.push(m), () => {});
+    const steered = watcher.steer("t1", "turn-1", "Dark");
+    expect(sent.at(-1)).toMatchObject({ method: "turn/steer", params: { threadId: "t1", expectedTurnId: "turn-1", input: [{ type: "text", text: "Dark" }] } });
+    watcher.handle({ id: sent.at(-1).id, result: { turnId: "turn-1" } });
+    await expect(steered).resolves.toBeUndefined();
+    const late = watcher.steer("t1", "turn-1", "Dark");
+    watcher.handle({ id: sent.at(-1).id, error: { message: "expected turn mismatch" } });
+    await expect(late).rejects.toThrow("Codex refused the answer: expected turn mismatch");
+    void watcher.steer("t1", undefined, "Dark");
+    expect(sent.at(-1).method).toBe("thread/queue/add");
   });
 });

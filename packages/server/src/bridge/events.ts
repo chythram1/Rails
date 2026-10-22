@@ -29,13 +29,14 @@ export type SessionEvent =
   | { kind: "ended" };
 
 /**
- * A pi dialog Rails can answer (ADR 0027), as the Rails extension reports it: its id there, and what it takes. pi's
- * own select (one of `options`) and input (any text), or a questionnaire from an extension with an answer contract
- * (an option of the questions Rails read from the tool's input, or text).
+ * A question Rails can answer (ADR 0027): its id, and what it takes. In pi, from the Rails extension: pi's own
+ * select (one of `options`) and input (any text), or a questionnaire from an extension with an answer contract (an
+ * option of the questions Rails read from the tool's input, or text). In Codex, `steer`: a question it asked while
+ * its turn goes on, answered by steering that turn (the id is the turn's) with the text.
  */
 export interface DialogRef {
   id: string;
-  kind: "select" | "input" | "questionnaire";
+  kind: "select" | "input" | "questionnaire" | "steer";
   options?: string[];
 }
 
@@ -194,6 +195,16 @@ export function fromCodex(method: string, params: any): SessionEvent[] {
     }
     case "item/completed": {
       const item = params?.item ?? {};
+      // A question Codex asks while its turn goes on ("? 1 question" in its panel): it waits for the answer, steered
+      // into the turn, and may keep working meanwhile (verified with 0.163).
+      if (item.type === "agentMessage" && item.delivery === "async" && Array.isArray(item.questions) && item.questions.length) {
+        const questions = item.questions.slice(0, 10).map((q: any) => ({
+          question: clip(q?.title ?? q?.question, 500),
+          options: (Array.isArray(q?.options) ? q.options : []).slice(0, 20).map((o: any) => clip(typeof o === "string" ? o : (o?.label ?? ""), 200)).filter(Boolean),
+        }));
+        const turnId = typeof params?.turnId === "string" ? params.turnId : undefined;
+        return [{ kind: "waiting", reason: "question", questions, ...(turnId ? { dialog: { id: turnId, kind: "steer", options: questions[0].options } } : {}) }];
+      }
       if (item.type === "userMessage") {
         const text = (item.content ?? []).map((c: any) => (c?.type === "text" ? c.text : "")).join("\n");
         return text.trim() ? [{ kind: "prompt", text: clip(text) }] : [];

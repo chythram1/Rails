@@ -38,3 +38,17 @@ Consequences:
 - Answering several questions at once, Claude Code's question dialog (its hooks can't hold a dialog open for an
   answer), and approvals stay open. A standard answer API in pi itself would replace layers 1 and 2: proposed
   upstream.
+
+## Addendum: Codex's questions
+
+Codex 0.163 asks with `request_user_input` while its turn goes on: an `agentMessage` item with
+`delivery: "async"` and `questions: [{title, options}]`, shown as "? 1 question" in its panel. The turn stays
+active (it sleeps in a tool while it waits), and its panel answers by steering that turn. Rails heard the item and
+ignored it, so these questions never reached the Coordinator (an open item since test run 1).
+
+- Rails reads it as a question wait, with the turn's id as the question's id (`kind: "steer"`). Codex's tool calls
+  while it waits don't end the wait, nor expire a drafted answer; a prompt or the turn's end does.
+- Send answers with `turn/steer {threadId, expectedTurnId, input}`, the text being the option's label when the
+  draft names one. A turn that ended meanwhile gets the answer as the next message (`thread/queue/add`):
+  `thread/queue/add` alone waits for the turn to end, and Codex had answered itself by then (verified live).
+- Codex's approvals stay the user's, in the panel (ADR 0026).

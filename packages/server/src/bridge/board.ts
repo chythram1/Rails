@@ -21,7 +21,7 @@ export interface SessionCard {
    * The pi dialog it waits on, when Rails can answer it (ADR 0027): its id, kind, the options of its (first)
    * question, and how many questions it holds.
    */
-  dialog?: { id: string; kind: "select" | "input" | "questionnaire"; options: string[]; questions: number };
+  dialog?: { id: string; kind: "select" | "input" | "questionnaire" | "steer"; options: string[]; questions: number };
   error?: string;
   /** The latest prompt: what the session was asked to do. */
   intent?: string;
@@ -61,6 +61,7 @@ export function foldCard(panel: { id: string; kind: PanelKind; title: string; se
         c.waitingFor = c.error = c.dialog = undefined;
         break;
       case "tool":
+        // A session that waits keeps waiting (Codex may work on while its question is open).
         if (c.status !== "waiting") c.status = "working";
         if (e.edit) for (const f of e.files) c.edits = [{ file: f, at }, ...c.edits.filter((x) => x.file !== f)].slice(0, MAX_EDITS);
         if (e.command) c.lastCommand = e.command;
@@ -74,7 +75,7 @@ export function foldCard(panel: { id: string; kind: PanelKind; title: string; se
             id: e.dialog.id,
             kind: e.dialog.kind,
             options: e.dialog.options ?? e.questions?.[0]?.options ?? [],
-            questions: e.dialog.kind === "questionnaire" ? (e.questions?.length ?? 0) : 1,
+            questions: e.dialog.kind === "questionnaire" || e.dialog.kind === "steer" ? (e.questions?.length ?? 0) : 1,
           };
         c.status = "waiting";
         break;

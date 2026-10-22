@@ -7,6 +7,7 @@
 import { shortTitle, type Panel, type Suggestion } from "@rails/shared";
 import { AGENT, type SessionCard } from "./bridge/board.ts";
 import { deliver, piInbox } from "./bridge/deliver.ts";
+import { steerCodex } from "./bridge/codex.ts";
 import { ASKING, type SessionEvent } from "./bridge/events.ts";
 import { cardOf, onEvents, onPanelForgotten, onReturned } from "./bridge/index.ts";
 import { panels, sprockets, suggestions } from "./db.ts";
@@ -45,6 +46,8 @@ const plain = (s: string) =>
 export function dialogAnswer(dialog: SessionCard["dialog"], text: string): Suggestion["dialog"] {
   if (!dialog || dialog.questions !== 1 || !text.trim()) return undefined;
   const option = dialog.options.findIndex((o) => plain(o) === plain(text));
+  // Codex takes the answer as text: the option's own label when the draft names one.
+  if (dialog.kind === "steer") return { id: dialog.id, text: option >= 0 ? dialog.options[option] : text.trim() };
   if (dialog.kind === "select") return option >= 0 ? { id: dialog.id, option } : undefined;
   if (dialog.kind === "questionnaire" && option >= 0) return { id: dialog.id, option };
   return { id: dialog.id, text: text.trim() };
@@ -100,7 +103,7 @@ export function suggest(
       if (old.messageId) suggestions.setStatus(old.id, ["pending"], "replaced");
       else suggestions.drop([old.id]); // from this same run: never shown
     }
-  const dialog = mode === "answer" && panel.kind === "pi" ? dialogAnswer(cardOf(panel).dialog, text) : undefined;
+  const dialog = mode === "answer" && (panel.kind === "pi" || panel.kind === "codex") ? dialogAnswer(cardOf(panel).dialog, text) : undefined;
   const s = suggestions.create({ sprocketId, panelId: panel.id, kind: panel.kind, title, sessionId: panel.sessionId, mode, text, rule, attachment, from, dialog });
   changes.emit();
   return shown(s);
@@ -160,11 +163,17 @@ export async function sendSuggestion(id: string, rawText: unknown): Promise<Sugg
   return shown(suggestions.get(id)!);
 }
 
-/** Send an answer to the pi dialog it was drafted for (ADR 0027), as drafted: its option is fixed. */
+/**
+ * Send an answer to the question it was drafted for (ADR 0027), as drafted: a pi dialog's option through the pi
+ * extension, or Codex's question by steering its turn. A Codex question whose turn has ended since gets the answer
+ * as the next message (it's still asked in the panel's queue).
+ */
 async function answerDialog(s: Stored): Promise<Suggestion> {
   const panel = panels.get(s.panelId);
   const card = panel && cardOf(panel);
-  const why = !panel || !card ? "The panel was closed." : card.status !== "waiting" || card.dialog?.id !== s.dialog!.id ? "The dialog has closed." : undefined;
+  const open = card?.status === "waiting" && card.dialog?.id === s.dialog!.id;
+  const afterTurn = panel?.kind === "codex" && card?.status === "idle";
+  const why = !panel || !card ? "The panel was closed." : !open && !afterTurn ? "The dialog has closed." : undefined;
   if (why) {
     if (suggestions.setStatus(s.id, ["pending", "failed"], "expired", { error: why })) changes.emit();
     throw new ServiceError(why, 409);
@@ -172,7 +181,11 @@ async function answerDialog(s: Stored): Promise<Suggestion> {
   if (!suggestions.setStatus(s.id, ["pending", "failed"], "sending")) throw new ServiceError("It's already being sent.", 409);
   changes.emit();
   try {
-    await piInbox.answer(panel!.id, s.dialog!);
+    if (panel!.kind === "codex") {
+      const thread = panel!.sessionId ?? card!.sessionId;
+      if (!thread) throw new Error("Rails can't reach this Codex session. Answer it in its panel.");
+      await steerCodex(thread, open ? s.dialog!.id : undefined, s.dialog!.text ?? s.text);
+    } else await piInbox.answer(panel!.id, s.dialog!);
     suggestions.setStatus(s.id, ["sending"], "sent");
   } catch (e) {
     suggestions.setStatus(s.id, ["sending"], "failed", { error: (e as Error).message });
@@ -191,6 +204,8 @@ export function dismissSuggestion(id: string): Suggestion {
 
 /** The session did something, so an answer suggested for it no longer fits. */
 const movesOn = (e: SessionEvent) => e.kind === "prompt" || e.kind === "tool" || e.kind === "resumed" || e.kind === "stopped";
+/** For a Codex question it may work on past (ADR 0027), its tools don't count: it's still asked. */
+const movesOnFrom = (card: SessionCard | undefined) => (e: SessionEvent) => movesOn(e) && !(e.kind === "tool" && card?.dialog?.kind === "steer");
 
 /** Expire a panel's pending answers, or (`all`) its messages too. */
 /** A chat was cleared (ADR 0021): what waited under its replies can't be sent from it anymore. */
@@ -219,7 +234,7 @@ export function startSuggestions(): void {
   onReturned(returned);
   onEvents((panel, events) => {
     if (events.some((e) => e.kind === "ended")) expireFor(panel.id, { all: true, error: "The session ended." });
-    else if (events.some(movesOn)) expireFor(panel.id);
+    else if (events.some(movesOnFrom(cardOf(panel)))) expireFor(panel.id);
   });
   onPanelForgotten((panelId) => expireFor(panelId, { all: true, error: "The panel was closed." }));
 }

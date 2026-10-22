@@ -39,6 +39,8 @@ export interface Wake {
   decisionId?: string;
   /** A permission whose purpose isn't known yet (Codex says it waits before it says what for). */
   vague?: boolean;
+  /** A question the session may go on working past (Codex's, ADR 0027): its tools don't mean it was answered. */
+  goesOn?: boolean;
 }
 
 /** A permission wait as the Coordinator reads it: what it's for, as far as the agent said. */
@@ -105,7 +107,8 @@ function tail(text: string): string {
 export function admit(e: SessionEvent): Wake | "over" | null {
   switch (e.kind) {
     case "waiting":
-      if (e.questions?.length) return { what: "question", text: e.questions.map((q) => q.question).join("\n"), questions: e.questions };
+      if (e.questions?.length)
+        return { what: "question", text: e.questions.map((q) => q.question).join("\n"), questions: e.questions, ...(e.dialog?.kind === "steer" ? { goesOn: true } : {}) };
       if (ASKING.has(e.reason)) return { what: "question", text: `It's waiting for ${e.reason}.` };
       // Permissions and approvals, and other dialogs from pi extensions (which may well be approvals too).
       return permission(e);
@@ -127,6 +130,8 @@ export class Watches {
   private woken = new Set<string>();
   /** How many events each panel has reported, so a late judgment can tell whether the session moved on. */
   private seen = new Map<string, number>();
+  /** Panels waiting on a question they may work on past (`goesOn`): only a prompt or the turn's end answers it. */
+  private workingOn = new Set<string>();
 
   /** `fire` wakes the Coordinator and says whether it did (there may be none). */
   constructor(private fire: (panelId: string, wake: Wake) => boolean) {}
@@ -136,9 +141,14 @@ export class Watches {
     for (const e of events) {
       const a = admit(e);
       if (a === "over") {
+        if (e.kind === "tool" && this.workingOn.has(panelId)) continue;
+        this.workingOn.delete(panelId);
         this.cancel(panelId);
         this.woken.delete(panelId);
-      } else if (a) this.arm(panelId, a);
+      } else if (a) {
+        if (a.goesOn) this.workingOn.add(panelId);
+        this.arm(panelId, a);
+      }
     }
   }
 
@@ -194,6 +204,7 @@ export class Watches {
     this.last.delete(panelId);
     this.woken.delete(panelId);
     this.seen.delete(panelId);
+    this.workingOn.delete(panelId);
   }
 }
 

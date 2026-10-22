@@ -141,6 +141,22 @@ describe("Watches", () => {
     expect(w.armIfStill("p3", w.position("p3"), { what: "question", text: "other" })).toBe(false);
   });
 
+  it("keeps a Codex question's wake while Codex works on (ADR 0027)", () => {
+    const fire = vi.fn(() => true);
+    const w = new Watches(fire);
+    w.handle("p1", fromCodex("item/completed", { threadId: "t", turnId: "u1", item: { type: "agentMessage", delivery: "async", questions: [{ title: "Dark or light?", options: ["Dark", "Light"] }] } }));
+    vi.advanceTimersByTime(5_000);
+    w.handle("p1", [{ kind: "tool", tool: "shell", files: [], edit: false }]); // Codex waits by sleeping in a tool
+    vi.advanceTimersByTime(GRACE_MS);
+    expect(fire).toHaveBeenCalledTimes(1);
+    expect((fire.mock.calls[0] as unknown[])[1]).toMatchObject({ what: "question", text: "Dark or light?", goesOn: true });
+    // An answer (a prompt) ends it as usual.
+    w.handle("p2", fromCodex("item/completed", { threadId: "t", turnId: "u2", item: { type: "agentMessage", delivery: "async", questions: [{ title: "Q?", options: [] }] } }));
+    w.handle("p2", [{ kind: "prompt", text: "A" }]);
+    vi.advanceTimersByTime(GRACE_MS);
+    expect(fire).toHaveBeenCalledTimes(1);
+  });
+
   it("doesn't wake for a permission the user gave in time", () => {
     const fire = vi.fn(() => true);
     const w = new Watches(fire);

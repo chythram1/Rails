@@ -191,7 +191,8 @@ three). Files changed by shell commands count too (ADR 0016). Permission waits s
 Claude Code's `PermissionRequest` input, Codex's approval requests from its daemon (checked live with 0.163), and
 the call pi was running when an unknown dialog opened. Rails answers some pi dialogs itself (ADR 0027): pi's own
 select and input, wrapped by the Rails extension, and `@juicesharp/rpiv-ask-user-question` 2.13.9+ through its
-`rpiv:ask-user:answer` event; other dialogs, and Claude Code's, are answered in the panel.
+`rpiv:ask-user:answer` event; Codex's questions (`request_user_input`) are answered by steering its turn
+(`turn/steer`); other dialogs, and Claude Code's, are answered in the panel.
 
 Agent tools (ADR 0018): Claude Code and pi panels get Rails' MCP server at `/bridge/<panel>/mcp`, behind the
 panel's token (`agentTools.ts`): Claude Code from `--mcp-config`, pi from the Rails extension. `neighbours` shows an

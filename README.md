@@ -41,7 +41,8 @@ Status:
 - A red dot when an agent needs you (a permission, a question) or its turn failed, and an amber mark when
   two sessions change the same files (ADR 0014)
 - Answers from the chat: the Coordinator's suggested answer to a pi question dialog (pi's own select and input,
-  or rpiv-ask-user-question 2.13.9+) is sent with one tap (ADR 0027); other dialogs are answered in the panel
+  or rpiv-ask-user-question 2.13.9+) or to Codex's question is sent with one tap (ADR 0027); other dialogs are
+  answered in the panel
 - Agent tools (ADR 0018): Claude Code and pi sessions can see what the other sessions in their project are doing,
   wait for one to finish, and draft messages for them, which you read and send
 - Session names (ADR 0019): rename a session from its menu in the sidebar or by double-clicking its tab, and

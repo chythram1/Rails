@@ -150,6 +150,23 @@ export class CodexWatcher {
     });
   }
 
+  /**
+   * Answer a question Codex asked while its turn goes on (ADR 0027): steer that turn with the text, as its panel's
+   * "answer" does. Without a turn (it ended since), the text goes as the next message instead.
+   */
+  steer(threadId: string, turnId: string | undefined, text: string, timeoutMs = 5000): Promise<void> {
+    if (!turnId) return this.queue(threadId, text, timeoutMs);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Codex didn't take the answer in time. Answer it in its panel.")), timeoutMs);
+      const input = [{ type: "text", text }];
+      this.request("turn/steer", { threadId, expectedTurnId: turnId, clientUserMessageId: randomUUID(), input }, (_result, error) => {
+        clearTimeout(timer);
+        if (error) reject(new Error(`Codex refused the answer: ${(error as { message?: string })?.message ?? "unknown error"}`));
+        else resolve();
+      });
+    });
+  }
+
   /** Whether a new panel still waits for its thread (closed panels and old entries don't count). */
   hasPending = () => this.pending.some((p) => Date.now() - p.since < MAP_WITHIN_MS && panels.get(p.panelId));
 }
@@ -189,6 +206,12 @@ export function watchCodex(open: Panel[], started?: { panelId: string; cwd: stri
 export function sendToCodex(threadId: string, text: string): Promise<void> {
   if (!watcher || ws?.readyState !== WebSocket.OPEN) return Promise.reject(new Error("Rails isn't connected to Codex right now. Reply in its panel."));
   return watcher.queue(threadId, text);
+}
+
+/** Answer a Codex question by steering its turn (ADR 0027), or as the next message once the turn is over. */
+export function steerCodex(threadId: string, turnId: string | undefined, text: string): Promise<void> {
+  if (!watcher || ws?.readyState !== WebSocket.OPEN) return Promise.reject(new Error("Rails isn't connected to Codex right now. Answer it in its panel."));
+  return watcher.steer(threadId, turnId, text);
 }
 
 /** A panel closed: drop the connection when no Codex panel (or new one waiting for its thread) is left. */
