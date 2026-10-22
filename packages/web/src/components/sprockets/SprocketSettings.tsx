@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { IconArrowRight as ArrowRight, IconBook as Book, IconChevronLeft as ChevronLeft, IconLayoutSidebarRight as PanelRight, IconPlus as Plus, IconSettings as Cog, IconX as X } from "@tabler/icons-react";
+import { IconArrowRight as ArrowRight, IconBook as Book, IconChevronLeft as ChevronLeft, IconLayoutSidebarRight as PanelRight, IconPlus as Plus, IconX as X } from "@tabler/icons-react";
 import {
   SPROCKET_DESCRIPTION_MAX,
   SPROCKET_RULE_MAX,
@@ -20,6 +20,8 @@ import { ModelSelect, useModelSettings } from "../ModelSelect.tsx";
 import { useOpenSettings } from "../settings/context.ts";
 import { useAutoGrow } from "../useAutoGrow.ts";
 import { ConnectorLogo } from "../customize/ConnectorLogo.tsx";
+import { useConfirm } from "../ConfirmDialog.tsx";
+import { onTabKeys } from "../tabKeys.ts";
 
 /**
  * The button that opens and closes a Sprocket's settings panel. It sits at the right end of the chat header,
@@ -40,15 +42,24 @@ export function PanelToggle({ sprocket, project = false, open }: { sprocket: Spr
   );
 }
 
+type Tab = "about" | "project" | "rules" | "tools";
+const TABS: { id: Tab; label: string }[] = [
+  { id: "about", label: "About" },
+  { id: "project", label: "Project" },
+  { id: "rules", label: "Rules" },
+  { id: "tools", label: "Tools" },
+];
+/** The tab last shown, so the panel opens where you were (for as long as the page is open). */
+let lastTab: Tab = "about";
+
 /**
- * A Sprocket's panel beside its chat (refs: ref/sprockets/stage2/chat2.png, settings1.png and settings2.png,
- * Grok's). It opens on the Sprocket's job: the project it looks after (one Sprocket per project, ADR 0016), its
- * standing rules and its pending handoffs. A cog at the top right leads to Settings, what rarely changes (name,
- * description, model, Delete), which has a back arrow at its top left. Everything saves as you go: a field
- * when you leave it, a choice at once, and a quiet "Saved" in the header confirms it. Its core memory is its
- * own business. Moving it to another project deletes its project chat (ADR 0021), so that asks first. The panel has its
- * own URL (`#/sprockets/<id>/settings`): its toggle, Escape (from Settings: back first) or the browser's back
- * button close it.
+ * A Sprocket's panel beside its chat, in tabs, so a long list (rules, tools) never pushes the rest down: About
+ * (name, description, model, usage, Delete), Project (the project it looks after, one Sprocket per project,
+ * ADR 0016; its pending handoffs and owners), Rules (a Coordinator's only) and Tools. Only the tab's own page
+ * scrolls. Everything saves as you go: a field when you leave it, a choice at once, and a quiet "Saved" in the
+ * header confirms it. Its core memory is its own business. Moving it to another project deletes its project chat
+ * (ADR 0021), so that asks first. The panel has its own URL (`#/sprockets/<id>/settings`): its toggle, Escape or
+ * the browser's back button close it.
  */
 /** `onProjectChat`: it opened beside the project chat, so closing it goes back there. */
 export function SprocketSettings({ sprocket, all, onProjectChat = false }: { sprocket: SprocketData; all: SprocketData[]; onProjectChat?: boolean }) {
@@ -61,18 +72,12 @@ export function SprocketSettings({ sprocket, all, onProjectChat = false }: { spr
   const openSettings = useOpenSettings();
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(0);
-  const [page, setPage] = useState<"job" | "settings">("job");
+  const tabs = TABS.filter((t) => t.id !== "rules" || sprocket.coordinator);
+  const [chosen, setTab] = useState<Tab>(lastTab);
+  // Rules goes when it stops being a Coordinator: show Project, where that changed, instead.
+  const tab = tabs.some((t) => t.id === chosen) ? chosen : "project";
+  const pick = (t: Tab) => setTab((lastTab = t));
   const close = () => navigate(href.sprocket(id, onProjectChat));
-  // Changing pages puts focus where the page starts: the back arrow on Settings, the cog back on the job.
-  const pageStart = useRef<HTMLButtonElement>(null);
-  const moved = useRef(false);
-  useEffect(() => {
-    if (moved.current) pageStart.current?.focus();
-  }, [page]);
-  const go = (to: "job" | "settings") => {
-    moved.current = true;
-    setPage(to);
-  };
 
   // "Saved" shows for a moment after each save.
   useEffect(() => {
@@ -94,92 +99,69 @@ export function SprocketSettings({ sprocket, all, onProjectChat = false }: { spr
     }
   };
 
-  const move = async (projectId: string) => {
+  const [confirmDialog, ask] = useConfirm();
+  const move = (projectId: string) => {
     const to = projects.find((p) => p.id === projectId);
-    const question = to ? `Attach ${name} to ${to.name}?` : `Detach ${name} from its project?`;
-    if (sprocket.projectChat?.lastMessage && !confirm(`${question}\n\nIts project chat is deleted. Its own chat with you, name, look and core memory stay.`)) return;
-    await save({ projectId: projectId || null });
+    if (!sprocket.projectChat?.lastMessage) return void save({ projectId: projectId || null });
+    ask({
+      title: to ? `Attach ${name} to ${to.name}?` : `Detach ${name} from its project?`,
+      text: "Its project chat is deleted. Its own chat with you, name, look and core memory stay.",
+      action: to ? "Attach" : "Detach",
+      danger: true,
+      onConfirm: () => save({ projectId: projectId || null }).then(() => undefined),
+    });
   };
 
-  const remove = async () => {
-    if (!confirm(`Delete ${name}?\n\nIts chat and memory are deleted too. This can't be undone.`)) return;
-    try {
-      await api.deleteSprocket(id);
-      navigate(href.sprockets());
-    } catch (e: any) {
-      done(false, e.message);
-    }
-  };
+  const remove = () =>
+    ask({
+      title: `Delete ${name}?`,
+      text: "Its chat and memory are deleted too. This can't be undone.",
+      action: `Delete ${name}`,
+      danger: true,
+      onConfirm: async () => {
+        await api.deleteSprocket(id);
+        navigate(href.sprockets());
+      },
+    });
 
   const defaultName = models?.models.find((m) => m.ref === models.defaultModel)?.name;
 
-  const onKey = (e: React.KeyboardEvent) => {
-    if (e.key !== "Escape") return;
-    if (page === "settings") go("job");
-    else close();
-  };
+  const onKey = (e: React.KeyboardEvent) => e.key === "Escape" && close();
 
   return (
     <aside className="sp-panel" aria-labelledby="sp-panel-title" onKeyDown={onKey}>
-      <header className="sp-panel-head">
-        <div className="sp-panel-start">
-          {page === "settings" ? (
-            <button ref={pageStart} className="icon-btn" aria-label={`Back to ${name}`} title="Back" onClick={() => go("job")}>
-              <ChevronLeft size={18} />
-            </button>
-          ) : (
-            <button className="icon-btn sp-panel-back" aria-label={`Back to the chat with ${name}`} onClick={close}>
-              <ChevronLeft size={18} />
-            </button>
-          )}
-        </div>
-        {/* The job page needs no title (the chat beside it says whose it is); screen readers still get one. */}
-        <h2 id="sp-panel-title" className={page === "settings" ? "sp-panel-title" : "sr-only"}>
-          {page === "settings" ? "Settings" : `${name} settings`}
+      {confirmDialog}
+      <header className="sp-panel-head sp-panel-tabbed">
+        <button className="icon-btn sp-panel-back" aria-label={`Back to the chat with ${name}`} onClick={close}>
+          <ChevronLeft size={18} />
+        </button>
+        <h2 id="sp-panel-title" className="sr-only">
+          {name} settings
         </h2>
+        <div className="sp-panel-tabs" role="tablist" aria-labelledby="sp-panel-title" onKeyDown={onTabKeys}>
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              id={`sp-tab-${t.id}`}
+              aria-selected={tab === t.id}
+              aria-controls="sp-panel-page"
+              tabIndex={tab === t.id ? 0 : -1}
+              className="sp-chat-tab"
+              onClick={() => pick(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
         <div className="sp-panel-end">
           <span className="sp-saved muted small" role="status">{saved ? "Saved" : ""}</span>
-          {page === "job" && (
-            <button ref={pageStart} className="icon-btn" aria-label={`${name}'s name, description and model`} title="Settings" onClick={() => go("settings")}>
-              <Cog size={18} />
-            </button>
-          )}
           <PanelToggle sprocket={sprocket} project={onProjectChat} open />
         </div>
       </header>
-      <div className="sp-panel-body">
-        {page === "job" ? (
-          <section className="sp-section" aria-label="Project">
-            <div className="settings-field">
-              <label htmlFor="sp-project">Project</label>
-              <Dropdown
-                id="sp-project"
-                value={sprocket.projectId ?? ""}
-                disabled={sprocket.running}
-                options={[
-                  { value: "", label: "None" },
-                  ...projects.map((p) => {
-                    const holder = holderOf(p.id);
-                    return { value: p.id, label: holder ? `${p.name} (${holder.name})` : p.name, disabled: !!holder };
-                  }),
-                ]}
-                describedBy="sp-project-help"
-                onChange={(v) => void move(v)}
-              />
-              <p id="sp-project-help" className="muted small">
-                {sprocket.running
-                  ? "It's replying. You can move it when it's done."
-                  : project
-                    ? "It looks after this project's sessions: it tells you when one waits for you, passes things on and watches for clashes."
-                    : "Attach it to a project to have it look after that project's sessions. A project has one Sprocket."}
-              </p>
-            </div>
-            {sprocket.coordinator && <RulesField sprocket={sprocket} onSave={(rules) => save({ rules })} />}
-            {sprocket.coordinator && <HandoffsField sprocket={sprocket} />}
-            {sprocket.projectId && <OwnersField sprocket={sprocket} />}
-            <ToolsField sprocket={sprocket} onSave={(tools) => save({ tools })} />
-          </section>
-        ) : (
+      <div className="sp-panel-body" id="sp-panel-page" role="tabpanel" aria-labelledby={`sp-tab-${tab}`} key={tab}>
+        {tab === "about" && (
           <>
             <section className="sp-section" aria-label="About">
               <NameField sprocket={sprocket} onDone={done} />
@@ -209,8 +191,7 @@ export function SprocketSettings({ sprocket, all, onProjectChat = false }: { spr
                 <p className="muted small">{usageText(sprocket.usage)}</p>
               </div>
             </section>
-
-            {/* For now Delete lives here, at the end, set apart from what you change often. */}
+            {/* Delete, at the end, set apart from what you change often. */}
             <div className="sp-danger-zone">
               <button type="button" className="btn small danger" onClick={() => void remove()}>
                 Delete {name}
@@ -218,6 +199,38 @@ export function SprocketSettings({ sprocket, all, onProjectChat = false }: { spr
             </div>
           </>
         )}
+        {tab === "project" && (
+          <section className="sp-section" aria-label="Project">
+            <div className="settings-field">
+              <label htmlFor="sp-project">Project</label>
+              <Dropdown
+                id="sp-project"
+                value={sprocket.projectId ?? ""}
+                disabled={sprocket.running}
+                options={[
+                  { value: "", label: "None" },
+                  ...projects.map((p) => {
+                    const holder = holderOf(p.id);
+                    return { value: p.id, label: holder ? `${p.name} (${holder.name})` : p.name, disabled: !!holder };
+                  }),
+                ]}
+                describedBy="sp-project-help"
+                onChange={(v) => void move(v)}
+              />
+              <p id="sp-project-help" className="muted small">
+                {sprocket.running
+                  ? "It's replying. You can move it when it's done."
+                  : project
+                    ? "It looks after this project's sessions: it tells you when one waits for you, passes things on and watches for clashes."
+                    : "Attach it to a project to have it look after that project's sessions. A project has one Sprocket."}
+              </p>
+            </div>
+            {sprocket.coordinator && <HandoffsField sprocket={sprocket} />}
+            {sprocket.projectId && <OwnersField sprocket={sprocket} />}
+          </section>
+        )}
+        {tab === "rules" && <RulesField sprocket={sprocket} onSave={(rules) => save({ rules })} />}
+        {tab === "tools" && <ToolsField sprocket={sprocket} onSave={(tools) => save({ tools })} />}
 
         {error && <p className="error" role="alert">{error}</p>}
       </div>

@@ -1100,6 +1100,12 @@ ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
 .sp-saved { margin-right: 6px; }
 .sp-panel-title { grid-column: 2; margin: 0; font-size: 15px; font-weight: 600; }
 .sp-panel-back { display: none; }
+/* A Sprocket's panel: its tabs (About, Project, Rules, Tools) fill the header's left, as a chat's do in the chat
+   header, underlined on its rule; "Saved" and the toggle stay at the right. */
+.sp-panel-head.sp-panel-tabbed { display: flex; gap: 4px; }
+.sp-panel-tabs { display: flex; align-self: stretch; margin: -7px auto 0 -6px; min-width: 0; }
+.sp-panel-tabs .sp-chat-tab[aria-selected="true"] { color: var(--text); box-shadow: inset 0 -2px 0 var(--tint-ink); }
+.sp-panel-tabs .sp-chat-tab:hover:not([aria-selected="true"]) { color: var(--text-2); }
 .sp-panel-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 16px 16px 24px; display: flex; flex-direction: column; gap: 28px; }
 /* A page's fields, 16px apart; Delete sits 28px below them (twice the gap inside). */
 .sp-section { display: flex; flex-direction: column; gap: 16px; }
