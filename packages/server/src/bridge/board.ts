@@ -17,6 +17,11 @@ export interface SessionCard {
   /** Unknown until the session reports something (panels started before the bridge existed stay unknown). */
   status: "unknown" | "idle" | "working" | "waiting" | "failed" | "ended";
   waitingFor?: string;
+  /**
+   * The pi dialog it waits on, when Rails can answer it (ADR 0027): its id, kind, the options of its (first)
+   * question, and how many questions it holds.
+   */
+  dialog?: { id: string; kind: "select" | "input" | "questionnaire"; options: string[]; questions: number };
   error?: string;
   /** The latest prompt: what the session was asked to do. */
   intent?: string;
@@ -53,7 +58,7 @@ export function foldCard(panel: { id: string; kind: PanelKind; title: string; se
       case "prompt":
         c.intent = e.text;
         c.status = "working";
-        c.waitingFor = c.error = undefined;
+        c.waitingFor = c.error = c.dialog = undefined;
         break;
       case "tool":
         if (c.status !== "waiting") c.status = "working";
@@ -64,29 +69,36 @@ export function foldCard(panel: { id: string; kind: PanelKind; title: string; se
         // A question's dialog is reported more than once (pi's question tool, then its dialog; Claude Code's
         // question, then its permission check): it stays a question.
         if (!(c.status === "waiting" && c.waitingFor === "question")) c.waitingFor = e.reason;
+        if (e.dialog)
+          c.dialog = {
+            id: e.dialog.id,
+            kind: e.dialog.kind,
+            options: e.dialog.options ?? e.questions?.[0]?.options ?? [],
+            questions: e.dialog.kind === "questionnaire" ? (e.questions?.length ?? 0) : 1,
+          };
         c.status = "waiting";
         break;
       case "resumed":
         if (c.status === "waiting") c.status = "working";
-        c.waitingFor = undefined;
+        c.waitingFor = c.dialog = undefined;
         break;
       case "turn_end":
         c.status = "idle";
-        c.waitingFor = undefined;
+        c.waitingFor = c.dialog = undefined;
         if (e.text) c.lastOutcome = e.text;
         break;
       case "stopped":
         c.status = "idle";
-        c.waitingFor = undefined;
+        c.waitingFor = c.dialog = undefined;
         break;
       case "failed":
         c.status = "failed";
-        c.waitingFor = undefined;
+        c.waitingFor = c.dialog = undefined;
         c.error = e.error;
         break;
       case "ended":
         c.status = "ended";
-        c.waitingFor = undefined;
+        c.waitingFor = c.dialog = undefined;
         break;
     }
   }

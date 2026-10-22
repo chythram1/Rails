@@ -23,7 +23,8 @@ Decisions:
   - **answer**: the session waits on a question in a dialog (Claude Code's AskUserQuestion, a pi question
     tool) or a form: the card shows the suggested option with "Open panel", and the user picks it there.
     Rails never types into a panel, so it can't answer dialogs itself (automatic answers through hooks may
-    come later).
+    come later). (Changed by ADR 0027: pi's own select and input, and questionnaires from extensions that take
+    answers from outside, get Send too, through Rails' pi extension.)
   - Never for a working session, a permission prompt, or any other dialog a pi extension shows (it may be an
     approval): those stay the user's to answer in the panel.
   - **message** (`suggest_message`, added after the user's first tries): something the user asked the

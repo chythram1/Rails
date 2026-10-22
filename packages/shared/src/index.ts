@@ -660,6 +660,11 @@ export interface Suggestion {
   /** A message an agent drafted for this session (ADR 0018): the session it came from. */
   from?: { panelId: string; kind: PanelKind; title: string };
   /**
+   * An answer Rails can give a pi dialog itself (ADR 0027): the dialog, and the option (its index) or the text it
+   * takes. Without it, an answer is picked in the panel.
+   */
+  dialog?: { id: string; option?: number; text?: string };
+  /**
    * "replaced": a newer answer for the same session took its place (it isn't shown), or, for an agent's message,
    * the same agent's newer message for that session (ADR 0018). The Coordinator's messages aren't replaced.
    */

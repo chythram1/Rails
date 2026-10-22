@@ -189,7 +189,9 @@ extension, Codex through its app-server daemon. Edits count for overlaps (ADR 00
 Code's PostToolUse, pi's tool end without an error, Codex's completed file changes (checked live with all
 three). Files changed by shell commands count too (ADR 0016). Permission waits say what they're for (ADR 0026):
 Claude Code's `PermissionRequest` input, Codex's approval requests from its daemon (checked live with 0.163), and
-the call pi was running when an unknown dialog opened.
+the call pi was running when an unknown dialog opened. Rails answers some pi dialogs itself (ADR 0027): pi's own
+select and input, wrapped by the Rails extension, and `@juicesharp/rpiv-ask-user-question` 2.13.9+ through its
+`rpiv:ask-user:answer` event; other dialogs, and Claude Code's, are answered in the panel.
 
 Agent tools (ADR 0018): Claude Code and pi panels get Rails' MCP server at `/bridge/<panel>/mcp`, behind the
 panel's token (`agentTools.ts`): Claude Code from `--mcp-config`, pi from the Rails extension. `neighbours` shows an

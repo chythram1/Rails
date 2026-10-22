@@ -1,11 +1,12 @@
 // Suggested replies (ADR 0010). A Coordinator drafts what its user could answer a session (suggest_reply),
 // or a message the user asked it to pass on (suggest_message); the user sends it, edited or not, or dismisses
-// it. A dialog's answer is picked in the panel instead: Rails never types into one. Everything is checked
+// it. A dialog's answer is picked in the panel, except pi dialogs Rails can answer through its extension
+// (ADR 0027): Rails never types into a panel. Everything is checked
 // again when the user sends. An answer expires as soon as its session moves on (a new prompt, a tool, the
 // dialog answered); a message doesn't, and a busy session gets it in its own queue, after its current turn.
 import { shortTitle, type Panel, type Suggestion } from "@rails/shared";
 import { AGENT, type SessionCard } from "./bridge/board.ts";
-import { deliver } from "./bridge/deliver.ts";
+import { deliver, piInbox } from "./bridge/deliver.ts";
 import { ASKING, type SessionEvent } from "./bridge/events.ts";
 import { cardOf, onEvents, onPanelForgotten, onReturned } from "./bridge/index.ts";
 import { panels, sprockets, suggestions } from "./db.ts";
@@ -25,6 +26,29 @@ export const onSuggestionsChanged = changes.on;
 
 type Stored = NonNullable<ReturnType<typeof suggestions.get>>;
 const shown = ({ sprocketId: _s, messageId: _m, ...s }: Stored): Suggestion => s;
+
+/** How an option's label and a drafted answer are compared: case, quotes, end punctuation and "(Recommended)" aside. */
+const plain = (s: string) =>
+  s
+    .trim()
+    .replace(/\s*\(recommended\)\s*$/i, "")
+    .replace(/^["'“‘]+|["'”’]+$/g, "")
+    .replace(/[.!]+$/, "")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
+/**
+ * What answer a drafted text gives the pi dialog a session waits on, if Rails can give it (ADR 0027): one of a
+ * select's options, an input's text, or a single-question questionnaire's option (or, not matching one, its typed
+ * answer). Dialogs with several questions, and drafts that match no option of a select, are answered in the panel.
+ */
+export function dialogAnswer(dialog: SessionCard["dialog"], text: string): Suggestion["dialog"] {
+  if (!dialog || dialog.questions !== 1 || !text.trim()) return undefined;
+  const option = dialog.options.findIndex((o) => plain(o) === plain(text));
+  if (dialog.kind === "select") return option >= 0 ? { id: dialog.id, option } : undefined;
+  if (dialog.kind === "questionnaire" && option >= 0) return { id: dialog.id, option };
+  return { id: dialog.id, text: text.trim() };
+}
 
 /**
  * What a Coordinator can suggest for a session in this state: an answer to its question (a reply, or a
@@ -76,7 +100,8 @@ export function suggest(
       if (old.messageId) suggestions.setStatus(old.id, ["pending"], "replaced");
       else suggestions.drop([old.id]); // from this same run: never shown
     }
-  const s = suggestions.create({ sprocketId, panelId: panel.id, kind: panel.kind, title, sessionId: panel.sessionId, mode, text, rule, attachment, from });
+  const dialog = mode === "answer" && panel.kind === "pi" ? dialogAnswer(cardOf(panel).dialog, text) : undefined;
+  const s = suggestions.create({ sprocketId, panelId: panel.id, kind: panel.kind, title, sessionId: panel.sessionId, mode, text, rule, attachment, from, dialog });
   changes.emit();
   return shown(s);
 }
@@ -108,8 +133,9 @@ export function deliveredText(text: string, attachment?: Suggestion["attachment"
 export async function sendSuggestion(id: string, rawText: unknown): Promise<Suggestion> {
   const s = suggestions.get(id);
   if (!s?.messageId) throw new ServiceError("Not found", 404);
-  if (s.mode === "answer") throw new ServiceError("Answer it in the session's panel.", 400);
+  if (s.mode === "answer" && !s.dialog) throw new ServiceError("Answer it in the session's panel.", 400);
   if (s.status === "sent" || s.status === "sending") throw new ServiceError("It's already sent.", 409);
+  if (s.mode === "answer") return answerDialog(s);
   if (s.status !== "pending" && s.status !== "failed") throw new ServiceError("It can't be sent anymore.", 409);
   const text = typeof rawText === "string" ? rawText.trim() : s.text;
   if (!text) throw new ServiceError("The reply is empty.", 400);
@@ -132,6 +158,27 @@ export async function sendSuggestion(id: string, rawText: unknown): Promise<Sugg
   }
   changes.emit();
   return shown(suggestions.get(id)!);
+}
+
+/** Send an answer to the pi dialog it was drafted for (ADR 0027), as drafted: its option is fixed. */
+async function answerDialog(s: Stored): Promise<Suggestion> {
+  const panel = panels.get(s.panelId);
+  const card = panel && cardOf(panel);
+  const why = !panel || !card ? "The panel was closed." : card.status !== "waiting" || card.dialog?.id !== s.dialog!.id ? "The dialog has closed." : undefined;
+  if (why) {
+    if (suggestions.setStatus(s.id, ["pending", "failed"], "expired", { error: why })) changes.emit();
+    throw new ServiceError(why, 409);
+  }
+  if (!suggestions.setStatus(s.id, ["pending", "failed"], "sending")) throw new ServiceError("It's already being sent.", 409);
+  changes.emit();
+  try {
+    await piInbox.answer(panel!.id, s.dialog!);
+    suggestions.setStatus(s.id, ["sending"], "sent");
+  } catch (e) {
+    suggestions.setStatus(s.id, ["sending"], "failed", { error: (e as Error).message });
+  }
+  changes.emit();
+  return shown(suggestions.get(s.id)!);
 }
 
 export function dismissSuggestion(id: string): Suggestion {

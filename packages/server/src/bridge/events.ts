@@ -16,7 +16,7 @@ export type SessionEvent =
    * The agent is waiting for the user: a permission, a question, a form. `questions` when it asked in a dialog;
    * `detail` what a permission is for, when the agent says (the command, the file), in a line or two.
    */
-  | { kind: "waiting"; reason: string; questions?: SessionQuestion[]; detail?: string }
+  | { kind: "waiting"; reason: string; questions?: SessionQuestion[]; detail?: string; dialog?: DialogRef }
   /** The wait is over (answered or dismissed). */
   | { kind: "resumed" }
   /** The agent finished its turn. `text` is its last message. */
@@ -27,6 +27,23 @@ export type SessionEvent =
   | { kind: "failed"; error: string }
   /** The session ended (the agent quit). */
   | { kind: "ended" };
+
+/**
+ * A pi dialog Rails can answer (ADR 0027), as the Rails extension reports it: its id there, and what it takes. pi's
+ * own select (one of `options`) and input (any text), or a questionnaire from an extension with an answer contract
+ * (an option of the questions Rails read from the tool's input, or text).
+ */
+export interface DialogRef {
+  id: string;
+  kind: "select" | "input" | "questionnaire";
+  options?: string[];
+}
+
+function dialogOf(v: any): DialogRef | undefined {
+  if (typeof v?.id !== "string" || !v.id || !["select", "input", "questionnaire"].includes(v.kind)) return undefined;
+  const options = Array.isArray(v.options) ? v.options.filter((o: unknown) => typeof o === "string").slice(0, 50).map((o: string) => clip(o, 200)) : undefined;
+  return { id: v.id.slice(0, 200), kind: v.kind, ...(v.kind === "select" ? { options: options ?? [] } : {}) };
+}
 
 /** Waits without questions that still ask the user something: a Claude Code MCP form, Codex's request for input. */
 export const ASKING = new Set(["a form", "input"]);
@@ -145,10 +162,11 @@ export function fromPi(event: string, data: any): SessionEvent[] {
       // A dialog opened. If a tool whose input holds questions was running (the extension sends its input),
       // it's that question for the user; otherwise it's some extension's dialog, which may be an approval.
       const questions = questionsOf(data?.input);
-      if (questions) return [{ kind: "waiting", reason: "question", questions }];
+      const dialog = dialogOf(data?.dialog);
+      if (questions) return [{ kind: "waiting", reason: "question", questions, ...(dialog ? { dialog } : {}) }];
       // The tool that was running when it opened (the extension sends it): what an approval would be for.
       const during = data?.during?.tool ? toolDetail(clip(data.during.tool, 100), data.during.input, "While running") : "";
-      return [{ kind: "waiting", reason: data?.title ? clip(data.title, 120) : "a prompt", ...(during ? { detail: during } : {}) }];
+      return [{ kind: "waiting", reason: data?.title ? clip(data.title, 120) : "a prompt", ...(during ? { detail: during } : {}), ...(dialog ? { dialog } : {}) }];
     }
     case "ui_prompt_end":
       return [{ kind: "resumed" }];

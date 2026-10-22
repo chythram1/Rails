@@ -11,7 +11,8 @@ import { useAutoGrow } from "../useAutoGrow.ts";
  * What a Coordinator drafts for a session, under its message (server suggestions.ts, ADR 0010): an answer to
  * its question (with the standing rule it followed, if any, ADR 0011) or a message the user asked it to pass
  * on. The user edits it and sends it, or dismisses it; nothing reaches the session until they send it. A
- * dialog's answer is picked in the panel, so that card links there instead. Once it's sent (or queued in a
+ * dialog's answer is picked in the panel, so that card links there, unless Rails can answer a pi dialog itself (ADR
+ * 0027): then it has Send too. Once it's sent (or queued in a
  * busy session), dismissed or out of date, a muted line says so. A handoff's message also carries what the
  * finished session said last (ADR 0015), sent as it is under the text: collapsed, to read if you want. A message
  * an agent drafted (ADR 0018) says which session wrote it, as plainly as the text: pi and Codex take what the user
@@ -78,16 +79,28 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
 
   if (s.mode === "answer") {
     const open = projectId && (s.sessionId && s.kind !== "shell" ? href.session(projectId, sessionKey(s.kind, s.sessionId)) : href.project(projectId));
+    // A pi dialog Rails can answer (ADR 0027) gets Send; others are picked in the panel.
+    const sending = busy || s.status === "sending";
+    const problem = error || (s.status === "failed" && s.error ? `Not sent: ${s.error}` : "");
     return (
       <div className="sp-suggestion">
         {head}
         <p className="sp-suggestion-answer">{s.text}</p>
         {rule}
-        {error && <p className="error small" role="alert">{error}</p>}
+        {problem && <p className="error small" role="alert">{problem}</p>}
         <div className="sp-suggestion-actions">
-          <span className="muted small grow">Pick this in its panel: Rails doesn't answer dialogs.</span>
-          <button type="button" className="btn small" disabled={busy} onClick={dismiss}>Dismiss</button>
-          {open && <a className="btn small primary" href={open}>Open panel</a>}
+          <span className="muted small grow">{s.dialog ? "Sending picks this in its dialog." : "Pick this in its panel: Rails can't answer this dialog."}</span>
+          <button type="button" className="btn small" disabled={sending} onClick={dismiss}>Dismiss</button>
+          {s.dialog ? (
+            <>
+              {open && <a className="btn small" href={open}>Open panel</a>}
+              <button type="button" className="btn small primary" disabled={sending} onClick={() => void act(() => api.sendSuggestion(s.id, s.text))}>
+                {sending ? "Sending…" : "Send"}
+              </button>
+            </>
+          ) : (
+            open && <a className="btn small primary" href={open}>Open panel</a>
+          )}
         </div>
       </div>
     );

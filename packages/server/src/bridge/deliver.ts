@@ -74,6 +74,8 @@ export interface PiMessage {
   id: string;
   text: string;
   queue: boolean;
+  /** An answer to a dialog instead (ADR 0027): the extension gives it to the dialog with that id, if still open. */
+  answer?: { dialog: string; option?: number; text?: string };
 }
 
 /**
@@ -107,7 +109,7 @@ export class PiInbox {
    * Hand text to the panel's extension and wait until it says pi took it. It gets `takeMs` to come back if
    * it's between two polls, then `ackMs` to answer.
    */
-  async hand(panelId: string, text: string, { queue = false, takeMs = TAKE_MS, ackMs = ACK_MS } = {}): Promise<{ queued: boolean }> {
+  async hand(panelId: string, text: string, { queue = false, takeMs = TAKE_MS, ackMs = ACK_MS, answer }: { queue?: boolean; takeMs?: number; ackMs?: number; answer?: PiMessage["answer"] } = {}): Promise<{ queued: boolean }> {
     const until = Date.now() + takeMs;
     while (!this.waiting.has(panelId)) {
       if (Date.now() >= until) throw new Error(unreachable("pi"));
@@ -124,15 +126,23 @@ export class PiInbox {
       };
       this.acks.set(id, { panelId, settle });
     });
-    this.waiting.get(panelId)!([{ id, text, queue }]);
+    this.waiting.get(panelId)!([{ id, text, queue, ...(answer ? { answer } : {}) }]);
     return answered;
   }
 
+  /** Answer the dialog a pi session waits on (ADR 0027): fails with the extension's reason if it can't. */
+  async answer(panelId: string, dialog: { id: string; option?: number; text?: string }, opts: { takeMs?: number; ackMs?: number } = {}): Promise<void> {
+    const answer = { dialog: dialog.id, ...(dialog.option !== undefined ? { option: dialog.option } : {}), ...(dialog.text !== undefined ? { text: dialog.text } : {}) };
+    await this.hand(panelId, "", { ...opts, answer });
+  }
+
   /** The extension's answer for a message: pi took it (now, or into its queue), or it was busy (or the message was bad). */
-  ack(panelId: string, id: unknown, ok: unknown, queued?: unknown): void {
+  ack(panelId: string, id: unknown, ok: unknown, queued?: unknown, error?: unknown): void {
     const pending = typeof id === "string" ? this.acks.get(id) : undefined;
     if (!pending || pending.panelId !== panelId) return; // not this panel's message
-    pending.settle(ok === true ? { queued: queued === true } : { error: "pi started working on something else, so it wasn't sent." });
+    // An answer's refusal says why (the dialog closed, the extension turned it down); reasons are clipped.
+    const why = typeof error === "string" && error.trim() ? error.trim().slice(0, 300) : "pi started working on something else, so it wasn't sent.";
+    pending.settle(ok === true ? { queued: queued === true } : { error: why });
   }
 }
 

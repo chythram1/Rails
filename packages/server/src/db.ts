@@ -234,6 +234,8 @@ addColumn("suggestions", "attachment", "TEXT");
 /** On an agent's message: the session that drafted it, as JSON {panelId, kind, title} (ADR 0018). */
 addColumn("suggestions", "sender", "TEXT");
 addColumn("suggestions", "edited", "INTEGER NOT NULL DEFAULT 0");
+/** On an answer Rails can give a pi dialog itself: JSON {id, option?, text?} (ADR 0027). */
+addColumn("suggestions", "dialog", "TEXT");
 db.exec(`
   -- Shadow judgments of the fast decision model (ADR 0012). Kept to the latest few hundred.
   CREATE TABLE IF NOT EXISTS decisions (
@@ -853,6 +855,7 @@ type SuggestionRow = {
   rule: string | null;
   attachment: string | null;
   sender: string | null;
+  dialog: string | null;
   queued: number;
   edited: number;
   status: Suggestion["status"];
@@ -873,6 +876,7 @@ const toSuggestion = (r: SuggestionRow): Suggestion & { sprocketId: string; mess
   ...(r.rule ? { rule: r.rule } : {}),
   ...(r.attachment ? { attachment: JSON.parse(r.attachment) as NonNullable<Suggestion["attachment"]> } : {}),
   ...(r.sender ? { from: JSON.parse(r.sender) as NonNullable<Suggestion["from"]> } : {}),
+  ...(r.dialog ? { dialog: JSON.parse(r.dialog) as NonNullable<Suggestion["dialog"]> } : {}),
   status: r.status,
   ...(r.error ? { error: r.error } : {}),
   ...(r.queued ? { queued: true } : {}),
@@ -893,11 +897,12 @@ export const suggestions = {
     rule?: string;
     attachment?: Suggestion["attachment"];
     from?: Suggestion["from"];
+    dialog?: Suggestion["dialog"];
   }) {
     const id = randomUUID();
     const now = new Date().toISOString();
     db.prepare(
-      "INSERT INTO suggestions (id, sprocket_id, panel_id, kind, title, session_id, mode, text, rule, attachment, sender, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+      "INSERT INTO suggestions (id, sprocket_id, panel_id, kind, title, session_id, mode, text, rule, attachment, sender, dialog, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
     ).run(
       id,
       s.sprocketId,
@@ -910,6 +915,7 @@ export const suggestions = {
       s.rule ?? null,
       s.attachment ? JSON.stringify(s.attachment) : null,
       s.from ? JSON.stringify(s.from) : null,
+      s.dialog ? JSON.stringify(s.dialog) : null,
       now,
       now,
     );

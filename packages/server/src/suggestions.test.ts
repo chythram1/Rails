@@ -5,13 +5,13 @@ import { join } from "node:path";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { CodexWatcher } from "./bridge/codex.ts";
-import { PiInbox } from "./bridge/deliver.ts";
+import { PiInbox, piInbox } from "./bridge/deliver.ts";
 import { receive } from "./bridge/index.ts";
-import { panels, projects, settings, suggestions } from "./db.ts";
+import { panels, projects, settings, sprocketMessages, suggestions } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
 import { createSprocket, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
-import { dismissSuggestion, sendSuggestion, startSuggestions, suggest } from "./suggestions.ts";
+import { dialogAnswer, dismissSuggestion, sendSuggestion, startSuggestions, suggest } from "./suggestions.ts";
 
 const look = { character: "bell", color: "purple", accessory: "none" } as const;
 const faux = fauxProvider();
@@ -360,5 +360,70 @@ describe("delivery", () => {
     const refused = watcher.queue("t1", "x");
     watcher.handle({ id: sent.at(-1).id, error: { message: "no such thread" } });
     await expect(refused).rejects.toThrow("Codex refused the message: no such thread");
+  });
+});
+
+describe("answering pi dialogs (ADR 0027)", () => {
+  const select = { id: "select-1", kind: "select" as const, options: ["Yes (Recommended)", "No"], questions: 1 };
+  const questionnaire = { id: "rpiv-t1", kind: "questionnaire" as const, options: ["Blue", "Green"], questions: 1 };
+
+  it("matches a drafted answer to the dialog's option, or types it where text is taken", () => {
+    expect(dialogAnswer(select, "yes")).toEqual({ id: "select-1", option: 0 });
+    expect(dialogAnswer(select, "\u201cNo.\u201d")).toEqual({ id: "select-1", option: 1 });
+    expect(dialogAnswer(select, "Yes, but only the tests")).toBeUndefined(); // a select takes only its options
+    expect(dialogAnswer(questionnaire, "Green")).toEqual({ id: "rpiv-t1", option: 1 });
+    expect(dialogAnswer(questionnaire, "Teal, like the brief")).toEqual({ id: "rpiv-t1", text: "Teal, like the brief" });
+    expect(dialogAnswer({ id: "input-2", kind: "input", options: [], questions: 1 }, " main ")).toEqual({ id: "input-2", text: "main" });
+    expect(dialogAnswer({ ...questionnaire, questions: 2 }, "Green")).toBeUndefined(); // several questions: in the panel
+    expect(dialogAnswer(undefined, "Green")).toBeUndefined();
+  });
+
+  /** A draft under a reply in the chat, as a Coordinator's run leaves it. */
+  function shownDraft(leadId: string, ...args: Parameters<typeof suggest>) {
+    const s = suggest(...args);
+    suggestions.attach([s.id], sprocketMessages.create(projectChat(leadId), "sprocket", "Drafted.", new Date().toISOString()).id);
+    return s;
+  }
+
+  /** A pi session asking in an rpiv questionnaire whose dialog Rails can answer. */
+  function asking() {
+    const { lead, project } = setup();
+    const pi = panels.create({ projectId: project.id, kind: "pi", title: "UI" });
+    const input = { questions: [{ question: "Show the key on each shop card?", options: [{ label: "Yes" }, { label: "No" }] }] };
+    receive(pi.id, "pi", "tool", { tool: "ask_user_question", input, started: true, id: "t1" });
+    receive(pi.id, "pi", "ui_prompt_start", { title: "", kind: "custom", input, dialog: { id: "rpiv-t1", kind: "questionnaire" } });
+    return { lead, pi };
+  }
+
+  it("sends an answer through the extension, and says why when it's turned down", async () => {
+    const { lead, pi } = asking();
+    const s = shownDraft(lead.id, lead.id, pi, "UI", "Yes");
+    expect(s).toMatchObject({ mode: "answer", dialog: { id: "rpiv-t1", option: 0 } });
+    const poll = piInbox.poll(pi.id, new AbortController().signal);
+    const sent = sendSuggestion(s.id, undefined);
+    const [m] = await poll;
+    expect(m.answer).toEqual({ dialog: "rpiv-t1", option: 0 });
+    piInbox.ack(pi.id, m.id, false, false, "The question extension didn't take the answer: answer it in the panel.");
+    expect(await sent).toMatchObject({ status: "failed", error: "The question extension didn't take the answer: answer it in the panel." });
+    // Tried again, and taken.
+    const again = piInbox.poll(pi.id, new AbortController().signal);
+    const retry = sendSuggestion(s.id, undefined);
+    piInbox.ack(pi.id, (await again)[0].id, true);
+    expect(await retry).toMatchObject({ status: "sent" });
+  });
+
+  it("can't send once the user answered in the panel, and keeps the panel for other dialogs", async () => {
+    const { lead, pi } = asking();
+    const s = shownDraft(lead.id, lead.id, pi, "UI", "No");
+    receive(pi.id, "pi", "ui_prompt_end", {}); // answered in the panel first
+    await expect(sendSuggestion(s.id, undefined)).rejects.toThrow();
+    expect(suggestions.get(s.id)!.status).toBe("expired");
+    // A question dialog Rails can't answer (no dialog id: an older extension, or a custom dialog): the panel.
+    const other = panels.create({ projectId: pi.projectId, kind: "pi", title: "Old" });
+    const input = { questions: [{ question: "Which colour?", options: ["Blue"] }] };
+    receive(other.id, "pi", "ui_prompt_start", { title: "", kind: "custom", input });
+    const t = shownDraft(lead.id, lead.id, other, "Old", "Blue");
+    expect(t.dialog).toBeUndefined();
+    await expect(sendSuggestion(t.id, undefined)).rejects.toThrow("Answer it in the session's panel.");
   });
 });

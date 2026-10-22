@@ -45,7 +45,7 @@ export function replyCapabilities(rules: string[], made: (id: string) => void): 
   return [
     {
       name: "suggest_reply",
-      description: `Suggest an answer to a question a session in your project asked your user: one that ended its turn asking something, or one waiting on a question in a dialog. Your user sees it under your message and sends it, edits it or dismisses it: nothing reaches the session until they do. Write it as your user would, in the first person, short and plain (at most ${SUGGESTION_MAX} characters). For a dialog, give the option you'd pick, exactly as it's labelled, or for an open question (no options) the answer to type; your user answers it in the panel. When one of your user's rules decides the answer, pass its number as \`rule\`; leave it out when you're using your own judgment. To pass on something your user asked you to tell a session, use suggest_message instead. One answer per session: a new one replaces your last. Resolves to what happens next.`,
+      description: `Suggest an answer to a question a session in your project asked your user: one that ended its turn asking something, or one waiting on a question in a dialog. Your user sees it under your message and sends it, edits it or dismisses it: nothing reaches the session until they do. Write it as your user would, in the first person, short and plain (at most ${SUGGESTION_MAX} characters). For a dialog, give the option you'd pick, exactly as it's labelled (nothing else, or Rails can't match it), or for an open question (no options) the answer to type; for some pi dialogs your user can send it from the chat, else they answer it in the panel. When one of your user's rules decides the answer, pass its number as \`rule\`; leave it out when you're using your own judgment. To pass on something your user asked you to tell a session, use suggest_message instead. One answer per session: a new one replaces your last. Resolves to what happens next.`,
       params: Type.Object({
         session,
         reply: Type.String({ description: "The answer, as your user would write it." }),
@@ -64,7 +64,9 @@ export function replyCapabilities(rules: string[], made: (id: string) => void): 
         const check = rule ? ` It cites rule ${args.rule}: ${JSON.stringify(rule)} If that rule doesn't fit the question, or your answer doesn't do what it says, suggest again (it replaces this one).` : "";
         return s.mode === "reply"
           ? `Suggested. Your user sees it under your message and decides whether to send it to "${title}". Don't repeat the reply in your message.${check}`
-          : `Suggested. "${title}" is waiting on a dialog, so your user answers it in its panel; they see your suggestion with a button to open it. Don't repeat it in your message.${check}`;
+          : s.dialog
+            ? `Suggested. "${title}" is waiting on a dialog Rails can answer: your user sees your suggestion and sends it with one tap. Don't repeat it in your message.${check}`
+            : `Suggested. "${title}" is waiting on a dialog, so your user answers it in its panel; they see your suggestion with a button to open it. Don't repeat it in your message.${check}`;
       },
     },
     {
