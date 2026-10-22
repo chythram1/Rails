@@ -25,8 +25,12 @@ Decisions:
   PreToolUse hook now matching it too; pi's bash, whose end the extension now reports; Codex's command items), Rails
   notes the project's changed files with `git status` and each file's modification time and size, at the start and
   again at the end, and counts as that session's edits the files that changed in between or were modified after it
-  started. Files another session reported changing with its edit tools meanwhile stay theirs; commands longer than
-  60 s are left out, since they'd collect everyone's edits; projects that aren't git repositories are skipped.
+  started. Files another session reported changing with its edit tools meanwhile stay theirs (looked up 1.5 s after
+  the command ends, since those reports can arrive late); commands longer than 60 s are left out, since they'd
+  collect everyone's edits; projects that aren't git repositories are skipped. A command whose line only reads
+  (`cat`, `rg`, `sed -n`, `git diff`, `node --test`… with no redirection to a file) counts nothing: in test run 6 a
+  Codex that was only reading `src/main.js` took the blame for Claude Code's edit to it. Anything Rails can't read
+  that way (a heredoc, a script, quoting it can't follow) still counts.
 - **Smaller fixes from the run:** a Sprocket's usage (runs, tokens, and cost where the provider reports one) is
   recorded per run, quiet ones included, and shown in its settings; a message Rails put in pi's queue that pi hands
   back to its editor when the user presses Escape is marked not sent, saying where it is.

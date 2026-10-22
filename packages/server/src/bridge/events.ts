@@ -200,21 +200,24 @@ export function fromCodex(method: string, params: any): SessionEvent[] {
 export interface ShellCall {
   phase: "start" | "end";
   id: string;
+  /** At the start, the command line, when the agent says (to tell commands that only read). */
+  command?: string;
 }
 
 /** Whether a report is a shell command starting or ending: Claude Code's Bash, pi's bash, Codex's commands. */
 export function shellCall(source: string, name: string, body: any): ShellCall | undefined {
-  const call = (phase: ShellCall["phase"], v: unknown) => (typeof v === "string" && v ? { phase, id: v.slice(0, 200) } : undefined);
+  const call = (phase: ShellCall["phase"], v: unknown, command?: unknown): ShellCall | undefined =>
+    typeof v === "string" && v ? { phase, id: v.slice(0, 200), ...(typeof command === "string" && command ? { command: command.slice(0, 4000) } : {}) } : undefined;
   if (source === "claude" && body?.tool_name === "Bash") {
-    if (name === "PreToolUse") return call("start", body.tool_use_id);
+    if (name === "PreToolUse") return call("start", body.tool_use_id, body.tool_input?.command);
     if (name === "PostToolUse") return call("end", body.tool_use_id);
   }
   if (source === "pi") {
-    if (name === "tool" && body?.tool === "bash" && body?.started) return call("start", body.id);
+    if (name === "tool" && body?.tool === "bash" && body?.started) return call("start", body.id, body.input?.command);
     if (name === "tool_end") return call("end", body?.id);
   }
   if (source === "codex" && body?.item?.type === "commandExecution") {
-    if (name === "item/started") return call("start", body.item.id);
+    if (name === "item/started") return call("start", body.item.id, body.item.command);
     if (name === "item/completed") return call("end", body.item.id);
   }
   return undefined;

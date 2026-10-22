@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { shellCall } from "./bridge/events.ts";
 import { cardOf, receive } from "./bridge/index.ts";
 import { panels, projects } from "./db.ts";
-import { changedFiles, porcelainPaths, snapshot, startShellEdits } from "./shellEdits.ts";
+import { changedFiles, porcelainPaths, readsOnly, snapshot, startShellEdits } from "./shellEdits.ts";
 
 startShellEdits();
 
@@ -32,6 +32,34 @@ describe("shell commands' edits", () => {
     expect(shellCall("pi", "tool_end", { id: "p1" })).toEqual({ phase: "end", id: "p1" });
     expect(shellCall("codex", "item/started", { item: { type: "commandExecution", id: "c1" } })).toEqual({ phase: "start", id: "c1" });
     expect(shellCall("codex", "item/completed", { item: { type: "fileChange", id: "c2" } })).toBeUndefined();
+    expect(shellCall("claude", "PreToolUse", { tool_name: "Bash", tool_use_id: "t3", tool_input: { command: "ls" } })).toEqual({ phase: "start", id: "t3", command: "ls" });
+    expect(shellCall("codex", "item/started", { item: { type: "commandExecution", id: "c3", command: "/bin/zsh -lc 'ls'" } })?.command).toBe("/bin/zsh -lc 'ls'");
+  });
+
+  it("tells commands that only read", () => {
+    for (const c of [
+      "cat src/main.js src/engine/controls.js; cat src/ui/shop.js",
+      "/bin/zsh -lc 'nl -ba src/ui/hud.js | head -30; nl -ba src/main.js | sed -n 65,95p'",
+      "rg --files tests && git diff --stat",
+      "node --test 2>&1 | tail -5",
+      "cd src && ls -la >/dev/null",
+      "FORCE_COLOR=0 git status --short",
+    ])
+      expect(readsOnly(c), c).toBe(true);
+    for (const c of [
+      undefined,
+      "cat > engine.js",
+      "echo hi >> notes.md",
+      "sed -i '' 's/a/b/' x.js",
+      "rg x && cat <<'EOF' > tests/a.test.js\nEOF",
+      "node build.js",
+      "npm test",
+      "git checkout -- src/main.js",
+      "find . -name '*.tmp' -delete",
+      "python3 fix.py",
+      "cat a | tee b",
+    ])
+      expect(readsOnly(c), String(c)).toBe(false);
   });
 
   it("counts what a session's shell command wrote as its edits, but not what another session reported", async () => {
@@ -51,7 +79,30 @@ describe("shell commands' edits", () => {
     receive(pi.id, "pi", "tool", { cwd: root, tool: "write", input: { path: "ui.js" } });
     receive(claude.id, "claude", "PostToolUse", { tool_name: "Bash", tool_use_id: "t1", cwd: root, tool_input: { command: "cat > engine.js" } });
 
-    await vi.waitFor(() => expect(cardOf(claude).edits.map((e) => e.file)).toEqual([join(root, "engine.js")]));
+    await vi.waitFor(() => expect(cardOf(claude).edits.map((e) => e.file)).toEqual([join(root, "engine.js")]), { timeout: 5_000 });
+  });
+
+  it("counts nothing for a command that only reads, and leaves a late edit report its own", async () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "rails-shell-")));
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    const project = projects.create("app", root);
+    const codex = panels.create({ projectId: project.id, kind: "codex", title: "Codex" });
+    const claude = panels.create({ projectId: project.id, kind: "claude", title: "Claude Code", sessionId: `c-${Math.random()}` });
+    const pi = panels.create({ projectId: project.id, kind: "pi", title: "pi" });
+    // Codex reads while Claude Code edits main.js with its tool.
+    receive(codex.id, "codex", "item/started", { item: { type: "commandExecution", id: "r1", command: "/bin/zsh -lc 'cat src/main.js'" } });
+    receive(pi.id, "pi", "tool", { cwd: root, tool: "bash", started: true, id: "w1", input: { command: "python3 gen.py" } });
+    await new Promise((r) => setTimeout(r, 50));
+    writeFileSync(join(root, "main.js"), "export {};\n");
+    receive(codex.id, "codex", "item/completed", { item: { type: "commandExecution", id: "r1", command: "/bin/zsh -lc 'cat src/main.js'" } });
+    receive(pi.id, "pi", "tool_end", { id: "w1" });
+    // Claude Code's report of its edit comes in after both commands ended.
+    await new Promise((r) => setTimeout(r, 300));
+    receive(claude.id, "claude", "PostToolUse", { tool_name: "Edit", tool_use_id: "e1", cwd: root, tool_input: { file_path: join(root, "main.js") } });
+    await new Promise((r) => setTimeout(r, 2_500));
+    expect(cardOf(codex).edits).toEqual([]);
+    expect(cardOf(pi).edits).toEqual([]);
+    expect(cardOf(claude).edits.map((e) => e.file)).toEqual([join(root, "main.js")]);
   });
 
   it("ignores projects that aren't git repositories", async () => {
