@@ -1,6 +1,7 @@
 # ADR 0020: Customize holds agent profiles and saved prompts
 
-Status: accepted (first part of Customize; tools come later).
+Status: superseded in part by ADR 0025: agent profiles are removed (Customize is the Sprockets' toolbox now).
+Saved prompts stand.
 
 Customize was a placeholder. AGENTS.md reserves it for agent profiles, prompts and tools, and keeps app settings
 in the Settings modal. Every agent starts in a panel with the same command line, so the user can't say "start

@@ -19,7 +19,6 @@ vi.mock("./providers/index.ts", () => ({
 
 const { getWorkspace, openPanel, panelEnded } = await import("./panels.ts");
 const { panels, projects } = await import("./db.ts");
-const { createProfile } = await import("./customize.ts");
 
 describe("openPanel", () => {
   let projectId: string;
@@ -70,22 +69,4 @@ describe("openPanel", () => {
     expect((await getWorkspace(projectId)).panels.map((p) => p.id)).toEqual([panel.id]);
   });
 
-  it("starts Claude Code with a profile's flags after the bridge's, new or resumed", async () => {
-    const { startSession } = await import("./tmux.ts");
-    const profile = createProfile({ agent: "claude", name: "Plan", permissionMode: "plan", allowedTools: ["Edit"], isDefault: true });
-    vi.mocked(startSession).mockClear();
-    const panel = await openPanel(projectId, { kind: "claude", prompt: "hi", profileId: profile.id });
-    expect(panel.profile).toEqual({ id: profile.id, name: "Plan", model: "", effort: "", permissionMode: "plan" });
-    const argv = vi.mocked(startSession).mock.calls[0][2];
-    expect(argv[0]).toBe("claude");
-    const after = (a: string[]) => a.slice(a.indexOf("--settings") + 2); // the bridge's flags (ADR 0007, 0018) come first
-    expect(argv.slice(1, 5).filter((a) => a.startsWith("--"))).toEqual(["--mcp-config", "--settings"]);
-    expect(after(argv).slice(0, 5)).toEqual(["--permission-mode", "plan", "--allowed-tools", "Edit", "--session-id"]);
-    expect(argv.slice(-2)).toEqual(["--", "hi"]);
-
-    // Resuming from the sidebar picks no profile: the agent's default applies.
-    vi.mocked(startSession).mockClear();
-    await openPanel(projectId, { kind: "claude", sessionId: "s-profile" });
-    expect(after(vi.mocked(startSession).mock.calls[0][2])).toEqual(["--permission-mode", "plan", "--allowed-tools", "Edit", "--resume", "s-profile"]);
-  });
 });

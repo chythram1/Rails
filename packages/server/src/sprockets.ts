@@ -18,7 +18,9 @@ import {
   type SprocketMessage,
   type SprocketSettings,
 } from "@rails/shared";
-import { handoffs, projects, sprocketChats, sprocketMessages, sprockets, suggestions, usage, type StoredChat } from "./db.ts";
+import { handoffs, mcpServers, projects, sprocketChats, sprocketMessages, sprocketTools, sprockets, suggestions, usage, type StoredChat } from "./db.ts";
+import { customizeChanged } from "./customize.ts";
+import { skillExists } from "./skills.ts";
 import { ServiceError } from "./errors.ts";
 import { endRound, nameClash, onTeamsChanged, startRound } from "./teams.ts";
 import { settleHandoffs } from "./handoffs.ts";
@@ -85,6 +87,7 @@ function withLook({ coreMemory: _internal, ...row }: ReturnType<typeof sprockets
     running: isRunning(row.id),
     direct: chatInfo(sprocketChats.of(row.id, "direct")!),
     ...(project ? { projectChat: chatInfo(project) } : {}),
+    tools: sprocketTools.of(row.id),
   };
 }
 
@@ -196,7 +199,7 @@ export function postEvent(sprocketId: string, event: SprocketEvent, text: string
  */
 export function updateSettings(id: string, body: SprocketSettings | undefined): Sprocket {
   const s = getSprocket(id);
-  const { projectId, model, description, rules } = body ?? {};
+  const { projectId, model, description, rules, tools } = body ?? {};
   const moving = projectId !== undefined && (projectId ?? undefined) !== s.projectId;
   if (moving) {
     const to = projectId === null ? undefined : typeof projectId === "string" ? projects.get(projectId) : undefined;
@@ -212,14 +215,31 @@ export function updateSettings(id: string, body: SprocketSettings | undefined): 
       throw new ServiceError(`Descriptions can be at most ${SPROCKET_DESCRIPTION_MAX} characters.`, 400);
   }
   const ruleList = rules === undefined ? undefined : parseRules(rules);
+  const toolbox = tools === undefined ? undefined : parseTools(tools);
 
   if (moving) sprockets.setProject(id, projectId ?? null);
   if (model !== undefined) sprockets.setModel(id, model);
   if (description !== undefined) sprockets.setDescription(id, description.trim());
   if (ruleList) sprockets.setRules(id, ruleList);
+  if (toolbox?.mcp) sprocketTools.set(id, "mcp", toolbox.mcp);
+  if (toolbox?.skills) sprocketTools.set(id, "skill", toolbox.skills);
+  if (toolbox) customizeChanged(); // who uses what shows in Customize
   if (moving) settleHandoffs(); // its handoffs belong to the project it left
   changed();
   return getSprocket(id);
+}
+
+/** The MCP servers and skills a request gives a Sprocket (ADR 0025): known ones only. */
+function parseTools(raw: unknown): { mcp?: string[]; skills?: string[] } {
+  const t = (raw ?? {}) as { mcp?: unknown; skills?: unknown };
+  const ids = (v: unknown, known: (id: string) => boolean, what: string) => {
+    if (v === undefined) return undefined;
+    if (!Array.isArray(v) || v.some((x) => typeof x !== "string")) throw new ServiceError(`${what} must be a list`, 400);
+    const bad = v.find((x) => !known(x));
+    if (bad) throw new ServiceError(`Unknown ${what === "Servers" ? "MCP server" : "skill"}: ${bad}`, 400);
+    return v as string[];
+  };
+  return { mcp: ids(t.mcp, (id) => !!mcpServers.get(id), "Servers"), skills: ids(t.skills, skillExists, "Skills") };
 }
 
 /** Standing rules from a request: trimmed, empty ones dropped, within the limits. */

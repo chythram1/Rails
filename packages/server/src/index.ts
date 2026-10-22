@@ -18,8 +18,11 @@ import { panels, projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
 import { listFolder, previewFile } from "./tree.ts";
 import { nameSession } from "./names.ts";
-import type { AgentProfileInput, OpenPanel, SavedPromptInput, SprocketTeamInput, SprocketInput, SprocketSettings } from "@rails/shared";
-import { createPrompt, createProfile, deletePrompt, deleteProfile, listPrompts, listProfiles, profileUses, updatePrompt, updateProfile as updateAgentProfile } from "./customize.ts";
+import type { ConnectorInput, McpServerInput, OpenPanel, SavedPromptInput, SkillInput, SprocketTeamInput, SprocketInput, SprocketSettings } from "@rails/shared";
+import { createPrompt, deletePrompt, listPrompts, updatePrompt } from "./customize.ts";
+import { addConnector, cancelSignIn as cancelMcpSignIn, createServer, deleteServer, disconnectAll, listServers, pasteSignIn, signOut, startSignIn as startMcpSignIn, testServer, updateServer } from "./mcp.ts";
+import { createSkill, deleteSkill, importSkill, listSkills, skillSources, updateSkill } from "./skills.ts";
+import { decideApproval } from "./approvals.ts";
 import { closePanel, getWorkspace, openPanel, saveLayout } from "./panels.ts";
 import { ServiceError } from "./errors.ts";
 import { attachPickedFolder, attachProject, detachProject, getProject, listProjectSessions, recentFolders } from "./projects.ts";
@@ -199,15 +202,38 @@ app.put("/api/projects/:id/layout", async (c) => {
 // ---- the file tree (read-only) ----
 app.get("/api/projects/:id/files", async (c) => c.json(await listFolder(getProject(c.req.param("id")).path, c.req.query("dir") ?? "")));
 app.get("/api/projects/:id/files/content", async (c) => c.json(await previewFile(getProject(c.req.param("id")).path, c.req.query("path") ?? "")));
-// ---- Customize: agent profiles and saved prompts (ADR 0020) ----
-app.get("/api/profiles", (c) => c.json(listProfiles()));
-app.post("/api/profiles", async (c) => c.json(createProfile(await c.req.json<AgentProfileInput>()), 201));
-app.put("/api/profiles/:id", async (c) => c.json(updateAgentProfile(c.req.param("id"), await c.req.json<AgentProfileInput>())));
-app.delete("/api/profiles/:id", (c) => {
-  deleteProfile(c.req.param("id"));
+// ---- Customize (ADR 0025): saved prompts, MCP servers, skills ----
+app.get("/api/mcp", (c) => c.json(listServers()));
+app.post("/api/mcp", async (c) => c.json(createServer(await c.req.json<McpServerInput>()), 201));
+app.put("/api/mcp/:id", async (c) => c.json(updateServer(c.req.param("id"), await c.req.json<McpServerInput>())));
+app.delete("/api/mcp/:id", (c) => {
+  deleteServer(c.req.param("id"));
   return c.json({ ok: true });
 });
-app.get("/api/profiles/:id/panels", async (c) => c.json(await profileUses(c.req.param("id"))));
+app.post("/api/mcp/:id/test", async (c) => c.json(await testServer(c.req.param("id"))));
+// Add a connector (a server Rails knows, shared CONNECTORS).
+app.post("/api/connectors/:id", async (c) => c.json(await addConnector(c.req.param("id"), await c.req.json<ConnectorInput>().catch(() => ({}))), 201));
+// Signing in to a remote server (OAuth): start, the address pasted from another device, cancel, sign out.
+app.post("/api/mcp/:id/sign-in", async (c) => c.json(await startMcpSignIn(c.req.param("id"))));
+app.post("/api/mcp/:id/sign-in/address", async (c) => c.json(await pasteSignIn(c.req.param("id"), (await c.req.json<{ address: unknown }>()).address)));
+app.delete("/api/mcp/:id/sign-in", async (c) => {
+  await cancelMcpSignIn(c.req.param("id"));
+  return c.json({ ok: true });
+});
+app.post("/api/mcp/:id/sign-out", async (c) => c.json(await signOut(c.req.param("id"))));
+app.get("/api/skills", (c) => c.json(listSkills()));
+app.get("/api/skills/sources", (c) => c.json(skillSources()));
+app.post("/api/skills/import", async (c) => c.json(await importSkill((await c.req.json<{ path?: unknown }>().catch(() => ({}) as { path?: unknown })).path)));
+app.post("/api/skills", async (c) => c.json(createSkill(await c.req.json<SkillInput>()), 201));
+app.put("/api/skills/:id", async (c) => c.json(updateSkill(c.req.param("id"), await c.req.json<SkillInput>())));
+app.delete("/api/skills/:id", (c) => {
+  deleteSkill(c.req.param("id"));
+  return c.json({ ok: true });
+});
+app.post("/api/approvals/:id", async (c) => {
+  await decideApproval(c.req.param("id"), (await c.req.json<{ allow?: unknown }>()).allow);
+  return c.json({ ok: true });
+});
 app.get("/api/prompts", (c) => c.json(listPrompts()));
 app.post("/api/prompts", async (c) => c.json(createPrompt(await c.req.json<SavedPromptInput>()), 201));
 app.put("/api/prompts/:id", async (c) => c.json(updatePrompt(c.req.param("id"), await c.req.json<SavedPromptInput>())));
@@ -355,7 +381,8 @@ server.on("upgrade", (req, socket, head) => {
 
 const shutdown = () => {
   hub.detachAll(); // panel processes keep running in tmux
-  process.exit(0);
+  // MCP servers Rails started (ADR 0025) stop with it; give them a moment.
+  void Promise.race([disconnectAll(), new Promise((r) => setTimeout(r, 1500))]).finally(() => process.exit(0));
 };
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

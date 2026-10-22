@@ -1,11 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { userInfo } from "node:os";
-import type { AgentProfile, OpenPanel, Panel, PanelKind, ProviderId, Workspace } from "@rails/shared";
+import type { OpenPanel, Panel, PanelKind, ProviderId, Workspace } from "@rails/shared";
 import { layouts, panels } from "./db.ts";
 import { bridgeEnv, forgetPanel } from "./bridge/index.ts";
 import { onCodexSession, unwatchCodexIfIdle, watchCodex } from "./bridge/codex.ts";
 import { bridgeFlags } from "./bridge/wiring.ts";
-import { launchProfile } from "./customize.ts";
 import { ServiceError } from "./errors.ts";
 import { getProject } from "./projects.ts";
 import { discovery, findSession, installed } from "./providers/index.ts";
@@ -54,24 +53,6 @@ function newCommand(kind: PanelKind, prompt: string | undefined): { argv: string
     case "shell":
       return { argv: [loginShell(), "-l"] };
   }
-}
-
-/**
- * Flags for a profile's launch options (ADR 0020), inserted after the program name. Each value is its own
- * argv entry (tmux execs argv as-is), so instructions and tool patterns need no quoting. Only Claude Code has
- * profiles so far.
- */
-export function profileFlags(kind: PanelKind, profile: AgentProfile | undefined): string[] {
-  if (!profile || kind !== "claude") return [];
-  const flags: string[] = [];
-  if (profile.model) flags.push("--model", profile.model);
-  if (profile.effort) flags.push("--effort", profile.effort);
-  if (profile.permissionMode) flags.push("--permission-mode", profile.permissionMode);
-  if (profile.instructions) flags.push("--append-system-prompt", profile.instructions);
-  // Tool lists take several values; the next argv entry is always another flag or `--`, which ends them.
-  if (profile.allowedTools.length) flags.push("--allowed-tools", ...profile.allowedTools);
-  if (profile.disallowedTools.length) flags.push("--disallowed-tools", ...profile.disallowedTools);
-  return flags;
 }
 
 // ---- change notifications (the terminal hub forwards these to every browser) ----
@@ -143,25 +124,24 @@ export async function openPanel(projectId: string, req: OpenPanel): Promise<Pane
   const project = getProject(projectId);
   if (!["claude", "codex", "pi", "shell"].includes(req.kind)) throw new ServiceError("Unknown panel kind", 400);
   if (req.kind !== "shell" && !installed(req.kind)) throw new ServiceError(`${discovery[req.kind].name} isn't installed on the server`, 400);
-  const profile = launchProfile(req.kind, req.profileId);
 
   if (req.sessionId) {
     if (req.kind === "shell") throw new ServiceError("Shells have no sessions", 400);
     const { sessionId } = req;
     const inFlight = opening.get(sessionId);
     if (inFlight) return inFlight;
-    const open = openSession(project.id, req.kind, sessionId, profile).finally(() => opening.delete(sessionId));
+    const open = openSession(project.id, req.kind, sessionId).finally(() => opening.delete(sessionId));
     opening.set(sessionId, open);
     return open;
   }
 
   const { argv, sessionId } = newCommand(req.kind, req.prompt?.trim() || undefined);
   const title = req.kind === "shell" ? "Shell" : discovery[req.kind].name;
-  return start(project.id, req.kind, sessionId, title, project.path, argv, profile);
+  return start(project.id, req.kind, sessionId, title, project.path, argv);
 }
 
 /** Resume a discovered session in a panel, or return the panel it's already running in. */
-async function openSession(projectId: string, kind: ProviderId, sessionId: string, profile: AgentProfile | undefined): Promise<Panel> {
+async function openSession(projectId: string, kind: ProviderId, sessionId: string): Promise<Panel> {
   const existing = panels.bySession(sessionId);
   if (existing) {
     if ((await tmux.runningPanels()).has(existing.id)) return existing;
@@ -169,23 +149,16 @@ async function openSession(projectId: string, kind: ProviderId, sessionId: strin
   }
   const found = await findSession(kind, sessionId);
   if (!found) throw new ServiceError("Session transcript not found", 404);
-  return start(projectId, kind, sessionId, found.title, found.cwd, resumeCommand(kind, sessionId), profile);
+  return start(projectId, kind, sessionId, found.title, found.cwd, resumeCommand(kind, sessionId));
 }
 
-async function start(projectId: string, kind: PanelKind, sessionId: string | undefined, title: string, cwd: string, argv: string[], profile?: AgentProfile) {
-  const panel = panels.create({
-    projectId,
-    kind,
-    sessionId,
-    title,
-    ...(profile ? { profile: { id: profile.id, name: profile.name, model: profile.model, effort: profile.effort, permissionMode: profile.permissionMode } } : {}),
-  });
+async function start(projectId: string, kind: PanelKind, sessionId: string | undefined, title: string, cwd: string, argv: string[]) {
+  const panel = panels.create({ projectId, kind, sessionId, title });
   starting.add(panel.id);
   try {
     // Agents report to the bridge (ADR 0007): their flags go after the program name, the token in the env.
-    // A profile's flags (ADR 0020) follow them.
     const [program, ...rest] = argv;
-    const wired = kind === "shell" ? argv : [program, ...bridgeFlags(kind, panel.id), ...profileFlags(kind, profile), ...rest];
+    const wired = kind === "shell" ? argv : [program, ...bridgeFlags(kind, panel.id), ...rest];
     await tmux.startSession(panel.id, cwd, wired, kind === "shell" ? {} : bridgeEnv(panel.id));
   } catch (e) {
     panels.remove(panel.id);

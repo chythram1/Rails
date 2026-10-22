@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { IconArrowRight as ArrowRight, IconChevronLeft as ChevronLeft, IconLayoutSidebarRight as PanelRight, IconPlus as Plus, IconSettings as Cog, IconX as X } from "@tabler/icons-react";
+import { IconArrowRight as ArrowRight, IconBook as Book, IconChevronLeft as ChevronLeft, IconLayoutSidebarRight as PanelRight, IconPlus as Plus, IconSettings as Cog, IconX as X } from "@tabler/icons-react";
 import {
   SPROCKET_DESCRIPTION_MAX,
   SPROCKET_RULE_MAX,
   SPROCKET_RULES_MAX,
+  connectorById,
+  type McpServer,
   type Sprocket as SprocketData,
   type SprocketSettings as Settings,
 } from "@rails/shared";
@@ -12,10 +14,12 @@ import { href, navigate } from "../../router.ts";
 import { useStore } from "../../store.tsx";
 import { shortTitle } from "../../util.ts";
 import { Dropdown } from "../Dropdown.tsx";
+import { Switch } from "../Switch.tsx";
 import { PanelIcon } from "../PanelMenu.tsx";
 import { ModelSelect, useModelSettings } from "../ModelSelect.tsx";
 import { useOpenSettings } from "../settings/context.ts";
 import { useAutoGrow } from "../useAutoGrow.ts";
+import { ConnectorLogo } from "../customize/ConnectorLogo.tsx";
 
 /**
  * The button that opens and closes a Sprocket's settings panel. It sits at the right end of the chat header,
@@ -173,6 +177,7 @@ export function SprocketSettings({ sprocket, all, onProjectChat = false }: { spr
             {sprocket.coordinator && <RulesField sprocket={sprocket} onSave={(rules) => save({ rules })} />}
             {sprocket.coordinator && <HandoffsField sprocket={sprocket} />}
             {sprocket.projectId && <OwnersField sprocket={sprocket} />}
+            <ToolsField sprocket={sprocket} onSave={(tools) => save({ tools })} />
           </section>
         ) : (
           <>
@@ -566,5 +571,75 @@ function DescriptionField({ sprocket, onSave }: { sprocket: SprocketData; onSave
         It follows this in every reply{editing ? ` (${text.length}/${SPROCKET_DESCRIPTION_MAX})` : ""}.
       </p>
     </div>
+  );
+}
+
+/**
+ * What it can use (ADR 0025): a switch per MCP server and per skill in Customize. Each server's tools ask first
+ * unless Customize allows them; it reaches them in its direct chat and teams.
+ */
+function ToolsField({ sprocket, onSave }: { sprocket: SprocketData; onSave(tools: { mcp?: string[]; skills?: string[] }): Promise<boolean> }) {
+  const { mcpServers, skills } = useStore();
+  const has = sprocket.tools;
+  const toggle = (kind: "mcp" | "skills", itemId: string, on: boolean) =>
+    void onSave({ [kind]: on ? [...has[kind], itemId] : has[kind].filter((x) => x !== itemId) });
+  const none = !mcpServers?.length && !skills?.length;
+  return (
+    <div className="settings-field" role="group" aria-labelledby="sp-tools-label">
+      <p id="sp-tools-label" className="sp-field-label">Tools</p>
+      <p className="muted small">
+        {none ? (
+          <>
+            None yet. Add MCP servers and skills in <a href={href.customize()}>Customize</a>.
+          </>
+        ) : (
+          <>
+            From <a href={href.customize()}>Customize</a>. It uses servers in its own chat and teams; tools that change things ask you first.
+          </>
+        )}
+      </p>
+      {!none && (
+        <ul className="sp-tools">
+          {(mcpServers ?? []).map((s) => (
+            <ToolRow
+              key={s.id}
+              id={`sp-tool-${s.id}`}
+              name={connectorById(s.connector)?.name ?? s.name}
+              server={s}
+              kind={s.connector ? "Connector" : "MCP server"}
+              detail={s.signIn?.state === "needed" ? "Sign in to it in Customize" : s.status.state === "error" ? "Can't connect" : s.toolsAt ? `${s.tools.filter((t) => t.policy !== "off").length} tools` : ""}
+              warn={s.status.state === "error"}
+              on={has.mcp.includes(s.id)}
+              onChange={(on) => toggle("mcp", s.id, on)}
+            />
+          ))}
+          {(skills ?? []).map((k) => (
+            <ToolRow key={k.id} id={`sp-skill-${k.id}`} name={k.name} kind="Skill" detail="" on={has.skills.includes(k.id)} onChange={(on) => toggle("skills", k.id, on)} />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ToolRow(props: { id: string; name: string; kind: string; detail: string; warn?: boolean; server?: McpServer; on: boolean; onChange(on: boolean): void }) {
+  return (
+    <li className="sp-tool">
+      {props.server ? (
+        <ConnectorLogo server={props.server} size={28} />
+      ) : (
+        <span className="sp-tool-icon" aria-hidden>
+          <Book size={16} />
+        </span>
+      )}
+      <label htmlFor={props.id} className="sp-tool-text">
+        <span className="sp-tool-name truncate">{props.name}</span>
+        <span className="muted small">
+          {props.kind}
+          {props.detail && (props.warn ? <span className="sp-tool-warn"> · {props.detail}</span> : ` · ${props.detail}`)}
+        </span>
+      </label>
+      <Switch id={props.id} checked={props.on} onChange={props.onChange} />
+    </li>
   );
 }

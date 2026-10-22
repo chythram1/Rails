@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { AgentProfile, DecisionEntry, Handoff, Panel, PanelKind, Project, Sprocket, SprocketAsk, SprocketAuthor, SprocketCard, SprocketChatKind, SprocketEvent, SprocketLook, SprocketMessage, SavedPrompt, Suggestion } from "@rails/shared";
+import type { DecisionEntry, Handoff, Panel, PanelKind, Project, Sprocket, SprocketApproval, SprocketAsk, SprocketAuthor, SprocketCard, SprocketChatKind, SprocketEvent, SprocketLook, SprocketMessage, SavedPrompt, Suggestion } from "@rails/shared";
 import { RAILS_HOME } from "./config.ts";
 
 const db = new DatabaseSync(join(RAILS_HOME, "rails.db"));
@@ -134,6 +134,34 @@ addColumn("sprocket_messages", "pass_to", "TEXT");
 addColumn("sprocket_messages", "ask", "TEXT");
 /** On a card a Sprocket showed (ADR 0024): the SprocketCard, as JSON. */
 addColumn("sprocket_messages", "card", "TEXT");
+/** On an approval (ADR 0025): the SprocketApproval, as JSON. */
+addColumn("sprocket_messages", "approval", "TEXT");
+// Customize (ADR 0025): MCP servers (their secret values are in mcp-secrets.json, not here), and what each
+// Sprocket has: servers and skills (skills are folders in RAILS_HOME/skills, by folder name).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS mcp_servers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL DEFAULT '',
+    transport TEXT NOT NULL,
+    command TEXT NOT NULL DEFAULT '',
+    args TEXT NOT NULL DEFAULT '[]',
+    url TEXT NOT NULL DEFAULT '',
+    tools TEXT NOT NULL DEFAULT '[]',
+    tools_at TEXT,
+    policies TEXT NOT NULL DEFAULT '{}',
+    status TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS sprocket_tools (
+    sprocket_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    PRIMARY KEY (sprocket_id, kind, item_id)
+  );
+`);
+// The connector (shared CONNECTORS) a server was added from, if any.
+addColumn("mcp_servers", "connector", "TEXT");
 
 /**
  * Every Sprocket has its direct chat and an attached one its project chat; messages from before chats go in one:
@@ -166,7 +194,7 @@ export function assignChats(): void {
 }
 assignChats();
 addColumn("panels", "bridge_token", "TEXT");
-/** The agent profile it started with (ADR 0020), as JSON: a snapshot, since the profile may change later. */
+/** The agent profile it started with (ADR 0020, removed by ADR 0025): no longer written or read. */
 addColumn("panels", "profile", "TEXT");
 db.exec(`
   CREATE TABLE IF NOT EXISTS session_events (
@@ -225,8 +253,7 @@ db.exec(`
     event_message_id TEXT
   );
   CREATE INDEX IF NOT EXISTS decisions_by_panel ON decisions (panel_id, at);
-  -- Customize (ADR 0020). A profile's launch options are JSON, checked by the service when read, so options
-  -- for more agents don't need new columns.
+  -- Agent profiles (ADR 0020), removed by ADR 0025: kept, unread, so nothing the user made is deleted.
   CREATE TABLE IF NOT EXISTS agent_profiles (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -311,7 +338,7 @@ export const projects = {
   },
 };
 
-type PanelRow = { id: string; project_id: string; kind: PanelKind; session_id: string | null; title: string; created_at: string; profile: string | null };
+type PanelRow = { id: string; project_id: string; kind: PanelKind; session_id: string | null; title: string; created_at: string };
 const toPanel = (r: PanelRow): Panel => ({
   id: r.id,
   projectId: r.project_id,
@@ -319,7 +346,6 @@ const toPanel = (r: PanelRow): Panel => ({
   sessionId: r.session_id ?? undefined,
   title: r.title,
   createdAt: r.created_at,
-  ...(r.profile ? { profile: JSON.parse(r.profile) } : {}),
 });
 
 export const panels = {
@@ -339,14 +365,13 @@ export const panels = {
   },
   create(p: Omit<Panel, "id" | "createdAt">): Panel {
     const panel: Panel = { ...p, id: randomUUID(), createdAt: new Date().toISOString() };
-    db.prepare("INSERT INTO panels (id, project_id, kind, session_id, title, created_at, profile) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
+    db.prepare("INSERT INTO panels (id, project_id, kind, session_id, title, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(
       panel.id,
       panel.projectId,
       panel.kind,
       panel.sessionId ?? null,
       panel.title,
       panel.createdAt,
-      panel.profile ? JSON.stringify(panel.profile) : null,
     );
     return panel;
   },
@@ -416,7 +441,7 @@ type SprocketRow = {
   rules: string;
 };
 /** A stored Sprocket, with its internal core memory (never sent to browsers). */
-const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running" | "pending" | "handoffs" | "owners" | "usage" | "direct" | "projectChat"> & { look: unknown; coreMemory: string } => ({
+const toSprocket = (r: SprocketRow): Omit<Sprocket, "look" | "running" | "pending" | "handoffs" | "owners" | "usage" | "direct" | "projectChat" | "tools"> & { look: unknown; coreMemory: string } => ({
   id: r.id,
   name: r.name,
   look: JSON.parse(r.look),
@@ -506,6 +531,7 @@ export const sprockets = {
     db.prepare("DELETE FROM suggestions WHERE sprocket_id = ?").run(id);
     db.prepare("DELETE FROM sprocket_runs WHERE sprocket_id = ? AND status IN ('queued', 'waiting')").run(id);
     db.prepare("DELETE FROM sprocket_usage WHERE sprocket_id = ?").run(id);
+    db.prepare("DELETE FROM sprocket_tools WHERE sprocket_id = ?").run(id);
     db.prepare("DELETE FROM sprockets WHERE id = ?").run(id);
   },
 };
@@ -589,6 +615,7 @@ type MessageRow = {
   pass_to: string | null;
   ask: string | null;
   card: string | null;
+  approval: string | null;
 };
 const toMessage = (r: MessageRow): SprocketMessage => ({
   id: r.id,
@@ -602,6 +629,7 @@ const toMessage = (r: MessageRow): SprocketMessage => ({
   ...(r.pass_to ? { passTo: r.pass_to } : {}),
   ...(r.ask ? { ask: JSON.parse(r.ask) } : {}),
   ...(r.card ? { card: JSON.parse(r.card) } : {}),
+  ...(r.approval ? { approval: JSON.parse(r.approval) } : {}),
 });
 
 export const sprocketMessages = {
@@ -633,7 +661,18 @@ export const sprocketMessages = {
       passTo,
       ask,
       card,
-    }: { activity?: string; steps?: unknown[]; event?: SprocketEvent; sprocketId?: string; runId?: string; passTo?: string; ask?: SprocketAsk; card?: SprocketCard } = {},
+      approval,
+    }: {
+      activity?: string;
+      steps?: unknown[];
+      event?: SprocketEvent;
+      sprocketId?: string;
+      runId?: string;
+      passTo?: string;
+      ask?: SprocketAsk;
+      card?: SprocketCard;
+      approval?: SprocketApproval;
+    } = {},
   ): SprocketMessage {
     const chat = sprocketChats.get(chatId);
     if (!chat) throw new Error(`No chat ${chatId}`);
@@ -650,9 +689,10 @@ export const sprocketMessages = {
       ...(passTo ? { passTo } : {}),
       ...(ask ? { ask } : {}),
       ...(card ? { card } : {}),
+      ...(approval ? { approval } : {}),
     };
     db.prepare(
-      "INSERT INTO sprocket_messages (id, sprocket_id, chat_id, author, text, created_at, activity, steps, event, run_id, pass_to, ask, card) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO sprocket_messages (id, sprocket_id, chat_id, author, text, created_at, activity, steps, event, run_id, pass_to, ask, card, approval) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     ).run(
       m.id,
       m.sprocketId,
@@ -667,6 +707,7 @@ export const sprocketMessages = {
       passTo ?? null,
       ask ? JSON.stringify(ask) : null,
       card ? JSON.stringify(card) : null,
+      approval ? JSON.stringify(approval) : null,
     );
     return m;
   },
@@ -690,6 +731,19 @@ export const sprocketMessages = {
   answer(id: string, answer: string): void {
     db.prepare("UPDATE sprocket_messages SET ask = json_set(ask, '$.answer', ?) WHERE id = ? AND ask IS NOT NULL").run(answer, id);
   },
+  /** A message by id (an approval being decided). */
+  get(id: string): SprocketMessage | undefined {
+    const r = db.prepare("SELECT * FROM sprocket_messages WHERE id = ?").get(id) as MessageRow | undefined;
+    return r && toMessage(r);
+  },
+  /** The run a message came from, if a run posted it. */
+  runOf(id: string): string | undefined {
+    return (db.prepare("SELECT run_id FROM sprocket_messages WHERE id = ?").get(id) as { run_id: string | null } | undefined)?.run_id ?? undefined;
+  },
+  /** Record what came of an approval (ADR 0025). */
+  setApproval(id: string, approval: SprocketApproval): void {
+    db.prepare("UPDATE sprocket_messages SET approval = ? WHERE id = ?").run(JSON.stringify(approval), id);
+  },
   /** Mark an event the Coordinator decided the user needn't hear about. */
   setQuiet(id: string): void {
     db.prepare("UPDATE sprocket_messages SET event = json_set(event, '$.quiet', json('true')) WHERE id = ? AND event IS NOT NULL").run(id);
@@ -704,7 +758,8 @@ export const sprocketMessages = {
 };
 
 export type RunStatus = "queued" | "running" | "waiting" | "done" | "failed" | "cancelled";
-export type RunTrigger = "user" | "pass" | "event";
+/** `approval`: the user allowed or denied an MCP call the Sprocket asked for (ADR 0025). */
+export type RunTrigger = "user" | "pass" | "event" | "approval";
 type RunRow = {
   id: string;
   chat_id: string;
@@ -1159,55 +1214,6 @@ export const usage = {
   },
 };
 
-// Agent profiles (ADR 0020): `options` holds the launch options as JSON, validated by customize.ts.
-type ProfileRow = { id: string; name: string; agent: AgentProfile["agent"]; is_default: number; options: string; created_at: string };
-export type StoredProfile = Pick<AgentProfile, "id" | "name" | "agent" | "isDefault" | "createdAt"> & { options: unknown };
-const toProfile = (r: ProfileRow): StoredProfile => ({
-  id: r.id,
-  name: r.name,
-  agent: r.agent,
-  isDefault: r.is_default === 1,
-  options: JSON.parse(r.options),
-  createdAt: r.created_at,
-});
-
-export const agentProfiles = {
-  list(): StoredProfile[] {
-    return (db.prepare("SELECT * FROM agent_profiles ORDER BY agent, name COLLATE NOCASE").all() as ProfileRow[]).map(toProfile);
-  },
-  get(id: string): StoredProfile | undefined {
-    const r = db.prepare("SELECT * FROM agent_profiles WHERE id = ?").get(id) as ProfileRow | undefined;
-    return r && toProfile(r);
-  },
-  defaultFor(agent: string): StoredProfile | undefined {
-    const r = db.prepare("SELECT * FROM agent_profiles WHERE agent = ? AND is_default = 1").get(agent) as ProfileRow | undefined;
-    return r && toProfile(r);
-  },
-  create(name: string, agent: string, options: unknown): StoredProfile {
-    const id = randomUUID();
-    db.prepare("INSERT INTO agent_profiles (id, name, agent, options, created_at) VALUES (?, ?, ?, ?, ?)").run(id, name, agent, JSON.stringify(options), new Date().toISOString());
-    return this.get(id)!;
-  },
-  update(id: string, name: string, options: unknown): void {
-    db.prepare("UPDATE agent_profiles SET name = ?, options = ? WHERE id = ?").run(name, JSON.stringify(options), id);
-  },
-  /** Make a profile its agent's default, taking over from any other, or stop. */
-  setDefault(id: string, on: boolean): void {
-    db.exec("BEGIN");
-    try {
-      if (on) db.prepare("UPDATE agent_profiles SET is_default = 0 WHERE agent = (SELECT agent FROM agent_profiles WHERE id = ?)").run(id);
-      db.prepare("UPDATE agent_profiles SET is_default = ? WHERE id = ?").run(on ? 1 : 0, id);
-      db.exec("COMMIT");
-    } catch (e) {
-      db.exec("ROLLBACK");
-      throw e;
-    }
-  },
-  remove(id: string): void {
-    db.prepare("DELETE FROM agent_profiles WHERE id = ?").run(id);
-  },
-};
-
 type PromptRow = { id: string; name: string; text: string; created_at: string };
 const toPrompt = (r: PromptRow): SavedPrompt => ({ id: r.id, name: r.name, text: r.text, createdAt: r.created_at });
 
@@ -1229,5 +1235,133 @@ export const savedPrompts = {
   },
   remove(id: string): void {
     db.prepare("DELETE FROM saved_prompts WHERE id = ?").run(id);
+  },
+};
+
+// ---- Customize (ADR 0025): MCP servers and what each Sprocket has ----
+
+/** A tool as Rails last saw it on its server (its input schema too, for the capability). */
+export type StoredTool = { name: string; title?: string; description: string; inputSchema: Record<string, unknown>; readOnly: boolean };
+export type StoredMcpServer = {
+  id: string;
+  name: string;
+  description: string;
+  transport: "stdio" | "http";
+  command: string;
+  args: string[];
+  url: string;
+  tools: StoredTool[];
+  toolsAt?: string;
+  policies: Record<string, "allow" | "ask" | "off">;
+  status: { state: "unknown" | "ok" | "error"; error?: string; at?: string };
+  connector?: string;
+  createdAt: string;
+};
+type McpRow = {
+  id: string;
+  name: string;
+  description: string;
+  transport: "stdio" | "http";
+  command: string;
+  args: string;
+  url: string;
+  tools: string;
+  tools_at: string | null;
+  policies: string;
+  status: string | null;
+  connector: string | null;
+  created_at: string;
+};
+const toMcp = (r: McpRow): StoredMcpServer => ({
+  id: r.id,
+  name: r.name,
+  description: r.description,
+  transport: r.transport,
+  command: r.command,
+  args: JSON.parse(r.args),
+  url: r.url,
+  tools: JSON.parse(r.tools),
+  ...(r.tools_at ? { toolsAt: r.tools_at } : {}),
+  policies: JSON.parse(r.policies),
+  status: r.status ? JSON.parse(r.status) : { state: "unknown" },
+  ...(r.connector ? { connector: r.connector } : {}),
+  createdAt: r.created_at,
+});
+
+export const mcpServers = {
+  list(): StoredMcpServer[] {
+    return (db.prepare("SELECT * FROM mcp_servers ORDER BY name").all() as McpRow[]).map(toMcp);
+  },
+  get(id: string): StoredMcpServer | undefined {
+    const r = db.prepare("SELECT * FROM mcp_servers WHERE id = ?").get(id) as McpRow | undefined;
+    return r && toMcp(r);
+  },
+  byName(name: string): StoredMcpServer | undefined {
+    const r = db.prepare("SELECT * FROM mcp_servers WHERE name = ?").get(name) as McpRow | undefined;
+    return r && toMcp(r);
+  },
+  create(s: Pick<StoredMcpServer, "name" | "description" | "transport" | "command" | "args" | "url" | "connector">): StoredMcpServer {
+    const id = randomUUID();
+    db.prepare("INSERT INTO mcp_servers (id, name, description, transport, command, args, url, connector, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+      id,
+      s.name,
+      s.description,
+      s.transport,
+      s.command,
+      JSON.stringify(s.args),
+      s.url,
+      s.connector ?? null,
+      new Date().toISOString(),
+    );
+    return this.get(id)!;
+  },
+  update(id: string, s: Pick<StoredMcpServer, "name" | "description" | "transport" | "command" | "args" | "url" | "policies">): void {
+    db.prepare("UPDATE mcp_servers SET name = ?, description = ?, transport = ?, command = ?, args = ?, url = ?, policies = ? WHERE id = ?").run(
+      s.name,
+      s.description,
+      s.transport,
+      s.command,
+      JSON.stringify(s.args),
+      s.url,
+      JSON.stringify(s.policies),
+      id,
+    );
+  },
+  setTools(id: string, tools: StoredTool[]): void {
+    db.prepare("UPDATE mcp_servers SET tools = ?, tools_at = ? WHERE id = ?").run(JSON.stringify(tools), new Date().toISOString(), id);
+  },
+  setStatus(id: string, status: StoredMcpServer["status"]): void {
+    db.prepare("UPDATE mcp_servers SET status = ? WHERE id = ?").run(JSON.stringify(status), id);
+  },
+  remove(id: string): void {
+    db.prepare("DELETE FROM mcp_servers WHERE id = ?").run(id);
+    db.prepare("DELETE FROM sprocket_tools WHERE kind = 'mcp' AND item_id = ?").run(id);
+  },
+};
+
+/** What each Sprocket has (ADR 0025): MCP servers by id, skills by folder name. */
+export const sprocketTools = {
+  of(sprocketId: string): { mcp: string[]; skills: string[] } {
+    const rows = db.prepare("SELECT kind, item_id FROM sprocket_tools WHERE sprocket_id = ? ORDER BY item_id").all(sprocketId) as { kind: string; item_id: string }[];
+    return { mcp: rows.filter((r) => r.kind === "mcp").map((r) => r.item_id), skills: rows.filter((r) => r.kind === "skill").map((r) => r.item_id) };
+  },
+  /** The Sprockets that have this server or skill. */
+  users(kind: "mcp" | "skill", itemId: string): string[] {
+    return (db.prepare("SELECT sprocket_id FROM sprocket_tools WHERE kind = ? AND item_id = ?").all(kind, itemId) as { sprocket_id: string }[]).map((r) => r.sprocket_id);
+  },
+  set(sprocketId: string, kind: "mcp" | "skill", ids: string[]): void {
+    db.exec("BEGIN");
+    try {
+      db.prepare("DELETE FROM sprocket_tools WHERE sprocket_id = ? AND kind = ?").run(sprocketId, kind);
+      for (const id of new Set(ids)) db.prepare("INSERT INTO sprocket_tools (sprocket_id, kind, item_id) VALUES (?, ?, ?)").run(sprocketId, kind, id);
+      db.exec("COMMIT");
+    } catch (e) {
+      db.exec("ROLLBACK");
+      throw e;
+    }
+  },
+  /** A skill is gone: no Sprocket has it any more. */
+  dropSkill(id: string): void {
+    db.prepare("DELETE FROM sprocket_tools WHERE kind = 'skill' AND item_id = ?").run(id);
   },
 };

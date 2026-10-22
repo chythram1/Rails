@@ -10,9 +10,14 @@ export type Route =
    * direct chat, or with `project` its project's chat (ADR 0021). `team` is a team chat (ADR 0022), by its id.
    */
   | { name: "sprockets"; view: "list" | "new" | "chat" | "settings" | "team" | "teamSettings"; id?: string; project?: boolean }
-  /** Customize (ADR 0020): agent profiles and saved prompts, or one of them open for editing. */
-  | { name: "customize"; view: "list" | "profile" | "prompt"; id?: string }
+  /**
+   * Customize (ADR 0025): a tab (connectors, skills, prompts) of cards, or one thing open: a server, skill or prompt
+   * of yours by id, or a connector (shared CONNECTORS) not added yet by its catalog id.
+   */
+  | { name: "customize"; view: "home" | "connector" | "mcp" | "skill" | "prompt"; tab: CustomizeTab; id?: string }
   | { name: "automate" };
+
+export type CustomizeTab = "connectors" | "skills" | "prompts";
 
 function parse(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
@@ -29,9 +34,12 @@ function parse(hash: string): Route {
   }
   if (parts[0] === "new" && parts[1]) return { name: "home", promptId: parts[1] };
   if (parts[0] === "customize") {
-    if (parts[1] === "profiles" && parts[2]) return { name: "customize", view: "profile", id: parts[2] };
-    if (parts[1] === "prompts" && parts[2]) return { name: "customize", view: "prompt", id: parts[2] };
-    return { name: "customize", view: "list" };
+    if (parts[1] === "mcp" && parts[2]) return { name: "customize", view: "mcp", tab: "connectors", id: parts[2] };
+    if (parts[1] === "connectors" && parts[2]) return { name: "customize", view: "connector", tab: "connectors", id: parts[2] };
+    if (parts[1] === "skills" && parts[2]) return { name: "customize", view: "skill", tab: "skills", id: parts[2] };
+    if (parts[1] === "prompts" && parts[2]) return { name: "customize", view: "prompt", tab: "prompts", id: parts[2] };
+    if (parts[1] === "skills" || parts[1] === "prompts") return { name: "customize", view: "home", tab: parts[1] };
+    return { name: "customize", view: "home", tab: "connectors" };
   }
   if (parts[0] === "automate") return { name: "automate" };
   return { name: "home" };
@@ -50,8 +58,11 @@ export const href = {
   team: (id: string) => `#/sprockets/teams/${encodeURIComponent(id)}`,
   teamSettings: (id: string) => `#/sprockets/teams/${encodeURIComponent(id)}/settings`,
   sprocketSettings: (id: string, project = false) => `#/sprockets/${encodeURIComponent(id)}${project ? "/project" : ""}/settings`,
-  customize: () => "#/customize",
-  profile: (id: string) => `#/customize/profiles/${encodeURIComponent(id)}`,
+  customize: (tab: CustomizeTab = "connectors") => (tab === "connectors" ? "#/customize" : `#/customize/${tab}`),
+  /** A connector not added yet (its page, with Connect). */
+  connector: (id: string) => `#/customize/connectors/${encodeURIComponent(id)}`,
+  mcpServer: (id: string) => `#/customize/mcp/${encodeURIComponent(id)}`,
+  skill: (id: string) => `#/customize/skills/${encodeURIComponent(id)}`,
   prompt: (id: string) => `#/customize/prompts/${encodeURIComponent(id)}`,
 };
 

@@ -33,7 +33,7 @@ writeFileSync(
  * Environment for tmux and everything it starts. Drops rails' own and npm's variables (the access
  * token must not leak into agents) plus markers of a parent agent session.
  */
-function cleanEnv(): Record<string, string> {
+export function cleanEnv(): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) {
     if (v === undefined || /^(npm_|RAILS_|PI_|CLAUDE_CODE_)|^(CLAUDECODE|NODE_ENV|INIT_CWD)$/.test(k)) continue;

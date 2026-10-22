@@ -32,10 +32,10 @@ export function useWorkspace(projectId: string) {
 
   /** Open a new panel, or focus the panel an existing session is already open in. */
   const open = useCallback(
-    async (kind: PanelKind, sessionId?: string, profileId?: string): Promise<Panel | undefined> => {
+    async (kind: PanelKind, sessionId?: string): Promise<Panel | undefined> => {
       setError("");
       try {
-        const panel = await api.openPanel(projectId, { kind, sessionId, profileId });
+        const panel = await api.openPanel(projectId, { kind, sessionId });
         await load();
         void refreshSessions(projectId);
         return panel;

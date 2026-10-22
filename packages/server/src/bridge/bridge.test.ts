@@ -183,17 +183,6 @@ describe("bridge", () => {
     expect(board).toMatch(/asked \(latest in its transcript, [^)]*\): x{100}/);
     expect(board).toMatch(/last reply \(in its transcript, [^)]*\): Here's a plan\./);
   });
-  it("shows a Sprocket the profile a session started with (ADR 0020)", async () => {
-    const own = projects.create("profiled", `/work/profiled-${Math.random()}`);
-    const profile = { id: "pr1", name: "Planner", model: "sonnet", effort: "high" as const, permissionMode: "plan" as const };
-    const p = panels.create({ projectId: own.id, kind: "claude", title: "Claude Code", profile });
-    expect(panels.get(p.id)?.profile).toEqual(profile); // stored as a snapshot
-    const ctx = { sprocketId: "s", project: own, signal: new AbortController().signal };
-    const board = (await projectCapabilities.find((c) => c.name === "project_board")!.run({}, ctx)) as string;
-    expect(board).toContain("profile: Planner (sonnet, plan permission mode, high effort)");
-    const list = (await projectCapabilities.find((c) => c.name === "list_sessions")!.run({}, ctx)) as any[];
-    expect(list[0]).toMatchObject({ id: p.id.slice(0, 8), profile: "Planner (sonnet, plan permission mode, high effort)" });
-  });
 });
 
 describe("Codex watcher", () => {

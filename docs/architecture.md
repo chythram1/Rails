@@ -43,7 +43,6 @@ packages/
   front (`--session-id`), so the panel knows its session immediately. New Codex panels don't know their
   session id. Opening a session that already has a running panel returns that panel.
   `DELETE /api/panels/:id` kills the tmux session.
-  An agent profile adds its flags to the command line (see **Customize** below).
 - **Terminals:** each browser terminal sends `term.attach` with its size and a page-unique `attachId`; the server spawns
   `tmux attach` in a PTY for it and streams bytes both ways. Killing that PTY only detaches. While a
   browser terminal is being resized it refits (and reports `term.resize`) at most every 100ms, plus once at
@@ -79,17 +78,41 @@ packages/
   `suggestions.ts`, ADR 0010), shown under its message; when the user sends it, `bridge/deliver.ts` puts it into
   the session: Claude Code's message socket, the pi extension's long poll (`GET /bridge/<panelId>/pi/inbox`, confirmed with `POST …/pi/delivered`) or
   Codex's `thread/queue/add`. Suggestions expire as soon as their session moves on. A handoff (ADR 0015, `handoffs.ts`, planned by the Coordinator when the user asks) wakes it when its session ends a turn without a question, to draft the message for the other session; handoffs expire after 24 hours and are cancelled when either session ends. Owners (ADR 0016, `owners.ts`), recorded by the Coordinator with `set_owner`, route its requests; an edit to files another session owns wakes it like an overlap. Shell commands' edits count too (`shellEdits.ts`): Rails compares `git status` and file times at a command's start and end. Each run's usage goes in `sprocket_usage`. An overlap also wakes the Coordinator, for the session that changed the files second (batched over 15 s, once per pair and file per 30 minutes); it judges whether they clash and may draft a heads-up with `suggest_message`. A Coordinator's standing rules (ADR 0011) are in its prompt, numbered; a suggestion records the rule it followed. If the user picked a decision model, `decisions.ts` (ADR 0012) asks it about every turn end and unknown dialog in projects with a Coordinator, through pi-ai's `classify()`, and logs its answers next to Rails' own (`decisions` table, `GET /api/decisions`, `decisions.changed`). It may also wake the Coordinator (ADR 0013, `wakeFromModel` in `watches.ts`) for a question the rules missed, unless the session moved on meanwhile; `RAILS_DECISIONS=shadow` keeps it to judging.
-- **Customize** (ADR 0020, `customize.ts`): agent profiles and saved prompts, stored in SQLite (`agent_profiles`,
-  with a profile's options as JSON, checked again when read; `saved_prompts`) and broadcast as `customize.changed`.
-  Routes: `GET/POST /api/profiles`, `PUT/DELETE /api/profiles/:id`, `GET /api/profiles/:id/panels` (the running
-  panels that started with it, "In use"), and the same CRUD under `/api/prompts`. When a panel starts, the profile
-  picked (or else the agent's default; also when a session is resumed) adds its flags after the bridge's
-  (`profileFlags` in `panels.ts`), and the panel keeps a snapshot of it (`panels.profile`): the tab's tooltip names
-  it, and the board and `list_sessions` show it to Sprockets. Every Sprocket can read the saved prompts
-  (`saved_prompts`, `harness/prompts.ts`). The web pages are `#/customize`, `#/customize/profiles/<id>` and
-  `#/customize/prompts/<id>`; a profile's Start opens a panel with it (`POST /api/projects/:id/panels` with
-  `profileId`), and a prompt's "Use on Home" goes to `#/new/<promptId>`, which fills Home's composer. Saved prompts
-  also fill Sprocket chats' composer (`SavedPromptsMenu`).
+- **Customize** (ADR 0025): what Sprockets can use, broadcast as `customize.changed`.
+  - **MCP servers** (`mcp.ts`, `mcp_servers`): a local command (stdio) or a URL (Streamable HTTP), connected with
+    `@earendil-works/pi-mcp` when a run first needs one and closed after 5 idle minutes. Environment and header values
+    are in `RAILS_HOME/mcp-secrets.json` (0600), never in the database or the API. A local server gets the panels'
+    cleaned environment (no `RAILS_*`) plus its own. Each connection lists the tools and keeps them, with each tool's
+    allow, ask or off (`policies`; read-only tools start as allow). Routes: `GET/POST /api/mcp`, `PUT/DELETE
+    /api/mcp/:id`, `POST /api/mcp/:id/test`.
+  - **Signing in to remote servers** (OAuth, in `mcp.ts`, through `@earendil-works/pi-mcp/oauth`): `POST
+    /api/mcp/:id/sign-in` discovers the service's sign-in server, registers Rails (or uses the user's `clientId` and
+    `clientSecret`) and returns the page to open as `signIn.authUrl`; the browser comes back to a listener on
+    `127.0.0.1:${RAILS_MCP_OAUTH_PORT}/mcp/oauth/callback` (signin.ts' `awaitRedirect`), or the user pastes that
+    address (`POST …/sign-in/address`). `DELETE …/sign-in` cancels, `POST …/sign-out` forgets the tokens. Tokens
+    and the registered app are kept in `mcp-secrets.json` (pi-mcp's `McpOAuthState`); a signed-in connection
+    renews them on a 401. A 401 on connecting or on a call sets the status `SIGN_IN_NEEDED`. The sign-in state
+    reaches browsers as `McpServer.signIn` (with `customize.changed`).
+  - **Tools in runs** (`harness/mcpTools.ts`): a Sprocket's servers (`sprocket_tools`) become capabilities named
+    `<server>_<tool>`, in direct and team chats only. Results are labelled as data from the server, cut at 20,000
+    characters. An ask tool ends the turn with an **approval** (a message with `approval`, the run `waiting`);
+    `POST /api/approvals/:messageId` (`approvals.ts`) allows (Rails calls it and stores the result) or denies, then
+    queues the Sprocket's next run (trigger `approval`), which sees what came of it as Rails' note.
+  - **Skills** (`skills.ts`): `RAILS_HOME/skills/<id>/SKILL.md` folders, written in Customize or copied in from
+    `~/.agents/skills`, `~/.claude/skills`, `~/.pi/agent/skills` or the native folder picker (no symlinks, at most 200
+    files and 5 MB). A Sprocket's skills are listed in its instructions in every chat, and `read_skill`
+    (`harness/skills.ts`) reads SKILL.md or a text file beside it. Routes under `/api/skills` (`sources`, `import`).
+  - **Saved prompts** (`customize.ts`, `saved_prompts`, `/api/prompts`): every Sprocket can read them
+    (`saved_prompts`, `harness/prompts.ts`); a prompt's "Use on Home" goes to `#/new/<promptId>`, which fills Home's
+    composer, and they also fill Sprocket chats' composer (`SavedPromptsMenu`).
+  - **Connectors** (`packages/shared/src/connectors.ts`): the MCP servers Rails knows, each with how it connects.
+    `POST /api/connectors/:id` (`addConnector` in `mcp.ts`, with `{ token }` for one that takes a token) makes a
+    server from the entry (`mcp_servers.connector`), then signs in, connects, or (the user's own app) just adds it;
+    a folder comes from the native picker. An entry can say all its tools only read (DeepWiki), so they start as Allow.
+  - The web pages are the tabs `#/customize` (connectors), `#/customize/skills` and `#/customize/prompts`, and one item:
+    `#/customize/connectors/<connectorId>` (not added yet), `#/customize/mcp/<id>`, `#/customize/skills/<id>` and
+    `#/customize/prompts/<id>`.
+    Agent profiles (ADR 0020) are gone; their table stays, unread.
 - **Persistence:** panels survive browser disconnects and server restarts (`tsx watch` included).
   On a reboot the tmux server is gone; the next workspace read drops panels whose tmux session no
   longer exists. Their transcripts remain, so sessions can be resumed from the sidebar.
@@ -157,8 +180,8 @@ packages/
 | pi | ✅ `~/.pi/agent/sessions/*/*.jsonl` | ✅ `pi --session-id <uuid> [-- prompt]` / `pi --session <id>` |
 | codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl`, names from `~/.codex/session_index.jsonl` (checked with Codex 0.163) | ✅ `codex [-- prompt]` / `codex resume <id>`; a new panel learns its session id from Codex's daemon (ADR 0007) |
 
-Agent profiles (ADR 0020) exist for claude only so far: pi's and Codex's flags still have to be checked on a
-real install, and any `-c`, `--enable`, `--disable` or `--search` flag makes Codex leave its daemon (ADR 0007).
+Any `-c`, `--enable`, `--disable` or `--search` flag makes Codex leave its daemon (ADR 0007), so Rails passes Codex
+none.
 
 Every provider panel reports to the bridge (ADR 0007): Claude Code through hooks, pi through the Rails
 extension, Codex through its app-server daemon. Edits count for overlaps (ADR 0014) once they worked: Claude
@@ -201,6 +224,7 @@ Transcript format notes are in [providers.md](./providers.md).
 | `RAILS_HOST` | `127.0.0.1` | bind address |
 | `RAILS_PORT` | `4317` | server port (Vite dev runs on 5173 and proxies to it) |
 | `RAILS_TOKEN` | generated | access token override |
+| `RAILS_MCP_OAUTH_PORT` | `4328` | where signing in to a remote MCP server sends the browser back (`127.0.0.1`, ADR 0025) |
 | `RAILS_DECISIONS` | — | `shadow`: the decision model only judges and logs, never wakes the Coordinator (for evaluating a model, ADR 0013) |
 | `CLAUDE_HOME` / `PI_HOME` / `CODEX_HOME` | `~/.claude`, `~/.pi/agent`, `~/.codex` | provider store roots |
 

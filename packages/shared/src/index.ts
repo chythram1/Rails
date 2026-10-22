@@ -1,5 +1,6 @@
 // Shared domain + wire types. Terms are defined in docs/CONTEXT.md.
 
+export * from "./connectors.ts";
 export type ProviderId = "claude" | "codex" | "pi";
 
 export interface ProviderInfo {
@@ -92,22 +93,7 @@ export interface Panel {
   /** The name the user gave its session in Rails (in a workspace only): browsers show it instead of any title. */
   name?: string;
   createdAt: string;
-  /** The agent profile it started with, as it was then (ADR 0020): editing the profile doesn't change a running panel. */
-  profile?: PanelProfile;
 }
-
-/** A running panel started with an agent profile: where the profile is in use (Customize). */
-export interface ProfileUse {
-  panelId: string;
-  projectId: string;
-  projectName: string;
-  kind: PanelKind;
-  title: string;
-  sessionId?: string;
-}
-
-/** What a panel records of the profile it started with. Sprockets see it on the board. */
-export type PanelProfile = Pick<AgentProfile, "id" | "name" | "model" | "effort" | "permissionMode">;
 
 /** Body of "open a panel" (POST /api/projects/:id/panels). */
 export interface OpenPanel {
@@ -116,52 +102,139 @@ export interface OpenPanel {
   sessionId?: string;
   /** First message for a new agent session. */
   prompt?: string;
-  /** Start the agent with this profile's flags; without one, the agent's default profile (if any) applies. */
-  profileId?: string;
 }
 
-// ---- Customize: agent profiles and saved prompts (ADR 0020). ----
 
-/** Agents that can have profiles so far: their flags are checked against a real install (ADR 0020). */
-export const PROFILE_AGENTS = ["claude"] as const satisfies readonly ProviderId[];
+// ---- Customize (ADR 0025): saved prompts, MCP servers and skills. ----
 
-/** Claude Code's `--effort` levels. */
-export const CLAUDE_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
-/** Claude Code's `--permission-mode` values. */
-export const CLAUDE_PERMISSION_MODES = ["manual", "acceptEdits", "auto", "plan", "dontAsk", "bypassPermissions"] as const;
+/** What a Sprocket may do with an MCP tool: call it, ask the user first (an approval), or not have it. */
+export type McpToolPolicy = "allow" | "ask" | "off";
+export const MCP_TOOL_POLICIES = ["allow", "ask", "off"] as const satisfies readonly McpToolPolicy[];
 
-export const PROFILE_NAME_MAX_LEN = 40;
-export const PROFILE_INSTRUCTIONS_MAX = 2000;
-/** At most this many allowed (and as many denied) tool patterns, each at most PROFILE_TOOL_MAX characters. */
-export const PROFILE_TOOLS_MAX = 30;
-export const PROFILE_TOOL_MAX = 200;
+/** A tool an MCP server offers, as Rails last saw it, with what Sprockets may do with it. */
+export interface McpToolInfo {
+  name: string;
+  title?: string;
+  description: string;
+  /** The server says it only reads (its `readOnlyHint`): it starts as allow, others as ask. */
+  readOnly: boolean;
+  policy: McpToolPolicy;
+}
 
 /**
- * A named set of launch options for one agent, applied as command-line flags when Rails starts it in a panel.
- * Empty fields leave the agent's own default. At most one profile per agent is its default.
+ * An MCP server Rails connects Sprockets to: a local command or a remote URL. Its environment and header
+ * values stay on the server: browsers see only their names.
  */
-export interface AgentProfile {
+export interface McpServer {
   id: string;
+  /** Also the start of its tools' names for a Sprocket (`<name>_<tool>`): lowercase letters, digits, - and _. */
   name: string;
-  agent: ProviderId;
-  /** Used when a panel for this agent starts without a profile picked (also when resuming a session). */
-  isDefault: boolean;
-  /** `--model`: an alias (`opus`, `sonnet`) or a full model name. */
-  model: string;
-  /** `--effort`, or "" for the agent's default. */
-  effort: (typeof CLAUDE_EFFORTS)[number] | "";
-  /** `--permission-mode`, or "" for the agent's default. */
-  permissionMode: (typeof CLAUDE_PERMISSION_MODES)[number] | "";
-  /** `--append-system-prompt`: added to the agent's own system prompt. */
-  instructions: string;
-  /** `--allowed-tools` / `--disallowed-tools` patterns, e.g. `Bash(git *)`, `Edit`. */
-  allowedTools: string[];
-  disallowedTools: string[];
+  description: string;
+  transport: "stdio" | "http";
+  command: string;
+  args: string[];
+  url: string;
+  env: string[];
+  headers: string[];
+  /** Its tools, as of the last connection (empty until then). */
+  tools: McpToolInfo[];
+  toolsAt?: string;
+  /** The last connection: whether it worked, and why not. */
+  status: { state: "unknown" | "ok" | "error"; error?: string; at?: string };
+  /** The Sprockets that have it. */
+  usedBy: string[];
+  /** Signing in to a server with a URL (OAuth); none for a command. */
+  signIn?: McpSignIn;
+  /** The connector (CONNECTORS) it was added from; none for a custom server. */
+  connector?: string;
   createdAt: string;
 }
 
-/** Body of "create" and "change a profile". Only the fields present change. */
-export type AgentProfileInput = Partial<Omit<AgentProfile, "id" | "createdAt">>;
+/**
+ * Signing in to a remote MCP server (OAuth, ADR 0025). Rails holds the token; the browser only ever sees this.
+ * `state`: `none` (it hasn't asked), `needed` (it turned Rails away until someone signs in), `signed-in`.
+ */
+export interface McpSignIn {
+  state: "none" | "needed" | "signed-in";
+  /** A sign-in under way: the service's page to open. Once there, the browser comes back to `redirectUrl`. */
+  authUrl?: string;
+  /** Why the last sign-in failed. */
+  error?: string;
+  /** The app registered with the service by the user, for services that don't let apps register themselves. */
+  clientId?: string;
+  /** Whether that app's secret is set (the value never comes back). */
+  clientSecret: boolean;
+  /** Where the service sends the browser back: to give such a service when registering the app. */
+  redirectUrl: string;
+}
+
+/**
+ * Body of "add" and "change an MCP server". Only the fields present change. In `env` and `headers` a value sets
+ * one, null removes it, and names left out keep theirs.
+ */
+export interface McpServerInput {
+  name?: string;
+  description?: string;
+  transport?: McpServer["transport"];
+  command?: string;
+  args?: string[];
+  url?: string;
+  env?: Record<string, string | null>;
+  headers?: Record<string, string | null>;
+  policies?: Record<string, McpToolPolicy>;
+  /** The user's own app (OAuth client) for signing in: a value sets it, null removes it. */
+  clientId?: string | null;
+  clientSecret?: string | null;
+}
+/** Body of "add a connector": the token, for a connector set up with one. */
+export interface ConnectorInput {
+  token?: string;
+}
+export const MCP_NAME_MAX = 30;
+export const MCP_DESCRIPTION_MAX = 300;
+
+/** A skill (a `SKILL.md` folder) Sprockets can read (ADR 0025). */
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  /** SKILL.md without its front matter. */
+  body: string;
+  /** The other files in its folder, relative to it (text ones a Sprocket can read). */
+  files: string[];
+  usedBy: string[];
+  updatedAt: string;
+}
+export interface SkillInput {
+  name?: string;
+  description?: string;
+  body?: string;
+}
+/** A skill one of the user's agents has, which Customize can copy in. */
+export interface SkillSource {
+  path: string;
+  name: string;
+  description: string;
+  /** Where it was found: `~/.agents/skills`, `~/.claude/skills`, `~/.pi/agent/skills`. */
+  from: string;
+}
+export const SKILL_NAME_MAX = 64;
+export const SKILL_DESCRIPTION_MAX = 1024;
+export const SKILL_BODY_MAX = 60_000;
+
+/**
+ * A call to an MCP tool a Sprocket wanted to make, waiting for the user's yes (ADR 0025). The message it's on is
+ * the approval card.
+ */
+export interface SprocketApproval {
+  serverId: string;
+  server: string;
+  tool: string;
+  args: Record<string, unknown>;
+  status: "pending" | "running" | "done" | "denied" | "failed";
+  /** What the call returned (trimmed), or why it failed. */
+  result?: string;
+}
 
 export const SAVED_PROMPT_NAME_MAX = 60;
 export const SAVED_PROMPT_TEXT_MAX = 4000;
@@ -281,6 +354,8 @@ export interface Sprocket {
   direct: SprocketChatInfo;
   /** Its project's chat, where Rails' events land, while it's attached (ADR 0021). */
   projectChat?: SprocketChatInfo;
+  /** The MCP servers and skills it has (ADR 0025), by id. */
+  tools: { mcp: string[]; skills: string[] };
 }
 
 /** A Sprocket's own chat with the user, its project's chat (ADR 0021), or a team of Sprockets' (ADR 0022). */
@@ -412,6 +487,8 @@ export interface SprocketSettings {
   description?: string;
   /** Replace its standing rules (empty ones are dropped). */
   rules?: string[];
+  /** Replace the MCP servers and skills it has (ADR 0025), by id. */
+  tools?: { mcp?: string[]; skills?: string[] };
 }
 
 /** Body of "create a Sprocket" and "edit a Sprocket". */
@@ -550,6 +627,8 @@ export interface SprocketMessage {
   ask?: SprocketAsk;
   /** On a card a Sprocket showed (ADR 0024); `text` is the card as plain text (cardText). */
   card?: SprocketCard;
+  /** On an approval (ADR 0025): the MCP call the Sprocket wants to make, and what came of it. */
+  approval?: SprocketApproval;
 }
 
 /**

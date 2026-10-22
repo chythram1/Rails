@@ -15,11 +15,11 @@ import { fileURLToPath } from "node:url";
 import type { OAuthCredential } from "@earendil-works/pi-ai";
 
 /** A sign-in waiting for the browser to come back from the provider. */
-export interface PendingSignIn {
+export interface PendingSignIn<C = OAuthCredential> {
   /** The provider's page the user opens to sign in. */
   authUrl: string;
   /** Resolves with the credential once the browser comes back; rejects if the sign-in fails or times out. */
-  credential: Promise<OAuthCredential>;
+  credential: Promise<C>;
   /** The address the browser landed on, pasted by the user. Rejects if it's wrong; the sign-in goes on. */
   paste(address: string): Promise<void>;
   /** Stop waiting and free the port. */
@@ -42,18 +42,20 @@ class Fatal extends Error {}
  * Listen on 127.0.0.1:`port` (0 = any free port) for the provider's redirect to `path`, and accept the same
  * address pasted by the user. `read` checks an address and pulls out what `exchange` needs; a bad address
  * (a stray request, a wrong paste) is turned away and the sign-in goes on. The first good address is
- * exchanged once for the credential.
+ * exchanged once for the credential. MCP servers' sign-ins use it too (mcp.ts), with `busy` saying who else may
+ * hold the port.
  */
-async function awaitRedirect<T>(opts: {
+export async function awaitRedirect<T, C = OAuthCredential>(opts: {
   port: number;
   path: string;
   authUrl(redirectUri: string): string;
   read(url: URL): T;
-  exchange(value: T, redirectUri: string): Promise<OAuthCredential>;
-}): Promise<PendingSignIn> {
-  let resolve!: (c: OAuthCredential) => void;
+  exchange(value: T, redirectUri: string): Promise<C>;
+  busy?: string;
+}): Promise<PendingSignIn<C>> {
+  let resolve!: (c: C) => void;
   let reject!: (e: Error) => void;
-  const credential = new Promise<OAuthCredential>((res, rej) => ((resolve = res), (reject = rej)));
+  const credential = new Promise<C>((res, rej) => ((resolve = res), (reject = rej)));
   credential.catch(() => {}); // the caller may stop listening first
   let exchanging: Promise<void> | undefined;
   let settled = false;
@@ -99,7 +101,7 @@ async function awaitRedirect<T>(opts: {
     server.once("error", (e: NodeJS.ErrnoException) =>
       bad(
         e.code === "EADDRINUSE"
-          ? new Error(`Port ${opts.port} is busy, probably with another sign-in (Codex or pi use it too). Finish or cancel that one, then try again.`)
+          ? new Error(opts.busy ?? `Port ${opts.port} is busy, probably with another sign-in (Codex or pi use it too). Finish or cancel that one, then try again.`)
           : e,
       ),
     );

@@ -1,33 +1,4 @@
-import type {
-  AgentProfile,
-  AgentProfileInput,
-  DecisionLog,
-  FolderListing,
-  GitStatus,
-  ModelSettings,
-  OpenPanel,
-  Panel,
-  Profile,
-  ProfileChange,
-  Project,
-  ProviderInfo,
-  ProfileUse,
-  RecentFolder,
-  SavedPrompt,
-  SavedPromptInput,
-  ServerInfo,
-  SessionKey,
-  SessionSummary,
-  Suggestion,
-  SignIn,
-  Sprocket,
-  SprocketTeam,
-  SprocketTeamInput,
-  SprocketInput,
-  SprocketMessage,
-  SprocketSettings,
-  Workspace,
-} from "@rails/shared";
+import type { ConnectorInput, DecisionLog, FolderListing, GitStatus, McpServer, McpServerInput, ModelSettings, OpenPanel, Panel, Profile, ProfileChange, Project, ProviderInfo, RecentFolder, SavedPrompt, SavedPromptInput, ServerInfo, SessionKey, SessionSummary, SignIn, Skill, SkillInput, SkillSource, Sprocket, SprocketInput, SprocketMessage, SprocketSettings, SprocketTeam, SprocketTeamInput, Suggestion, Workspace } from "@rails/shared";
 
 export class Unauthorized extends Error {}
 
@@ -90,12 +61,29 @@ export const api = {
   closePanel: (id: string) => req("/api/panels/" + enc(id), { method: "DELETE" }),
   saveLayout: (projectId: string, layout: unknown) =>
     req(`/api/projects/${enc(projectId)}/layout`, { method: "PUT", body: JSON.stringify({ layout }) }),
-  agentProfiles: () => req<AgentProfile[]>("/api/profiles"),
-  createAgentProfile: (body: AgentProfileInput) => req<AgentProfile>("/api/profiles", { method: "POST", body: JSON.stringify(body) }),
-  updateAgentProfile: (id: string, body: AgentProfileInput) => req<AgentProfile>("/api/profiles/" + enc(id), { method: "PUT", body: JSON.stringify(body) }),
-  deleteAgentProfile: (id: string) => req("/api/profiles/" + enc(id), { method: "DELETE" }),
-  /** The running panels that started with this profile. */
-  profileUses: (id: string) => req<ProfileUse[]>(`/api/profiles/${enc(id)}/panels`),
+  mcpServers: () => req<McpServer[]>("/api/mcp"),
+  createMcpServer: (body: McpServerInput) => req<McpServer>("/api/mcp", { method: "POST", body: JSON.stringify(body) }),
+  updateMcpServer: (id: string, body: McpServerInput) => req<McpServer>("/api/mcp/" + enc(id), { method: "PUT", body: JSON.stringify(body) }),
+  deleteMcpServer: (id: string) => req("/api/mcp/" + enc(id), { method: "DELETE" }),
+  /** Connect now and list its tools. */
+  testMcpServer: (id: string) => req<McpServer>(`/api/mcp/${enc(id)}/test`, { method: "POST" }),
+  /** Add a connector (shared CONNECTORS): signed in to, connected or just added, as its setup says. */
+  addConnector: (id: string, body: ConnectorInput = {}) => req<McpServer>(`/api/connectors/${enc(id)}`, { method: "POST", body: JSON.stringify(body) }),
+  /** Signing in to a remote MCP server (OAuth). */
+  signInMcpServer: (id: string) => req<McpServer>(`/api/mcp/${enc(id)}/sign-in`, { method: "POST" }),
+  pasteMcpSignIn: (id: string, address: string) => req<McpServer>(`/api/mcp/${enc(id)}/sign-in/address`, { method: "POST", body: JSON.stringify({ address }) }),
+  cancelMcpSignIn: (id: string) => req(`/api/mcp/${enc(id)}/sign-in`, { method: "DELETE" }),
+  signOutMcpServer: (id: string) => req<McpServer>(`/api/mcp/${enc(id)}/sign-out`, { method: "POST" }),
+  skills: () => req<Skill[]>("/api/skills"),
+  createSkill: (body: SkillInput) => req<Skill>("/api/skills", { method: "POST", body: JSON.stringify(body) }),
+  updateSkill: (id: string, body: SkillInput) => req<Skill>("/api/skills/" + enc(id), { method: "PUT", body: JSON.stringify(body) }),
+  deleteSkill: (id: string) => req("/api/skills/" + enc(id), { method: "DELETE" }),
+  /** Skills the user's agents have, to copy in. */
+  skillSources: () => req<SkillSource[]>("/api/skills/sources"),
+  /** Copy a skill folder in: one of skillSources' paths, or a folder chosen in the server's picker (no path). */
+  importSkill: (path?: string) => req<Skill | null>("/api/skills/import", { method: "POST", body: JSON.stringify(path ? { path } : {}) }),
+  /** Allow or deny an MCP call a Sprocket asked for (ADR 0025). */
+  decideApproval: (messageId: string, allow: boolean) => req(`/api/approvals/${enc(messageId)}`, { method: "POST", body: JSON.stringify({ allow }) }),
   prompts: () => req<SavedPrompt[]>("/api/prompts"),
   createPrompt: (body: SavedPromptInput) => req<SavedPrompt>("/api/prompts", { method: "POST", body: JSON.stringify(body) }),
   updatePrompt: (id: string, body: SavedPromptInput) => req<SavedPrompt>("/api/prompts/" + enc(id), { method: "PUT", body: JSON.stringify(body) }),

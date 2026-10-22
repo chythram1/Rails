@@ -3,7 +3,7 @@
 // project and bounded: a transcript's end at most, never a whole one, and capped files and diffs.
 import { Type } from "@earendil-works/pi-ai";
 import type { Project } from "@rails/shared";
-import { AGENT, boardText, profileText } from "../bridge/board.ts";
+import { AGENT, boardText } from "../bridge/board.ts";
 import type { SessionEvent } from "../bridge/events.ts";
 import { cardOf } from "../bridge/index.ts";
 import { panels, sessionEvents } from "../db.ts";
@@ -130,7 +130,6 @@ export const projectCapabilities: Capability[] = [
           title: { type: "string" },
           agent: { type: "string" },
           status: { type: "string", description: "unknown, idle, working, waiting, failed or ended" },
-          profile: { type: "string", description: "The agent profile it started with and its options, if any (e.g. plan permission mode)." },
           waitingFor: { type: "string" },
           changed: { type: "array", items: { type: "string" }, description: "Files it changed recently." },
           lastAsked: { type: "string", description: "What it was last asked (clipped)." },
@@ -152,7 +151,6 @@ export const projectCapabilities: Capability[] = [
           title: panel.title,
           agent: AGENT[panel.kind],
           status: card.status,
-          ...(card.profile ? { profile: profileText(card.profile) } : {}),
           ...(card.waitingFor ? { waitingFor: card.waitingFor } : {}),
           changed: card.edits.slice(0, 8).map((e) => e.file),
           ...(asked ? { lastAsked: clip(asked, 300) } : {}),

@@ -17,6 +17,7 @@ import {
   sprocketChats,
   sprocketMessages,
   sprocketRuns,
+  sprocketTools,
   sprockets,
   suggestions,
   usage,
@@ -33,6 +34,10 @@ import { projectCapabilities } from "./harness/project.ts";
 import { promptsCapability } from "./harness/prompts.ts";
 import { replyCapabilities } from "./harness/reply.ts";
 import { showCardCapability } from "./harness/cards.ts";
+import { mcpCapabilities, resultText } from "./harness/mcpTools.ts";
+import { readSkillCapability, skillsPrompt } from "./harness/skills.ts";
+import { listSkills } from "./skills.ts";
+import { serversFor } from "./mcp.ts";
 import { askUserCapability, passTurnCapability, sendMessageCapability, type TurnEnd } from "./harness/turns.ts";
 import { findModel, models } from "./models.ts";
 import { projectOwners } from "./owners.ts";
@@ -89,6 +94,8 @@ export const onTyping = typingChanges.on;
 /** The step a reply is on and what it has done so far (the run log); nulls when the run ends. */
 export const onActivity = activityChanges.on;
 const changed = runChanges.emit;
+/** Tell browsers a chat changed (a message was updated outside a run, as an approval decided). */
+export const runsChanged = changed;
 const typing = typingChanges.emit;
 
 /** Whether a Sprocket has a run going (in any chat). A Sprocket answers one chat at a time (ADR 0021). */
@@ -280,7 +287,8 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   const fresh = history.filter(
     (m) => (!since || Date.parse(m.createdAt) > Date.parse(since)) && (m.author === "user" || m.author === "event" || (!!team && m.sprocketId !== id)),
   );
-  if (!last || !fresh.length) return;
+  // A decided approval (ADR 0025) is new even though no message came: the Sprocket goes on with its result.
+  if (!last || (!fresh.length && r.trigger !== "approval")) return;
   // What this run answers: everything since the last reply.
   const unanswered = history.slice(history.findLastIndex((m) => m.author === "sprocket") + 1);
   const start = Math.max(Date.now(), Date.parse(last.createdAt) + 1);
@@ -308,7 +316,15 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   const replayed = sprocketMessages.recentSteps(chatId, id, REPLAYED);
   const context: Message[] = recentMessages.flatMap((m) => [...((replayed.get(m.id) ?? []) as Message[]), toLlm(m, model, id, team)]);
   // How to write, once more right before it does: models keep their document habits from the system prompt alone.
-  if (chat.kind !== "project") context.push({ role: "user", content: team ? `${TEXTING_NOW}\n${roundNow(history, r, team)}` : TEXTING_NOW, timestamp: Date.now() });
+  // Its MCP servers (ADR 0025), outside the project chat: those never connected connect now, and one that can't is
+  // named in the reminder.
+  const toolbox = sprocketTools.of(id);
+  const servers = chat.kind !== "project" ? await serversFor(toolbox.mcp) : [];
+  // Its skills, in every chat: reading one changes nothing.
+  const skills = toolbox.skills.length ? listSkills().filter((k) => toolbox.skills.includes(k.id)) : [];
+  const unreachable = servers.filter((x) => x.error).map((x) => `[Rails] The MCP server ${x.server.name} can't be reached right now (${x.error}), so its tools aren't here this turn.`);
+  if (chat.kind !== "project")
+    context.push({ role: "user", content: [team ? `${TEXTING_NOW}\n${roundNow(history, r, team)}` : TEXTING_NOW, ...unreachable].join("\n"), timestamp: Date.now() });
   // One tool (ADR 0008): the model writes scripts that call the Sprocket's capabilities. A Coordinator can
   // also suggest replies to sessions (ADR 0010), shown under the reply this run saves. Outside the project chat a
   // run can end its turn on purpose (ADR 0023): ask the user, or in a team pass the turn.
@@ -324,6 +340,8 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
     ...(project && chat.kind !== "project" ? [projectChatCapability] : []),
     ...(project && s.coordinator ? replyCapabilities(s.rules, (sid) => made.push(sid)) : []),
     ...(chat.kind !== "project" ? [askUserCapability(endWith, ended), sendMessageCapability((text) => post(text)), showCardCapability((card) => show(card))] : []),
+    ...mcpCapabilities(servers.filter((x) => !x.error).map((x) => x.server), endWith, ended),
+    ...(skills.length ? [readSkillCapability(skills)] : []),
     ...(team ? [passTurnCapability(team.members.filter((m) => m.id !== id), { hop: r.hop, queued: () => queuedIn(chatId), said: () => posted.size > 0 || sent.length > 0 }, endWith, ended)] : []),
   ];
   // The run log: every call's outcome, and the ones going now (scripts can run several at once).
@@ -351,7 +369,7 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   });
   const agent = new Agent({
     initialState: {
-      systemPrompt: systemPrompt(s.name, project?.name, s.description, s.coreMemory, s.coordinator ? s.rules : undefined, s.coordinator ? handoffs.pending(s.id) : [], ownedBy, chat.kind, team && { ...team, self: id }),
+      systemPrompt: [systemPrompt(s.name, project?.name, s.description, s.coreMemory, s.coordinator ? s.rules : undefined, s.coordinator ? handoffs.pending(s.id) : [], ownedBy, chat.kind, team && { ...team, self: id }), ...skillsPrompt(skills)].join("\n"),
       model,
       tools: [code],
       messages: context,
@@ -471,6 +489,18 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
       const asked = sprocketMessages.create(chatId, "sprocket", e.ask.question, postTime(chatId), { sprocketId: id, runId: r.id, ask: e.ask, steps: steps_ });
       steps_ = [];
       lastPosted = asked;
+      outcome = { asked: true };
+    }
+    if (e && "approval" in e) {
+      const { server, tool } = e.approval;
+      const card = sprocketMessages.create(chatId, "sprocket", `Wants to use ${server} ${tool}`, postTime(chatId), {
+        sprocketId: id,
+        runId: r.id,
+        approval: { ...e.approval, status: "pending" },
+        steps: steps_,
+      });
+      steps_ = [];
+      lastPosted = card;
       outcome = { asked: true };
     }
     if (lastPosted) {
@@ -614,6 +644,23 @@ function toLlm(m: SprocketMessage, model: Model<Api>, self: string, team: TeamIn
   // A pass line (ADR 0023) is Rails' note, whoever passed.
   if (author === "pass")
     return { role: "user", content: `[Rails] ${m.sprocketId === self ? "You" : nameOf(m.sprocketId)} gave ${m.passTo === self ? "you" : nameOf(m.passTo ?? "")} the turn${text ? `: ${JSON.stringify(text)}` : ""}.`, timestamp };
+  // An approval (ADR 0025): what it asked to call, and what came of it, as Rails' note.
+  if (m.approval) {
+    const a = m.approval;
+    const who = m.sprocketId === self ? "You" : nameOf(m.sprocketId);
+    const call = `${who} asked to call ${a.tool} on the MCP server ${a.server} with ${JSON.stringify(a.args)}.`;
+    const outcome =
+      a.status === "done"
+        ? `Your user allowed it. ${resultText(a.server, a.result ?? "")}`
+        : a.status === "failed"
+          ? `Your user allowed it, but it failed: ${a.result ?? "unknown error"}`
+          : a.status === "denied"
+            ? "Your user denied it: it didn't run. Don't ask for it again unless they ask you to."
+            : a.status === "running"
+              ? "Your user allowed it; it's running."
+              : "Your user hasn't decided yet.";
+    return { role: "user", content: `[Rails] ${call} ${outcome}`, timestamp };
+  }
   // A card (ADR 0024) as Rails' note of what it showed, so a model doesn't take up writing cards out as text.
   if (m.card) {
     const who = m.sprocketId === self ? "You" : nameOf(m.sprocketId);

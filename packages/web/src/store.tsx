@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import type { AgentProfile, AttentionReason, PanelOverlap, Profile, ProfileChange, Project, ProviderInfo, SavedPrompt, SessionSummary } from "@rails/shared";
+import type { AttentionReason, McpServer, PanelOverlap, Profile, ProfileChange, Project, ProviderInfo, SavedPrompt, SessionSummary, Skill } from "@rails/shared";
 import { api } from "./api.ts";
 import { href, navigate } from "./router.ts";
 import { socket } from "./ws.ts";
@@ -30,9 +30,10 @@ interface Store {
   /** Add a folder as a project and open it. */
   chooseFolder(path: string): Promise<void>;
   refreshSessions(projectId: string): Promise<void>;
-  /** Agent profiles and saved prompts (Customize, ADR 0020); null until loaded. Kept current by the server. */
-  agentProfiles: AgentProfile[] | null;
+  /** Customize (ADR 0025): saved prompts, MCP servers and skills; null until loaded. Kept current by the server. */
   savedPrompts: SavedPrompt[] | null;
+  mcpServers: McpServer[] | null;
+  skills: Skill[] | null;
   /** Load them again now (e.g. right after creating one, before opening it). */
   refreshCustomize(): Promise<void>;
 }
@@ -51,7 +52,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState<Record<string, SessionSummary[]>>({});
   const [activePanelId, setActivePanelId] = useState<string>();
   const [picking, setPicking] = useState(false);
-  const [agentProfiles, setAgentProfiles] = useState<AgentProfile[] | null>(null);
+  const [mcpServers, setMcpServers] = useState<McpServer[] | null>(null);
+  const [skills, setSkills] = useState<Skill[] | null>(null);
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[] | null>(null);
   const projectsRef = useRef(projects);
   projectsRef.current = projects;
@@ -62,9 +64,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshCustomize = useCallback(async () => {
-    const [profiles, prompts] = await Promise.all([api.agentProfiles().catch(() => null), api.prompts().catch(() => null)]);
-    if (profiles) setAgentProfiles(profiles);
+    const [prompts, servers, skillList] = await Promise.all([api.prompts().catch(() => null), api.mcpServers().catch(() => null), api.skills().catch(() => null)]);
     if (prompts) setSavedPrompts(prompts);
+    if (servers) setMcpServers(servers);
+    if (skillList) setSkills(skillList);
   }, []);
 
   const refreshProjects = useCallback(async () => {
@@ -152,8 +155,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     picking,
     openFolder,
     chooseFolder,
-    agentProfiles,
     savedPrompts,
+    mcpServers,
+    skills,
     refreshCustomize,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

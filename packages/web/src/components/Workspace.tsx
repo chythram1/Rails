@@ -29,7 +29,7 @@ const MOBILE = "(max-width: 860px)";
 /** What the dockview tab / content / header components need from the workspace. */
 interface Ctx extends WorkspaceState {
   /** Open a panel and place it in `group` (or the active group). */
-  openIn(kind: PanelKind, group?: DockviewGroupPanel, sessionId?: string, profileId?: string): void;
+  openIn(kind: PanelKind, group?: DockviewGroupPanel, sessionId?: string): void;
   /** Whether the side panel is open. */
   sideOpen: boolean;
   /** Open the side panel (on Sprockets if a reply waits, else its last tab), or close it. */
@@ -62,9 +62,9 @@ export function Workspace({ projectId, openKey }: { projectId: string; openKey?:
     return () => mq.removeEventListener("change", on);
   }, []);
 
-  const openIn = (kind: PanelKind, group?: DockviewGroupPanel, sessionId?: string, profileId?: string) => {
+  const openIn = (kind: PanelKind, group?: DockviewGroupPanel, sessionId?: string) => {
     targetGroup.current = group;
-    void ws.open(kind, sessionId, profileId).then((p) => {
+    void ws.open(kind, sessionId).then((p) => {
       if (!p) return;
       // A session inside two projects (one folder nested in the other) has one panel, which may live in
       // the other project's workspace: go there and focus it.
@@ -281,7 +281,7 @@ function PanelTab(props: IDockviewPanelHeaderProps) {
     setRenaming({ projectId: panel.projectId, key: sessionKey(panel.kind, panel.sessionId), name: panel.name, agentTitle: s?.agentTitle ?? s?.title ?? panel.title });
   };
   return (
-    <div className="panel-tab" title={panel.profile ? `${title} · ${panel.profile.name} profile` : title} onDoubleClick={rename}>
+    <div className="panel-tab" title={title} onDoubleClick={rename}>
       {renaming && <RenameSession renaming={renaming} onClose={() => setRenaming(undefined)} />}
       <PanelIcon kind={panel.kind} />
       <span className="truncate">{title}</span>
@@ -306,7 +306,7 @@ function HeaderAdd(props: IDockviewHeaderActionsProps) {
   const ws = useWs();
   return (
     <div className="header-add">
-      <PanelMenu onPick={(kind, profileId) => ws.openIn(kind, props.group, undefined, profileId)} />
+      <PanelMenu onPick={(kind) => ws.openIn(kind, props.group)} />
     </div>
   );
 }
@@ -359,7 +359,7 @@ function EmptyWorkspace(_: IWatermarkPanelProps) {
         <SideToggles />
       </div>
       <p className="muted">No panels open. Pick a session in the sidebar, or start something:</p>
-      <PanelMenu onPick={(kind, profileId) => ws.openIn(kind, undefined, undefined, profileId)} />
+      <PanelMenu onPick={(kind) => ws.openIn(kind)} />
     </div>
   );
 }
@@ -395,7 +395,7 @@ function MobilePanels() {
             )}
           </div>
         ))}
-        <PanelMenu onPick={(kind, profileId) => void ws.open(kind, undefined, profileId).then((p) => p && setActiveId(p.id))} />
+        <PanelMenu onPick={(kind) => void ws.open(kind).then((p) => p && setActiveId(p.id))} />
         <span className="grow" />
         <SideToggles />
       </div>

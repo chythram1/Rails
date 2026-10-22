@@ -15,6 +15,8 @@ if (process.env.VITEST && !process.env.RAILS_HOME) {
 export const RAILS_HOME = process.env.RAILS_HOME ?? join(home, ".rails");
 export const HOST = process.env.RAILS_HOST ?? "127.0.0.1";
 export const PORT = Number(process.env.RAILS_PORT ?? 4317);
+/** Where an MCP server's sign-in sends the browser back (ADR 0025): a listener on 127.0.0.1 while one runs. */
+export const MCP_OAUTH_PORT = Number(process.env.RAILS_MCP_OAUTH_PORT ?? 4328);
 /**
  * `RAILS_DECISIONS=shadow`: the decision model only judges and logs, and never wakes anyone (ADR 0012, 0013). For
  * evaluating a model on real sessions; read on each use, so tests can set it.

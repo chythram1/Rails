@@ -6,7 +6,11 @@ import { ASK_OPTIONS_MAX, ASK_OPTIONS_MIN, TEAM_TURNS_MAX, type SprocketAsk } fr
 import type { Capability } from "./capabilities.ts";
 
 /** How a run ended on purpose: the teammate it passed to (and what for), or the question it asked. */
-export type TurnEnd = { passTo: string; note: string } | { ask: SprocketAsk };
+export type TurnEnd =
+  | { passTo: string; note: string }
+  | { ask: SprocketAsk }
+  /** A call to an MCP tool that asks first (ADR 0025, mcpTools.ts). */
+  | { approval: { serverId: string; server: string; tool: string; args: Record<string, unknown> } };
 
 /** A pass's note, shown on its line: what the teammate should do next. */
 export const PASS_NOTE_MAX = 160;

@@ -345,6 +345,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .segment:has(input:checked) { background: var(--tint); color: var(--tint-ink); }
 .segment:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: -2px; }
 .segment svg { flex-shrink: 0; }
+.segmented.small .segment { padding: 3px 10px; font-size: 12.5px; }
 
 /* ---- settings forms (Settings → Models, Sprocket settings) ---- */
 .settings-field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
@@ -948,6 +949,34 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .chat-card-code.diff { padding: 8px 0; font-size: 12px; }
 .chat-card-file { margin: 0; padding: 8px 14px 0; color: var(--muted); font: 12px/1.4 var(--mono); overflow-wrap: anywhere; }
 .sp-message.pop .chat-card { animation: sp-pop 260ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both; transform-origin: 0 100%; }
+/* An approval (ADR 0025, ApprovalCard.tsx): a card with the tool on a rule, its arguments, then Deny and Allow. */
+.chat-card.approval { width: min(520px, 100%); }
+.approval-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; padding: 8px 14px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+.approval-head svg { flex: none; }
+.approval-label { flex: none; }
+.approval-tool { min-width: 0; overflow-wrap: anywhere; color: var(--text); font: 12.5px/1.4 var(--mono); }
+.approval-wait { display: inline-flex; align-items: center; gap: 6px; flex: none; margin-left: auto; color: var(--text-2); font-size: 12px; }
+.approval-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); }
+.approval-args { padding: 10px 14px; font-size: 14px; line-height: 1.5; }
+.approval-args dd { white-space: pre-wrap; max-height: 9em; overflow-y: auto; }
+.approval-actions { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-top: 1px solid var(--border); }
+.approval-actions .error { margin: 0; }
+/* Decided: one quiet line (its edge drops to --border), opening onto the arguments and what came back. */
+.chat-card.approval.decided { border-color: var(--border); background: transparent; }
+.approval-summary { display: flex; align-items: center; gap: 8px; padding: 7px 14px; color: var(--muted); font-size: 13px; cursor: pointer; list-style: none; }
+.approval-summary::-webkit-details-marker { display: none; }
+.approval-summary:hover { background: var(--tint); }
+.approval-summary:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.approval-summary > svg:first-child { flex: none; }
+.approval.done .approval-summary > svg:first-child { color: var(--green); }
+.approval.failed .approval-summary { color: var(--red); }
+.approval-chevron { flex: none; transition: rotate 150ms ease-out; }
+.approval details[open] .approval-chevron { rotate: 90deg; }
+.approval details[open] .approval-summary { border-bottom: 1px solid var(--border); }
+.approval-note { margin: 0; padding: 0 14px 10px; color: var(--muted); font-size: 13px; }
+.approval-result-wrap { padding: 10px 14px 12px; border-top: 1px solid var(--border); }
+.approval-result-label { margin: 0 0 6px; color: var(--muted); font-size: 12px; }
+.approval-result { white-space: pre-wrap; font: 12px/1.5 var(--mono); max-height: 16em; overflow-y: auto; color: var(--text-2); }
 /* Who's on it, at the bottom left: faces pop up when they get the message; the one writing is dots in its colour. */
 .sp-watching { min-height: 36px; justify-content: flex-end; }
 .sp-watcher { line-height: 0; animation: sp-face-in 320ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both; transform-origin: 50% 100%; }
@@ -1245,22 +1274,178 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
   .settings-field a:hover, .sp-event-open:hover, button.link:hover { text-decoration-thickness: 2px; }
 }
 
-/* ---- Customize (ADR 0020): the Sprockets page's list and layout (.sprockets, .sp-*), with an editor of
-   Settings rows (.set-group, .set-row, .settings-field) on the right. ---- */
-.cz-row { padding-left: 10px; min-height: 52px; }
-.cz-row > .provider-icon, .cz-row-icon { flex-shrink: 0; color: var(--muted); }
+/* ---- Customize (ADR 0025): a page of cards per tab (connectors, skills, prompts), and one item open full width
+   with an editor of Settings rows (.set-group, .set-row). ---- */
+.cz-page { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; container-type: inline-size; }
+.cz-page-inner { max-width: 1040px; margin: 0 auto; padding: 56px 40px 72px; }
+.cz-title { margin: 0; font: 600 36px/1.1 var(--grotesk); letter-spacing: -0.03em; }
+.cz-lead { margin: 10px 0 0; max-width: 60ch; color: var(--muted); text-wrap: pretty; }
+/* Tabs (links, underlined like a chat's tabs), Yours · Discover, then search and Add at the right, on a rule. */
+.cz-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin: 28px 0 0; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.cz-tabs { display: flex; align-self: stretch; margin: 0 4px -13px 0; }
+.cz-tab { display: flex; align-items: center; padding: 6px 12px 12px; color: var(--muted); font-size: 14px; font-weight: 500; text-decoration: none; }
+.cz-tab:first-child { padding-left: 0; }
+.cz-tab[aria-current="page"] { color: var(--text); box-shadow: inset 0 -2px 0 var(--tint-ink); }
+.cz-tab:hover:not([aria-current="page"]) { color: var(--text-2); }
+.cz-tab:focus-visible { outline-offset: -2px; }
+.cz-search {
+  display: flex; align-items: center; gap: 8px; width: 220px; height: 32px; padding: 0 10px;
+  border: 1px solid var(--border-field); background: var(--field); color: var(--muted);
+}
+.cz-search:focus-within { border-color: var(--border-focus); }
+.cz-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: 13px; color: var(--text); }
+.cz-search input::placeholder { color: var(--muted); }
+.cz-add { height: 32px; }
+.cz-add-label { display: inline-flex; align-items: center; gap: 6px; }
+.cz-none { margin: 32px 0 0; }
+/* The banner: a collection of connectors on --surface-2, its words on the left, its marks on the right in a loose
+   staggered row (every other one smaller and lower), arrows and dots under the words. */
+.cz-banner {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "text marks" "nav marks";
+  gap: 20px 32px; align-items: center; margin: 32px 0 0; padding: 32px 32px 24px; background: var(--surface-2); min-height: 200px;
+}
+.cz-banner-text { grid-area: text; }
+.cz-banner-eyebrow { margin: 0 0 8px; color: var(--muted); font: 600 11.5px/1.4 var(--font); letter-spacing: 0.08em; text-transform: uppercase; }
+.cz-banner-title { margin: 0; font: 600 26px/1.15 var(--grotesk); letter-spacing: -0.02em; text-wrap: balance; }
+.cz-banner-lead { margin: 8px 0 0; color: var(--text-2); max-width: 44ch; text-wrap: pretty; }
+.cz-banner-marks { grid-area: marks; list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 14px; }
+.cz-banner-marks li:nth-child(even) { margin-top: 28px; }
+.cz-banner-marks a { position: relative; display: block; }
+.cz-banner-marks .cz-logo { background: var(--bg); transition: translate 150ms ease-out; }
+@media (hover: hover) { .cz-banner-marks a:hover .cz-logo { translate: 0 -3px; } }
+.cz-banner-added { position: absolute; right: -6px; top: -6px; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--green); color: var(--bg); }
+.cz-banner-nav { grid-area: nav; display: flex; align-items: center; gap: 6px; margin-left: -8px; }
+.cz-banner-dots { display: flex; gap: 6px; }
+.cz-banner-dots > span { width: 6px; height: 6px; border-radius: 3px; background: var(--border-strong); transition: width 150ms ease-out, background-color 150ms ease-out; }
+.cz-banner-dots > span.on { width: 18px; background: var(--text-2); }
+@media (prefers-reduced-motion: reduce) { .cz-banner-marks .cz-logo, .cz-banner-dots > span { transition: none; } }
+/* Sections: a heading with its count and a muted line, then a grid of cards. */
+.cz-section { margin: 40px 0 0; }
+.cz-section-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 14px; }
+.cz-section-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.cz-section-blurb { margin: 0; color: var(--muted); font-size: 13px; }
+.cz-section .cz-count { margin-left: 8px; }
+.cz-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+/* A card: square, on --surface-2 (as the Sprockets gallery's), the mark top left, the name a link over the whole card,
+   two muted lines and a small line of facts; one action top right above the link. */
+.cz-card { position: relative; display: flex; align-items: flex-start; gap: 14px; min-width: 0; padding: 16px; background: var(--surface-2); border: 1px solid transparent; }
+@media (hover: hover) { .cz-card:has(.cz-card-name[href]:hover), .cz-card-add:hover { background: var(--tint); } }
+.cz-card:has(.cz-card-name:focus-visible) { outline: 2px solid var(--blue); outline-offset: -2px; }
+.cz-card-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.cz-card-name { font-size: 15px; font-weight: 500; color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+.cz-card-name[href]::after { content: ""; position: absolute; inset: 0; }
+.cz-card-name:focus-visible { outline: none; }
+.cz-card-desc { margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.cz-card-meta { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.cz-card-warn { color: var(--red); }
+.cz-card-action { position: relative; z-index: 1; flex: none; }
+.cz-plus { border: 1px solid var(--border-strong); background: var(--surface); }
+.cz-added { display: grid; place-items: center; width: 30px; height: 30px; color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
+.cz-spinner { width: 14px; height: 14px; border: 2px solid var(--border-strong); border-top-color: var(--text); border-radius: 50%; animation: cz-spin 700ms linear infinite; }
+@keyframes cz-spin { to { rotate: 360deg; } }
+/* A card that adds something: dashed and transparent, the whole card one button. */
+.cz-card-add { padding: 0; background: transparent; border: 1px dashed var(--border-strong); }
+.cz-card-add-btn { display: flex; align-items: flex-start; gap: 14px; width: 100%; padding: 16px; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.cz-card-add-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.cz-logo-add { color: var(--muted); border-style: dashed; }
+/* A mark: a square ruled tile, the brand mark (or an icon) centred. */
+.cz-logo {
+  --side: calc(var(--size, 40px) * var(--scale, 1));
+  display: grid; place-items: center; flex: none; width: var(--side); height: var(--side);
+  border: 1px solid var(--border-strong); background: var(--surface); color: var(--text);
+}
+.cz-logo > svg { width: 50%; height: 50%; }
+/* One item open: the head is the way back and the actions; a connector's page and a server's editor start with a hero
+   (the 64px mark, the name in Space Grotesk, who makes it, its status). */
+.cz-detail { flex: 1; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }
+.cz-head { border-bottom: 1px solid var(--border); padding-bottom: 7px; }
+.cz-back { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 13px; text-decoration: none; }
+.cz-back:hover { color: var(--text); }
+.cz-head-sep { color: var(--border-strong); }
+.cz-hero { display: flex; align-items: center; gap: 18px; }
+.cz-hero-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cz-hero-name { margin: 0; font: 600 28px/1.15 var(--grotesk); letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.cz-hero-by { margin: 0; color: var(--muted); font-size: 13px; }
+.cz-hero .cz-status { margin-top: 6px; }
+.cz-about { margin: -16px 0 0; color: var(--text-2); line-height: 1.6; text-wrap: pretty; }
+.cz-about-lead { color: var(--text); }
+.cz-already { margin: -16px 0 0; color: var(--muted); font-size: 13px; }
+.cz-connect { display: flex; flex-direction: column; gap: 14px; padding-top: 14px; }
+.cz-connect-how { margin: 0; color: var(--text-2); font-size: 14px; text-wrap: pretty; }
+.cz-connect-token { display: flex; flex-direction: column; gap: 6px; max-width: 420px; }
+.cz-connect-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.cz-guide { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+.cz-where { font: 12.5px/1.5 var(--mono); color: var(--text-2); overflow-wrap: anywhere; text-align: right; }
+/* A connector's own settings (address, name, headers), folded under its tools. */
+.cz-advanced > summary { width: fit-content; padding: 6px 0; color: var(--text-2); font-size: 13px; cursor: pointer; }
+.cz-advanced > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.cz-advanced-body { display: flex; flex-direction: column; gap: 40px; margin-top: 20px; }
+.cz-gone { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px; text-align: center; }
+@container (max-width: 640px) {
+  .cz-page-inner { padding: 64px 16px 48px; }
+  .cz-title { font-size: 30px; }
+  .cz-search { order: 3; flex: 1 1 100%; width: auto; }
+  .cz-cards { grid-template-columns: 1fr; }
+  .cz-banner { grid-template-columns: 1fr; grid-template-areas: "text" "marks" "nav"; padding: 24px 20px 16px; }
+  .cz-banner-marks { gap: 10px; --scale: 0.72; }
+  .cz-banner-marks li:nth-child(even) { margin-top: 18px; }
+  .cz-toolbar { border-bottom: 0; padding-bottom: 0; }
+  .cz-tabs { flex: 1 1 100%; margin: 0; border-bottom: 1px solid var(--border); }
+}
 .cz-editor { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .cz-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 40px; padding: 30px 32px 48px; }
 .cz-body > * { width: 100%; max-width: 720px; margin: 0 auto; }
-.cz-agent { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-2); }
-.cz-fields { display: flex; flex-direction: column; gap: 22px; }
 .cz-uses { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .cz-uses a { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 0; font-size: 13px; color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; }
-.cz-intro { max-width: 460px; }
-.cz-intro p { margin: 0; text-wrap: pretty; }
-.cz-intro-title { font-size: 18px; font-weight: 500; }
-.cz-strong { color: var(--text); font-weight: 500; }
-.cz-intro-actions { display: flex; gap: 8px; margin-top: 4px; }
+/* Customize's editors (ADR 0025): a server's status, secret rows, tools with allow/ask/off, a skill's files. */
+.cz-mono { font-family: var(--mono); font-size: 12.5px; }
+.cz-status { display: flex; align-items: center; gap: 8px; margin: 0; }
+.cz-status.error { margin: 0; overflow-wrap: anywhere; }
+.cz-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--idle); flex: none; }
+.cz-dot.ok { background: var(--green); }
+.cz-dot.needed { background: var(--red); }
+/* Signing in to a remote server: its state in a row, then while it runs the page to open and the paste field, on a
+   --surface-2 block; "Your own app" folded under a small disclosure. */
+.cz-signin-state { display: flex; align-items: center; gap: 8px; }
+.cz-signin-flow { display: flex; flex-direction: column; gap: 14px; margin: 4px 0 14px; padding: 14px 16px; background: var(--surface-2); }
+.cz-signin-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.cz-signin-actions a.btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.cz-signin-paste { display: flex; flex-direction: column; gap: 6px; }
+.cz-signin-row { display: flex; gap: 8px; align-items: center; }
+.cz-signin-row > .input { flex: 1; min-width: 0; }
+.set-row > .cz-signin-secret { width: min(300px, 50%); flex-shrink: 0; }
+.cz-redirect-row { flex-direction: column; align-items: stretch; gap: 8px; }
+.cz-redirect { display: block; padding: 8px 12px; border: 1px solid var(--border); background: var(--surface-2); font: 12.5px/1.5 var(--mono); color: var(--text); overflow-wrap: anywhere; user-select: all; }
+.cz-signin-error { margin: 0 0 10px; overflow-wrap: anywhere; }
+.cz-signin-app { margin-top: 6px; }
+.cz-signin-app > summary { width: fit-content; padding: 6px 0; color: var(--text-2); font-size: 13px; cursor: pointer; }
+.cz-signin-app > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.cz-signin-app[open] > summary { margin-bottom: 2px; }
+.cz-secret-add { gap: 8px; }
+.cz-secret-add > .input { flex: 1; min-width: 0; }
+.cz-secret-add > .input:first-child { flex: 0 1 40%; }
+/* Tools in two groups (can change things, read-only), each a small head with its "All" control over ruled rows:
+   the name in mono, its description in two muted lines, Allow · Ask · Off at the right, lined up with the head's. */
+.cz-toolgroup { margin-top: 20px; }
+.cz-toolgroup-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 34px; padding-bottom: 8px; border-bottom: 1px solid var(--border-strong); }
+.cz-toolgroup-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.cz-count { margin-left: 4px; color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+.cz-toolgroup-all { display: inline-flex; align-items: center; gap: 10px; }
+.cz-tools { list-style: none; margin: 0; padding: 0; }
+.cz-tool { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.cz-tool:last-child { border-bottom: 0; }
+.cz-tool-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cz-tool-name { font: 12.5px/1.5 var(--mono); color: var(--text); overflow-wrap: anywhere; }
+.cz-tool-desc { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cz-files { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; color: var(--text-2); }
+/* A Sprocket's tools in its settings panel: a row per server or skill, with a switch. */
+.sp-tools { list-style: none; margin: 4px 0 0; padding: 0; border-top: 1px solid var(--border); }
+.sp-tool { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.sp-tool-text { display: flex; flex-direction: column; min-width: 0; cursor: pointer; }
+.sp-tool-name { font-size: 14px; }
+.sp-tool-icon { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border: 1px solid var(--border); color: var(--muted); }
+.sp-tool-text { flex: 1; }
+.sp-tool-warn { color: var(--red); }
 
 /* ---- small screens: sidebar becomes a drawer ---- */
 @media (max-width: 860px) {
@@ -1283,6 +1468,8 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
   .sp-panel .sp-panel-toggle { display: none; }
   .sp-panel-head { padding-left: 52px; } /* room for the sidebar toggle, as in the chat header */
   .cz-body { padding: 20px 16px 32px; gap: 32px; }
+  .cz-head { padding-left: 52px; } /* room for the sidebar toggle */
+  .main:has(> .cz-detail) > .nav-toggle { top: 14px; }
   .main:has(> .sprockets) > .nav-toggle { top: 14px; } /* on the Sprockets header's centre line */
   .page { padding: 64px 16px 32px; }
   .home { padding-top: 72px; }
@@ -1298,7 +1485,7 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
   .settings-panel-body { padding: 20px 16px 24px; gap: 32px; }
   .settings-title { font-size: 24px; }
   .set-row { flex-wrap: wrap; gap: 10px 24px; }
-  .set-row > :is(.dropdown, .input, .threshold) { width: 100%; }
+  .set-row > :is(.dropdown, .input, .threshold, .cz-signin-secret) { width: 100%; }
   .avatar-grid { grid-template-columns: repeat(4, 52px); }
 }
 @media (prefers-reduced-motion: reduce) {

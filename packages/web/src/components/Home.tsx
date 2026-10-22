@@ -12,11 +12,9 @@ import { SavedPromptsMenu } from "./customize/SavedPromptsMenu.tsx";
 import { ProviderIcon } from "./ProviderIcon.tsx";
 
 export function Home({ promptId }: { promptId?: string }) {
-  const { projects, providers, picking, agentProfiles, savedPrompts } = useStore();
+  const { projects, providers, picking, savedPrompts } = useStore();
   const [selected, setSelected] = useState("");
   const [provider, setProvider] = useState<ProviderId>("claude");
-  /** The agent profile to start with (ADR 0020); "" is the agent's default. */
-  const [profileId, setProfileId] = useState("");
   const [fill, setFill] = useState<{ text: string }>();
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
@@ -34,10 +32,6 @@ export function Home({ promptId }: { promptId?: string }) {
   }, [promptId, savedPrompts]);
 
   const project = projects.find((p) => p.id === selected);
-  const profiles = (agentProfiles ?? []).filter((p) => p.agent === provider);
-  const defaultProfile = profiles.find((p) => p.isDefault);
-  // A profile for another agent (or deleted since) falls back to the default.
-  const shownProfile = profiles.some((p) => p.id === profileId) ? profileId : "";
 
   /** Start the chosen agent's TUI with the prompt as its first message, in a new panel. */
   const start = async (text: string) => {
@@ -45,7 +39,7 @@ export function Home({ promptId }: { promptId?: string }) {
     setError("");
     setStarting(true);
     try {
-      await api.openPanel(project.id, { kind: provider, prompt: text, ...(shownProfile ? { profileId: shownProfile } : {}) });
+      await api.openPanel(project.id, { kind: provider, prompt: text });
       navigate(href.project(project.id));
     } catch (e: any) {
       setError(e.message);
@@ -84,18 +78,6 @@ export function Home({ promptId }: { promptId?: string }) {
             disabled: !p.installed,
           }))}
         />
-        {profiles.length > 0 && (
-          <Dropdown
-            plain
-            label="Profile"
-            value={shownProfile}
-            onChange={setProfileId}
-            options={[
-              { value: "", label: defaultProfile ? defaultProfile.name : "No profile" },
-              ...profiles.filter((p) => !p.isDefault).map((p) => ({ value: p.id, label: p.name })),
-            ]}
-          />
-        )}
         <SavedPromptsMenu onPick={(text) => setFill({ text })} />
       </Composer>
       {error && <p className="error" role="alert">{error}</p>}
