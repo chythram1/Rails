@@ -64,8 +64,8 @@ Decisions:
 - **Where they show.** The Sprockets page lists teams first, under a "Teams" heading: the members' characters
   overlapping, the name, and the last line with who wrote it. The list's New button (beside the search) makes a
   Sprocket or a team: a dialog with the name and four member slots, the first one the lead's. Once made, a team is
-  changed (name, members, lead) or deleted in its settings panel, as a Sprocket is; the chat's `…` menu clears its
-  chat (ADR 0021). Typing `@` in a team's composer suggests the members whose names fit what follows it, and
+  changed (name, members, lead) or deleted in its settings panel, as a Sprocket is; the chat's Clear chat button
+  clears its chat (ADR 0021). Typing `@` in a team's composer suggests the members whose names fit what follows it, and
   mentions of members read as chips. Each member's run of replies has its name over it and its face at its foot.
   One face at a time pops up at the bottom left: the member whose turn it is, once Rails knows it answers (never
   while Rails works out who), turning into dots as it writes. Members whose turns come later aren't shown, so the
