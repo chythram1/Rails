@@ -1,6 +1,6 @@
 import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fromClaude, fromPi, type SessionEvent } from "./bridge/events.ts";
+import { fromClaude, fromCodex, fromPi, type SessionEvent } from "./bridge/events.ts";
 import { receive } from "./bridge/index.ts";
 import { panels, projects, settings } from "./db.ts";
 import { models, refOf } from "./models.ts";
@@ -47,15 +47,29 @@ describe("looksLikeQuestion", () => {
 });
 
 describe("admit", () => {
-  it("wakes for questions and forms, never for permissions or other extension dialogs", () => {
+  it("wakes for questions and forms", () => {
     const questions = [{ question: "Which colour?", options: ["Blue", "Green"] }];
     expect(admit({ kind: "waiting", reason: "question", questions })).toEqual({ what: "question", text: "Which colour?", questions });
     expect(admit({ kind: "waiting", reason: "a form" })).toEqual({ what: "question", text: "It's waiting for a form." });
     expect(admit({ kind: "waiting", reason: "input" })).toEqual({ what: "question", text: "It's waiting for input." });
-    expect(admit({ kind: "waiting", reason: "permission for Bash" })).toBeNull();
-    expect(admit({ kind: "waiting", reason: "approval" })).toBeNull();
-    // A pi extension's own dialog (here an approval extension's): it may well be a permission.
-    expect(admit(fromPi("ui_prompt_start", { title: "Approve write to /work/app/notes.txt?" })[0])).toBeNull();
+  });
+
+  it("wakes for permissions too, saying what they're for (ADR 0026)", () => {
+    const claude = fromClaude("PermissionRequest", { tool_name: "Bash", tool_input: { command: "npm install left-pad", description: "Install a dependency" } });
+    expect(admit(claude[0])).toEqual({ what: "permission", text: "Use Bash: npm install left-pad (Install a dependency)" });
+    expect(admit({ kind: "waiting", reason: "permission for Bash" })).toEqual({ what: "permission", text: "It asks permission to use Bash." });
+    const codex = fromCodex("item/commandExecution/requestApproval", {
+      threadId: "t",
+      command: "/bin/zsh -lc 'curl -sI https://example.com | head -1'",
+      commandActions: [{ type: "unknown", command: "curl -sI https://example.com | head -1" }],
+      reason: "Allow this command to access the network outside the sandbox?",
+    });
+    expect(admit(codex[0])).toEqual({ what: "permission", text: "Run: curl -sI https://example.com | head -1\nIts reason: Allow this command to access the network outside the sandbox?" });
+    expect(admit(fromCodex("item/fileChange/requestApproval", { threadId: "t", grantRoot: "/etc" })[0])).toEqual({ what: "permission", text: "Change files, and write under /etc" });
+    expect(admit({ kind: "waiting", reason: "approval" })).toEqual({ what: "permission", text: "It's waiting for an approval.", vague: true });
+    // A pi extension's own dialog (here an approval extension's), with the call that was running.
+    const pi = fromPi("ui_prompt_start", { title: "Approve write to notes.txt?", kind: "confirm", during: { tool: "write", input: { path: "notes.txt", content: "x" } } });
+    expect(admit(pi[0])).toEqual({ what: "permission", text: 'A dialog titled "Approve write to notes.txt?".\nWhile running write: notes.txt' });
   });
 
   it("wakes for a turn that ends with a question, keeping the end of it", () => {
@@ -107,6 +121,34 @@ describe("Watches", () => {
     vi.advanceTimersByTime(GRACE_MS);
     expect(fire).toHaveBeenCalledTimes(1);
     expect(fire.mock.calls[0]).toEqual(["p1", { what: "question", text: "Which colour?", questions }]);
+  });
+
+  it("lets a permission learn what it's for, or become a question, before it wakes", () => {
+    const fire = vi.fn(() => true);
+    const w = new Watches(fire);
+    // Codex says it waits for an approval, then (in a request) what for.
+    w.handle("p1", fromCodex("thread/status/changed", { threadId: "t", status: { type: "active", activeFlags: ["waitingOnApproval"] } }));
+    w.handle("p1", fromCodex("item/commandExecution/requestApproval", { threadId: "t", command: "rm -rf build" }));
+    vi.advanceTimersByTime(GRACE_MS);
+    expect(fire).toHaveBeenCalledWith("p1", { what: "permission", text: "Run: rm -rf build" });
+    // A pi dialog the decision model takes for a question.
+    w.handle("p2", fromPi("ui_prompt_start", { title: "Pick a theme" }));
+    expect(w.armIfStill("p2", w.position("p2"), { what: "question", text: "Pick a theme", decisionId: "d1" })).toBe(true);
+    vi.advanceTimersByTime(GRACE_MS);
+    expect(fire).toHaveBeenLastCalledWith("p2", { what: "question", text: "Pick a theme", decisionId: "d1" });
+    // ...but nothing replaces a question.
+    w.handle("p3", [question]);
+    expect(w.armIfStill("p3", w.position("p3"), { what: "question", text: "other" })).toBe(false);
+  });
+
+  it("doesn't wake for a permission the user gave in time", () => {
+    const fire = vi.fn(() => true);
+    const w = new Watches(fire);
+    w.handle("p1", fromClaude("PermissionRequest", { tool_name: "Edit", tool_input: { file_path: "/w/a.js" } }));
+    vi.advanceTimersByTime(3_000);
+    w.handle("p1", fromClaude("PostToolUse", { tool_name: "Edit", tool_input: { file_path: "/w/a.js" }, cwd: "/w" }));
+    vi.advanceTimersByTime(GRACE_MS);
+    expect(fire).not.toHaveBeenCalled();
   });
 
   it("paces wakes per session with a cooldown, which starts only when someone was woken", () => {

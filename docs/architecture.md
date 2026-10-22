@@ -73,7 +73,8 @@ packages/
   `panels.attention` (red dots). Files two live sessions both changed in the last 30 minutes are broadcast as
   `panels.overlaps` (amber marks; `overlaps.ts`, ADR 0014). Attached Sprockets read the board through their capabilities (`harness/project.ts`).
   Recorded events also go to the watches (`watches.ts`, ADR 0009): when a session asks the user something (a
-  dialog, or a turn that ends with a question) and nobody answers within 20 s, Rails puts an event in the
+  dialog, or a turn that ends with a question) or waits for their permission (ADR 0026: the Coordinator only says
+  what it's for and whether its rules allow it) and nobody answers within 20 s, Rails puts an event in the
   project's chat (ADR 0021) and starts the Coordinator's run there. The Coordinator can suggest a reply (`suggest_reply`,
   `suggestions.ts`, ADR 0010), shown under its message; when the user sends it, `bridge/deliver.ts` puts it into
   the session: Claude Code's message socket, the pi extension's long poll (`GET /bridge/<panelId>/pi/inbox`, confirmed with `POST …/pi/delivered`) or
@@ -186,7 +187,9 @@ none.
 Every provider panel reports to the bridge (ADR 0007): Claude Code through hooks, pi through the Rails
 extension, Codex through its app-server daemon. Edits count for overlaps (ADR 0014) once they worked: Claude
 Code's PostToolUse, pi's tool end without an error, Codex's completed file changes (checked live with all
-three). Files changed by shell commands count too (ADR 0016).
+three). Files changed by shell commands count too (ADR 0016). Permission waits say what they're for (ADR 0026):
+Claude Code's `PermissionRequest` input, Codex's approval requests from its daemon (checked live with 0.163), and
+the call pi was running when an unknown dialog opened.
 
 Agent tools (ADR 0018): Claude Code and pi panels get Rails' MCP server at `/bridge/<panel>/mcp`, behind the
 panel's token (`agentTools.ts`): Claude Code from `--mcp-config`, pi from the Rails extension. `neighbours` shows an

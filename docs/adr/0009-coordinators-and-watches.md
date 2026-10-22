@@ -24,7 +24,8 @@ Decisions:
   - one wake per wait (agents may report a wait twice), and at most one per session per minute (a sooner
     one waits for the minute to pass);
   - permission prompts never wake it, nor other dialogs pi extensions show (they may be approvals): Sprockets
-    never answer those, and the tab's attention mark covers them. pi has no question tool of its own, so a
+    never answer those, and the tab's attention mark covers them. (Superseded by ADR 0026: they wake it after
+    the same grace period, and it tells the user what they're for, drafting nothing.) pi has no question tool of its own, so a
     pi dialog is a question only when it opens while a tool whose input holds questions is running; the
     questions are read by their shape, whatever the tool is called (docs/providers.md). A question without
     options is open, and the Coordinator is told it's answered by typing.

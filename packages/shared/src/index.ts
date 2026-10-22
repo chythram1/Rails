@@ -585,11 +585,12 @@ export interface SprocketEvent {
   title: string;
   sessionId?: string;
   /**
-   * It asked in a dialog (or a form), it ended its turn with what looks like a question, it changed files
-   * other sessions changed shortly before (ADR 0014), it finished a turn a handoff waits for (ADR 0015), or it
-   * drafted a message for another session (ADR 0018), shown under the event, with the text as the event's.
+   * It asked in a dialog (or a form), it ended its turn with what looks like a question, it waits for the user's
+   * permission in its panel (ADR 0026: the text says what for), it changed files other sessions changed shortly
+   * before (ADR 0014), it finished a turn a handoff waits for (ADR 0015), or it drafted a message for another
+   * session (ADR 0018), shown under the event, with the text as the event's.
    */
-  what: "question" | "turn_end" | "overlap" | "handoff" | "message";
+  what: "question" | "turn_end" | "permission" | "overlap" | "handoff" | "message";
   questions?: SessionQuestion[];
   /** The Coordinator looked and decided the user needn't hear about it. */
   quiet?: boolean;

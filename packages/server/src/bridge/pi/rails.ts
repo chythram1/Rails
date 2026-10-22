@@ -107,6 +107,7 @@ export default function railsBridge(pi: any) {
   const EDITS = new Set(["edit", "write"]);
   const editing = new Map<string, { tool: string; input: unknown }>();
   const shells = new Set<string>();
+  const running = new Map<string, { tool: string; input: unknown }>();
 
   pi.on("tool_call", (e: any) => {
     if (mayAsk(e.input)) asking.set(e.toolCallId, e.input);
@@ -116,9 +117,11 @@ export default function railsBridge(pi: any) {
     post("tool", { tool: e.toolName, input: e.input, started: true, id: e.toolCallId });
     if (EDITS.has(e.toolName)) editing.set(e.toolCallId, { tool: e.toolName, input: e.input });
     if (e.toolName === "bash") shells.add(e.toolCallId);
+    if (EDITS.has(e.toolName) || e.toolName === "bash") running.set(e.toolCallId, { tool: e.toolName, input: e.input });
   });
   pi.on("tool_execution_end", (e: any) => {
     asking.delete(e.toolCallId);
+    running.delete(e.toolCallId);
     const edit = editing.get(e.toolCallId);
     editing.delete(e.toolCallId);
     if (edit && !e.isError) post("tool", edit);
@@ -126,11 +129,14 @@ export default function railsBridge(pi: any) {
   });
   pi.on("ui_prompt_start", (e: any) => {
     const input = [...asking.values()].at(-1);
-    post("ui_prompt_start", { title: e.title ?? "", kind: e.kind, ...(input ? { input } : {}) });
+    // Else the call that may change something (an edit, a shell command) running now: what an approval is for.
+    const during = input ? undefined : [...running.values()].at(-1);
+    post("ui_prompt_start", { title: e.title ?? "", kind: e.kind, ...(input ? { input } : {}), ...(during ? { during } : {}) });
   });
   pi.on("ui_prompt_end", () => post("ui_prompt_end", {}));
   pi.on("agent_end", (e: any) => {
     asking.clear();
+    running.clear();
     editing.clear();
     shells.clear();
     const last = [...(e.messages ?? [])].reverse().find((m: any) => m.role === "assistant");

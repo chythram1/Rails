@@ -29,7 +29,7 @@ describe("events", () => {
     expect(fromClaude("UserPromptSubmit", claude.prompt)).toEqual([{ kind: "prompt", text: "Fix the login bug" }]);
     expect(fromClaude("PostToolUse", claude.write)).toEqual([{ kind: "tool", tool: "Write", files: [`${cwd}/src/login.ts`], edit: true }]);
     expect(fromClaude("PostToolUse", claude.bash)).toEqual([{ kind: "tool", tool: "Bash", files: [], edit: false, command: "npm test" }]);
-    expect(fromClaude("PermissionRequest", claude.permission)).toEqual([{ kind: "waiting", reason: "permission for Bash" }]);
+    expect(fromClaude("PermissionRequest", claude.permission)).toEqual([{ kind: "waiting", reason: "permission for Bash", detail: "Use Bash: rm -rf dist" }]);
     expect(fromClaude("Stop", claude.stop)).toEqual([{ kind: "turn_end", text: "Fixed: the token expired early." }]);
   });
 

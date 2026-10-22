@@ -7,8 +7,10 @@
 //   a tool, the answer) means it's moving again, and nothing wakes;
 // - one wake per wait, and at most one per session per COOLDOWN_MS, as a guard against loops (a wait that
 //   comes sooner wakes it once the cooldown is over, if the session is still waiting then).
-// Permission prompts never wake it, nor other dialogs pi extensions show (they may be approvals): Sprockets
-// don't answer those, and the tab's attention mark covers them.
+// - a session waits for the user's permission (Claude Code's permission prompt, Codex's approval, a dialog from
+//   a pi extension Rails doesn't know), past the same grace period (ADR 0026): neither Rails nor the Coordinator
+//   can give it, but the Coordinator tells the user what it's for and what its rules say. In test run 7 a Codex
+//   sat for minutes on an approval nobody saw, as the user was in the chat.
 // A turn that ends without a question also wakes the Coordinator for each handoff waiting on that session
 // (ADR 0015, handoffs.ts).
 import type { Panel, SessionQuestion, SprocketEvent } from "@rails/shared";
@@ -35,6 +37,17 @@ export interface Wake {
   questions?: SessionQuestion[];
   /** Set when the decision model added this wake (ADR 0013): its judgment, to link the outcome to. */
   decisionId?: string;
+  /** A permission whose purpose isn't known yet (Codex says it waits before it says what for). */
+  vague?: boolean;
+}
+
+/** A permission wait as the Coordinator reads it: what it's for, as far as the agent said. */
+function permission(e: Extract<SessionEvent, { kind: "waiting" }>): Wake {
+  if (e.reason === "approval") return e.detail ? { what: "permission", text: e.detail } : { what: "permission", text: "It's waiting for an approval.", vague: true };
+  if (e.reason.startsWith("permission for ")) return { what: "permission", text: e.detail ?? `It asks permission to use ${e.reason.slice(15)}.` };
+  // A pi extension's dialog: often an approval, sometimes a question (the decision model may say which).
+  const titled = e.reason === "a prompt" ? "A dialog with no title." : `A dialog titled ${JSON.stringify(e.reason)}.`;
+  return { what: "permission", text: e.detail ? `${titled}\n${e.detail}` : titled };
 }
 
 // Phrases that ask the user for something even without a question mark. Pleasantries ("let me know if you
@@ -94,9 +107,8 @@ export function admit(e: SessionEvent): Wake | "over" | null {
     case "waiting":
       if (e.questions?.length) return { what: "question", text: e.questions.map((q) => q.question).join("\n"), questions: e.questions };
       if (ASKING.has(e.reason)) return { what: "question", text: `It's waiting for ${e.reason}.` };
-      // Permissions and approvals, and other dialogs from pi extensions (which may well be approvals too):
-      // only the user answers those.
-      return null;
+      // Permissions and approvals, and other dialogs from pi extensions (which may well be approvals too).
+      return permission(e);
     case "turn_end":
       return looksLikeQuestion(e.text) ? { what: "turn_end", text: tail(e.text) } : "over";
     case "start":
@@ -108,7 +120,8 @@ export function admit(e: SessionEvent): Wake | "over" | null {
 
 /** Wakes waiting for their grace period, per panel, and when each panel last woke its Coordinator. */
 export class Watches {
-  private pending = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Armed wakes: their timer, and the wake, which a better account of the same wait may replace meanwhile. */
+  private pending = new Map<string, { timer: ReturnType<typeof setTimeout>; wake: Wake }>();
   private last = new Map<string, number>();
   /** Panels whose current wait already woke the Coordinator (agents may report one wait more than once). */
   private woken = new Set<string>();
@@ -140,27 +153,38 @@ export class Watches {
    * one-wake-per-wait rules apply. False when it isn't armed.
    */
   armIfStill(panelId: string, position: number, wake: Wake): boolean {
-    if (this.position(panelId) !== position || this.pending.has(panelId) || this.woken.has(panelId)) return false;
+    if (this.position(panelId) !== position || this.woken.has(panelId)) return false;
+    const armed = this.pending.get(panelId);
+    // A dialog the model takes for a question was armed as a permission: it's that question now.
+    if (armed && !(armed.wake.what === "permission" && wake.what === "question")) return false;
     this.arm(panelId, wake);
     return true;
   }
 
   private arm(panelId: string, wake: Wake) {
-    // The same wait reported twice (pi reports its question tool, then the dialog): the first, with the questions, stands.
-    if (this.pending.has(panelId) || this.woken.has(panelId)) return;
+    if (this.woken.has(panelId)) return;
+    const armed = this.pending.get(panelId);
+    if (armed) {
+      // The same wait reported twice (pi reports its question tool, then the dialog): the first, with the questions,
+      // stands; but a permission learns what it's for (Codex's request after its status), and a dialog the decision
+      // model took for a question becomes one.
+      if (armed.wake.what === "permission" && (wake.what === "question" || (armed.wake.vague && wake.what === "permission" && !wake.vague))) armed.wake = wake;
+      return;
+    }
     const delay = Math.max(GRACE_MS, (this.last.get(panelId) ?? -Infinity) + COOLDOWN_MS - Date.now());
     const timer = setTimeout(() => {
+      const now = this.pending.get(panelId)?.wake ?? wake;
       this.pending.delete(panelId);
-      if (!this.fire(panelId, wake)) return;
+      if (!this.fire(panelId, now)) return;
       this.last.set(panelId, Date.now());
       this.woken.add(panelId);
     }, delay);
     timer.unref?.();
-    this.pending.set(panelId, timer);
+    this.pending.set(panelId, { timer, wake });
   }
 
   private cancel(panelId: string) {
-    clearTimeout(this.pending.get(panelId));
+    clearTimeout(this.pending.get(panelId)?.timer);
     this.pending.delete(panelId);
   }
 

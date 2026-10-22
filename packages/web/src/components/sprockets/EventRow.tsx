@@ -20,7 +20,7 @@ export function EventRow({ message, projectId, name }: { message: SprocketMessag
       <p className="sp-event-head">
         <PanelIcon kind={e.kind} />
         <span className="sp-event-title truncate" title={e.title}>{shortTitle(e.title)}</span>
-        <span className="sp-event-what">{e.what === "message" ? "wants to tell" : e.what === "handoff" ? "finished a turn; hand off to" : e.what === "overlap" ? (e.overlaps?.every((o) => o.owns) ? "changed files owned by" : "changed the same files as") : e.what === "turn_end" ? "is waiting for your reply" : "is asking you"}</span>
+        <span className="sp-event-what">{e.what === "message" ? "wants to tell" : e.what === "handoff" ? "finished a turn; hand off to" : e.what === "overlap" ? (e.overlaps?.every((o) => o.owns) ? "changed files owned by" : "changed the same files as") : e.what === "turn_end" ? "is waiting for your reply" : e.what === "permission" ? "is waiting for your permission" : "is asking you"}</span>
         {open && (
           <a className="sp-event-open" href={open}>
             Open<span className="sr-only"> {e.title}</span>

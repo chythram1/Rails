@@ -622,6 +622,8 @@ function eventText(m: SprocketMessage): string {
       ? `${who} ended its turn, and you planned a handoff (id ${h.id.slice(0, 8)}) for when it's done: for "${h.to.title}" (${AGENT[h.to.kind]}, id ${h.to.panelId.slice(0, 8)}), ${JSON.stringify(h.note)}. The end of its last message:\n"""\n${m.text}\n"""\n${wroteAlready(e.panelId, h) || `Check its work is really done (session_conversation). If it is, draft the message for "${h.to.title}" with suggest_message, passing handoff: "${h.id.slice(0, 8)}". Rails attaches what it said last, word for word, so don't repeat or summarize that: say in a sentence or two what "${h.to.title}" should do now, in your user's words. If it isn't, reply (quiet): Rails wakes you again when it ends its next turn.`}`
       : e.what === "overlap"
       ? `${who} just changed files that another session in your project also changed in the last 30 minutes, or owns:\n${(e.overlaps ?? []).map((o) => `- ${o.owns ? "owned by" : "also changed by"} "${o.title}" (${AGENT[o.kind]}, id ${o.panelId.slice(0, 8)}): ${o.files.map((f) => JSON.stringify(f)).join(", ")}`).join("\n")}\nThey may be working against each other, or not: if both changes are intact and work together, reply (quiet) and draft nothing. The titles and file names are as the sessions reported them.`
+      : e.what === "permission"
+      ? `${who} has been waiting for a while for your user's permission in its panel (Rails' attention mark is on its tab, but your user may not have seen it). What it's for, as far as its agent said:\n"""\n${m.text}\n"""\nOnly your user can give it, in the panel: neither you nor Rails can answer it, so don't draft anything for this session. In a sentence or two, tell your user what it wants to do and whether your rules and the brief say to allow it, and why. If it's a dialog that asks something rather than an approval (its conversation shows it), say what it asks instead.`
       : e.what === "turn_end"
       ? `${who} ended its turn with what looks like a question for your user. The end of its last message:\n"""\n${m.text}\n"""`
       : e.questions?.length
@@ -798,7 +800,7 @@ const TEXTING = [
 
 /** The reminder when several events wait for one reply (not saved, not from the user). */
 export function severalEvents(events: SprocketMessage[]): string {
-  const what = { question: "asks your user in a dialog", turn_end: "ended its turn, maybe with a question", overlap: "changed files another session changed or owns", handoff: "finished a turn a handoff waits for", message: "drafted a message" } as const;
+  const what = { question: "asks your user in a dialog", turn_end: "ended its turn, maybe with a question", permission: "waits for your user's permission in its panel (tell them; draft nothing)", overlap: "changed files another session changed or owns", handoff: "finished a turn a handoff waits for", message: "drafted a message" } as const;
   const list = events.map((m, i) => `${i + 1}. "${m.event!.title}" ${what[m.event!.what] ?? "is waiting"}.`).join("\n");
   return `[Rails, not your user] ${events.length} events came in since your last reply, and this one reply answers all of them:\n${list}\nDeal with each in turn: draft what each one needs (a reply, an answer, a handoff's message), and say in a sentence what each was. Reply (quiet) only if none of them needs your user.`;
 }

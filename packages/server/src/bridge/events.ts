@@ -12,8 +12,11 @@ export type SessionEvent =
   | { kind: "prompt"; text: string }
   /** The agent used a tool. `files` are absolute paths it read or changed; `command` a shell command. */
   | { kind: "tool"; tool: string; files: string[]; edit: boolean; command?: string }
-  /** The agent is waiting for the user: a permission, a question, a form. `questions` when it asked in a dialog. */
-  | { kind: "waiting"; reason: string; questions?: SessionQuestion[] }
+  /**
+   * The agent is waiting for the user: a permission, a question, a form. `questions` when it asked in a dialog;
+   * `detail` what a permission is for, when the agent says (the command, the file), in a line or two.
+   */
+  | { kind: "waiting"; reason: string; questions?: SessionQuestion[]; detail?: string }
   /** The wait is over (answered or dismissed). */
   | { kind: "resumed" }
   /** The agent finished its turn. `text` is its last message. */
@@ -93,8 +96,11 @@ export function fromClaude(hook: string, input: any, extra: { inbox?: string } =
         },
       ];
     }
-    case "PermissionRequest":
-      return [{ kind: "waiting", reason: `permission for ${clip(input?.tool_name, 100) || "a tool"}` }];
+    case "PermissionRequest": {
+      const tool = clip(input?.tool_name, 100) || "a tool";
+      const detail = toolDetail(tool, input?.tool_input);
+      return [{ kind: "waiting", reason: `permission for ${tool}`, ...(detail ? { detail } : {}) }];
+    }
     case "Notification":
       // Forms from MCP servers wait for the user; other notifications (idle reminders, auth) don't.
       return /^elicitation(_url)?_dialog$/.test(input?.notification_type ?? "") ? [{ kind: "waiting", reason: "a form" }] : [];
@@ -140,7 +146,9 @@ export function fromPi(event: string, data: any): SessionEvent[] {
       // it's that question for the user; otherwise it's some extension's dialog, which may be an approval.
       const questions = questionsOf(data?.input);
       if (questions) return [{ kind: "waiting", reason: "question", questions }];
-      return [{ kind: "waiting", reason: data?.title ? clip(data.title, 120) : "a prompt" }];
+      // The tool that was running when it opened (the extension sends it): what an approval would be for.
+      const during = data?.during?.tool ? toolDetail(clip(data.during.tool, 100), data.during.input, "While running") : "";
+      return [{ kind: "waiting", reason: data?.title ? clip(data.title, 120) : "a prompt", ...(during ? { detail: during } : {}) }];
     }
     case "ui_prompt_end":
       return [{ kind: "resumed" }];
@@ -189,9 +197,30 @@ export function fromCodex(method: string, params: any): SessionEvent[] {
     }
     case "thread/closed":
       return [{ kind: "ended" }];
+    // Approvals the daemon asks its clients for (requests with an id; the panel answers them, never Rails),
+    // with what they're for. `thread/status/changed` has already said it waits for one.
+    case "item/commandExecution/requestApproval": {
+      const shown = params?.commandActions?.find?.((a: any) => typeof a?.command === "string")?.command ?? params?.command;
+      return [{ kind: "waiting", reason: "approval", detail: reasoned(`Run: ${clip(shown, 300)}`, params?.reason) }];
+    }
+    case "item/fileChange/requestApproval":
+      return [{ kind: "waiting", reason: "approval", detail: reasoned(params?.grantRoot ? `Change files, and write under ${clip(params.grantRoot, 200)}` : "Change files", params?.reason) }];
+    case "item/permissions/requestApproval":
+      return [{ kind: "waiting", reason: "approval", detail: reasoned(`More permissions: ${clip(JSON.stringify(params?.permissions ?? {}), 300)}`, params?.reason) }];
     default:
       return [];
   }
+}
+
+const reasoned = (what: string, reason: unknown) => (clip(reason, 300) ? `${what}\nIts reason: ${clip(reason, 300)}` : what);
+
+/** What a tool call is for, in a line: its command, file or address, else its input. */
+function toolDetail(tool: string, input: any, lead = "Use"): string {
+  if (!input || typeof input !== "object") return tool === "a tool" ? "" : `${lead} ${tool}`;
+  const one = [input.command, input.file_path, input.path, input.notebook_path, input.url].find((v) => typeof v === "string" && v.trim());
+  const what = one ? clip(one, 300) : clip(JSON.stringify(input), 300);
+  const why = typeof input.description === "string" && input.description.trim() ? ` (${clip(input.description, 150)})` : "";
+  return `${lead} ${tool}: ${what}${why}`;
 }
 
 // ---- shell commands, for the files they change (shellEdits.ts, ADR 0016) ----
