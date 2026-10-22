@@ -10,6 +10,7 @@ import { receive, record } from "../../packages/server/src/bridge/index.ts";
 import { fromCodex } from "../../packages/server/src/bridge/events.ts";
 import { panels, projects, sprocketMessages, suggestions, usage } from "../../packages/server/src/db.ts";
 import { planHandoff } from "../../packages/server/src/handoffs.ts";
+import { suggest } from "../../packages/server/src/suggestions.ts";
 import { setOwner } from "../../packages/server/src/owners.ts";
 import { createSprocket, listMessages, postEvent, projectChat, sendMessage, updateSettings } from "../../packages/server/src/sprockets.ts";
 import { sessionTitle } from "../../packages/server/src/titles.ts";
@@ -157,6 +158,28 @@ export class World {
     postEvent(this.coordinator.id, { panelId: panel.id, kind: panel.kind, title: await sessionTitle(panel), sessionId: panel.sessionId, ...event }, text);
   }
 
+  /** An event the Coordinator already answered, with its reply (no run). */
+  async earlier(panel: Panel, event: Omit<SprocketEvent, "panelId" | "kind" | "title" | "sessionId">, text: string, reply: string): Promise<void> {
+    postEvent(this.coordinator.id, { panelId: panel.id, kind: panel.kind, title: await sessionTitle(panel), sessionId: panel.sessionId, ...event }, text, { wake: false });
+    sprocketMessages.create(projectChat(this.coordinator.id), "sprocket", reply, new Date(Date.now() + 1).toISOString());
+  }
+
+  /** Several events at once, as when they come in while the Coordinator answers another: one run gets them all. */
+  async wakeAll(list: { panel: Panel; event: Omit<SprocketEvent, "panelId" | "kind" | "title" | "sessionId">; text: string }[]): Promise<void> {
+    const titles = await Promise.all(list.map((x) => sessionTitle(x.panel)));
+    list.forEach(({ panel, event, text }, i) => postEvent(this.coordinator.id, { panelId: panel.id, kind: panel.kind, title: titles[i], sessionId: panel.sessionId, ...event }, text));
+  }
+
+  /** A session drafted a message for another (ADR 0018), as agentTools.ts posts it; `sent`: the user sent it. */
+  async agentMessage(from: Panel, to: Panel, text: string, sent = true): Promise<void> {
+    const [fromTitle, toTitle] = await Promise.all([sessionTitle(from), sessionTitle(to)]);
+    const sender = { panelId: from.id, kind: from.kind, title: fromTitle };
+    const draft = suggest(this.coordinator.id, to, toTitle, text, { purpose: "message", from: sender });
+    const event = postEvent(this.coordinator.id, { ...sender, sessionId: from.sessionId, what: "message", to: { panelId: to.id, kind: to.kind, title: toTitle, sessionId: to.sessionId } }, text, { wake: false });
+    suggestions.attach([draft.id], event.id);
+    if (sent) suggestions.setStatus(draft.id, ["pending"], "sent");
+  }
+
   async title(panel: Panel): Promise<string> {
     return sessionTitle(panel);
   }
@@ -173,6 +196,7 @@ export class World {
       rule: s.rule ? RULES.indexOf(s.rule) + 1 : undefined,
       text: s.text,
       attachment: !!s.attachment,
+      fromAgent: !!s.from,
     }));
     const replies = after.filter((m) => m.author === "sprocket");
     const steps = sprocketMessages.recentSteps(projectChat(this.coordinator.id), this.coordinator.id, 3);
@@ -197,6 +221,8 @@ export interface Draft {
   rule?: number;
   text: string;
   attachment: boolean;
+  /** An agent's own message (ADR 0018), not the Coordinator's draft. */
+  fromAgent: boolean;
 }
 
 export interface Outcome {

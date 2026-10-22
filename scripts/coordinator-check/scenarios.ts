@@ -2,6 +2,7 @@
 // plus two it got right (routing, a real clash) so a fix can't trade one mistake for another. Each sets up a
 // World, wakes the Coordinator the way Rails would, and returns the checks for what it did.
 import type { Panel } from "@rails/shared";
+import { handoffs } from "../../packages/server/src/db.ts";
 import type { Draft, Outcome, Turn, World } from "./world.ts";
 
 export interface Check {
@@ -83,7 +84,8 @@ function team(w: World, later: { engine?: Turn[]; gameplay?: Turn[]; ui?: Turn[]
 
 // ---- checking what it drafted ----
 
-const to = (o: Outcome, p: Panel) => o.drafts.filter((d) => d.to === p.id);
+/** The Coordinator's drafts for a session (not the sessions' own messages). */
+const to = (o: Outcome, p: Panel) => o.drafts.filter((d) => d.to === p.id && !d.fromAgent);
 const all = (ds: Draft[], test: (d: Draft) => boolean) => ds.length > 0 && ds.every(test);
 /** Telling a session to talk to another, which it can't. */
 const RELAY = /\bcoordinat|\b(flag|tell|ask|notify|ping|message|let)\b[^.\n]{0,25}\b(claude|codex|pi|the (engine|gameplay|ui) session|the other session|its owner)\b/i;
@@ -292,6 +294,58 @@ export const SCENARIOS: Scenario[] = [
           { what: "doesn't tell it to talk to another session", ok: d.every((x) => !RELAY.test(x.text)) },
         ];
       };
+    },
+  },
+  {
+    name: "several-events",
+    run2: "(Test run 6.) Claude asked for a go-ahead while the Coordinator answered Codex, and pi asked in a dialog just after: one run got both, and answered only pi.",
+    async play(w) {
+      const plan =
+        "Here's what happens today when the tab is hidden or loses focus mid-wave, and what I'd change.\n\n**Today**\n- requestAnimationFrame stops while the tab is hidden, but the loop keeps its last timestamp, so the first frame back gets a huge dt (clamped to 0.1 s per step, but the accumulator still runs several steps at once).\n- Enemies jump forward along the path, and a burst of projectiles resolves in one frame.\n- Losing focus without hiding (another window) changes nothing.\n\n**What I'd change** (src/main.js and src/engine/loop.js only)\n1. Pause the game on visibilitychange when the tab is hidden, through the same ui:pause event the Pause button uses.\n2. Reset the loop's clock and accumulator on resume, so the first frame back has a normal dt.\n3. Leave blur alone: pausing on every focus change is annoying when you check another window.\n4. Don't unpause automatically when the tab comes back; the player presses Pause again.\n5. A pure shouldAutoPause(state, hidden) function with tests, so the rule is covered. Pausing only applies while playing and not already paused, and never on the title, help or end screens.\n\nI'd leave the banner and audio alone since they belong to the UI session. Want me to go ahead with 1, 2, 4 and 5?";
+      const t = team(w, {
+        engine: [{ user: "Look at what happens when the tab is hidden mid-wave. Tell me what you'd change and ask whether to go ahead; don't change anything yet.", reply: plan }],
+        ui: [{ user: "The towers can be picked with 1-4. Add that to How to play, then ask me whether to also show each key on its shop card, and stop.", edits: ["src/ui/hud.js"], reply: "" }],
+      });
+      // The run before: Codex's choice, answered while these two came in.
+      await w.earlier(t.gameplay, { what: "turn_end" }, "Two options for a fifth enemy: 1. Boiler Runner, speeds up below half health. 2. Ironclad Crawler, armour against Gear Guns but weak to Tesla. Which one should I build?", "Codex asked you to choose between Boiler Runner and Ironclad Crawler. I suggested Boiler Runner as the simpler option, following rule 2; you can send it with one tap.");
+      const questions = [{ question: "Should I also show each tower's shortcut key on its shop card?", options: ["Yes", "No"] }];
+      w.ask(t.ui, questions);
+      await w.wakeAll([
+        { panel: t.engine, event: { what: "turn_end" }, text: plan },
+        { panel: t.ui, event: { what: "question", questions }, text: questions[0].question },
+      ]);
+      return (o) => {
+        const e = to(o, t.engine);
+        const u = to(o, t.ui);
+        return [
+          { what: "answers Claude's go-ahead", ok: e.some((x) => x.mode === "reply") },
+          { what: "says yes to Claude", ok: all(e, (x) => /\b(yes|go ahead)\b/i.test(x.text)) },
+          { what: "answers pi's dialog", ok: u.some((x) => x.mode === "answer") },
+        ];
+      };
+    },
+  },
+  {
+    name: "handoff-covered",
+    run2: "(Test runs 4-6.) Claude messaged pi about the new layout itself, mid-turn; when it finished, the planned handoff drafted the same for pi again.",
+    async play(w) {
+      const layout =
+        "Layout change in the engine (needs UI work): the canvas is now 960 x 782. import { LAYOUT } from '../engine/renderer.js': LAYOUT.hud = {x:0,y:0,w:960,h:56}, LAYOUT.map = {x:0,y:56,w:960,h:576}, LAYOUT.shop = {x:0,y:632,w:960,h:150}. Please draw the HUD into LAYOUT.hud and the shop and tower panel into LAYOUT.shop, so nothing covers the map; clicks arrive with click.region = 'hud' | 'map' | 'shop'.";
+      const done =
+        "The canvas now has a HUD band above the map and a shop band below it, exported as LAYOUT from src/engine/renderer.js, with input mapped per region. I've told the UI session what it needs (the LAYOUT rectangles and click.region). Also added shake() and burst() effect helpers. node --test passes.";
+      const t = team(w, {
+        engine: [{ user: "Give the canvas a layout where the map is never covered: a HUD band above and a shop band below, exported as one LAYOUT object the UI can draw into.", edits: ["src/engine/renderer.js", "src/main.js", "index.html"], reply: done }],
+      });
+      const note = "tell the pi session the new layout is ready and to move the HUD, shop and tower panel into it so nothing covers the map";
+      const id = w.handoff(t.engine, t.ui, note);
+      w.history("When the Claude session is done, tell the pi session the new layout is ready and to move the HUD, shop and tower panel into it so nothing covers the map.", "Planned: when Claude Code finishes, I'll draft that for pi.");
+      await w.agentMessage(t.engine, t.ui, layout);
+      const pi = await w.title(t.ui);
+      await w.wake(t.engine, { what: "handoff", handoff: { id, to: { panelId: t.ui.id, kind: "pi", title: pi, sessionId: t.ui.sessionId }, note } }, done);
+      return (o) => [
+        { what: "drafts nothing new for pi", ok: to(o, t.ui).length === 0 },
+        { what: "the handoff doesn't stay waiting", ok: !handoffs.pending(w.coordinator.id).some((h) => h.id === id) },
+      ];
     },
   },
 ];
