@@ -9,6 +9,8 @@ import type { Capability } from "./capabilities.ts";
 export type TurnEnd =
   | { passTo: string; note: string }
   | { ask: SprocketAsk }
+  /** Nothing more to do: it passed to a teammate whose turn already comes, after posting its part. */
+  | { done: true }
   /** A call to an MCP tool that asks first (ADR 0025, mcpTools.ts). */
   | { approval: { serverId: string; server: string; tool: string; args: Record<string, unknown> } };
 
@@ -45,8 +47,12 @@ export function passTurnCapability(
       const name = to.replace(/^@/, "").trim().toLowerCase();
       const target = others.find((m) => m.name.toLowerCase() === name);
       if (!target) throw new Error(`There's no teammate called ${JSON.stringify(to)}. Your teammates: ${others.map((m) => m.name).join(", ")}.`);
-      if (turn.queued().includes(target.id))
-        throw new Error(`${target.name} already has a turn coming after yours: they'll answer it themselves. Give your own answer, and don't pass the turn.`);
+      if (turn.queued().includes(target.id)) {
+        if (!turn.said()) throw new Error(`${target.name} already has a turn coming after yours: they'll answer it themselves. Give your own answer, and don't pass the turn.`);
+        // Its part is posted and the teammate goes next anyway: end the turn, or models wrote their message again.
+        end({ done: true });
+        return `${target.name} already has a turn coming after yours and will see your message. Your turn ends here.`;
+      }
       if (turn.hop + 1 > TEAM_TURNS_MAX)
         throw new Error(`The turn has been passed ${TEAM_TURNS_MAX} times since your user wrote: post your result here, and your user decides what's next.`);
       if (!note.trim()) throw new Error("Say in `note` what they should do now.");

@@ -39,7 +39,9 @@ Decisions:
   - a pass past 10 in a chain (`TEAM_TURNS_MAX`). The member is told to post its result, and you decide what's
     next;
   - a member whose turn already comes (after `@everyone`, the lead would otherwise hand its own question to the
-    next member, who was going to answer anyway). The member is told who answers after it;
+    next member, who was going to answer anyway). The member is told who answers after it. If it has already
+    posted its part, its turn just ends there, with no pass line: told to answer itself after answering, models
+    wrote their message again;
   - a pass before the member has written anything this turn: models passed with only a note, and the teammate
     had nothing to check or go on.
   A refusal comes back to the member as the call's error, so it can still answer in the same run. Passing back to

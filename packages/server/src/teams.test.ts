@@ -255,7 +255,7 @@ describe("team chats", () => {
     let result = "";
     let told = "";
     faux.setResponses([
-      (c) => ((told = seen(c)), pass("Bo, yours?", "Bo")),
+      (c) => ((told = seen(c)), pass("", "Bo")),
       (c) => {
         const r = c.messages.filter((m) => m.role === "toolResult").at(-1);
         result = r && r.role === "toolResult" ? (r.content[0] as { text: string }).text : "";
@@ -267,8 +267,17 @@ describe("team chats", () => {
     sendMessage(team.id, "@everyone a colour each.");
     await settled();
     expect(told).toContain("Bo and Cy have a turn after yours");
-    expect(result).toMatch(/Bo already has a turn coming after yours/);
-    expect(said(team.id).slice(1)).toEqual(["Ada: Bo, yours?", "Ada: Mine: red.", "Bo: Blue.", "Cy: Green."]);
+    expect(result).toMatch(/Bo already has a turn coming after yours: they'll answer it themselves/);
+    expect(said(team.id).slice(1)).toEqual(["Ada: Mine: red.", "Bo: Blue.", "Cy: Green."]);
+  });
+
+  it("ends the turn, without a pass, when a member who has posted passes to one whose turn already comes", async () => {
+    const { team } = crew();
+    // Told to answer themselves after already answering, models wrote it again; now the run just ends.
+    faux.setResponses([pass("Red. Bo, yours?", "Bo"), reply("Blue."), reply("Green.")]);
+    sendMessage(team.id, "@everyone a colour each.");
+    await settled();
+    expect(said(team.id).slice(1)).toEqual(["Ada: Red. Bo, yours?", "Bo: Blue.", "Cy: Green."]);
   });
 
   it("won't pass the turn before the member has written anything, and doesn't post a message twice", async () => {
