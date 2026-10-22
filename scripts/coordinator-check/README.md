@@ -1,6 +1,6 @@
 # The Coordinator check
 
-Replays situations from test runs 2 and 6 against the real Coordinator on a real model, a few times each, and checks
+Replays situations from test runs 2, 6 and 7 against the real Coordinator on a real model, a few times each, and checks
 what it drafted. Use it after changing the Coordinator's instructions (`systemPrompt` and `eventText` in
 `packages/server/src/runs.ts`, the tool descriptions in `harness/reply.ts`), or to compare models.
 
@@ -28,6 +28,8 @@ The situations (`scenarios.ts`):
 | `done-not-continue` | A handoff to a finished session doesn't tell it to continue, or to talk to another session. |
 | `several-events` | Two events that come in together (a go-ahead and a dialog, test run 6) both get an answer. |
 | `handoff-covered` | A handoff the finished session already carried out with its own message isn't drafted again (runs 4 to 6). |
+| `permission-deny` | A session waiting on a permission the rules forbid (installing a package, test run 7): tell the user not to allow it, draft nothing. |
+| `permission-allow` | A permission the rules allow (running the tests): tell the user it's fine, draft nothing. |
 
 **Sign-in.** The model needs a provider in the check's home, `/tmp/rails-check` by default (`--home`). Sign in
 once: start a server with `RAILS_HOME=/tmp/rails-check RAILS_PORT=4319 RAILS_TOKEN=t` (and Vite on another
