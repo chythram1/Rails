@@ -33,7 +33,9 @@ Decisions:
   them as `[Rails event, not from your user]`, with the session's text quoted as data. The Coordinator's run
   replies as usual: which session, what it's asking, what it would answer and why. If the wait doesn't need
   the user after all, it replies `(quiet)` (or ends its reply with it): nothing is saved but a "nothing needed"
-  mark on the event.
+  mark on the event. Events that come in while it answers another wait for one run, which ends with a reminder listing
+  them (not saved): in test run 6 such a run answered only the newest of two and left a session's go-ahead
+  question without an answer or a mark.
 - **The bridge keeps the end of final messages** (the first 500 and the last 1,500 characters), since a
   closing question is what says a session waits.
 - **Not yet:** suggested answers the user sends with one tap (done in ADR 0010), automatic answers for rules the user trusts (through the hooks: Claude Code's PreToolUse

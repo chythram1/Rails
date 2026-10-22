@@ -325,6 +325,10 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   const unreachable = servers.filter((x) => x.error).map((x) => `[Rails] The MCP server ${x.server.name} can't be reached right now (${x.error}), so its tools aren't here this turn.`);
   if (chat.kind !== "project")
     context.push({ role: "user", content: [team ? `${TEXTING_NOW}\n${roundNow(history, r, team)}` : TEXTING_NOW, ...unreachable].join("\n"), timestamp: Date.now() });
+  // Events that came in together (one arrived while it answered another): models answered only the latest.
+  // (An agent's drafted message doesn't wake it, and needs nothing.)
+  const events = unanswered.filter((m) => m.author === "event" && m.event && m.event.what !== "message");
+  if (chat.kind === "project" && events.length > 1) context.push({ role: "user", content: severalEvents(events), timestamp: Date.now() });
   // One tool (ADR 0008): the model writes scripts that call the Sprocket's capabilities. A Coordinator can
   // also suggest replies to sessions (ADR 0010), shown under the reply this run saves. Outside the project chat a
   // run can end its turn on purpose (ADR 0023): ask the user, or in a team pass the turn.
@@ -775,6 +779,13 @@ const TEXTING = [
   "- No headings, no bold, no Markdown tables. A short list of a few items is fine inside one bubble. Use Markdown only for code.",
   "- When structure helps (comparing options, figures, a checklist of steps, code or a diff), show a card with show_card instead of writing it out, with a sentence around it if useful. Most replies are plain text.",
 ].join("\n");
+
+/** The reminder when several events wait for one reply (not saved, not from the user). */
+export function severalEvents(events: SprocketMessage[]): string {
+  const what = { question: "asks your user in a dialog", turn_end: "ended its turn, maybe with a question", overlap: "changed files another session changed or owns", handoff: "finished a turn a handoff waits for", message: "drafted a message" } as const;
+  const list = events.map((m, i) => `${i + 1}. "${m.event!.title}" ${what[m.event!.what] ?? "is waiting"}.`).join("\n");
+  return `[Rails, not your user] ${events.length} events came in since your last reply, and this one reply answers all of them:\n${list}\nDeal with each in turn: draft what each one needs (a reply, an answer, a handoff's message), and say in a sentence what each was. Reply (quiet) only if none of them needs your user.`;
+}
 
 /** The reminder after the chat (not saved, not from the user). */
 const TEXTING_NOW =
