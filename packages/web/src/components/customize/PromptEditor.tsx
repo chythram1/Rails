@@ -5,6 +5,7 @@ import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
 import { MenuButton } from "../Menu.tsx";
 import { EditorHead, LongText, TextInput } from "./fields.tsx";
+import { useConfirm } from "../ConfirmDialog.tsx";
 
 /** One saved prompt: its name and its text. Home's composer lists them to fill in. */
 export function PromptEditor({ prompt }: { prompt: SavedPrompt }) {
@@ -22,18 +23,24 @@ export function PromptEditor({ prompt }: { prompt: SavedPrompt }) {
     }
   };
 
-  const remove = async () => {
-    if (!confirm(`Delete the prompt ${name}?`)) return;
-    try {
-      await api.deletePrompt(id);
-      navigate(href.customize("prompts"));
-    } catch (e: any) {
-      setError(e.message);
-    }
-  };
+  const [confirmDialog, ask] = useConfirm();
+  const remove = () =>
+    ask({
+      title: `Delete ${name}?`,
+      text: "The prompt is deleted, on every device.",
+      action: "Delete prompt",
+      danger: true,
+      // It opened from the `…` menu, whose item is gone: back to the menu's button.
+      returnFocus: () => document.querySelector<HTMLElement>(`[aria-label="${CSS.escape(`${name} actions`)}"]`),
+      onConfirm: async () => {
+        await api.deletePrompt(id);
+        navigate(href.customize("prompts"));
+      },
+    });
 
   return (
     <div className="cz-editor">
+      {confirmDialog}
       <EditorHead back={href.customize("prompts")} backLabel="Prompts" title={name}>
         <a className="btn small" href={href.homeWithPrompt(id)} title="Open Home with this prompt filled in">Use on Home</a>
         <MenuButton label={`${name} actions`} title="More" icon={<Dots size={18} />} align="right" items={[{ label: "Delete prompt", danger: true, onSelect: () => void remove() }]} />

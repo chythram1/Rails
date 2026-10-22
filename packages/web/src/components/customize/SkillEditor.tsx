@@ -6,6 +6,7 @@ import { href, navigate } from "../../router.ts";
 import { MenuButton } from "../Menu.tsx";
 import { useSprockets } from "../sprockets/useSprockets.ts";
 import { EditorHead, LongText, TextInput } from "./fields.tsx";
+import { useConfirm } from "../ConfirmDialog.tsx";
 
 /**
  * One skill (ADR 0025): its name and description (what a Sprocket sees to know when it applies), its instructions
@@ -26,18 +27,24 @@ export function SkillEditor({ skill: k }: { skill: Skill }) {
       return false;
     }
   };
-  const remove = async () => {
-    if (!confirm(`Delete the skill ${k.name}? Sprockets that have it lose it. A folder it was copied from stays.`)) return;
-    try {
-      await api.deleteSkill(k.id);
-      navigate(href.customize("skills"));
-    } catch (e: any) {
-      setError(e.message);
-    }
-  };
+  const [confirmDialog, ask] = useConfirm();
+  const remove = () =>
+    ask({
+      title: `Delete ${k.name}?`,
+      text: "Sprockets that have it lose it. A folder it was copied from stays.",
+      action: "Delete skill",
+      danger: true,
+      // It opened from the `…` menu, whose item is gone: back to the menu's button.
+      returnFocus: () => document.querySelector<HTMLElement>(`[aria-label="${CSS.escape(`${k.name} actions`)}"]`),
+      onConfirm: async () => {
+        await api.deleteSkill(k.id);
+        navigate(href.customize("skills"));
+      },
+    });
 
   return (
     <div className="cz-editor">
+      {confirmDialog}
       <EditorHead back={href.customize("skills")} backLabel="Skills" title={k.name}>
         <MenuButton label={`${k.name} actions`} title="More" icon={<Dots size={18} />} align="right" items={[{ label: "Delete skill", danger: true, onSelect: () => void remove() }]} />
       </EditorHead>

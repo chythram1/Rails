@@ -6,6 +6,7 @@ import { href, navigate, type Route } from "../router.ts";
 import { useStore } from "../store.tsx";
 import { timeAgo } from "../util.ts";
 import { Avatar } from "./Avatar.tsx";
+import { ConfirmDialog, showNotice } from "./ConfirmDialog.tsx";
 import { FolderMenu } from "./FolderMenu.tsx";
 import { Logo } from "./Logo.tsx";
 import { MenuButton } from "./Menu.tsx";
@@ -86,20 +87,16 @@ export function Sidebar({ route }: { route: Route }) {
     addEventListener("pointerup", up);
   };
 
-  // Detach only: transcripts stay on disk, and adding the folder again brings the sessions back.
+  // Detach only: transcripts stay on disk, and adding the folder again brings the sessions back. Open panels must
+  // be closed first. What it asks, once it knows how many panels are open and which Sprockets are attached:
+  const [removing, setRemoving] = useState<{ p: Project; open: number; attached: string[] } | null>(null);
   const remove = async (p: Project) => {
     const open = (await api.workspace(p.id).catch(() => null))?.panels.length ?? 0;
-    if (open > 0) return alert(`Close the ${open} open panel${open === 1 ? "" : "s"} in "${p.name}" before removing it.`);
     const attached = ((await api.sprockets().catch(() => [])) ?? []).filter((s) => s.projectId === p.id).map((s) => s.name);
-    const sprocketNote = attached.length
-      ? `\n\n${attached.join(", ")} ${attached.length === 1 ? "is" : "are"} detached, and ${attached.length === 1 ? "its chat" : "their chats"} here deleted.`
-      : "";
-    if (!confirm(`Remove "${p.name}" from Rails?\n\nIts agent sessions stay on disk. Add the folder again anytime to bring them back.${sprocketNote}`)) return;
-    try {
-      await api.removeProject(p.id);
-    } catch (e: any) {
-      return alert(e.message);
-    }
+    setRemoving({ p, open, attached });
+  };
+  const confirmRemove = async (p: Project) => {
+    await api.removeProject(p.id);
     if (route.name === "workspace" && route.projectId === p.id) navigate(href.home());
     await refreshProjects();
   };
@@ -109,7 +106,7 @@ export function Sidebar({ route }: { route: Route }) {
       await api.openPanel(p.id, { kind });
       navigate(href.project(p.id));
     } catch (e: any) {
-      alert(e.message);
+      showNotice("Couldn't open the panel", e.message);
     }
   };
 
@@ -197,6 +194,29 @@ export function Sidebar({ route }: { route: Route }) {
         <AccountMenu connected={connected} />
       </div>
       <div className="sidebar-resize" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" onPointerDown={startResize} />
+      {removing && (
+        <ConfirmDialog
+          {...(removing.open
+            ? {
+                title: "Close its panels first",
+                text: `${removing.p.name} has ${removing.open} open panel${removing.open === 1 ? "" : "s"}. Close ${removing.open === 1 ? "it" : "them"}, then remove the project.`,
+                action: "Close",
+              }
+            : {
+                title: `Remove ${removing.p.name}?`,
+                text: `Its agent sessions stay on disk: add the folder again anytime to bring them back.${
+                  removing.attached.length
+                    ? ` ${removing.attached.join(", ")} ${removing.attached.length === 1 ? "is" : "are"} detached, and ${removing.attached.length === 1 ? "its chat" : "their chats"} here deleted.`
+                    : ""
+                }`,
+                action: "Remove",
+                danger: true,
+                onConfirm: () => confirmRemove(removing.p),
+              })}
+          onClose={() => setRemoving(null)}
+          returnFocus={() => aside.current?.querySelector<HTMLElement>(`[aria-label="${CSS.escape(`${removing.p.name} actions`)}"]`) ?? null}
+        />
+      )}
     </aside>
   );
 }

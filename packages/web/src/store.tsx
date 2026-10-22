@@ -3,6 +3,7 @@ import type { AttentionReason, McpServer, PanelOverlap, Profile, ProfileChange, 
 import { api } from "./api.ts";
 import { href, navigate } from "./router.ts";
 import { socket } from "./ws.ts";
+import { showNotice } from "./components/ConfirmDialog.tsx";
 
 interface Store {
   projects: Project[];
@@ -115,7 +116,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await refreshProjects();
       navigate(href.project(project.id));
     } catch (e: any) {
-      alert(e.message);
+      showNotice("Couldn't add the project", e.message);
     } finally {
       setPicking(false);
     }
@@ -128,7 +129,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await refreshProjects();
         navigate(href.project(id));
       } catch (e: any) {
-        alert(e.message);
+        showNotice("Couldn't add the project", e.message);
       }
     },
     [refreshProjects],

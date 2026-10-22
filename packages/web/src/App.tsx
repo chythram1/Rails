@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, onSignedOut, Unauthorized } from "./api.ts";
 import { CustomizePage } from "./components/customize/CustomizePage.tsx";
+import { Notices } from "./components/ConfirmDialog.tsx";
 import { Home } from "./components/Home.tsx";
 import { Login } from "./components/Login.tsx";
 import { Placeholder } from "./components/Placeholder.tsx";
@@ -119,6 +120,7 @@ function Shell() {
             onClose={closeSettings}
           />
         )}
+        <Notices />
       </div>
     </SettingsContext.Provider>
   );

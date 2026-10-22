@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ServerInfo } from "@rails/shared";
 import { api } from "../../api.ts";
 import { ProfileSettings } from "./ProfileSettings.tsx";
+import { useConfirm } from "../ConfirmDialog.tsx";
 
 /**
  * Settings → Account: the profile (ProfileSettings.tsx), then access. Rails has one user and one access
@@ -12,7 +13,6 @@ export function AccountSettings() {
   const [info, setInfo] = useState<ServerInfo | null>(null);
   const [link, setLink] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
   useEffect(() => {
     api.server().then(setInfo, (e: Error) => setError(e.message));
   }, []);
@@ -26,22 +26,23 @@ export function AccountSettings() {
     }
   };
 
-  const signOutEverywhere = async () => {
-    if (!confirm("Sign out everywhere?\n\nRails makes a new access token. Every other device is signed out until it signs in with the new one. This device stays signed in.")) return;
-    setError("");
-    setBusy(true);
-    try {
-      const { token } = await api.signOutEverywhere();
-      setLink(`${location.origin}/?token=${encodeURIComponent(token)}`);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const [confirmDialog, ask] = useConfirm();
+  const signOutEverywhere = () =>
+    ask({
+      title: "Sign out everywhere?",
+      text: "Rails makes a new access token. Every other device is signed out until it signs in with the new one. This device stays signed in.",
+      action: "Sign out everywhere",
+      danger: true,
+      onConfirm: async () => {
+        setError("");
+        const { token } = await api.signOutEverywhere();
+        setLink(`${location.origin}/?token=${encodeURIComponent(token)}`);
+      },
+    });
 
   return (
     <>
+      {confirmDialog}
       <ProfileSettings />
       <section className="set-group" aria-labelledby="access-title">
         <h3 id="access-title">Access</h3>
@@ -61,7 +62,7 @@ export function AccountSettings() {
                 : "Makes a new access token, so every other device has to sign in again. This one stays signed in."}
             </p>
           </div>
-          <button className="btn small danger" disabled={!info || info.tokenFromEnv || busy} onClick={() => void signOutEverywhere()}>
+          <button className="btn small danger" disabled={!info || info.tokenFromEnv} onClick={signOutEverywhere}>
             Sign out everywhere
           </button>
         </div>

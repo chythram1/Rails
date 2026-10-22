@@ -9,6 +9,7 @@ import { Segmented } from "../Segmented.tsx";
 import { useSprockets } from "../sprockets/useSprockets.ts";
 import { ConnectorLogo } from "./ConnectorLogo.tsx";
 import { EditorHead, LongText, TextInput } from "./fields.tsx";
+import { useConfirm } from "../ConfirmDialog.tsx";
 
 /** A server in a line, for the list: its tools, or why it can't connect. */
 export function serverSummary(s: McpServer): string {
@@ -54,15 +55,20 @@ export function McpEditor({ server: s }: { server: McpServer }) {
       setTesting(false);
     }
   };
-  const remove = async () => {
-    if (!confirm(`Remove ${s.name}? Sprockets that have it lose its tools.`)) return;
-    try {
-      await api.deleteMcpServer(s.id);
-      navigate(href.customize("connectors"));
-    } catch (e: any) {
-      setError(e.message);
-    }
-  };
+  const [confirmDialog, ask] = useConfirm();
+  const remove = () =>
+    ask({
+      title: `Remove ${s.name}?`,
+      text: "Sprockets that have it lose its tools.",
+      action: "Remove",
+      danger: true,
+      // It opened from the `…` menu, whose item is gone: back to the menu's button.
+      returnFocus: () => document.querySelector<HTMLElement>(`[aria-label="${CSS.escape(`${s.name} actions`)}"]`),
+      onConfirm: async () => {
+        await api.deleteMcpServer(s.id);
+        navigate(href.customize("connectors"));
+      },
+    });
   const local = s.transport === "stdio";
   const connector = connectorById(s.connector);
   const users = (sprockets ?? []).filter((x) => s.usedBy.includes(x.id));
@@ -145,6 +151,7 @@ export function McpEditor({ server: s }: { server: McpServer }) {
 
   return (
     <div className="cz-editor">
+      {confirmDialog}
       <EditorHead back={href.customize("connectors")} backLabel="Connectors">
         <button type="button" className="btn small" disabled={testing} onClick={() => void test()}>
           {testing ? "Connecting…" : "Test"}

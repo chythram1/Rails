@@ -4,6 +4,7 @@ import type { ModelProvider, SignIn } from "@rails/shared";
 import { api } from "../../api.ts";
 import { socket } from "../../ws.ts";
 import { useModelSettings } from "../ModelSelect.tsx";
+import { useConfirm } from "../ConfirmDialog.tsx";
 
 /**
  * Settings → Providers (ADR 0006): the services Sprockets and the decision model run on, each connected with an
@@ -58,14 +59,15 @@ function ProviderRow({ provider: p }: { provider: ModelProvider }) {
     }
   };
 
-  const remove = async () => {
-    if (!confirm(`Remove ${p.name}? Sprockets that use its models stop replying until you pick another model.`)) return;
-    try {
-      await api.removeProvider(p.id);
-    } catch (e: any) {
-      setError(e.message);
-    }
-  };
+  const [confirmDialog, ask] = useConfirm();
+  const remove = () =>
+    ask({
+      title: `Remove ${p.name}?`,
+      text: "Sprockets that use its models stop replying until you pick another model.",
+      action: "Remove",
+      danger: true,
+      onConfirm: () => api.removeProvider(p.id).then(() => undefined),
+    });
 
   const startSignIn = async (fresh = false) => {
     setError("");
@@ -78,6 +80,7 @@ function ProviderRow({ provider: p }: { provider: ModelProvider }) {
 
   return (
     <li className="provider-row" id={`setting-provider-${p.id}`} data-settings-row tabIndex={-1}>
+      {confirmDialog}
       <div className="provider-main">
         <span className="provider-name">{p.name}</span>
         <span className={"provider-status" + (p.auth ? " ok" : "")}>
