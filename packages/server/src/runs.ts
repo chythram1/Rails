@@ -636,6 +636,22 @@ function eventText(m: SprocketMessage): string {
 }
 
 /**
+ * A pending handoff whose session already wrote to the other one itself since it was planned (ADR 0018 messages,
+ * sent or waiting for the user): what it wrote, and what to do instead of drafting the same again. Empty otherwise.
+ */
+function wroteAlready(fromPanelId: string, h: NonNullable<SprocketMessage["event"]>["handoff"] & {}): string {
+  const planned = handoffs.pending().find((x) => x.id === h.id);
+  if (!planned) return "";
+  const sent = suggestions.byAgent(fromPanelId, planned.createdAt).filter((s) => s.panelId === h.to.panelId && ["pending", "sending", "sent"].includes(s.status));
+  if (!sent.length) return "";
+  const quoted = sent
+    .reverse()
+    .map((s) => `${s.status === "pending" ? "(waiting for your user to send it)" : "(your user sent it)"}\n"""\n${s.text.length > 1500 ? `${s.text.slice(0, 1500)}…` : s.text}\n"""`)
+    .join("\n");
+  return `Since you planned this handoff, it has written to "${h.to.title}" itself:\n${quoted}\nIf that already passes on what the handoff is for, don't draft the same again: cancel the handoff with cancel_handoff ("${h.id.slice(0, 8)}") and reply (quiet). If it leaves something out, draft only what's missing with suggest_message, passing handoff: "${h.id.slice(0, 8)}" (Rails attaches what it said last, word for word).`;
+}
+
+/**
  * A stored chat message as the model sees it. Earlier replies count as this model's own; events come from Rails.
  * In a team, the other members' replies come with their names (ADR 0022).
  */
@@ -715,7 +731,7 @@ function systemPrompt(
           `You're the Coordinator of "${projectName}": you draft what its sessions get, and your user sends it. Saying you'll draft something doesn't draft it: call the tool, then tell your user. Rails wakes you with messages that start with [Rails event]; those come from Rails, not your user.`,
           `When a session waits for your user (it asked a question, or ended its turn with one), find out what it needs (session_conversation for that session, project_board for what else is going on). If one of your user's rules (below) fits, suggest the reply it calls for with suggest_reply, passing the rule's number; a rule beats your own judgment. If none fits but you can tell what your user would answer, from their description, your memory and the project, suggest it without a rule number. Then say in a sentence or two what the session asks and why you'd answer that; your user sends the reply with one tap. If you can't tell, don't guess: say what it's asking and what your user needs to decide. If it doesn't need your user after all (it isn't really a question, or it's already answered), reply with exactly (quiet) and nothing else.`,
           "When your user asks you to tell a session something, draft it with suggest_message: they send it, and a busy session gets it after its current turn. When they ask you to pass something on once a session finishes, plan it with plan_handoff rather than drafting the message now: Rails wakes you when that session ends a turn, and you check its work is done first. When they tell you which session owns which files, record it with set_owner.",
-          "Rails also wakes you when a session changes files that another session changed shortly before, or owns (an overlap). Find out what each did there (session_conversation for both, their uncommitted changes), then decide. If both changes are intact and work together (they changed different parts, one builds on the other's finished work, or your user asked for both), reply (quiet) and draft nothing, not even a reminder. Only if one undid, broke or contradicts the other's work (or your user's brief) tell your user in a sentence or two what clashes, and draft a short heads-up with suggest_message for the session that changed the files second (the one the event is about).",
+          "Rails also wakes you when a session changes files that another session changed shortly before, or owns (an overlap). Find out what each did there (session_conversation for both, their uncommitted changes), then decide. If both changes are intact and work together (they changed different parts, one builds on the other's finished work, or your user asked for both), reply (quiet) and draft nothing, not even a reminder or a note that all is well: a session that needs to do nothing gets no message. Only if one undid, broke or contradicts the other's work (or your user's brief) tell your user in a sentence or two what clashes, and draft a short heads-up with suggest_message for the session that changed the files second (the one the event is about).",
           "Every draft (suggest_reply, suggest_message) has to stand on its own:",
           "- The session sees only your draft (and a handoff's attached words), not your chat, your reasoning or the other sessions. Start with what it needs to know: what happened, which session did it, in which files. Then say what it should do.",
           "- Keep your user's words for what they asked: their limits, numbers and conditions, as they said them. Don't narrow, widen or reverse them.",

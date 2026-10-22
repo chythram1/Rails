@@ -32,6 +32,11 @@ Decisions:
 - **Pending handoffs show on the Coordinator's job page**, under its rules, each with Cancel
   (`POST /api/handoffs/:id/cancel`). They're also in its instructions, with their ids, so it can list or cancel
   them (`cancel_handoff`).
+- **A handoff the session already carried out itself:** sessions can message each other (ADR 0018), and in test
+  runs 4 to 6 a session told the other what the handoff was for mid-turn, so the handoff's draft said it again.
+  When a handoff fires, its event shows the Coordinator the messages the finished session wrote to the other one
+  since the handoff was planned (sent, or still waiting for the user); if they cover it, the Coordinator cancels
+  the handoff and stays quiet, else it drafts only what they left out.
 - **Stored in the `handoffs` table** with its sessions' titles, kept current as the sessions report prompts and
   turn ends (a handoff is often planned before a session has a title of its own). A turn the user stopped
   isn't finished, so it doesn't count.
