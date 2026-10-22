@@ -1,4 +1,5 @@
-import { IconArrowUpRight as ArrowUpRight, IconX as X } from "@tabler/icons-react";
+import { IconArrowUpRight as ArrowUpRight, IconFolder as Folder, IconGitBranch as GitBranch, IconRobotFace as RobotFace, IconX as X } from "@tabler/icons-react";
+import type { ReactNode } from "react";
 import type { Sprocket as SprocketData } from "@rails/shared";
 import { href } from "../router.ts";
 import { FilesPanel } from "./FilesPanel.tsx";
@@ -26,28 +27,31 @@ export function SidePanel(props: {
 }) {
   const { view, onView, projectId, projectName, sprocket, onClose } = props;
   const waiting = sprocket?.pending.length ?? 0;
-  const tab = (id: SideView, label: string, dot = false) => (
+  // Icon tabs: the name is the tab's accessible name and its tooltip; the dot's words join it while a reply waits.
+  const tab = (id: SideView, label: string, icon: ReactNode, dot = false) => (
     <button
       type="button"
       role="tab"
       id={`side-tab-${id}`}
       aria-selected={view === id}
       aria-controls="side-view"
+      aria-label={dot ? `${label}, ${waiting > 1 ? `${waiting} replies waiting` : "1 reply waiting"}` : label}
+      title={label}
       tabIndex={view === id ? 0 : -1}
       className="side-view-tab"
       onClick={() => onView(id)}
     >
-      {label}
-      {dot && <span className="tab-attention" role="img" aria-label={waiting > 1 ? `${waiting} replies waiting` : "1 reply waiting"} />}
+      {icon}
+      {dot && <span className="tab-attention" aria-hidden />}
     </button>
   );
   return (
     <aside className="side-panel" aria-label="Side panel">
       <header className="side-head">
         <div className="side-views" role="tablist" aria-label="Show" onKeyDown={onTabKeys}>
-          {tab("sprockets", "Sprockets", waiting > 0)}
-          {tab("files", "Files")}
-          {tab("git", "Git")}
+          {tab("sprockets", "Sprockets", <RobotFace size={18} />, waiting > 0)}
+          {tab("files", "Files", <Folder size={18} />)}
+          {tab("git", "Git", <GitBranch size={18} />)}
         </div>
         <span className="grow" />
         <button className="icon-btn" aria-label="Close the side panel" title="Close" onClick={onClose}>
