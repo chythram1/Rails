@@ -336,34 +336,52 @@ function CustomSection({ onCustom }: { onCustom(t: "http" | "stdio"): void }) {
 
 /** A collection of connectors at the top of Discover: what it's for, and their marks to open. Arrows go through them. */
 function Banner({ servers }: { servers: McpServer[] }) {
-  const [at, setAt] = useState(0);
-  const c = CONNECTOR_COLLECTIONS[at];
-  const go = (d: number) => setAt((a) => (a + d + CONNECTOR_COLLECTIONS.length) % CONNECTOR_COLLECTIONS.length);
+  // Every collection is drawn, stacked in one cell, so the banner keeps the tallest one's size; only the shown one
+  // is visible. `dir` is which way it went, for the slide; `from` the one going out.
+  const [{ at, from, dir }, setState] = useState({ at: 0, from: -1, dir: 1 });
+  const n = CONNECTOR_COLLECTIONS.length;
+  const go = (d: number) => setState((s) => ({ at: (s.at + d + n) % n, from: s.at, dir: d }));
+  const slide = (i: number) => ({
+    className: "cz-slide" + (i === at ? " on" : i === from ? " out" : ""),
+    "aria-hidden": i !== at,
+    inert: i !== at,
+  });
   return (
-    <section className="cz-banner" aria-roledescription="carousel" aria-label="Collections">
-      <div className="cz-banner-text" aria-live="polite">
-        <p className="cz-banner-eyebrow">{c.eyebrow}</p>
-        <h2 className="cz-banner-title">{c.title}</h2>
-        <p className="cz-banner-lead">{c.text}</p>
+    <section className="cz-banner" aria-roledescription="carousel" aria-label="Collections" style={{ "--dir": dir } as React.CSSProperties}>
+      <div className="cz-banner-text cz-stack">
+        {CONNECTOR_COLLECTIONS.map((c, i) => (
+          <div key={c.title} {...slide(i)}>
+            <p className="cz-banner-eyebrow">{c.eyebrow}</p>
+            <h2 className="cz-banner-title">{c.title}</h2>
+            <p className="cz-banner-lead">{c.text}</p>
+          </div>
+        ))}
       </div>
-      <ul className="cz-banner-marks">
-        {c.ids.map((id, i) => {
-          const conn = connectorById(id)!;
-          const added = servers.find((s) => s.connector === id);
-          return (
-            <li key={id} style={{ "--i": i } as React.CSSProperties}>
-              <a href={added ? href.mcpServer(added.id) : href.connector(id)} title={conn.name} aria-label={`${conn.name}${added ? " (added)" : ""}`}>
-                <ConnectorLogo id={id} size={i % 2 ? 52 : 60} />
-                {added && (
-                  <span className="cz-banner-added" aria-hidden>
-                    <Check size={12} />
-                  </span>
-                )}
-              </a>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="cz-banner-marks cz-stack">
+        {CONNECTOR_COLLECTIONS.map((c, i) => (
+          <ul key={c.title} {...slide(i)}>
+            {c.ids.map((id, j) => {
+              const conn = connectorById(id)!;
+              const added = servers.find((s) => s.connector === id);
+              return (
+                <li key={id} style={{ "--i": j } as React.CSSProperties}>
+                  <a href={added ? href.mcpServer(added.id) : href.connector(id)} title={conn.name} aria-label={`${conn.name}${added ? " (added)" : ""}`}>
+                    <ConnectorLogo id={id} size={j % 2 ? 52 : 60} />
+                    {added && (
+                      <span className="cz-banner-added" aria-hidden>
+                        <Check size={12} />
+                      </span>
+                    )}
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        ))}
+      </div>
+      <span className="sr-only" aria-live="polite">
+        {CONNECTOR_COLLECTIONS[at].title}
+      </span>
       <div className="cz-banner-nav">
         <button type="button" className="icon-btn" aria-label="Previous collection" onClick={() => go(-1)}>
           <ChevronLeft size={18} />
