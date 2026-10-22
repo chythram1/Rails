@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { IconArrowDown as ArrowDown, IconArrowRight as ArrowRight, IconChevronLeft as ChevronLeft } from "@tabler/icons-react";
 import { TEAM_TURNS_MAX, findMentions, type Sprocket as SprocketData, type SprocketChatInfo, type SprocketTeam, type SprocketMessage } from "@rails/shared";
 import { api } from "../../api.ts";
@@ -16,6 +16,7 @@ import { EventRow } from "./EventRow.tsx";
 import { SuggestionCard } from "./SuggestionCard.tsx";
 import { MessageActions } from "./MessageActions.tsx";
 import { COLORS } from "./characters.ts";
+import { SPIN_MS, useSprocketMotion } from "./motion.ts";
 import { useThreadScroll } from "./threadScroll.ts";
 import { bubbles, typingTime } from "./bubbles.ts";
 import { Card } from "./Card.tsx";
@@ -176,6 +177,28 @@ export function SprocketChat({
   /** In a team, @mentions of members read as chips. */
   const text = (t: string) => (team ? withMentions(t, members) : t);
 
+  // Who's on it: one face at a time, of the member whose turn it is (the others wait unseen). When the one whose
+  // face shows starts writing, it spins round first (SPIN_MS), then turns into the typing dots.
+  const motion = useSprocketMotion();
+  const [spinning, setSpinning] = useState<string | null>(null);
+  const onIt = watching.flatMap((w) => speaker(w) ?? []);
+  const one = onIt.find((w) => w.id === writing) ?? onIt[0];
+  const dots = !!one && one.id === writing && spinning !== one.id;
+  const face = one && !dots ? one.id : null;
+  // The face last shown, and when: between thinking and writing there can be a moment with no one on it.
+  const lastFace = useRef<{ id: string; at: number } | null>(null);
+  // Before paint, so the dots never flash before the spin.
+  useLayoutEffect(() => {
+    const last = lastFace.current;
+    if (!writing || !motion || last?.id !== writing || Date.now() - last.at > 1500) return;
+    setSpinning(writing);
+    const t = setTimeout(() => setSpinning(null), SPIN_MS);
+    return () => clearTimeout(t);
+  }, [writing]);
+  useLayoutEffect(() => {
+    if (face) lastFace.current = { id: face, at: Date.now() };
+  });
+
 
   return (
     <section className="sp-chat" {...(embedded ? { "aria-label": chatName } : { "aria-labelledby": "sp-chat-title" })}>
@@ -184,7 +207,7 @@ export function SprocketChat({
           <a className="icon-btn sp-back" href={href.sprockets()} aria-label="All Sprockets">
             <ChevronLeft size={18} />
           </a>
-          {team ? <TeamFace looks={members} size={28} /> : <Sprocket look={sprocket.look} size={28} seed={id} />}
+          {team ? <TeamFace looks={members} size={28} /> : <Sprocket look={sprocket.look} size={28} seed={id} busy={running} />}
           {/* A team's name, then its members. */}
           <h2 id="sp-chat-title" className="truncate" title={team ? `${title} · ${members.map((m) => m.name).join(", ")}` : name}>
             {team ? (
@@ -338,17 +361,13 @@ export function SprocketChat({
                 </li>
               );
             })}
-            {/* Who's on it: one face at a time, of the member whose turn it is (the others wait unseen). It pops up
-                when it gets the message, then writes as dots in its colour, beside its face in a team as its reply
-                will be. */}
-            {watching.length > 0 &&
+            {/* Who's on it (above): it pops up when it gets the message, spins as it starts writing, then writes as
+                dots in its colour, beside its face in a team as its reply will be. */}
+            {one &&
               (() => {
-                const who = watching.flatMap((w) => speaker(w) ?? []);
-                const one = who.find((w) => w.id === writing) ?? who[0];
-                if (!one) return null;
                 return (
                   <li className="sp-message sprocket sp-watching" aria-hidden>
-                    {one.id === writing ? (
+                    {dots ? (
                       <div key={one.id} className="sp-said">
                         {team && (
                           <span className="sp-avatar">
@@ -363,7 +382,7 @@ export function SprocketChat({
                       </div>
                     ) : (
                       <span key={one.id} className="sp-watcher">
-                        <Sprocket look={one.look} size={26} seed={one.id} />
+                        <Sprocket look={one.look} size={26} seed={one.id} busy={spinning !== one.id} spin={spinning === one.id} />
                       </span>
                     )}
                   </li>

@@ -12,7 +12,10 @@ export function Eyes({ tilt }: { tilt: number }) {
   return (
     <>
       {[-EYE_X, EYE_X].map((x) => (
-        <rect key={x} x={x - 4.5} y={-11} width={9} height={22} rx={4.5} fill={INK} transform={`rotate(${tilt} ${x} 0)`} />
+        // Each eye in its own group, so expressions (motion.ts) can squash, move and size them apart.
+        <g key={x} className="s-eye">
+          <rect x={x - 4.5} y={-11} width={9} height={22} rx={4.5} fill={INK} transform={`rotate(${tilt} ${x} 0)`} />
+        </g>
       ))}
     </>
   );

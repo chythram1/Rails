@@ -775,6 +775,16 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sprocket :is(.s-rig, .s-sway, .s-pop, .s-hat, .s-in, .s-wobble, .s-lid, .s-shadow) { transform-box: fill-box; }
 .sprocket :is(.s-sway, .s-pop, .s-hat, .s-in, .s-wobble) { transform-origin: 50% 100%; }
 .sprocket .s-lid, .sprocket .s-shadow { transform-origin: 50% 50%; }
+/* Each eye changes size and shape about its own centre (motion.ts express). */
+.sprocket .s-eye { transform-box: fill-box; transform-origin: 50% 50%; }
+/* The spin's streak: white, with a faint dark edge so it shows on a light page too (from the shadow's strength).
+   A dash runs along it only while twirl() animates it; otherwise nothing shows. Thicker on small avatars. */
+.sprocket .s-streak-arc {
+  fill: none; stroke: #fff; stroke-width: var(--streak-w, 7px); stroke-linecap: round;
+  stroke-dasharray: 34 200; stroke-dashoffset: 34; opacity: 0;
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / calc(var(--sprocket-shadow) * 1.2)));
+}
+.sprocket .s-streak-arc.thin { stroke-width: calc(var(--streak-w, 7px) * 0.55); }
 /* The ground shadow: black in both themes, lighter on a light page (--sprocket-shadow). */
 .sprocket .s-shadow { fill: #000; opacity: var(--sprocket-shadow); }
 .sprocket .s-rig { animation: sp-bob var(--period, 1.7s) ease-in-out var(--phase, 0s) infinite alternate; }

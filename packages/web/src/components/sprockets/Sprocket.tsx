@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
 import type { SprocketLook } from "@rails/shared";
 import { CHARACTERS, COLORS, type Primitive } from "./characters.ts";
-import { popIn, squash, useBlink, useLook, useSprocketMotion } from "./motion.ts";
+import { popIn, squash, twirl, useBlink, useLook, useSprocketMotion } from "./motion.ts";
 import { Eyes, Hat } from "./parts.tsx";
 
 /** Seconds per half bob (up, or down) at tempo 1. Sway takes longer, so the two never line up. */
@@ -27,6 +27,10 @@ interface Props {
   still?: boolean;
   /** Eyes follow the pointer (the creator's preview). */
   follow?: boolean;
+  /** Working on a reply: it looks up and around, thinking. */
+  busy?: boolean;
+  /** Spin round (with a streak), as it starts writing: plays when this turns true. */
+  spin?: boolean;
   /** Accessible name. Without one the drawing is decorative and hidden from screen readers. */
   label?: string;
   /** Stable key (e.g. the Sprocket's id) that sets where in its idle loop this one starts. */
@@ -42,10 +46,11 @@ function phaseOf(seed: string) {
 
 /**
  * A Sprocket character (see ref characters.md §5.2 for the layers). Each nested group owns one kind of
- * motion: s-rig bobs, s-sway sways, s-pop squashes on change, s-face/s-eyes follow the pointer, s-lid
- * blinks, and the accessory (and its wobbly bits) trails the bob a little later.
+ * motion: s-rig bobs, s-sway sways, s-pop squashes on change and spins (s-fx, the streak round it, behind and in
+ * front), s-face/s-eyes look (at the pointer, around, up while thinking), s-lid blinks, each s-eye changes size and
+ * shape, and the accessory (and its wobbly bits) trails the bob a little later.
  */
-export function Sprocket({ look, size, still, follow, label, seed = look.character }: Props) {
+export function Sprocket({ look, size, still, follow, busy = false, spin = false, label, seed = look.character }: Props) {
   const def = CHARACTERS[look.character];
   const color = COLORS[look.color];
   const motion = useSprocketMotion();
@@ -56,7 +61,12 @@ export function Sprocket({ look, size, still, follow, label, seed = look.charact
   const mounted = useRef(false);
 
   useBlink(lid, !still);
-  useLook(svg, !!follow && live);
+  // Too small to see the eyes move (a 16px mention): they don't look around.
+  useLook(svg, live && size >= 24, { follow, busy });
+
+  useEffect(() => {
+    if (spin && live) twirl(svg.current);
+  }, [spin, live]);
 
   // Squash when the look changes (not on first render).
   useEffect(() => {
@@ -72,6 +82,7 @@ export function Sprocket({ look, size, still, follow, label, seed = look.charact
   const style = {
     "--bob": `${idle.bob}px`,
     "--sway": `${idle.sway}deg`,
+    "--streak-w": `${size <= 40 ? 14 : size <= 90 ? 9 : 7}px`,
     width: size,
     height: (size * VIEW.h) / VIEW.w,
     "--period": `${period.toFixed(2)}s`,
@@ -97,6 +108,7 @@ export function Sprocket({ look, size, still, follow, label, seed = look.charact
       <ellipse className="s-shadow" cx={def.shadow.x} cy={203} rx={def.shadow.half} ry={6} />
       <g className="s-rig">
         <g className="s-sway">
+          {live && <Streak def={def} half="back" />}
           <g className="s-pop" ref={pop}>
             <g fill={color} stroke={def.round ? color : undefined} strokeWidth={def.round} strokeLinejoin="round">
               {def.body.map((p, i) => (
@@ -118,9 +130,28 @@ export function Sprocket({ look, size, still, follow, label, seed = look.charact
               </g>
             )}
           </g>
+          {live && <Streak def={def} half="front" />}
         </g>
       </g>
     </svg>
+  );
+}
+
+/**
+ * Half of the two rings the spin's streaks run along: one round the body's middle, a thinner one higher up. The
+ * back halves are drawn behind the body, the front halves over it. Hidden until twirl() runs a dash along them
+ * (pathLength 100).
+ */
+function Streak({ def, half }: { def: (typeof CHARACTERS)[keyof typeof CHARACTERS]; half: "back" | "front" }) {
+  const arc = (cy: number, rx: number, ry: number) => {
+    const cx = def.shadow.x;
+    return half === "back" ? `M ${cx - rx} ${cy} A ${rx} ${ry} 0 0 1 ${cx + rx} ${cy}` : `M ${cx + rx} ${cy} A ${rx} ${ry} 0 0 1 ${cx - rx} ${cy}`;
+  };
+  return (
+    <g className={`s-fx s-fx-${half}`}>
+      <path className="s-streak-arc" d={arc(def.face.y + 8, def.shadow.half + 18, 14)} pathLength={100} />
+      <path className="s-streak-arc thin" d={arc(def.face.y - 22, def.shadow.half + 6, 11)} pathLength={100} />
+    </g>
   );
 }
 

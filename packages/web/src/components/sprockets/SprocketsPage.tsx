@@ -262,7 +262,7 @@ function Gallery({ list }: { list: SprocketData[] }) {
         {list.map((s) => (
           <li key={s.id}>
             <a className="sp-card" href={href.sprocket(s.id)} title={s.name}>
-              <Sprocket look={s.look} size={84} seed={s.id} />
+              <Sprocket look={s.look} size={84} seed={s.id} busy={s.running} />
               <span className="sp-card-name truncate">{s.name}</span>
               <span className="muted small truncate">{preview(s.direct)}</span>
             </a>
