@@ -34,7 +34,9 @@ function line(m: SprocketMessage): string {
         : e.what === "overlap"
           ? `${who} changed files others changed or own: ${(e.overlaps ?? []).map((o) => `${o.files.join(", ")} (${o.owns ? "owned by" : "also changed by"} "${o.title}")`).join("; ")}`
           : e.what === "finding"
-            ? `${who} ended its turn naming work in others' files: ${(e.findings ?? []).map((f) => `${f.files.join(", ")} ("${f.title}")`).join("; ")}`
+            ? e.findings?.length
+              ? `${who} ended its turn naming work in others' files: ${e.findings.map((f) => `${f.files.join(", ")} ("${f.title}")`).join("; ")}`
+              : `${who} ended its turn naming work for another session: ${clip(m.text)}`
           : e.questions?.length
             ? `${who} asked in a dialog: ${e.questions.map((q) => q.question).join(" / ")}`
             : `${who} waited for your user: ${clip(m.text)}`;

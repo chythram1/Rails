@@ -8,7 +8,8 @@
 // - A dialog Rails doesn't know (a pi extension's, without questions): "a question, an approval or something
 //   else?" Rails never wakes anyone for those.
 // - A turn end that doesn't ask, with other sessions around: "does it name work another session has to do?",
-//   next to findings.ts's rule (ADR 0029). Only ever logged: the rule wakes, so findings work without a model.
+//   next to findings.ts's rule (ADR 0029), asked by findings.ts before it decides. When the model is sure
+//   (FINDING_BAR) its answer decides, otherwise (or with no model, or in shadow) the rule does.
 // - Bounded: a short text per question, a deadline per call, a few calls a minute. Failures are logged.
 // - It may also wake the Coordinator where the rules didn't, when it's sure (ADR 0013): a turn end the rules
 //   thought didn't ask (ACT_ASKS), a dialog it calls a question (ACT_QUESTION). It only adds wakes, never cancels
@@ -19,7 +20,7 @@ import { AGENT, OVERLAP_MS, rel } from "./bridge/board.ts";
 import { ASKING, type SessionEvent } from "./bridge/events.ts";
 import { cardOf, onEvents } from "./bridge/index.ts";
 import { decisions, panels, projects, settings, sprockets } from "./db.ts";
-import { findingsIn } from "./findings.ts";
+import { findingsIn, setFindingJudge, type FindingVerdict } from "./findings.ts";
 import { projectOwners } from "./owners.ts";
 import { ServiceError } from "./errors.ts";
 import { decisionsInShadow } from "./config.ts";
@@ -50,6 +51,13 @@ function bars(): { asks: number; question: number } {
   const asks = decisionThreshold();
   return { asks, question: Math.min(DECISION_THRESHOLD.max, Math.round((asks + DECISION_THRESHOLD.dialogMargin) * 100) / 100) };
 }
+/**
+ * How sure it has to be for its finding answer to decide (ADR 0029), either way. From test run 8's log: it was right
+ * on all five turn ends where it or the rule saw a finding, at 0.78 to 0.92. A wrong wake costs a run the
+ * Coordinator ends quiet; below the bar, the rule decides.
+ */
+export const FINDING_BAR = 0.7;
+
 /** How much of a message's end an event keeps (as watches.ts). */
 const EVENT_TAIL = 600;
 
@@ -122,10 +130,15 @@ const inFlight = new Set<Promise<void>>();
  * Ask the model about one moment, and log its answer next to Rails' own. The entry is made at once (a wake
  * may link to it before the answer comes); the session's title as the user sees it follows.
  */
-async function judge(panel: Panel, item: NonNullable<ReturnType<typeof toJudge>>, position: number): Promise<void> {
+async function judge(
+  panel: Panel,
+  item: NonNullable<ReturnType<typeof toJudge>>,
+  position: number,
+  also: Record<string, ClassifierQuestion> = {},
+): Promise<{ answer: DecisionEntry["answer"]; also: Record<string, ClassifierAnswer | undefined> } | undefined> {
   const ref = settings.get("decisionModel");
   const model = ref ? findClassifier(ref) : undefined;
-  if (!model) return;
+  if (!model) return undefined;
   const { context: extra, ...entry } = item;
   const id = decisions.create({ panelId: panel.id, title: panel.title, kind: panel.kind, ...entry });
   decisions.setTitle(id, await sessionTitle(panel).catch(() => panel.title));
@@ -133,13 +146,15 @@ async function judge(panel: Panel, item: NonNullable<ReturnType<typeof toJudge>>
   while (recent.length && now - recent[0] > 60_000) recent.shift();
   if (recent.length >= MAX_PER_MINUTE) {
     decisions.finish(id, { error: `Skipped: more than ${MAX_PER_MINUTE} a minute.` });
-    return changes.emit();
+    changes.emit();
+    return undefined;
   }
   recent.push(now);
   const { key, question } = QUESTIONS[item.question];
   const state: Record<string, string> = { agent: AGENT[panel.kind], [item.question === "dialog" ? "dialog_title" : "message_end"]: item.text, ...extra };
-  const context: ClassifierContext = { state, questions: { [key]: question } };
+  const context: ClassifierContext = { state, questions: { [key]: question, ...also } };
   const started = Date.now();
+  let out: Awaited<ReturnType<typeof judge>>;
   try {
     const result = await models.classify(model, context, { signal: AbortSignal.timeout(DEADLINE_MS) });
     const latencyMs = Date.now() - started;
@@ -148,14 +163,38 @@ async function judge(panel: Panel, item: NonNullable<ReturnType<typeof toJudge>>
       const answer = readAnswer(item.question, result.answers[key]);
       // pi-ai prices a call at its catalog price, which is 0 for models it has no price for (Jev): no cost then, rather than $0.
       decisions.finish(id, { answer, model: result.model, latencyMs, cost: result.usage?.cost.total || undefined });
-      // A finding's judgment is only logged (ADR 0029): Rails' rule does the waking, with or without a model.
+      // A finding's answer goes back to findings.ts, which wakes (ADR 0029).
       const wake = decisionsInShadow() || item.question === "finding" ? undefined : wakeFor(item, answer, id);
       if (wake) wakeFromModel(panel.id, position, wake);
+      out = { answer, also: Object.fromEntries(Object.keys(also).map((k) => [k, result.answers[k]])) };
     }
   } catch (e) {
     decisions.finish(id, { latencyMs: Date.now() - started, error: (e as Error).message });
   }
   changes.emit();
+  return out;
+}
+
+/**
+ * The decision model's answer about a turn end, for findings.ts (ADR 0029): undefined (the rule decides) without a
+ * model, in shadow, on an error, or when it isn't sure. The same call also asks whether the reply asks the user:
+ * then it's left to that wake (the turn end's own judgment), as the rule leaves the questions it hears.
+ */
+async function judgeFinding(panel: Panel, text: string): Promise<FindingVerdict> {
+  if (!settings.get("decisionModel")) return undefined;
+  const item = await findingToJudge(panel, text);
+  if (!item) return undefined;
+  const p = judge(panel, item, eventPosition(panel.id), { [QUESTIONS.turn_end.key]: QUESTIONS.turn_end.question });
+  const tracked: Promise<void> = p.then(
+    () => undefined,
+    () => undefined,
+  ).finally(() => inFlight.delete(tracked));
+  inFlight.add(tracked);
+  const r = await p;
+  if (!r?.answer || decisionsInShadow()) return undefined;
+  const asks = r.also[QUESTIONS.turn_end.key];
+  if (asks?.type === "bool" && asks.probability >= bars().asks) return "asks";
+  return r.answer.probability >= FINDING_BAR ? (r.answer.label as FindingVerdict) : undefined;
 }
 
 /** The wake a judgment calls for when the model may act: only where the rules didn't wake, only when it's sure. */
@@ -207,24 +246,18 @@ export function startDecisions(): void {
     if (!settings.get("decisionModel") || !sprockets.coordinatorOf(panel.projectId)) return;
     // Where the panel's events are now (the watches have already seen these): a later event makes the judgment stale.
     const position = eventPosition(panel.id);
-    const run = (item: NonNullable<ReturnType<typeof toJudge>>) => {
-      const p = judge(panel, item, position)
+    for (const e of events) {
+      const item = toJudge(e);
+      if (!item) continue;
+      const p: Promise<void> = judge(panel, item, position)
+        .then(() => undefined)
         .catch((err) => console.error("decisions:", err))
         .finally(() => inFlight.delete(p));
       inFlight.add(p);
-    };
-    for (const e of events) {
-      const item = toJudge(e);
-      if (item) run(item);
-      if (e.kind === "turn_end") {
-        const p = findingToJudge(panel, e.text)
-          .then((f) => f && run(f))
-          .catch((err) => console.error("decisions:", err))
-          .finally(() => inFlight.delete(p));
-        inFlight.add(p);
-      }
     }
   });
+  // Turn ends with other sessions around: findings.ts asks before it decides (ADR 0029).
+  setFindingJudge(judgeFinding);
 }
 
 /** Pick the decision model (a classifier `provider/model`), or none to stop. */

@@ -47,6 +47,15 @@ describe("findings (ADR 0029)", () => {
     expect(findingsIn(ui, "audio.js still needs a mute key.")).toEqual([]); // its own file
   });
 
+  it("takes a folder by its owner only, not by files others changed in it (test run 8)", () => {
+    const { project, engine, ui } = setup();
+    receive(ui.id, "pi", "tool", { cwd: project.path, tool: "write", input: { path: "tests/ui.test.js" } });
+    expect(findingsIn(engine, "Gameplay said `node --test tests/` passed, but on Node 24 that form errors.")).toEqual([]);
+    expect(findingsIn(engine, "tests/ui.test.js still expects the old shop click, which is wrong now.")).toEqual([{ panelId: ui.id, files: ["tests/ui.test.js"] }]);
+    setOwner(project, ui, ["src/ui"]);
+    expect(findingsIn(engine, "Everything under src/ui/ still draws at the old offsets, which is wrong.")).toEqual([{ panelId: ui.id, files: ["src/ui"] }]);
+  });
+
   it("goes by who owns a path too, even one its owner hasn't changed lately", () => {
     const { project, engine, ui } = setup();
     setOwner(project, ui, ["src/ui"]);

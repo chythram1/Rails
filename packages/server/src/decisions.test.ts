@@ -5,6 +5,7 @@ import { panels, projects, settings, sprockets } from "./db.ts";
 import { ACT_ASKS, ACT_QUESTION, decisionLog, settled, setDecisionModel, setDecisionThreshold, startDecisions, toJudge, wakeFor } from "./decisions.ts";
 import { models, modelSettings, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
+import { turnEnded } from "./findings.ts";
 import { createSprocket, listMessages, projectChat, updateSettings } from "./sprockets.ts";
 import { GRACE_MS, startWatches } from "./watches.ts";
 
@@ -263,5 +264,48 @@ describe("the decision model waking the Coordinator (ADR 0013)", () => {
     await idle();
     expect(listMessages(projectChat(lead.id))[0].event).toMatchObject({ what: "question", byModel: true });
     expect(prompt).toContain("You can't suggest answers to dialogs Rails doesn't know");
+  });
+});
+
+describe("the decision model on findings (ADR 0029)", () => {
+  const RUNNER = "Added the Boiler Runner from wave 5. All 105 tests pass.\n\nUI handoff: add `runner: 'Boiler Runners'` to its roster label map.";
+  const finds = (p: number, asksUser = 0.05) => () => ({ answers: { names_work_for_another: { type: "bool" as const, probability: p }, asks_user: { type: "bool" as const, probability: asksUser } } });
+  function team() {
+    const { project: p, panel } = project();
+    const ui = panels.create({ projectId: p.id, kind: "pi", title: "UI" });
+    return { panel, ui, chat: () => listMessages(projectChat(sprockets.coordinatorOf(p.id)!.id)) };
+  }
+
+  it("wakes the Coordinator for work the reply names without a file, when the model is sure", async () => {
+    settings.set("decisionModel", "judge/judge-1");
+    answer = finds(0.78);
+    const { panel, chat } = team();
+    expect(await turnEnded(panel, RUNNER)).toBe(true);
+    expect(chat().at(-1)).toMatchObject({ author: "event", event: { what: "finding", findings: [] } });
+    // It asked both questions in one call, with the other sessions as context.
+    expect(Object.keys(asked.at(-1)!.questions)).toEqual(["names_work_for_another", "asks_user"]);
+    expect(asked.at(-1)!.state.other_sessions).toContain('"UI" (pi)');
+  });
+
+  it("leaves it to the rule when it isn't sure, fails, or only shadows; and to the question's wake when it hears one", async () => {
+    settings.set("decisionModel", "judge/judge-1");
+    answer = finds(0.6);
+    expect(await turnEnded(team().panel, RUNNER)).toBe(false); // unsure, and the rule sees no file
+    answer = () => ({ stopReason: "error", errorMessage: "overloaded" });
+    expect(await turnEnded(team().panel, RUNNER)).toBe(false);
+    answer = finds(0.95, 0.95);
+    expect(await turnEnded(team().panel, RUNNER)).toBe(false); // it asks the user: that wake covers it
+    process.env.RAILS_DECISIONS = "shadow";
+    answer = finds(0.95);
+    expect(await turnEnded(team().panel, RUNNER)).toBe(false);
+    expect(decisionLog().entries.filter((e) => e.question === "finding").length).toBeGreaterThanOrEqual(4); // all logged
+  });
+
+  it("works without a model, by the rule alone", async () => {
+    const { panel, ui, chat } = team();
+    receive(ui.id, "pi", "tool", { cwd: projects.get(panel.projectId)!.path, tool: "write", input: { path: "src/ui/hud.js" } });
+    expect(await turnEnded(panel, "Done. hud.js still sends the old speed payload, which the engine ignores now.")).toBe(true);
+    expect(asked).toHaveLength(0);
+    expect(chat().at(-1)!.event).toMatchObject({ what: "finding", findings: [{ panelId: ui.id, files: ["src/ui/hud.js"] }] });
   });
 });

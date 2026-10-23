@@ -10,7 +10,11 @@
 //   already wrote to lately (ADR 0018) or has a handoff planned to (ADR 0015), and once per pair and file per
 //   OVERLAP_MS.
 // Then the Coordinator wakes with a finding event: it drafts a message for that session, or replies (quiet).
-// The decision model, when one is set, judges each turn end the same way in shadow (decisions.ts), to tune this.
+// The decision model is optional. When one is set (decisions.ts registers a judge), it's asked first, and its
+// answer decides when it's sure: a finding wakes the Coordinator even with no file named (test run 8's "add
+// `runner` to its roster label map"), no finding stops the rule's wake (run 8's `tests/` in a command), and a reply
+// it hears asking the user is left to that wake. When it isn't sure, fails, times out, or there's no model (or
+// RAILS_DECISIONS=shadow), the rule decides: at worst a wake comes a few seconds later.
 import { basename } from "node:path";
 import type { Panel, SprocketEvent } from "@rails/shared";
 import { OVERLAP_MS, rel } from "./bridge/board.ts";
@@ -35,6 +39,15 @@ const CUE =
 
 /** The sentences of a reply, roughly: lines, then sentence ends. */
 const sentences = (text: string) => text.split(/\n+|(?<=[.!?])\s+/).filter((s) => s.trim());
+
+/** The decision model's answer about a turn end (decisions.ts), or undefined to leave it to the rule. */
+export type FindingVerdict = "finding" | "no finding" | "asks" | undefined;
+let judge: ((panel: Panel, text: string) => Promise<FindingVerdict>) | undefined;
+
+/** The decision model's judge for turn ends (decisions.ts); without one, the rule decides alone. */
+export function setFindingJudge(fn: typeof judge): void {
+  judge = fn;
+}
 
 export interface Finding {
   panelId: string;
@@ -66,13 +79,14 @@ export function findingsIn(reporter: Panel, text: string, now = Date.now()): Fin
       const raw = token.replace(/^\.\//, "").replace(/[.,:;)]+$/, "");
       if (!raw) continue;
       if (raw.includes("/")) {
-        // A path: by who owns it, and by who changed it (or a file under it) lately.
+        // A path: by who owns it, and by who changed that very file lately. A folder goes by its owner only: the
+        // files several sessions changed under one (`tests/` in a command) say nothing about whose it is.
         const relPath = ownedPath(project, raw);
         if (!relPath) continue;
         const owner = ownerOf(project.id, relPath);
         if (owner) add(owner, relPath);
         else for (const o of owned) if (o.paths.some((p) => p === relPath || p.startsWith(relPath + "/"))) add(o.panelId, relPath);
-        for (const [id, files] of changed) for (const f of files) if (f === relPath || f.startsWith(relPath + "/")) add(id, f);
+        for (const [id, files] of changed) if (files.includes(relPath)) add(id, relPath);
       } else {
         // A bare file name: only by who changed a file of that name lately (a name alone says nothing about owners).
         for (const [id, files] of changed) for (const f of files) if (basename(f) === raw) add(id, f);
@@ -92,18 +106,30 @@ function covered(reporter: Panel, otherId: string, now: number): boolean {
 /** Which pairs were reported for which file, when: once per OVERLAP_MS. */
 const reported = new Map<string, number>();
 
-/** A turn end from `panel`: wake its project's Coordinator for what it found in other sessions' files, if anything. */
-export async function noteFinding(panel: Panel, text: string, now = Date.now()): Promise<boolean> {
-  if (panel.kind === "shell" || !text.trim() || looksLikeQuestion(text)) return false;
+/**
+ * A turn end from `panel`: wake its project's Coordinator for what it found in other sessions' files, if anything.
+ * `verdict` is the decision model's answer (see the top of this file); undefined leaves it to the rule.
+ */
+export async function noteFinding(panel: Panel, text: string, now = Date.now(), verdict?: FindingVerdict): Promise<boolean> {
+  if (panel.kind === "shell" || !text.trim() || looksLikeQuestion(text) || verdict === "asks" || verdict === "no finding") return false;
   const coordinator = sprockets.coordinatorOf(panel.projectId);
   if (!coordinator) return false;
-  const fresh = findingsIn(panel, text, now)
+  const found = findingsIn(panel, text, now);
+  // The model heard work for another session, and the reply names none of their files: Rails can't tell whose it
+  // is, so the Coordinator reads the reply. Once per turn end; the agent's own messages show in its chat already.
+  if (verdict === "finding" && !found.length) return post(coordinator.id, panel, text, []);
+  const fresh = found
     .filter((f) => !covered(panel, f.panelId, now))
     .map((f) => ({ ...f, files: f.files.filter((file) => now - (reported.get(`${panel.id} ${f.panelId} ${file}`) ?? -Infinity) >= OVERLAP_MS) }))
     .filter((f) => f.files.length);
   if (!fresh.length) return false;
   if (reported.size > 1000) for (const [k, at] of reported) if (now - at >= OVERLAP_MS) reported.delete(k);
   for (const f of fresh) for (const file of f.files) reported.set(`${panel.id} ${f.panelId} ${file}`, now);
+  return post(coordinator.id, panel, text, fresh);
+}
+
+/** Post the finding event in the project chat, which wakes the Coordinator. */
+async function post(coordinatorId: string, panel: Panel, text: string, fresh: Finding[]): Promise<boolean> {
   const title = await sessionTitle(panel);
   const findings = await Promise.all(
     fresh.flatMap((f) => {
@@ -113,16 +139,23 @@ export async function noteFinding(panel: Panel, text: string, now = Date.now()):
   );
   const event: SprocketEvent = { panelId: panel.id, kind: panel.kind, title, ...(panel.sessionId ? { sessionId: panel.sessionId } : {}), what: "finding", findings };
   // Still this project's Coordinator (the lookups took a moment)?
-  const now2 = sprockets.get(coordinator.id);
-  if (!now2?.coordinator || now2.projectId !== panel.projectId) return false;
-  postEvent(coordinator.id, event, text.length > TAIL ? "…" + text.slice(-TAIL) : text);
+  const still = sprockets.get(coordinatorId);
+  if (!still?.coordinator || still.projectId !== panel.projectId) return false;
+  postEvent(coordinatorId, event, text.length > TAIL ? "…" + text.slice(-TAIL) : text);
   return true;
+}
+
+/** A turn end: ask the decision model first when there is one, then decide (see the top of this file). */
+export async function turnEnded(panel: Panel, text: string): Promise<boolean> {
+  if (panel.kind === "shell" || !text.trim() || looksLikeQuestion(text) || !sprockets.coordinatorOf(panel.projectId)) return false;
+  const verdict = judge ? await judge(panel, text).catch(() => undefined) : undefined;
+  return noteFinding(panel, text, Date.now(), verdict);
 }
 
 /** Follow every session's turn ends. */
 export function startFindings(): void {
   onEvents((panel, events: SessionEvent[]) => {
-    for (const e of events) if (e.kind === "turn_end") void noteFinding(panel, e.text).catch((err) => console.error("findings:", err));
+    for (const e of events) if (e.kind === "turn_end") void turnEnded(panel, e.text).catch((err) => console.error("findings:", err));
   });
   onPanelForgotten((id) => {
     for (const k of reported.keys()) if (k.includes(id)) reported.delete(k);
