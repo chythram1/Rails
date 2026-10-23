@@ -1,9 +1,10 @@
-// A Sprocket's toolbox (ADR 0025): MCP tools as capabilities (allowed, asked or off), approvals, and skills.
+// A Sprocket's toolbox (ADR 0025): MCP tools as capabilities (allowed, asked or off), ask tools' calls on cards
+// (ADR 0031), approvals, and skills.
 import { fauxAssistantMessage, fauxProvider, fauxToolCall, type TranscriptContext } from "@earendil-works/pi-ai";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { decideApproval } from "./approvals.ts";
-import { projects, settings, sprocketRuns } from "./db.ts";
+import { projects, settings, sprocketMessages, sprocketRuns } from "./db.ts";
 import { createServer, disconnectAll, testServer, updateServer } from "./mcp.ts";
 import { models, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
@@ -50,39 +51,44 @@ describe("MCP tools", () => {
     expect(listMessages(chat).at(-1)?.text).toBe("You have one note: Buy milk.");
   });
 
-  it("turns a call to an ask tool into an approval; allowing runs it and the Sprocket goes on with the result", async () => {
+  it("puts a call to an ask tool on a card instead of running it; the turn goes on, and calls share one card", async () => {
     const { server, chat } = await withNotes();
-    faux.setResponses([script(`await tools.${server.name}_add_note({ text: "Call Ada" })`), fauxAssistantMessage("Not reached: the turn ends with the approval.")]);
-    sendMessage(chat, "add a note to call Ada");
+    let result = "";
+    faux.setResponses([
+      script(`await tools.${server.name}_add_note({ text: "Call Ada" }); text(await tools.${server.name}_add_note({ text: "Email Bo" }))`),
+      (c) => ((result = lastResult(c)), fauxAssistantMessage("Both are on the card for you.")),
+    ]);
+    sendMessage(chat, "add notes for Ada and Bo");
     await idle();
-    const card = listMessages(chat).at(-1)!;
-    expect(card.approval).toEqual({ serverId: server.id, server: server.name, tool: "add_note", args: { text: "Call Ada" }, status: "pending" });
-    expect(sprocketRuns.list(["waiting"], chat)).toHaveLength(1);
-    expect(faux.getPendingResponseCount()).toBe(1);
-
-    let told = "";
-    faux.setResponses([(c) => ((told = seen(c)), fauxAssistantMessage("Done: it's note 2."))]);
-    await decideApproval(card.id, true);
-    await idle();
-    expect(listMessages(chat).find((m) => m.id === card.id)?.approval).toMatchObject({ status: "done", result: "Added note 2." });
-    expect(told).toContain("Your user allowed it.");
-    expect(told).toContain("Added note 2.");
-    expect(listMessages(chat).at(-1)?.text).toBe("Done: it's note 2.");
+    const card = listMessages(chat).find((m) => m.card)!;
+    expect(card.card).toMatchObject({ title: `Wants to use ${server.name}`, blocks: [] });
+    expect(card.card!.actions!.map((a) => [a.tool, a.args, a.status])).toEqual([
+      ["add_note", { text: "Call Ada" }, "waiting"],
+      ["add_note", { text: "Email Bo" }, "waiting"],
+    ]);
+    expect(result).toContain("Put on a card for your user to run or skip");
+    expect(listMessages(chat).at(-1)?.text).toBe("Both are on the card for you.");
+    expect(listMessages(chat).some((m) => m.approval)).toBe(false);
     expect(sprocketRuns.list(["waiting"], chat)).toHaveLength(0);
-    await expect(decideApproval(card.id, true)).rejects.toThrow("already decided");
   });
 
-  it("tells the Sprocket a denied call didn't run", async () => {
-    const { server, chat } = await withNotes();
-    faux.setResponses([script(`await tools.${server.name}_add_note({ text: "x" })`)]);
-    sendMessage(chat, "add x");
-    await idle();
-    const card = listMessages(chat).at(-1)!;
+  it("still decides an approval made before cards that act: allowing runs it, denying tells the Sprocket", async () => {
+    const { server, chat, s } = await withNotes();
+    const ask = (text: string) =>
+      sprocketMessages.create(chat, "sprocket", "", undefined, { sprocketId: s.id, approval: { serverId: server.id, server: server.name, tool: "add_note", args: { text }, status: "pending" } });
+    const yes = ask("Call Ada");
     let told = "";
-    faux.setResponses([(c) => ((told = seen(c)), fauxAssistantMessage("Ok, I won't."))]);
-    await decideApproval(card.id, false);
+    faux.setResponses([(c) => ((told = seen(c)), fauxAssistantMessage("Done: it's note 2."))]);
+    await decideApproval(yes.id, true);
     await idle();
-    expect(listMessages(chat).find((m) => m.id === card.id)?.approval?.status).toBe("denied");
+    expect(listMessages(chat).find((m) => m.id === yes.id)?.approval).toMatchObject({ status: "done", result: "Added note 2." });
+    expect(told).toContain("Your user allowed it.");
+    await expect(decideApproval(yes.id, true)).rejects.toThrow("already decided");
+    const no = ask("x");
+    faux.setResponses([(c) => ((told = seen(c)), fauxAssistantMessage("Ok, I won't."))]);
+    await decideApproval(no.id, false);
+    await idle();
+    expect(listMessages(chat).find((m) => m.id === no.id)?.approval?.status).toBe("denied");
     expect(told).toContain("Your user denied it: it didn't run.");
   });
 

@@ -373,6 +373,8 @@ const toolOf = (t: Tool): StoredTool => ({
   description: (t.description ?? "").slice(0, 2000),
   inputSchema: t.inputSchema ?? { type: "object" },
   readOnly: t.annotations?.readOnlyHint === true,
+  // Only when it says so: MCP's default (destructive unless marked otherwise) would ask twice for every write.
+  ...(t.annotations?.destructiveHint === true && t.annotations?.readOnlyHint !== true ? { destructive: true } : {}),
 });
 
 /** A connection to the server, opened (and its tools listed and kept) if there's none. */

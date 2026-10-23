@@ -536,8 +536,32 @@ export const ASK_OPTIONS_MAX = 4;
  */
 export interface SprocketCard {
   title?: string;
+  /** None only when it has actions. */
   blocks: CardBlock[];
+  /** Calls to its MCP tools the user runs or skips (ADR 0031), in order. */
+  actions?: SprocketCardAction[];
 }
+
+/**
+ * A call a card offers (ADR 0031): a tool of one of the Sprocket's MCP servers, with the arguments it filled in. The
+ * user's Run is the approval; Rails makes the call on the server and keeps what came of it here.
+ */
+export interface SprocketCardAction {
+  label: string;
+  serverId: string;
+  server: string;
+  tool: string;
+  args: Record<string, unknown>;
+  /** The server marks the tool destructive (its `destructiveHint`): Run asks once more. */
+  destructive?: boolean;
+  status: CardActionStatus;
+  /** What the call returned (trimmed), or why it failed. */
+  result?: string;
+}
+export type CardActionStatus = "waiting" | "running" | "done" | "failed" | "skipped";
+export const CARD_ACTIONS_MAX = 5;
+/** An action is settled once it ran (done or failed) or was skipped. */
+export const actionSettled = (a: SprocketCardAction) => a.status !== "waiting" && a.status !== "running";
 export type CardBlock =
   | { type: "text"; text: string }
   | { type: "table"; columns: string[]; rows: string[][] }
@@ -583,7 +607,8 @@ export function cardText(card: SprocketCard): string {
         return "```diff\n" + (b.file ? `${b.file}\n` : "") + b.diff + "\n```";
     }
   });
-  return [card.title, ...parts].filter(Boolean).join("\n\n");
+  const actions = (card.actions ?? []).map((a) => `- ${a.label} (${a.server} ${a.tool})`);
+  return [card.title, ...parts, ...(actions.length ? [`Actions:\n${actions.join("\n")}`] : [])].filter(Boolean).join("\n\n");
 }
 
 /** A question a session asked the user in a dialog (Claude Code's AskUserQuestion, a pi question tool). */

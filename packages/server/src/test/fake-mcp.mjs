@@ -1,5 +1,5 @@
 // A tiny MCP server over stdio for tests and checks (ADR 0025): a notes store with a read-only tool and an acting
-// one. `node fake-mcp.mjs`; FAKE_MCP_FAIL=1 makes it exit at once, FAKE_MCP_TOKEN is echoed by whoami.
+// one (and a destructive one). `node fake-mcp.mjs`; FAKE_MCP_FAIL=1 makes it exit at once, FAKE_MCP_TOKEN is echoed by whoami.
 import { createInterface } from "node:readline";
 
 if (process.env.FAKE_MCP_FAIL) {
@@ -19,6 +19,12 @@ const tools = [
     name: "add_note",
     description: "Add a note.",
     inputSchema: { type: "object", properties: { text: { type: "string", description: "The note." } }, required: ["text"] },
+  },
+  {
+    name: "clear_notes",
+    description: "Delete every note.",
+    inputSchema: { type: "object", properties: {} },
+    annotations: { destructiveHint: true },
   },
   {
     name: "whoami",
@@ -50,6 +56,7 @@ createInterface({ input: process.stdin }).on("line", (line) => {
         notes.push({ id: notes.length + 1, text: String(args.text) });
         return send({ id: m.id, result: text(`Added note ${notes.length}.`) });
       }
+      if (name === "clear_notes") return send({ id: m.id, result: text(`Deleted ${notes.splice(0).length} notes.`) });
       if (name === "whoami") return send({ id: m.id, result: text(`token=${process.env.FAKE_MCP_TOKEN ?? "none"} rails=${process.env.RAILS_TOKEN ?? "none"}`) });
       return send({ id: m.id, error: { code: -32602, message: `Unknown tool ${name}` } });
     }

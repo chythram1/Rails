@@ -69,6 +69,8 @@ Consequences:
   Their marks come from simple-icons (CC0), copied in rather than installed.
 - **Customize is a page of cards** with Connectors, Skills and Prompts tabs, each with Yours and Discover (Rails'
   connectors; the user's agents' skills to copy in). One item opens full width in its place.
+- **Amended by ADR 0031** (cards that act): in direct and team chats an ask tool's call goes on a card as an action
+  the user runs or skips, and the turn goes on, instead of ending the turn with an approval.
 - **Fewer fields to fill in** (added after researching other apps, `scratch/research/customize/findings.md`).
   Google's MCP servers let no app register itself (no dynamic registration, no client metadata documents), and every
   self-hosted app (n8n, Home Assistant) has users register their own; one-click sign-in would need an app the Rails

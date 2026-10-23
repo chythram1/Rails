@@ -359,7 +359,7 @@ export function SprocketChat({
                         {m.card && (
                           <>
                             <span className="sr-only">{by?.name ?? "A deleted Sprocket"} showed a card:</span>
-                            <Card card={m.card} />
+                            <Card card={m.card} messageId={m.id} />
                           </>
                         )}
                         {m.approval && <ApprovalCard messageId={m.id} approval={m.approval} name={by?.name ?? "A deleted Sprocket"} />}

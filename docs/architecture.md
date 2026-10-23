@@ -97,9 +97,12 @@ packages/
     reaches browsers as `McpServer.signIn` (with `customize.changed`).
   - **Tools in runs** (`harness/mcpTools.ts`): a Sprocket's servers (`sprocket_tools`) become capabilities named
     `<server>_<tool>`, in direct and team chats only. Results are labelled as data from the server, cut at 20,000
-    characters. An ask tool ends the turn with an **approval** (a message with `approval`, the run `waiting`);
-    `POST /api/approvals/:messageId` (`approvals.ts`) allows (Rails calls it and stores the result) or denies, then
-    queues the Sprocket's next run (trigger `approval`), which sees what came of it as Rails' note.
+    characters. An ask tool's call doesn't run: it goes on a card as an **action** (ADR 0031; the run's calls share
+    one card, `card.actions`), and the turn goes on. `POST /api/cards/:messageId/actions` (`cardActions.ts`, body
+    `{ index?, run }`) runs one (Rails re-checks the policy and calls it on the server, keeping the result) or skips
+    it, or all still waiting; once every action is settled, the Sprocket that proposed them gets one run (trigger
+    `actions`), which sees what came of each as Rails' note on the card. Older **approvals** (a message with
+    `approval`, the run `waiting`) still decide through `POST /api/approvals/:messageId` (`approvals.ts`).
   - **Skills** (`skills.ts`): `RAILS_HOME/skills/<id>/SKILL.md` folders, written in Customize or copied in from
     `~/.agents/skills`, `~/.claude/skills`, `~/.pi/agent/skills` or the native folder picker (no symlinks, at most 200
     files and 5 MB). A Sprocket's skills are listed in its instructions in every chat, and `read_skill`

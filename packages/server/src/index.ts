@@ -24,6 +24,7 @@ import { createPrompt, deletePrompt, listPrompts, updatePrompt } from "./customi
 import { addConnector, cancelSignIn as cancelMcpSignIn, createServer, deleteServer, disconnectAll, listApps, listServers, pasteSignIn, setApp, signOut, startSignIn as startMcpSignIn, testServer, updateServer } from "./mcp.ts";
 import { createSkill, deleteSkill, importSkill, listSkills, skillSources, updateSkill } from "./skills.ts";
 import { decideApproval } from "./approvals.ts";
+import { actOnCard } from "./cardActions.ts";
 import { closePanel, getWorkspace, openPanel, saveLayout } from "./panels.ts";
 import { ServiceError } from "./errors.ts";
 import { attachPickedFolder, attachProject, detachProject, getProject, listProjectSessions, recentFolders } from "./projects.ts";
@@ -247,6 +248,10 @@ app.post("/api/skills", async (c) => c.json(createSkill(await c.req.json<SkillIn
 app.put("/api/skills/:id", async (c) => c.json(updateSkill(c.req.param("id"), await c.req.json<SkillInput>())));
 app.delete("/api/skills/:id", (c) => {
   deleteSkill(c.req.param("id"));
+  return c.json({ ok: true });
+});
+app.post("/api/cards/:id/actions", async (c) => {
+  await actOnCard(c.req.param("id"), await c.req.json<{ index?: unknown; run?: unknown }>());
   return c.json({ ok: true });
 });
 app.post("/api/approvals/:id", async (c) => {

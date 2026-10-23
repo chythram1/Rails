@@ -1,57 +1,58 @@
 # ADR 0031: Cards that act
 
-Status: proposed (builds on ADR 0024's cards and ADR 0025's connectors and approvals).
+Status: accepted (builds on ADR 0024's cards; changes how ADR 0025's ask tools reach the user in direct and team
+chats).
 
-A Sprocket's card could only show things. To act on a connector it called the tool itself (an allow tool) or
-asked for it with an approval card (an ask tool): one call per run, its turn ended while it waited, and the
-user saw one call at a time. "Make these three Linear issues" meant three approvals across three runs, or
-three calls the user never saw before they ran.
+To act on a connector, a Sprocket called the tool itself (an allow tool) or asked for it with an approval card (an
+ask tool): one call per run, its turn ended while it waited, and the user saw one call at a time. "Add notes for
+Ada and Bo" became one approval, or one note with both in it ("I can add one note at a time").
 
-Other chat products put actions on what they show: ChatGPT's cards and its apps' widgets (a widget calls its
-app's tools; a write tool is confirmed), Notion AI's propose-then-save, and MCP Apps, the MCP extension that
-lets a connector ship its own interactive view. We looked at OpenUI again (still 1.0.1): its buttons run
-tool calls in the browser, and the button the model wrote is the only authorization ("restricted slots are not
-enforced yet"); its install telemetry is still on by default. Research: `scratch/research/intelligent-ui/
-cards-that-act.md`.
+Other chat products put actions where they show things: ChatGPT's apps (a widget calls its app's tools; a write
+tool is confirmed with its arguments shown), Notion AI's propose-then-save, and MCP Apps, the MCP extension that
+lets a connector ship its own view. We looked at OpenUI again (still 1.0.1): its buttons run tool calls in the
+browser, and the button the model wrote is the only authorization ("restricted slots are not enforced yet"); its
+install telemetry is still on by default. Research: `scratch/research/intelligent-ui/cards-that-act.md`.
 
 Decisions:
-- **A card can end with actions**: one to five, each a call to a tool of one of the Sprocket's connectors (a
-  tool that isn't off), with arguments the Sprocket fills in, and a short label ("Create 'Fix login timeout'").
-  `show_card` takes them as `actions: [{ label, server, tool, args }]`. Rails checks each when the card is
-  shown: the server is in the Sprocket's toolbox, the tool exists and isn't off, and the arguments fit the
-  tool's input schema; a card with an action that doesn't fit isn't shown, and the Sprocket hears why.
-- **Each action shows what it will do** under its label: the service, the tool, and its arguments, the way
-  the approval card shows them. The user can **Run** it or **Skip** it; with more than one waiting, **Run all**.
-- **Tapping Run is the approval.** The card has shown the exact call, so an ask tool needs no second card.
-  Rails checks again at the tap (the server still there, still in the toolbox, the tool not turned off since)
-  and makes the call on the server, as `approvals.ts` does; nothing runs in the browser. A tool marked
-  destructive (`destructiveHint`, now kept beside `readOnlyHint`) asks once more on the button itself
-  ("Delete it?"). Rails' approval card works this way already, and connector hosts treat a write that the user
-  confirmed with its arguments shown as approved (ChatGPT's apps confirm once per write tool).
-- **Arguments are read-only.** To change one, the user says so in the chat and the Sprocket shows a new card.
-  Approval cards in Rails, ChatGPT and Claude all show a call's arguments without editing them; an editor built
-  from an arbitrary JSON schema (nested objects, arrays) is new and untested ground, so it waits until a real
-  need shows which fields are worth editing.
-- **The Sprocket goes on once, when the card is settled**: every action run (done or failed) or skipped. One
-  new turn sees all the results, as Claude collects the answers to several questions before sending them. If
-  the user writes first, that turn sees what has run so far, and the card's remaining actions stay. A card is a
-  message, not a waiting run: showing one doesn't end the turn, and nothing waits in memory.
-- **Results stay on the card**: each action's state (waiting, running, done, failed, skipped) and what the call
-  returned (trimmed, as approvals keep it). A double tap or a second device can't run an action twice.
-- **Actions don't expire**: they stay until run, skipped, or the chat is cleared; the check at the tap covers
-  what changed meanwhile.
-- **Where**: direct and team chats, where cards are (in a team, the member that showed the card goes on). Not
-  the project chat, whose drafts already have Send, Edit and Dismiss.
-- **Replies stay `ask_user`.** Buttons that only answer ("More like this") are `ask_user`'s options, which
-  already wait, route to the asker in teams and show as tappable replies; cards don't get a second kind.
-- **Not now**: hosting MCP Apps (a connector's own view: a second origin for the sandbox, a content policy and
-  a message bridge; first check that a connected server ships one), OpenUI, live cards.
+- **An ask tool's call goes on a card** in direct and team chats. Calling it doesn't run it: Rails posts a card,
+  "Wants to use <server>", with the call as an action, and the turn goes on. The run's further calls join that card
+  (up to 5; then a new one). In a team the card is the member's that called it. The project chat has no MCP tools
+  (ADR 0025), so approvals are what's left of the old path there: never, today; old pending approvals still decide.
+- **One route, not two.** We first also let `show_card` take actions. Live, models picked between the two routes
+  unevenly (a team member asked for an approval in 2 of 4 tries where the direct chat used a card 4 of 4), and when
+  both were offered they used both, so the same calls showed on two cards. With the tool call as the only route,
+  12 of 12 live tries gave one card with every call, the same in a direct chat and a team. `show_card` stays
+  read-only (ADR 0024). An allow tool still runs when called: that's what allow means.
+- **Each action shows what it will do**: a label (the tool's title, "Add note"), the service and tool, and its
+  arguments, checked against the tool's schema when it was called. The user can **Run** or **Skip** each; with more
+  than one waiting, **Run all** runs them in order.
+- **Tapping Run is the approval.** The card has shown the exact call, so nothing asks again. Rails checks at the tap
+  (the server still there, still in the Sprocket's toolbox, the tool not turned off since) and makes the call on the
+  server, as `approvals.ts` did; nothing runs in the browser. A tool its server marks destructive
+  (`destructiveHint: true`, kept as `destructive` on stored tools) asks once more on the button ("Yes, run it").
+  Only an explicit hint counts: MCP's default (destructive unless marked otherwise) would ask twice for every write.
+- **Arguments are read-only.** To change one, the user says so and the Sprocket proposes again. Approval prompts in
+  Rails, ChatGPT and Claude all show a call's arguments without editing them; an editor for any tool's schema
+  (nested objects, lists) is untested ground, so it waits until a real need shows which fields to edit.
+- **The Sprocket goes on once, when the card is settled**: every action run (done or failed) or skipped. One new run
+  (trigger `actions`) sees all the results, the same in both kinds of chat: in a team, the member whose card it is,
+  outside any round (no go-round or hand-on reminders, ADR 0023). If the user writes first, that run sees what has
+  run so far, and the card's remaining actions stay. Nothing waits in memory: the card is the record.
+- **Results stay on the card**: each action's state (waiting, running, done, failed, skipped) and the first 4000
+  characters of what it returned. A double tap or a second device can't run an action twice. Settled actions fold to
+  one line (label, first text argument, outcome).
+- **Actions don't expire**: they stay until run, skipped, or the chat is cleared; the check at the tap covers what
+  changed meanwhile.
+- **Not now**: hosting MCP Apps (a connector's own view: a second origin for the sandbox, a content policy and a
+  message bridge; first check that a connected server ships one), OpenUI, live cards, reply buttons on cards (answers
+  are `ask_user`'s options).
 
 Consequences:
-- "Make these three issues" is one card, three visible calls, Run all, and one reply about what came of it.
-- An action is as safe as an approval: the user saw the call, Rails re-checks policy at the tap, the server
-  makes it. An allow tool on a card still waits for the tap; the Sprocket can call it itself when it shouldn't.
+- "Add these three notes" is one card, three visible calls, Run all, and one reply about what came of it.
+- An action is as safe as an approval was: the user saw the call, Rails re-checks policy at the tap, the server
+  makes it.
+- A Sprocket can't title a card of actions or put context on it; it says what they're for in its message, or shows a
+  read-only card first.
 - Fixing a typo in an argument costs a message and a new card.
-- New: `SprocketCardAction` in `shared` (on the card, with its state), the `actions` schema in
-  `harness/cards.ts`, a service beside `approvals.ts` with a route, the action rows in `sprockets/Card.tsx`, and
-  `destructive` on stored MCP tools.
+- Code: `SprocketCardAction` in `shared` (on the card), `propose` in `runs.ts` (from `harness/mcpTools.ts`),
+  `cardActions.ts` with `POST /api/cards/:messageId/actions` (`{ index?, run }`), `sprockets/CardActions.tsx`.

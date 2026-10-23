@@ -44,6 +44,7 @@ describe("MCP servers", () => {
     expect(tested.tools.map((t) => [t.name, t.readOnly, t.policy])).toEqual([
       ["list_notes", true, "allow"],
       ["add_note", false, "ask"],
+      ["clear_notes", false, "ask"],
       ["whoami", true, "allow"],
     ]);
     expect(await callTool(s.id, "add_note", { text: "Call Ada" })).toEqual({ text: "Added note 2.", isError: false });
@@ -52,7 +53,7 @@ describe("MCP servers", () => {
     // Its own variables reach it; Rails' don't.
     expect((await callTool(s.id, "whoami", {})).text).toBe("token=t0k rails=none");
     // Settings change per tool, only for tools it has.
-    expect(updateServer(s.id, { policies: { add_note: "allow", list_notes: "off" } }).tools.map((t) => t.policy)).toEqual(["off", "allow", "allow"]);
+    expect(updateServer(s.id, { policies: { add_note: "allow", list_notes: "off" } }).tools.map((t) => t.policy)).toEqual(["off", "allow", "ask", "allow"]);
     expect(() => updateServer(s.id, { policies: { nope: "allow" } })).toThrow("no tool called nope");
   });
 

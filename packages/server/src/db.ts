@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { DecisionEntry, Handoff, Panel, PanelKind, Project, Sprocket, SprocketApproval, SprocketAsk, SprocketAuthor, SprocketCard, SprocketChatKind, SprocketEvent, SprocketLook, SprocketMessage, SavedPrompt, Suggestion } from "@rails/shared";
+import type { DecisionEntry, Handoff, Panel, PanelKind, Project, Sprocket, SprocketApproval, SprocketAsk, SprocketAuthor, SprocketCard, SprocketCardAction, SprocketChatKind, SprocketEvent, SprocketLook, SprocketMessage, SavedPrompt, Suggestion } from "@rails/shared";
 import { RAILS_HOME } from "./config.ts";
 
 const db = new DatabaseSync(join(RAILS_HOME, "rails.db"));
@@ -745,6 +745,10 @@ export const sprocketMessages = {
     return (db.prepare("SELECT run_id FROM sprocket_messages WHERE id = ?").get(id) as { run_id: string | null } | undefined)?.run_id ?? undefined;
   },
   /** Record what came of an approval (ADR 0025). */
+  /** Replace a card's actions (ADR 0031): the card is the record of what ran. */
+  setCardActions(id: string, actions: SprocketCardAction[]): void {
+    db.prepare("UPDATE sprocket_messages SET card = json_set(card, '$.actions', json(?)) WHERE id = ? AND card IS NOT NULL").run(JSON.stringify(actions), id);
+  },
   setApproval(id: string, approval: SprocketApproval): void {
     db.prepare("UPDATE sprocket_messages SET approval = ? WHERE id = ?").run(JSON.stringify(approval), id);
   },
@@ -763,7 +767,7 @@ export const sprocketMessages = {
 
 export type RunStatus = "queued" | "running" | "waiting" | "done" | "failed" | "cancelled";
 /** `approval`: the user allowed or denied an MCP call the Sprocket asked for (ADR 0025). */
-export type RunTrigger = "user" | "pass" | "event" | "approval";
+export type RunTrigger = "user" | "pass" | "event" | "approval" | "actions";
 type RunRow = {
   id: string;
   chat_id: string;
@@ -1255,7 +1259,7 @@ export const savedPrompts = {
 // ---- Customize (ADR 0025): MCP servers and what each Sprocket has ----
 
 /** A tool as Rails last saw it on its server (its input schema too, for the capability). */
-export type StoredTool = { name: string; title?: string; description: string; inputSchema: Record<string, unknown>; readOnly: boolean };
+export type StoredTool = { name: string; title?: string; description: string; inputSchema: Record<string, unknown>; readOnly: boolean; destructive?: boolean };
 export type StoredMcpServer = {
   id: string;
   name: string;

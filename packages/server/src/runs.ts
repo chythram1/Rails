@@ -7,7 +7,7 @@
 // once more.
 import { Agent } from "@earendil-works/pi-agent-core";
 import { isRetryableAssistantError, type Api, type AssistantMessage, type Message, type Model } from "@earendil-works/pi-ai";
-import { TEAM_TURNS_MAX, cardText, type Handoff, type SprocketCard, type SprocketMessage } from "@rails/shared";
+import { CARD_ACTIONS_MAX, TEAM_TURNS_MAX, actionSettled, cardText, type Handoff, type SprocketCard, type SprocketCardAction, type SprocketMessage } from "@rails/shared";
 import { AGENT } from "./bridge/board.ts";
 import {
   handoffs,
@@ -35,7 +35,7 @@ import { projectCapabilities } from "./harness/project.ts";
 import { promptsCapability } from "./harness/prompts.ts";
 import { replyCapabilities } from "./harness/reply.ts";
 import { showCardCapability } from "./harness/cards.ts";
-import { mcpCapabilities, resultText } from "./harness/mcpTools.ts";
+import { mcpCapabilities, resultText, type Proposal } from "./harness/mcpTools.ts";
 import { readSkillCapability, skillsPrompt } from "./harness/skills.ts";
 import { listSkills } from "./skills.ts";
 import { serversFor } from "./mcp.ts";
@@ -288,8 +288,9 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   const fresh = history.filter(
     (m) => (!since || Date.parse(m.createdAt) > Date.parse(since)) && (m.author === "user" || m.author === "event" || (!!team && m.sprocketId !== id)),
   );
-  // A decided approval (ADR 0025) is new even though no message came: the Sprocket goes on with its result.
-  if (!last || (!fresh.length && r.trigger !== "approval")) return;
+  // A decided approval (ADR 0025) or a card's settled actions (ADR 0031) are new even though no message came: the
+  // Sprocket goes on with what came of them.
+  if (!last || (!fresh.length && r.trigger !== "approval" && r.trigger !== "actions")) return;
   // What this run answers: everything since the last reply.
   const unanswered = history.slice(history.findLastIndex((m) => m.author === "sprocket") + 1);
   const start = Math.max(Date.now(), Date.parse(last.createdAt) + 1);
@@ -325,7 +326,7 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   const skills = toolbox.skills.length ? listSkills().filter((k) => toolbox.skills.includes(k.id)) : [];
   const unreachable = servers.filter((x) => x.error).map((x) => `[Rails] The MCP server ${x.server.name} can't be reached right now (${x.error}), so its tools aren't here this turn.`);
   if (chat.kind !== "project")
-    context.push({ role: "user", content: [team ? `${TEXTING_NOW}\n${roundNow(history, r, team)}` : TEXTING_NOW, ...unreachable].join("\n"), timestamp: Date.now() });
+    context.push({ role: "user", content: [team ? `${TEXTING_NOW}\n${roundNow(history, r, team)}` : [TEXTING_NOW, ...whyNow(r)].join("\n"), ...unreachable].join("\n"), timestamp: Date.now() });
   // Events that came in together (one arrived while it answered another): models answered only the latest.
   // (An agent's drafted message doesn't wake it, and needs nothing.)
   const events = unanswered.filter((m) => m.author === "event" && m.event && m.event.what !== "message");
@@ -345,7 +346,7 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
     ...(project && chat.kind !== "project" ? [projectChatCapability] : []),
     ...(project && s.coordinator ? replyCapabilities(s.rules, (sid) => made.push(sid)) : []),
     ...(chat.kind !== "project" ? [askUserCapability(endWith, ended), sendMessageCapability((text) => post(text)), showCardCapability((card) => show(card))] : []),
-    ...mcpCapabilities(servers.filter((x) => !x.error).map((x) => x.server), endWith, ended),
+    ...mcpCapabilities(servers.filter((x) => !x.error).map((x) => x.server), endWith, ended, chat.kind !== "project" ? propose : undefined),
     ...(skills.length ? [readSkillCapability(skills)] : []),
     ...(team ? [passTurnCapability(team.members.filter((m) => m.id !== id), { hop: r.hop, queued: () => queuedIn(chatId), asking: () => waitingAsks(chatId).map((a) => a.sprocketId), said: () => posted.size > 0 || sent.length > 0 }, endWith, ended)] : []),
   ];
@@ -409,6 +410,28 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
     changed();
   };
 
+  /**
+   * An ask tool's call in a direct or team chat (ADR 0031): it goes on a card as an action. This run's calls share one
+   * card (a new one once it's full, or once the user has settled it).
+   */
+  let proposals: string | undefined;
+  function propose(p: Proposal): string {
+    if (stale()) return "Your user wrote again meanwhile: nothing was proposed.";
+    const action: SprocketCardAction = { label: labelOf(p.title), serverId: p.serverId, server: p.server, tool: p.tool, args: p.args, ...(p.destructive ? { destructive: true } : {}), status: "waiting" };
+    const open = proposals ? sprocketMessages.get(proposals)?.card : undefined;
+    if (proposals && open?.actions && open.actions.length < CARD_ACTIONS_MAX && !open.actions.every(actionSettled)) {
+      sprocketMessages.setCardActions(proposals, [...open.actions, action]);
+      changed();
+    } else {
+      const card: SprocketCard = { title: `Wants to use ${p.server}`, blocks: [], actions: [action] };
+      const m = sprocketMessages.create(chatId, "sprocket", cardText(card), postTime(chatId), { sprocketId: id, runId: r.id, card });
+      sent.push(m);
+      proposals = m.id;
+      changed();
+    }
+    return `Put on a card for your user to run or skip: ${p.server} ${p.tool} with ${JSON.stringify(p.args)}. Nothing has run yet. Your turn goes on; once your user is done with the card, you get a new turn with what came of each call. Don't say it's done.`;
+  }
+
   /** Asked to pass the turn it forgot: what it writes now isn't posted (its message is in already). */
   let nudged = false;
   /** The teammates its last message asks something, when it ended its turn without passing it to anyone. */
@@ -429,7 +452,7 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
     if (sprocketMessages.list(chatId).some((m) => m.author === "user" && Date.parse(m.createdAt) > start)) return [];
     const queued = queuedIn(chatId);
     const history = sprocketMessages.list(chatId);
-    return [...new Set([...handOn(history, r, t), ...notYet(history, r, t)])].filter((name) => !queued.includes(t.members.find((m) => m.name === name)!.id));
+    return [...new Set([...handOn(history, r, t), ...(inRound(r) ? notYet(history, r, t) : [])])].filter((name) => !queued.includes(t.members.find((m) => m.name === name)!.id));
   };
 
   let steps = 0;
@@ -755,10 +778,12 @@ function toLlm(m: SprocketMessage, model: Model<Api>, self: string, team: TeamIn
               : "Your user hasn't decided yet.";
     return { role: "user", content: `[Rails] ${call} ${outcome}`, timestamp };
   }
-  // A card (ADR 0024) as Rails' note of what it showed, so a model doesn't take up writing cards out as text.
+  // A card (ADR 0024) as Rails' note of what it showed, so a model doesn't take up writing cards out as text; its
+  // actions (ADR 0031) with what came of each.
   if (m.card) {
     const who = m.sprocketId === self ? "You" : nameOf(m.sprocketId);
-    return { role: "user", content: `[Rails] ${who} showed a card (show_card):\n${text}`, timestamp };
+    const actions = m.card.actions?.length ? `\n${actionsText(m.card.actions)}` : "";
+    return { role: "user", content: `[Rails] ${who} showed a card (show_card):\n${text}${actions}`, timestamp };
   }
   // A question with options shows them, and the answer once there is one.
   const said = m.ask?.options.length ? `${text}\n(options: ${m.ask.options.join(" | ")}${m.ask.answer ? `; your user answered ${JSON.stringify(m.ask.answer)}` : ""})` : text;
@@ -878,6 +903,37 @@ export function severalEvents(events: SprocketMessage[]): string {
 }
 
 /** The reminder after the chat (not saved, not from the user). */
+/** A tool's name as a button's label: its title as it is, or "add_note" as "Add note". */
+const labelOf = (title: string) => (/[\s]/.test(title) ? title : (title.charAt(0).toUpperCase() + title.slice(1)).replace(/[_-]+/g, " "));
+
+/** A card's actions for the model: each call, and what came of it so far. */
+function actionsText(actions: SprocketCardAction[]): string {
+  const lines = actions.map((a, i) => {
+    const call = `${i + 1}. "${a.label}": ${a.tool} on the MCP server ${a.server} with ${JSON.stringify(a.args)}.`;
+    switch (a.status) {
+      case "waiting":
+        return `${call} Not run yet: your user hasn't run or skipped it.`;
+      case "running":
+        return `${call} Your user ran it; it's running.`;
+      case "skipped":
+        return `${call} Your user skipped it: it didn't run. Don't offer it again unless they ask.`;
+      case "failed":
+        return `${call} Your user ran it, but it failed: ${a.result ?? "unknown error"}`;
+      case "done":
+        return `${call} Your user ran it. ${resultText(a.server, a.result ?? "")}`;
+    }
+  });
+  return `Its actions (your user runs or skips each from the card):\n${lines.join("\n")}`;
+}
+
+/** Why this run started, when it isn't a message: a decided approval, or a card whose actions are all settled. */
+function whyNow(r: StoredRun): string[] {
+  if (r.trigger === "approval") return ["Your user decided on the tool you asked to use (Rails' note above says what came of it). Go on from there."];
+  if (r.trigger === "actions")
+    return ["Your user has run or skipped every action on your card (Rails' note on the card above says what came of each). Tell them briefly what happened, without repeating the card, and go on from there."];
+  return [];
+}
+
 const TEXTING_NOW =
   "[Rails, not your user] Reply as chat messages: each paragraph is one, so put blank lines between short paragraphs of one or two sentences, with no headings or bold. A long answer is more messages, not longer ones.";
 
@@ -949,6 +1005,9 @@ export function handOn(history: SprocketMessage[], r: Pick<StoredRun, "from" | "
 /** A message for the whole team, without @everyone ("what do you all think?"). */
 const FOR_ALL = /\b(everyone|everybody|all of you|each of you|you all|y'all|you guys|whole team|the team)\b|\bteam\s*[?!]/i;
 
+/** A run that's part of answering the user's message (theirs, or a pass), not one an approval or a card started. */
+const inRound = (r: StoredRun) => r.trigger === "user" || r.trigger === "pass";
+
 /** Thanks, greetings and goodbyes to the team, which one answer covers. */
 const SMALL_TALK = /^\W*(thanks|thank you|thx|ty|cheers|great work|good job|nice work|well done|bye|goodbye|good night|night|hi|hello|hey|morning|good morning)\b/i;
 
@@ -975,7 +1034,7 @@ function roundNow(history: SprocketMessage[], r: StoredRun, team: TeamInfo): str
   const others = team.members.filter((m) => m.id !== r.sprocketId).map((m) => m.name);
   const next = queuedIn(r.chatId).flatMap((q) => team.members.find((m) => m.id === q && m.id !== r.sprocketId)?.name ?? []);
   const later = from ? handOn(history, r, team).filter((n) => !next.includes(n)) : [];
-  const round = notYet(history, r, team).filter((n) => !next.includes(n) && !later.includes(n));
+  const round = (inRound(r) ? notYet(history, r, team) : []).filter((n) => !next.includes(n) && !later.includes(n));
   const open = waitingAsks(r.chatId).flatMap((a) => {
     const who = a.sprocketId !== r.sprocketId && team.members.find((m) => m.id === a.sprocketId)?.name;
     return who ? [`${who} asked ${JSON.stringify(a.question)}`] : [];
@@ -984,7 +1043,7 @@ function roundNow(history: SprocketMessage[], r: StoredRun, team: TeamInfo): str
     `Your user's latest message: ${JSON.stringify(asked.length > 600 ? asked.slice(0, 600) + "…" : asked)}.`,
     from
       ? `${from} gave you the turn${note ? ` (${JSON.stringify(note)})` : ""}, pass ${r.hop} of ${TEAM_TURNS_MAX}: do what they asked of you, and post it here.`
-      : "Your user's message came to you.",
+      : (whyNow(r)[0] ?? "Your user's message came to you."),
     ...(later.length
       ? [`${from}'s message also gives ${list(later)} a step after yours: once your part is posted, pass the turn to ${later[0]}${later.length > 1 ? ` (and ask them to pass it on to ${list(later.slice(1))})` : ""}, unless your part changes that plan.`]
       : []),
