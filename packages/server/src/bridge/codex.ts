@@ -6,12 +6,15 @@
 // - `thread/resume {excludeTurns}` subscribes Rails to a mapped thread's turns and items;
 // - a panel's Codex can move to another thread (`/new`, `/fork`, `/resume`), and the daemon doesn't say which client
 //   did it, so Rails follows a fork by its `forkedFromId` and a new or resumed thread when only one Codex panel is
-//   open in its folder (`follow`; docs/providers.md).
+//   open in its folder (`follow`; docs/providers.md);
+// - Rails starts a new panel's thread itself, with its agent tools as dynamic tools (ADR 0030, `startThread`), and
+//   answers their calls (`item/tool/call`), which the daemon sends every client of the thread.
 // The protocol is JSON-RPC over a WebSocket on the daemon's Unix socket. It's marked experimental, so
 // unknown messages are ignored and a lost connection is retried.
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import WebSocket from "ws";
 import type { Panel } from "@rails/shared";
 import { CODEX_HOME } from "../config.ts";
@@ -24,6 +27,18 @@ const SOCKET = join(CODEX_HOME, "app-server-control", "app-server-control.sock")
 const MAP_WITHIN_MS = 2 * 60_000;
 
 type Send = (msg: object) => void;
+
+/** Rails' agent tools for Codex (ADR 0030), set by agentTools.ts: their specs, and what answers a call. */
+export interface CodexTools {
+  spec: object[];
+  call(panelId: string, tool: string, args: unknown, signal: AbortSignal): Promise<{ text: string; isError: boolean }>;
+}
+let tools: CodexTools | undefined;
+export const setCodexTools = (t: CodexTools) => void (tools = t);
+/** The namespace of Rails' tools: the TUI answers only calls in its own (`codex_tui`), and leaves ours to us. */
+const NAMESPACE = "rails";
+/** How long a finished call's answer is kept, for the daemon sending the call again after Rails reconnects. */
+const ANSWER_KEPT_MS = 10 * 60_000;
 
 /**
  * When a thread started. Codex's thread ids are UUIDv7s, whose first 48 bits are that time in ms; `createdAt` isn't
@@ -57,6 +72,19 @@ export class CodexWatcher {
   private left = new Map<string, string>();
   private nextId = 1;
   private replies = new Map<number, (result: any, error?: unknown) => void>();
+  /** Threads Rails started for new panels: not some other panel's new thread (`started`). */
+  private ours = new Set<string>();
+  /**
+   * Folders Rails is starting a thread in, and threads that started there meanwhile: the daemon can announce Rails'
+   * own before answering `thread/start`, so they wait until it has, and Rails knows which one is its own.
+   */
+  private launches = new Map<string, number>();
+  private held: { thread: any; live: boolean }[] = [];
+  /**
+   * Tool calls by Codex's call id: the request to answer (the daemon sends a pending call again to a client that
+   * subscribes, with a new request id, so after a reconnect the newest one), the turn, and its answer once done.
+   */
+  private calls = new Map<string, { requestId: unknown; threadId: string; turnId: string; abort: AbortController; answer?: object; at?: number }>();
 
   constructor(
     private send: Send,
@@ -89,7 +117,9 @@ export class CodexWatcher {
     }
     if (typeof msg?.method !== "string") return;
     const params = msg.params ?? {};
+    if (msg.method === "item/tool/call" && msg.id !== undefined) return this.toolCall(msg.id, params);
     if (msg.method === "thread/started") return this.started(params.thread);
+    if (msg.method === "turn/completed" && typeof params.threadId === "string") this.turnOver(params.threadId, params.turn?.id);
     const threadId: string | undefined = params.threadId ?? params.thread?.id;
     if (!threadId) return;
     const panel = panels.bySession(threadId);
@@ -103,12 +133,13 @@ export class CodexWatcher {
 
   /** A thread started, or (`live` false) one found loaded when Rails connected. */
   private started(thread: any, live = true) {
-    if (!thread?.id || thread.ephemeral || thread.parentThreadId) return;
+    if (!thread?.id || thread.ephemeral || thread.parentThreadId || this.ours.has(thread.id)) return;
     const known = panels.bySession(thread.id);
     if (known) return this.subscribe(thread.id); // a resumed session
     this.pending = this.pending.filter((p) => Date.now() - p.since < MAP_WITHIN_MS && panels.get(p.panelId));
     const cwd = typeof thread.cwd === "string" ? real(thread.cwd) : undefined;
     if (!cwd) return;
+    if (this.launches.get(cwd)) return void this.held.push({ thread, live });
     // Only threads started after the panel: the user may have their own Codex session in the same folder.
     const started = threadStarted(thread);
     const i = this.pending.findIndex((p) => p.cwd === cwd && started >= p.since - 5000);
@@ -225,6 +256,81 @@ export class CodexWatcher {
     });
   }
 
+  /**
+   * Start a thread for a new panel, with Rails' tools (ADR 0030); the panel then runs `codex resume <id>`. Codex
+   * keeps dynamic tools with the thread, so they're there after a resume or a fork, but only a thread's start can
+   * set them. The TUI can't resume a thread that hasn't saved anything, and Codex saves a thread at its first turn,
+   * or when it's placed in the sidebar's sections: placing it in none, where it is anyway, saves it now.
+   *
+   * Only in a folder Codex trusts (`roots`: the folder, its git root, its main repository): a thread keeps the
+   * permissions it started with, and in a folder not yet trusted those are read-only, where the TUI would ask for
+   * trust first and start its thread after. There Rails throws, and the panel runs plain `codex`.
+   */
+  async startThread(cwd: string, roots: string[] = [cwd]): Promise<string> {
+    if (!tools) throw new Error("No tools for Codex.");
+    cwd = real(cwd);
+    const config = await this.call("config/read", { cwd });
+    const projects = config?.config?.projects ?? {};
+    if (!roots.some((r) => projects[r]?.trust_level === "trusted")) throw new Error("Codex doesn't trust this folder yet.");
+    this.launches.set(cwd, (this.launches.get(cwd) ?? 0) + 1);
+    try {
+      const r = await this.call("thread/start", { cwd, dynamicTools: tools.spec });
+      const threadId = r?.thread?.id;
+      if (typeof threadId !== "string") throw new Error("Codex started no thread.");
+      this.ours.add(threadId);
+      this.subscribed.add(threadId); // starting it subscribed us
+      await this.call("thread/section/move", { threadId, sectionId: null });
+      return threadId;
+    } finally {
+      const left = (this.launches.get(cwd) ?? 1) - 1;
+      if (left) this.launches.set(cwd, left);
+      else {
+        this.launches.delete(cwd);
+        const held = this.held.filter((h) => real(h.thread.cwd) === cwd);
+        this.held = this.held.filter((h) => !held.includes(h));
+        for (const h of held) this.started(h.thread, h.live);
+      }
+    }
+  }
+
+  /** A call to one of Rails' tools: answer it for the panel the thread is in. Calls in other namespaces aren't ours. */
+  private toolCall(requestId: unknown, params: any) {
+    if (params.namespace !== NAMESPACE || typeof params.callId !== "string" || typeof params.threadId !== "string") return;
+    const now = Date.now();
+    for (const [id, c] of this.calls) if (c.at && now - c.at > ANSWER_KEPT_MS) this.calls.delete(id);
+    const known = this.calls.get(params.callId);
+    if (known) {
+      known.requestId = requestId; // sent again after a reconnect: answer this one
+      if (known.answer) this.send({ jsonrpc: "2.0", id: requestId, result: known.answer });
+      return;
+    }
+    const call = { requestId, threadId: params.threadId, turnId: String(params.turnId ?? ""), abort: new AbortController() } as NonNullable<ReturnType<typeof this.calls.get>>;
+    this.calls.set(params.callId, call);
+    const panel = panels.bySession(params.threadId);
+    const run =
+      panel?.kind === "codex" && tools
+        ? tools.call(panel.id, String(params.tool), params.arguments ?? {}, call.abort.signal)
+        : Promise.resolve({ text: "This session isn't in a Rails panel any more, so Rails' tools can't reach its project.", isError: true });
+    run
+      .catch((e: any) => ({ text: String(e?.message ?? e), isError: true }))
+      .then(({ text, isError }) => {
+        call.answer = { contentItems: [{ type: "inputText", text }], success: !isError };
+        call.at = Date.now();
+        if (!call.abort.signal.aborted) this.send({ jsonrpc: "2.0", id: call.requestId, result: call.answer });
+      });
+  }
+
+  /** A turn ended (or was interrupted, the only word Codex gives of it): its calls still running are moot. */
+  private turnOver(threadId: string, turnId: unknown) {
+    for (const c of this.calls.values()) if (!c.answer && c.threadId === threadId && (!turnId || c.turnId === turnId)) c.abort.abort();
+  }
+
+  private call(method: string, params: object): Promise<any> {
+    return new Promise((resolve, reject) =>
+      this.request(method, params, (result, error) => (error ? reject(new Error(`Codex refused ${method}: ${(error as { message?: string })?.message ?? "unknown error"}`)) : resolve(result))),
+    );
+  }
+
   /** Whether a new panel still waits for its thread (closed panels and old entries don't count). */
   hasPending = () => this.pending.some((p) => Date.now() - p.since < MAP_WITHIN_MS && panels.get(p.panelId));
 }
@@ -253,8 +359,8 @@ export const onCodexSession = (fn: (panelId: string, threadId: string) => void) 
 const codexPanels = (all: Panel[]) => all.filter((p) => p.kind === "codex");
 
 /** Watch Codex panels: call when one starts (with its folder) and once at startup. */
-export function watchCodex(open: Panel[], started?: { panelId: string; cwd: string }) {
-  if (!codexPanels(open).length && !started) return;
+export function watchCodex(open: Panel[], started?: { panelId: string; cwd: string }, launch = false) {
+  if (!codexPanels(open).length && !started && !launch) return;
   watcher ??= new CodexWatcher(
     (m) => ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify(m)),
     (panelId, threadId) => assignSession(panelId, threadId),
@@ -275,9 +381,59 @@ export function steerCodex(threadId: string, turnId: string | undefined, text: s
   return watcher.steer(threadId, turnId, text);
 }
 
+/** New panels whose thread Rails is starting: the connection stays up for them. */
+let launching = 0;
+/** How long a new panel waits for Rails to start its thread before it runs plain `codex`, without Rails' tools. */
+const START_WITHIN_MS = 10_000;
+
+/**
+ * Start a new panel's thread with Rails' tools (ADR 0030): its id, for `codex resume <id>`. Starts Codex's daemon
+ * if it isn't running (the first `codex` would). Rejects if Codex doesn't manage within START_WITHIN_MS, and the
+ * panel runs plain `codex` instead.
+ */
+export async function startCodexThread(cwd: string, open: Panel[]): Promise<string> {
+  launching++;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeout = new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error("Codex didn't start a thread in time.")), START_WITHIN_MS)));
+    return await Promise.race([timeout, Promise.all([connected(open), trustRoots(cwd)]).then(([, roots]) => watcher!.startThread(cwd, roots))]);
+  } finally {
+    clearTimeout(timer);
+    launching--;
+  }
+}
+
+/** The paths Codex looks up a folder's trust by: the folder, its git root, and the main repository of a worktree. */
+async function trustRoots(cwd: string): Promise<string[]> {
+  const git = (...args: string[]) =>
+    new Promise<string>((resolve) => execFile("git", ["-C", cwd, ...args], { timeout: 3000 }, (e, out) => resolve(e ? "" : out.trim())));
+  const [top, common] = await Promise.all([git("rev-parse", "--show-toplevel"), git("rev-parse", "--path-format=absolute", "--git-common-dir")]);
+  return [...new Set([cwd, top, common && dirname(common)].filter(Boolean).map(real))];
+}
+
+/** Connected to the daemon, starting it first if it isn't running. */
+async function connected(open: Panel[]): Promise<void> {
+  watchCodex(open, undefined, true);
+  if (await opened(1500)) return;
+  await new Promise<void>((resolve) => execFile("codex", ["app-server", "daemon", "start"], { timeout: 8000 }, () => resolve()));
+  clearTimeout(retry);
+  retry = undefined;
+  connect(() => codexPanels(panels.all()).flatMap((p) => (p.sessionId ? [p.sessionId] : [])));
+  if (!(await opened(5000))) throw new Error("Codex's daemon isn't answering.");
+}
+
+/** Whether the connection is (or gets) open within `ms`. */
+function opened(ms: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const check = () => (ws?.readyState === WebSocket.OPEN ? resolve(true) : Date.now() - started > ms ? resolve(false) : setTimeout(check, 50));
+    check();
+  });
+}
+
 /** A panel closed: drop the connection when no Codex panel (or new one waiting for its thread) is left. */
 export function unwatchCodexIfIdle() {
-  if (watcher?.hasPending() || panels.all().some((p) => p.kind === "codex")) return;
+  if (launching || watcher?.hasPending() || panels.all().some((p) => p.kind === "codex")) return;
   clearTimeout(retry);
   retry = undefined;
   const socket = ws;
@@ -300,7 +456,7 @@ function connect(mapped: () => string[]) {
   socket.on("error", () => {}); // the daemon isn't running yet (the first codex starts it): retried on close
   socket.on("close", () => {
     ws = undefined;
-    const stillNeeded = watcher?.hasPending() || panels.all().some((p) => p.kind === "codex");
+    const stillNeeded = launching || watcher?.hasPending() || panels.all().some((p) => p.kind === "codex");
     if (stillNeeded) retry = setTimeout(() => ((retry = undefined), connect(() => panels.all().flatMap((p) => (p.kind === "codex" && p.sessionId ? [p.sessionId] : [])))), 2000);
   });
 }

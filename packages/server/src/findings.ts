@@ -1,7 +1,7 @@
 // Findings (ADR 0029): a session ends its turn with a reply that names work in another session's files ("audio.js
 // listens for shot/hit, but the game emits projectile:*"), and doesn't tell that session. Nothing woke anyone for
 // that: a turn end wakes the Coordinator only when it asks the user something, and the agent may not use its
-// message tool (Codex has none). Test runs 4 and 7 lost findings this way. Rails' rule, plain code that needs no
+// message tool (older Codex sessions have none, ADR 0030). Test runs 4 and 7 lost findings this way. Rails' rule, plain code that needs no
 // decision model:
 // - the reply (its turn_end) doesn't ask the user anything (looksLikeQuestion; those wake it already);
 // - a sentence of it names a file that another live session owns (owners.ts) or changed in the last OVERLAP_MS,

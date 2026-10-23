@@ -15,9 +15,11 @@ const textOf = (content: unknown) =>
 const isContextText = (t: string) => /^<(environment_context|user_instructions|permissions)/.test(t.trim());
 
 async function scanFile(file: string): Promise<DiscoveredSession | null> {
-  const { head, mtime } = await headTail(file);
+  const { head, tail, mtime } = await headTail(file);
   const meta = head.find((e) => e.type === "session_meta")?.payload;
   if (!meta?.cwd) return null;
+  // A thread Rails started for a new panel that was closed before its first prompt (ADR 0030): nothing in it.
+  if (tail === head && !head.some((e) => e.type === "response_item" || e.type === "turn_context")) return null;
   const firstUser = head
     .filter((e) => e.type === "response_item" && e.payload?.type === "message" && e.payload.role === "user")
     .map((e) => textOf(e.payload.content))

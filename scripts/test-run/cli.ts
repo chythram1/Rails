@@ -1,7 +1,7 @@
 // The test-run harness: run Rails with real coding agents on a brief, act as the user through the run, and report
 // what happened. See README.md. Usage: npm run test-run -- <command> [args] [--run <name>]
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { cleanup, codexConfigPath, codexTrustEntry, transcriptDirs } from "./cleanup.ts";
 import { Panes } from "./panes.ts";
@@ -94,7 +94,11 @@ async function setup(path: string): Promise<void> {
   // Transcript folders that don't exist yet are the run's to remove; ones that do keep everything but its sessions.
   state.newDirs = transcriptDirs(project).filter((d) => !existsSync(d));
   const toml = codexConfigPath();
-  if (config.agents.some((a) => a.kind === "codex")) state.codexTrusted = existsSync(toml) && readFileSync(toml, "utf8").includes(codexTrustEntry(project));
+  if (config.agents.some((a) => a.kind === "codex")) {
+    state.codexTrusted = existsSync(toml) && readFileSync(toml, "utf8").includes(codexTrustEntry(project));
+    // Trusted before its panel opens, so Rails starts Codex's thread with its agent tools (ADR 0030); cleanup removes it.
+    if (!state.codexTrusted) appendFileSync(toml, codexTrustEntry(project));
+  }
   state.pids = startRails(config, dir, configDir);
   saveState(state);
   const api = new Api(portOf(config));

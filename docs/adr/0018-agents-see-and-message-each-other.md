@@ -110,7 +110,8 @@ Decisions (proposed):
   - Codex: none at first. Adding tools needs its config file (the user's), a `-c` flag (which makes it leave the
     daemon Rails follows), or overrides passed when Rails rejoins a running thread (`thread/resume` takes `config`
     and `developerInstructions`, but whether they apply to a running thread is unverified, and they might change
-    the user's session). Codex sessions still show up to the others and still get messages.
+    the user's session). Codex sessions still show up to the others and still get messages. Since ADR 0030, a new
+    Codex panel in a folder Codex trusts gets the same tools as dynamic tools on a thread Rails starts for it.
 - **The user stays the one who sends.** Every message is a draft until the user sends it; sending without asking
   is out of scope here and would need its own decision and a track record. Agents can't answer permissions or
   dialogs, through Rails or each other. The draft card is the safeguard, and it has limits that differ by agent:
@@ -140,6 +141,5 @@ Open questions:
 - Whether Claude Code asks permission for these tools outside auto mode, and if so whether Rails should allow its
   own read-only ones (`neighbours`, `wait_for`) in the permission rules it already passes with `--settings`
   (still flags only). `message` stays on whatever the user's own rules say.
-- Codex: whether the overrides `thread/resume` takes reach a running thread without changing the user's session;
-  until then Codex gets no tools.
+- Codex: settled by ADR 0030 (dynamic tools on a thread Rails starts).
 - Whether the Coordinator should also comment on agents' drafts when it next runs, or only see them.

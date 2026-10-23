@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { panels, projects } from "../db.ts";
 import { linkCodexThread } from "../panels.ts";
 import { boardText, foldCard, sharedFiles } from "./board.ts";
-import { CodexWatcher } from "./codex.ts";
+import { CodexWatcher, setCodexTools } from "./codex.ts";
 import { bridgeFlags } from "./wiring.ts";
 import { fromClaude, fromCodex, fromPi } from "./events.ts";
 import { attentionList, bridgeEnv, cardOf, receive, tokenOk } from "./index.ts";
@@ -214,6 +214,75 @@ describe("Codex watcher", () => {
     w.expect(p.id, project.path);
     w.handle({ method: "thread/started", params: { thread: { id: "t-old", cwd: project.path, createdAt: Date.now() / 1000 - 3600 } } });
     expect(assigned).toEqual([]);
+  });
+});
+
+describe("Codex watcher, Rails' tools (ADR 0030)", () => {
+  const setup = () => {
+    const project = projects.create("app", `/tmp/codex-tools-${Math.random()}`);
+    const sent: any[] = [];
+    const w = new CodexWatcher((m) => sent.push(m), (panelId, threadId) => panels.setSession(panelId, threadId));
+    const p = panels.create({ projectId: project.id, kind: "codex", title: "Codex", sessionId: `t-${Math.random()}` });
+    const calls: { panelId: string; tool: string; signal: AbortSignal; done: (text: string) => void }[] = [];
+    setCodexTools({
+      spec: [{ type: "namespace", name: "rails", description: "Rails", tools: [] }],
+      call: (panelId, tool, _args, signal) => new Promise((resolve) => calls.push({ panelId, tool, signal, done: (text) => resolve({ text, isError: false }) })),
+    });
+    const call = (id: number, callId: string, extra: object = {}) =>
+      w.handle({ id, method: "item/tool/call", params: { threadId: p.sessionId, turnId: "u1", callId, namespace: "rails", tool: "neighbours", arguments: {}, ...extra } });
+    return { project, sent, w, p, calls, call };
+  };
+
+  it("answers a call for the panel, again after a reconnect, and leaves other namespaces alone", async () => {
+    const { sent, p, calls, call } = setup();
+    call(7, "c1", { namespace: "codex_tui" });
+    expect(calls).toEqual([]);
+    call(8, "c1");
+    expect(calls.map((c) => [c.panelId, c.tool])).toEqual([[p.id, "neighbours"]]);
+    call(9, "c1"); // the daemon sends a pending call again to a client that subscribes
+    expect(calls.length).toBe(1);
+    calls[0].done("Two sessions.");
+    await new Promise((r) => setTimeout(r));
+    expect(sent.filter((m) => m.result)).toEqual([{ jsonrpc: "2.0", id: 9, result: { contentItems: [{ type: "inputText", text: "Two sessions." }], success: true } }]);
+    call(10, "c1");
+    expect(sent.filter((m) => m.result).map((m) => m.id)).toEqual([9, 10]);
+  });
+
+  it("stops a call whose turn ends (the user interrupted it)", async () => {
+    const { sent, p, calls, call, w } = setup();
+    call(8, "c2", { tool: "wait_for" });
+    w.handle({ method: "turn/completed", params: { threadId: p.sessionId, turn: { id: "u1", status: "interrupted", items: [] } } });
+    expect(calls[0].signal.aborted).toBe(true);
+    calls[0].done("stopped");
+    await new Promise((r) => setTimeout(r));
+    expect(sent.filter((m) => m.result)).toEqual([]);
+  });
+
+  it("starts a thread with the tools, saves it, and gives a panel waiting for one only the panel's own", async () => {
+    const { project, sent, w } = setup();
+    const waiting = panels.create({ projectId: project.id, kind: "codex", title: "Codex" });
+    w.expect(waiting.id, project.path);
+    const started = w.startThread(project.path);
+    expect(sent.at(-1)).toMatchObject({ method: "config/read", params: { cwd: project.path } });
+    w.handle({ id: sent.at(-1).id, result: { config: { projects: { [project.path]: { trust_level: "trusted" } } } } });
+    await new Promise((r) => setTimeout(r));
+    expect(sent.at(-1)).toMatchObject({ method: "thread/start", params: { cwd: project.path, dynamicTools: [{ name: "rails" }] } });
+    w.handle({ method: "thread/started", params: { thread: { id: "t-ours", cwd: project.path, createdAt: Date.now() / 1000 } } });
+    w.handle({ method: "thread/started", params: { thread: { id: "t-theirs", cwd: project.path, createdAt: Date.now() / 1000 } } });
+    w.handle({ id: sent.find((m) => m.method === "thread/start").id, result: { thread: { id: "t-ours" } } });
+    await new Promise((r) => setTimeout(r));
+    expect(sent.at(-1)).toMatchObject({ method: "thread/section/move", params: { threadId: "t-ours", sectionId: null } });
+    w.handle({ id: sent.at(-1).id, result: {} });
+    expect(await started).toBe("t-ours");
+    expect(panels.get(waiting.id)?.sessionId).toBe("t-theirs"); // held while Rails started its own, then the panel's
+  });
+
+  it("starts none in a folder Codex doesn't trust yet: its thread would stay read-only", async () => {
+    const { project, sent, w } = setup();
+    const started = w.startThread(project.path, [project.path, "/repo"]);
+    w.handle({ id: sent.at(-1).id, result: { config: { projects: { "/elsewhere": { trust_level: "trusted" }, "/repo": { trust_level: "untrusted" } } } } });
+    await expect(started).rejects.toThrow("doesn't trust");
+    expect(sent.some((m) => m.method === "thread/start")).toBe(false);
   });
 });
 

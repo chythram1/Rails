@@ -75,6 +75,10 @@ writeFileSync(
     { id: "x2", thread_name: " ", updated_at: ts },
   ]),
 );
+// A thread Rails started for a new panel that closed before its first prompt (ADR 0030): only its metadata.
+write(join(process.env.CODEX_HOME!, "sessions", "2026", "10", "01", "rollout-2026-10-01T10-00-00-x3.jsonl"), [
+  { type: "session_meta", payload: { id: "x3", cwd: project, timestamp: ts, dynamic_tools: [{ type: "namespace", name: "rails" }] } },
+]);
 write(join(process.env.CODEX_HOME!, "sessions", "2026", "10", "01", "rollout-2026-10-01T10-00-00-x1.jsonl"), [
   { type: "session_meta", payload: { id: "x1", cwd: project, timestamp: ts } },
   { type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "<environment_context>…</environment_context>" }] } },
@@ -84,7 +88,7 @@ write(join(process.env.CODEX_HOME!, "sessions", "2026", "10", "01", "rollout-202
 ]);
 
 describe("discovery", () => {
-  it("finds sessions of all three providers inside a project, including subfolders", async () => {
+  it("finds sessions of all three providers inside a project, including subfolders, not empty Codex threads", async () => {
     const found = await sessionsFor(project);
     expect(found.map((s) => `${s.provider}:${s.id}`).sort()).toEqual(["claude:c1", "claude:c2", "claude:c4", "claude:c5", "codex:x1", "codex:x2", "pi:p1", "pi:p2", "pi:p3"]);
   });

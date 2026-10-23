@@ -3,7 +3,7 @@ import { userInfo } from "node:os";
 import type { OpenPanel, Panel, PanelKind, ProviderId, Workspace } from "@rails/shared";
 import { layouts, panels } from "./db.ts";
 import { bridgeEnv, forgetPanel } from "./bridge/index.ts";
-import { onCodexSession, unwatchCodexIfIdle, watchCodex } from "./bridge/codex.ts";
+import { onCodexSession, startCodexThread, unwatchCodexIfIdle, watchCodex } from "./bridge/codex.ts";
 import { bridgeFlags } from "./bridge/wiring.ts";
 import { ServiceError } from "./errors.ts";
 import { getProject } from "./projects.ts";
@@ -38,9 +38,11 @@ function resumeCommand(provider: ProviderId, sessionId: string): string[] {
 
 /**
  * Command line for a new panel; `prompt` becomes the agent's first message. Claude and pi accept a
- * session id up front, so for them the panel knows its session immediately.
+ * session id up front, so for them the panel knows its session immediately. For Codex, Rails starts the thread
+ * itself, with its agent tools (ADR 0030), and the panel resumes it; if Codex can't, the panel runs plain `codex`,
+ * without them, and the bridge learns its thread from the daemon.
  */
-function newCommand(kind: PanelKind, prompt: string | undefined): { argv: string[]; sessionId?: string } {
+async function newCommand(kind: PanelKind, prompt: string | undefined, cwd: string): Promise<{ argv: string[]; sessionId?: string }> {
   const first = prompt ? ["--", prompt] : [];
   const sessionId = randomUUID();
   switch (kind) {
@@ -48,8 +50,10 @@ function newCommand(kind: PanelKind, prompt: string | undefined): { argv: string
       return { sessionId, argv: ["claude", "--session-id", sessionId, ...first] };
     case "pi":
       return { sessionId, argv: ["pi", "--session-id", sessionId, ...first] };
-    case "codex":
-      return { argv: ["codex", ...first] };
+    case "codex": {
+      const threadId = await startCodexThread(cwd, panels.all()).catch((e) => void console.warn(`Codex panel without Rails' tools: ${e.message}`));
+      return threadId ? { sessionId: threadId, argv: ["codex", "resume", threadId, ...first] } : { argv: ["codex", ...first] };
+    }
     case "shell":
       return { argv: [loginShell(), "-l"] };
   }
@@ -136,7 +140,7 @@ export async function openPanel(projectId: string, req: OpenPanel): Promise<Pane
     return open;
   }
 
-  const { argv, sessionId } = newCommand(req.kind, req.prompt?.trim() || undefined);
+  const { argv, sessionId } = await newCommand(req.kind, req.prompt?.trim() || undefined, project.path);
   const title = req.kind === "shell" ? "Shell" : discovery[req.kind].name;
   return start(project.id, req.kind, sessionId, title, project.path, argv);
 }

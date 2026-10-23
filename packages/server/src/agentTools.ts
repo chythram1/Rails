@@ -1,12 +1,14 @@
 // Agent tools (ADR 0018): what an agent in a Rails panel can ask Rails about its project. They're served to the
 // agents as an MCP server at /bridge/<panel>/mcp (index.ts), behind the panel's own token, so an agent only ever
 // reaches its own project. Claude Code connects it from a flag (bridge/wiring.ts), pi from the Rails extension
-// (bridge/pi/rails.ts); Codex gets none yet. Three tools: neighbours (read-only), message, a draft for another
+// (bridge/pi/rails.ts). Codex gets the same tools as dynamic tools on a thread Rails starts for a new panel
+// (ADR 0030, bridge/codex.ts), answered by `callTool`. Three tools: neighbours (read-only), message, a draft for another
 // session that waits in the Coordinator's chat until the user sends it, and wait_for, which waits for another
 // session to finish what it's doing.
 import { shortTitle } from "@rails/shared";
 import { AGENT, ago, boardText, rel, type SessionCard } from "./bridge/board.ts";
 import type { SessionEvent } from "./bridge/events.ts";
+import { setCodexTools } from "./bridge/codex.ts";
 import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
 import { panels, projects, sessionEvents, sprockets, suggestions } from "./db.ts";
 import { projectOwners } from "./owners.ts";
@@ -251,7 +253,7 @@ const TOOLS = [
   {
     name: "message",
     description:
-      "Draft a message for another coding session in this project, about something it has to act on: a fix in files it owns, or a change it must make because of work you've finished (a new export, a changed layout, one of its tests you broke). When you find something like that, draft it here, even a small one, rather than only noting it in your reply ('the UI session can drop that payload'): a note in your reply reaches your user, not that session. Not for status updates, plans, or work still in progress, yours or its: a test failing in files it's changing right now is likely its work in progress. Not to ask for what your task or the brief already settles, or for something you were told you'd hear about: to use another session's work once it's ready, call wait_for. Your user reads the draft and decides whether to send it (edited or not), so it may reach the session later or not at all, and it can't answer you before then (a Codex session answers only in its own reply, which neighbours shows). A new draft for the same session replaces your earlier one while that still waits, so put everything in one; neighbours shows what your user did with your drafts. It isn't for questions to your user: ask them in your reply.",
+      "Draft a message for another coding session in this project, about something it has to act on: a fix in files it owns, or a change it must make because of work you've finished (a new export, a changed layout, one of its tests you broke). When you find something like that, draft it here, even a small one, rather than only noting it in your reply ('the UI session can drop that payload'): a note in your reply reaches your user, not that session. Not for status updates, plans, or work still in progress, yours or its: a test failing in files it's changing right now is likely its work in progress. Not to ask for what your task or the brief already settles, or for something you were told you'd hear about: to use another session's work once it's ready, call wait_for. Your user reads the draft and decides whether to send it (edited or not), so it may reach the session later or not at all, and it can't answer you before then (a session without these tools answers only in its own reply, which neighbours shows). A new draft for the same session replaces your earlier one while that still waits, so put everything in one; neighbours shows what your user did with your drafts. It isn't for questions to your user: ask them in your reply.",
     inputSchema: {
       type: "object",
       properties: {
@@ -286,6 +288,38 @@ const TOOLS = [
 const INSTRUCTIONS =
   "Rails runs this session alongside other coding sessions in the same project, which may be changing the same code. Call the neighbours tool when you start a task and before you change files outside what you were asked to work on: it shows what the other sessions are doing, the files they changed lately and who owns which files. When another session has to act on something (a fix in files it owns, a change it must make because of work you finished), draft it with the message tool instead of changing its files; your user decides whether to send it. Don't message just to report progress or plans, or to ask for something you were told you'd get. When your next step needs another session to finish first, call wait_for instead of messaging it or checking again and again.";
 
+/** Run one of the tools for the agent in a panel, MCP's or Codex's: its text, and whether it failed. */
+export async function callTool(panelId: string, name: unknown, args: any, signal?: AbortSignal): Promise<{ text: string; isError: boolean }> {
+  if (name !== "neighbours" && name !== "message" && name !== "wait_for") return { text: `No tool "${name}".`, isError: true };
+  try {
+    const text =
+      name === "neighbours"
+        ? await neighboursText(panelId)
+        : name === "message"
+          ? await messageFromAgent(panelId, args?.session, args?.text)
+          : await waitForSession(panelId, args?.session, { next: args?.next === true, signal });
+    return { text, isError: false };
+  } catch (e: any) {
+    return { text: e.message, isError: true };
+  }
+}
+
+/**
+ * The tools as Codex's dynamic tools (ADR 0030): one `rails` namespace, whose description carries the instructions
+ * (Codex keeps it with the thread; at most 1024 characters).
+ */
+setCodexTools({
+  spec: [
+    {
+      type: "namespace",
+      name: "rails",
+      description: INSTRUCTIONS,
+      tools: TOOLS.map((t) => ({ type: "function", name: t.name, description: t.description, inputSchema: t.inputSchema })),
+    },
+  ],
+  call: callTool,
+});
+
 type Rpc = { jsonrpc: "2.0"; id: string | number; result?: unknown; error?: { code: number; message: string } };
 
 /**
@@ -315,19 +349,9 @@ export async function mcpRequest(panelId: string, msg: unknown, signal?: AbortSi
       return ok({ tools: TOOLS });
     case "tools/call": {
       const name = m.params?.name;
-      const args = m.params?.arguments ?? {};
       if (name !== "neighbours" && name !== "message" && name !== "wait_for") return error(-32602, `No tool "${name}".`);
-      try {
-        const text =
-          name === "neighbours"
-            ? await neighboursText(panelId)
-            : name === "message"
-              ? await messageFromAgent(panelId, args.session, args.text)
-              : await waitForSession(panelId, args.session, { next: args.next === true, signal });
-        return ok({ content: [{ type: "text", text }] });
-      } catch (e: any) {
-        return ok({ content: [{ type: "text", text: e.message }], isError: true });
-      }
+      const { text, isError } = await callTool(panelId, name, m.params?.arguments ?? {}, signal);
+      return ok({ content: [{ type: "text", text }], ...(isError ? { isError: true } : {}) });
     }
     default:
       return error(-32601, `No method "${m.method}".`);

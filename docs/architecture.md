@@ -180,7 +180,7 @@ packages/
 | --- | --- | --- |
 | claude | ✅ `~/.claude/projects/*/*.jsonl` | ✅ `claude --session-id <uuid> [-- prompt]` / `claude --resume <id>` |
 | pi | ✅ `~/.pi/agent/sessions/*/*.jsonl` | ✅ `pi --session-id <uuid> [-- prompt]` / `pi --session <id>` |
-| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl`, names from `~/.codex/session_index.jsonl` (checked with Codex 0.163) | ✅ `codex [-- prompt]` / `codex resume <id>`; a new panel learns its session id from Codex's daemon, and follows `/new`, `/fork` and `/resume` (ADR 0007) |
+| codex | ✅ `~/.codex/sessions/**/rollout-*.jsonl`, names from `~/.codex/session_index.jsonl` (checked with Codex 0.163) | ✅ new: Rails starts the thread with its agent tools and runs `codex resume <id> [-- prompt]` (ADR 0030), or plain `codex [-- prompt]` in a folder Codex doesn't trust yet, which learns its session id from Codex's daemon; `codex resume <id>`; follows `/new`, `/fork` and `/resume` (ADR 0007) |
 
 Any `-c`, `--enable`, `--disable` or `--search` flag makes Codex leave its daemon (ADR 0007), so Rails passes Codex
 none.
@@ -197,11 +197,12 @@ select and input, wrapped by the Rails extension, and `@juicesharp/rpiv-ask-user
 `RAILS_HOME/claude-mod`, Claude Code 2.1.287+); other dialogs are answered in the panel.
 
 Agent tools (ADR 0018): Claude Code and pi panels get Rails' MCP server at `/bridge/<panel>/mcp`, behind the
-panel's token (`agentTools.ts`): Claude Code from `--mcp-config`, pi from the Rails extension. `neighbours` shows an
+panel's token (`agentTools.ts`): Claude Code from `--mcp-config`, pi from the Rails extension. A new Codex panel
+gets them as dynamic tools on a thread Rails starts for it on Codex's daemon (ADR 0030), in a folder Codex trusts. `neighbours` shows an
 agent the other sessions in its project; `message` drafts a message for one of them, which waits in the
 Coordinator's chat until the user sends it (no model runs); `wait_for` waits, up to 100 seconds a call, until
-another session ends its turn, stops, fails or needs its user. Codex panels get none (it would need the user's config
-or a `-c` flag), but they receive messages.
+another session ends its turn, stops, fails or needs its user. Codex sessions from before, from plain `codex` (a
+folder Codex doesn't trust yet) or from `/new` get none, but they receive messages.
 
 A provider is only offered when its CLI is on the server's `PATH` (`ProviderInfo.installed`).
 Transcript format notes are in [providers.md](./providers.md).
