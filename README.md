@@ -48,9 +48,9 @@ Status:
 - Session names (ADR 0019): rename a session from its menu in the sidebar or by double-clicking its tab, and
   Rails, the Coordinator and the agents call it by that name
 - Customize (ADR 0025): connectors (Linear, Notion, GitHub, Google Drive and more, added in one step and signed
-  in to), other MCP servers and skills for your Sprockets (each tool allowed, asked first or off; a
-  Sprocket asks with an approval card before a call that changes something), and saved prompts for Home's and
-  Sprocket chats' composer
+  in to), other MCP servers and skills for your Sprockets (each tool allowed, asked first or off; a call
+  that changes something waits on a card in the chat, where you run or skip it, ADR 0031), and saved prompts
+  for Home's and Sprocket chats' composer
 - Automate (ADR 0032): a Sprocket runs a prompt on a schedule ("every weekday at 9") in its chat, with a run
   list; a run with nothing new posts nothing, and anything it wants to change waits on a card for you
 
