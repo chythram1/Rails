@@ -981,6 +981,8 @@ export type AutomationInput = Partial<Pick<Automation, "name" | "sprocketId" | "
 
 export const AUTOMATION_NAME_MAX = 80;
 export const AUTOMATION_PROMPT_MAX = 4000;
+/** A run's summary is one line of at most this many characters. */
+export const AUTOMATION_SUMMARY_MAX = 200;
 /** No schedule may run more often than this. */
 export const AUTOMATION_MIN_MINUTES = 15;
 /** Failed runs in a row before Rails turns an automation off. */

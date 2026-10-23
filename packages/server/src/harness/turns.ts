@@ -2,7 +2,7 @@
 // asks the user a question with options to tap. Either ends the run once its script is done (codemode.ts's
 // `ends`), so the model writes its message first and calls one of them last.
 import { Type } from "@earendil-works/pi-ai";
-import { ASK_OPTIONS_MAX, ASK_OPTIONS_MIN, TEAM_TURNS_MAX, type SprocketAsk } from "@rails/shared";
+import { ASK_OPTIONS_MAX, ASK_OPTIONS_MIN, AUTOMATION_SUMMARY_MAX, TEAM_TURNS_MAX, type SprocketAsk } from "@rails/shared";
 import type { Capability } from "./capabilities.ts";
 
 /** How a run ended on purpose: the teammate it passed to (and what for), or the question it asked. */
@@ -120,8 +120,6 @@ export function sendMessageCapability(post: (text: string) => void): Capability 
   };
 }
 
-export const QUIET_SUMMARY_MAX = 200;
-
 /**
  * `nothing_new`, in an automation's run only (ADR 0032): nothing this time is worth a message, so nothing is posted
  * and the run is listed as Nothing new with its summary. `said` is whether the run has posted anything yet.
@@ -131,7 +129,7 @@ export function nothingNewCapability(end: (e: TurnEnd) => void, ended: () => boo
     name: "nothing_new",
     description:
       "In an automation's run: when its instructions leave nothing to tell this time (they ask about changes and nothing changed, or nothing matched), call this instead of writing a message. Not when they ask for something each time. Nothing is posted in the chat; `summary` is one line for the automation's run list saying what you checked (\"No new issues since Monday 09:00\"). Your turn ends when this script ends.",
-    params: Type.Object({ summary: Type.String({ minLength: 1, maxLength: QUIET_SUMMARY_MAX }) }),
+    params: Type.Object({ summary: Type.String({ minLength: 1, maxLength: AUTOMATION_SUMMARY_MAX }) }),
     effect: "act",
     log: { doing: () => "Finding nothing new", done: () => "found nothing new" },
     run: async ({ summary }: { summary: string }) => {

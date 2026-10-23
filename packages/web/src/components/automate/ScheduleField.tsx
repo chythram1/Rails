@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { scheduleText, type AutomationSchedule } from "@rails/shared";
+import { AUTOMATION_MIN_MINUTES, scheduleText, type AutomationSchedule } from "@rails/shared";
 import { Dropdown } from "../Dropdown.tsx";
 import { Segmented } from "../Segmented.tsx";
 
@@ -126,7 +126,7 @@ export function ScheduleField({ id, schedule, timezone, onChange }: { id: string
             <span>Cron</span>
             <input className="input cz-mono" value={s.expr} spellCheck={false} onChange={(e) => set({ kind: "cron", expr: e.target.value })} aria-describedby={`${id}-cron-help`} />
             <small id={`${id}-cron-help`} className="muted">
-              Minute, hour, day of month, month, weekday. At most every 15 minutes.
+              Minute, hour, day of month, month, weekday. At most every {AUTOMATION_MIN_MINUTES} minutes.
             </small>
           </label>
         )}

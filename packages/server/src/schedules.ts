@@ -54,7 +54,7 @@ export function scheduleProblem(s: AutomationSchedule, timezone: string, now = n
       if (!Number.isInteger(s.minute) || s.minute < 0 || s.minute > 59) return "Pick a minute from 0 to 59.";
       break;
     case "weekly":
-      if (!s.days.length || s.days.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) return "Pick at least one day.";
+      if (!Array.isArray(s.days) || !s.days.length || s.days.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) return "Pick at least one day.";
       if (!TIME.test(s.time)) return "Pick a time.";
       break;
     case "daily":
@@ -62,7 +62,7 @@ export function scheduleProblem(s: AutomationSchedule, timezone: string, now = n
       if (!TIME.test(s.time)) return "Pick a time.";
       break;
     case "cron":
-      if (s.expr.trim().split(/\s+/).length !== 5) return "A cron expression has five fields: minute, hour, day of month, month and weekday.";
+      if (typeof s.expr !== "string" || s.expr.trim().split(/\s+/).length !== 5) return "A cron expression has five fields: minute, hour, day of month, month and weekday.";
       break;
     default:
       return "Pick a schedule.";

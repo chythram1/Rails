@@ -5,18 +5,19 @@ import {
   AUTOMATION_FAILS_TO_PAUSE,
   AUTOMATION_NAME_MAX,
   AUTOMATION_PROMPT_MAX,
+  AUTOMATION_SUMMARY_MAX,
   actionSettled,
   type Automation,
   type AutomationInput,
   type AutomationRun,
-  type AutomationSchedule,
   type AutomationTrigger,
   type SprocketMessage,
 } from "@rails/shared";
-import { automationRuns, automations, sprocketChats, sprocketMessages, sprocketRuns, sprockets, type StoredAutomation, type StoredAutomationRun } from "./db.ts";
+import { automationRuns, automations, sprocketMessages, sprocketRuns, sprockets, type StoredAutomation, type StoredAutomationRun } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { onRunsChanged, queueAutomationRun, userMessageTime } from "./runs.ts";
 import { knownTimezone, nextRun, scheduleProblem } from "./schedules.ts";
+import { directChat } from "./sprockets.ts";
 import { listeners } from "./util.ts";
 
 const changes = listeners<[]>();
@@ -25,8 +26,6 @@ const changed = () => changes.emit();
 
 /** How often the scheduler looks for automations that are due. */
 const TICK_MS = 30_000;
-/** A run's summary is one line of about this many characters. */
-const SUMMARY_MAX = 200;
 
 const publicRun = ({ sprocketRunId: _r, messageId: _m, ...run }: StoredAutomationRun): AutomationRun => run;
 
@@ -61,7 +60,7 @@ function checked(input: AutomationInput, current?: StoredAutomation): Omit<Store
   const name = (input.name ?? current?.name ?? "").trim();
   const prompt = (input.prompt ?? current?.prompt ?? "").trim();
   const sprocketId = input.sprocketId ?? current?.sprocketId ?? "";
-  const schedule = (input.schedule ?? current?.schedule) as AutomationSchedule | undefined;
+  const schedule = input.schedule ?? current?.schedule;
   const timezone = (input.timezone ?? current?.timezone ?? "").trim();
   const enabled = input.enabled ?? current?.enabled ?? true;
   if (!name) throw new ServiceError("Give it a name.", 400);
@@ -103,30 +102,25 @@ export function deleteAutomation(id: string): void {
   changed();
 }
 
+const isRunning = (id: string) => automationRuns.list(id, 1)[0]?.outcome === "running";
+
 /** Run it now, whatever its schedule (Run now). Refused while its last run is still going. */
 export function runAutomation(id: string): AutomationRun {
   const a = stored(id);
-  if (automationRuns.list(id, 1)[0]?.outcome === "running") throw new ServiceError("It's running now.", 409);
+  if (isRunning(id)) throw new ServiceError("It's running now.", 409);
   const run = fire(a, "manual");
-  if (!run) throw new ServiceError("Its Sprocket is gone.", 409);
+  changed();
   return publicRun(run);
 }
 
 /** Post its line in its Sprocket's direct chat and queue the run there; skipped while its last run still goes. */
-function fire(a: StoredAutomation, trigger: AutomationTrigger): StoredAutomationRun | undefined {
-  const chatId = sprocketChats.of(a.sprocketId, "direct")?.id;
-  if (!chatId || !sprockets.get(a.sprocketId)) return;
-  let run: StoredAutomationRun;
-  if (automationRuns.list(a.id, 1)[0]?.outcome === "running") {
-    run = automationRuns.create({ automationId: a.id, trigger, outcome: "skipped", summary: "Its previous run hadn't finished." });
-  } else {
-    const line = sprocketMessages.create(chatId, "automation", a.prompt, userMessageTime(chatId), { automation: { id: a.id, name: a.name, trigger } });
-    // Its row comes after the Sprocket's run is queued: settle() (on every run change) only sees it complete.
-    const sprocketRunId = queueAutomationRun(chatId, a.sprocketId, line.id);
-    run = automationRuns.create({ automationId: a.id, trigger, outcome: "running", sprocketRunId, messageId: line.id });
-  }
-  changed();
-  return run;
+function fire(a: StoredAutomation, trigger: AutomationTrigger): StoredAutomationRun {
+  if (isRunning(a.id)) return automationRuns.create({ automationId: a.id, trigger, outcome: "skipped", summary: "Its previous run hadn't finished." });
+  const chatId = directChat(a.sprocketId);
+  const line = sprocketMessages.create(chatId, "automation", a.prompt, userMessageTime(chatId), { automation: { id: a.id, name: a.name, trigger } });
+  // Its row comes after the Sprocket's run is queued: settle() (on every run change) only sees it complete.
+  const sprocketRunId = queueAutomationRun(chatId, a.sprocketId, line.id);
+  return automationRuns.create({ automationId: a.id, trigger, outcome: "running", sprocketRunId, messageId: line.id });
 }
 
 /**
@@ -134,20 +128,19 @@ function fire(a: StoredAutomation, trigger: AutomationTrigger): StoredAutomation
  * and its next run counted from now. A once that ran turns off.
  */
 export function tick(now = new Date()): void {
-  for (const a of automations.list()) {
-    if (!a.enabled || !a.nextRunAt || Date.parse(a.nextRunAt) > now.getTime()) continue;
-    if (!sprockets.get(a.sprocketId)) continue;
+  const ready = automations.list().filter((a) => a.enabled && a.nextRunAt && Date.parse(a.nextRunAt) <= now.getTime());
+  for (const a of ready) {
     fire(a, "schedule");
     const once = a.schedule.kind === "once";
-    automations.update(a.id, { ...a, enabled: once ? false : a.enabled, nextRunAt: once ? undefined : due(a, now) });
-    changed();
+    automations.update(a.id, { ...a, enabled: !once, nextRunAt: once ? undefined : due(a, now) });
   }
+  if (ready.length) changed();
 }
 
 /** The first line of a message, cut to a summary's length. */
 function oneLine(text: string): string {
   const line = text.split("\n").map((l) => l.replace(/^[#>*\-\s]+/, "").trim()).find(Boolean) ?? "";
-  return line.length > SUMMARY_MAX ? `${line.slice(0, SUMMARY_MAX - 1)}…` : line;
+  return line.length > AUTOMATION_SUMMARY_MAX ? `${line.slice(0, AUTOMATION_SUMMARY_MAX - 1)}…` : line;
 }
 
 /** How a finished Sprocket run went, for its automation's run list. */

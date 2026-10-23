@@ -18,15 +18,15 @@ type AutomateRoute = Extract<Route, { name: "automate" }>;
  */
 export function AutomatePage({ route }: { route: AutomateRoute }) {
   const { list: sprockets } = useSprockets();
-  const { list, error } = useAutomations();
   if (route.view === "new")
     return <div className="cz-detail">{sprockets && <NewAutomation sprockets={sprockets} />}</div>;
-  if (route.view === "item" && route.id)
+  if (route.view === "item")
     return <div className="cz-detail">{sprockets && <AutomationEditor key={route.id} id={route.id} sprockets={sprockets} />}</div>;
-  return <Gallery list={list} sprockets={sprockets ?? []} error={error} />;
+  return <Gallery sprockets={sprockets ?? []} />;
 }
 
-function Gallery({ list, sprockets, error }: { list: Automation[] | null; sprockets: SprocketData[]; error: string }) {
+function Gallery({ sprockets }: { sprockets: SprocketData[] }) {
+  const { list, error } = useAutomations();
   const [query, setQuery] = useState("");
   const [runError, setRunError] = useState("");
   const q = query.trim().toLowerCase();

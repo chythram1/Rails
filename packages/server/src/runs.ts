@@ -351,6 +351,8 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   let end: TurnEnd | undefined;
   const endWith = (e: TurnEnd) => (end = e);
   const ended = () => !!end;
+  /** Whether it has posted anything to its user this run (`posted` and `sent` are below). */
+  const said = () => posted.size > 0 || sent.length > 0;
   const capabilities = [
     memoryCapability(changed),
     promptsCapability,
@@ -361,8 +363,8 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
     ...(chat.kind !== "project" ? [askUserCapability(endWith, ended), sendMessageCapability((text) => post(text)), showCardCapability((card) => show(card))] : []),
     ...mcpCapabilities(servers.filter((x) => !x.error).map((x) => x.server), endWith, ended, chat.kind !== "project" ? propose : undefined),
     ...(skills.length ? [readSkillCapability(skills)] : []),
-    ...(r.trigger === "automation" && chat.kind === "direct" ? [nothingNewCapability(endWith, ended, () => posted.size > 0 || sent.length > 0)] : []),
-    ...(team ? [passTurnCapability(team.members.filter((m) => m.id !== id), { hop: r.hop, queued: () => queuedIn(chatId), asking: () => waitingAsks(chatId).map((a) => a.sprocketId), said: () => posted.size > 0 || sent.length > 0 }, endWith, ended)] : []),
+    ...(r.trigger === "automation" && chat.kind === "direct" ? [nothingNewCapability(endWith, ended, said)] : []),
+    ...(team ? [passTurnCapability(team.members.filter((m) => m.id !== id), { hop: r.hop, queued: () => queuedIn(chatId), asking: () => waitingAsks(chatId).map((a) => a.sprocketId), said }, endWith, ended)] : []),
   ];
   // The run log: every call's outcome, and the ones going now (scripts can run several at once).
   const done: { name: string; args: unknown; status: CallRecord["status"] }[] = [];

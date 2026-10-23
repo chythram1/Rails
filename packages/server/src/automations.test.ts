@@ -1,11 +1,13 @@
 // Automations (ADR 0032): a Sprocket runs a prompt on a schedule in its direct chat, and each run gets an outcome.
 import { fauxAssistantMessage, fauxProvider, fauxToolCall, type TranscriptContext } from "@earendil-works/pi-ai";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { fileURLToPath } from "node:url";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createAutomation, deleteAutomation, getAutomation, listAutomations, runAutomation, startAutomations, stopAutomations, tick, updateAutomation } from "./automations.ts";
 import { automations, settings } from "./db.ts";
+import { createServer, disconnectAll, testServer } from "./mcp.ts";
 import { models, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
-import { createSprocket, deleteSprocket, directChat, listMessages } from "./sprockets.ts";
+import { createSprocket, deleteSprocket, directChat, listMessages, updateSettings } from "./sprockets.ts";
 
 const faux = fauxProvider();
 models.setProvider(faux.provider);
@@ -16,6 +18,7 @@ beforeEach(() => {
   startAutomations();
 });
 afterEach(() => stopAutomations());
+afterAll(() => disconnectAll());
 
 let n = 0;
 const sprocket = () => createSprocket({ name: `Auto ${++n}`, look });
@@ -32,6 +35,9 @@ describe("automations", () => {
     expect(() => createAutomation({ name: "A", prompt: " ", sprocketId: s.id, schedule: daily, timezone: "UTC" })).toThrow("Say what it should do.");
     expect(() => createAutomation({ name: "A", prompt: "x", sprocketId: "nope", schedule: daily, timezone: "UTC" })).toThrow("Pick a Sprocket");
     expect(() => createAutomation({ name: "A", prompt: "x", sprocketId: s.id, schedule: { kind: "cron", expr: "* * * * *" }, timezone: "UTC" })).toThrow("every 15 minutes");
+    // A schedule missing its fields is refused, not a crash.
+    expect(() => createAutomation({ name: "A", prompt: "x", sprocketId: s.id, schedule: { kind: "weekly" } as never, timezone: "UTC" })).toThrow("Pick at least one day.");
+    expect(() => createAutomation({ name: "A", prompt: "x", sprocketId: s.id, schedule: { kind: "cron" } as never, timezone: "UTC" })).toThrow("five fields");
     const a = createAutomation({ name: "Brief", prompt: "Tell me what's new.", sprocketId: s.id, schedule: daily, timezone: "Europe/Berlin" });
     expect(a.enabled).toBe(true);
     expect(new Date(a.nextRunAt!).getTime()).toBeGreaterThan(Date.now());
@@ -126,16 +132,44 @@ describe("automations", () => {
     expect(on.nextRunAt).toBeDefined();
   });
 
+  it("counts only failures in a row", async () => {
+    const s = sprocket();
+    const a = createAutomation({ name: "Brief", prompt: "Tell me what's new.", sprocketId: s.id, schedule: daily, timezone: "UTC" });
+    for (const works of [false, false, true, false]) {
+      settings.set("defaultModel", works ? ref : "nowhere/none");
+      faux.setResponses([fauxAssistantMessage("All quiet.")]);
+      runAutomation(a.id);
+      await idle();
+    }
+    expect(getAutomation(a.id).runs.map((r) => r.outcome)).toEqual(["failed", "done", "failed", "failed"]);
+    expect(getAutomation(a.id).automation).toMatchObject({ enabled: true });
+  });
+
+  it("needs the user when a tool's call waits on a card", async () => {
+    const server = createServer({ name: "autonotes", transport: "stdio", command: process.execPath, args: [fileURLToPath(new URL("./test/fake-mcp.mjs", import.meta.url))] });
+    await testServer(server.id);
+    const s = sprocket();
+    updateSettings(s.id, { tools: { mcp: [server.id] } });
+    const a = createAutomation({ name: "Notes", prompt: "Note what's new.", sprocketId: s.id, schedule: daily, timezone: "UTC" });
+    faux.setResponses([script('await tools.autonotes_add_note({ text: "Call Ada" });'), fauxAssistantMessage("A note waits for you.")]);
+    runAutomation(a.id);
+    await idle();
+    expect(getAutomation(a.id).runs[0].outcome).toBe("needs_you");
+  });
+
   it("turns a once schedule off after it runs, and goes with its Sprocket", async () => {
     const s = sprocket();
-    const soon = new Date(Date.now() + 3_600_000);
-    const at = `${soon.toISOString().slice(0, 13)}:00`.replace(/(\d{2}):00$/, "$1:00");
-    const a = createAutomation({ name: "Once", prompt: "Remind me.", sprocketId: s.id, schedule: { kind: "once", at: at.slice(0, 16) }, timezone: "UTC" });
+    const at = new Date(Date.now() + 3_600_000).toISOString().slice(0, 16); // in an hour, UTC
+    const a = createAutomation({ name: "Once", prompt: "Remind me.", sprocketId: s.id, schedule: { kind: "once", at }, timezone: "UTC" });
     faux.setResponses([fauxAssistantMessage("Reminder!")]);
     tick(dueAt(a.id));
     await idle();
     expect(getAutomation(a.id).automation).toMatchObject({ enabled: false });
     expect(getAutomation(a.id).automation.nextRunAt).toBeUndefined();
+    // Once its time has passed it can still be renamed, but not turned on again.
+    automations.update(a.id, { ...automations.get(a.id)!, schedule: { kind: "once", at: "2020-01-01T09:00" } });
+    expect(updateAutomation(a.id, { name: "Once, done" }).name).toBe("Once, done");
+    expect(() => updateAutomation(a.id, { enabled: true })).toThrow("That time has passed.");
     deleteSprocket(s.id);
     expect(listAutomations().some((x) => x.id === a.id)).toBe(false);
     const b = createAutomation({ name: "Gone", prompt: "x", sprocketId: sprocket().id, schedule: daily, timezone: "UTC" });

@@ -797,12 +797,12 @@ export const sprocketMessages = {
     db.prepare("UPDATE sprocket_messages SET approval = ? WHERE id = ?").run(JSON.stringify(approval), id);
   },
   /** Mark an event the Coordinator decided the user needn't hear about. */
+  setQuiet(id: string): void {
+    db.prepare("UPDATE sprocket_messages SET event = json_set(event, '$.quiet', json('true')) WHERE id = ? AND event IS NOT NULL").run(id);
+  },
   /** An automation's run found nothing new (ADR 0032): its line isn't shown. */
   setAutomationQuiet(id: string): void {
     db.prepare("UPDATE sprocket_messages SET automation = json_set(automation, '$.quiet', json('true')) WHERE id = ? AND automation IS NOT NULL").run(id);
-  },
-  setQuiet(id: string): void {
-    db.prepare("UPDATE sprocket_messages SET event = json_set(event, '$.quiet', json('true')) WHERE id = ? AND event IS NOT NULL").run(id);
   },
   /** The stored tool steps of a Sprocket's `limit` latest replies in a chat that have them, by message id. */
   recentSteps(chatId: string, sprocketId: string, limit: number): Map<string, unknown[]> {
@@ -1558,11 +1558,6 @@ export const automationRuns = {
   },
   get(id: string): StoredAutomationRun | undefined {
     const r = db.prepare("SELECT * FROM automation_runs WHERE id = ?").get(id) as AutomationRunRow | undefined;
-    return r && toAutomationRun(r);
-  },
-  /** The run a Sprocket run belongs to, if an automation started it. */
-  bySprocketRun(sprocketRunId: string): StoredAutomationRun | undefined {
-    const r = db.prepare("SELECT * FROM automation_runs WHERE sprocket_run_id = ?").get(sprocketRunId) as AutomationRunRow | undefined;
     return r && toAutomationRun(r);
   },
   /** An automation's runs, newest first. */

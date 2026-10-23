@@ -21,7 +21,8 @@ export type Route =
   /** Something new in Customize, not created until the user says so. */
   | { name: "customize"; view: "new"; tab: CustomizeTab; draft: CustomizeDraft }
   /** Automate (ADR 0032): the list of automations, a new one (not created until Create), or one by id. */
-  | { name: "automate"; view: "list" | "new" | "item"; id?: string };
+  | { name: "automate"; view: "list" | "new" }
+  | { name: "automate"; view: "item"; id: string };
 
 export type CustomizeTab = "connectors" | "skills" | "prompts";
 /** What a new item in Customize is: a skill, a prompt, or a custom server with a URL or a command. */
