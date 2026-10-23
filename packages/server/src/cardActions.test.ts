@@ -100,6 +100,24 @@ describe("cards that act", () => {
     await expect(actOnCard(id, { run: true })).rejects.toThrow("Nothing on it is waiting");
   });
 
+  it("ends the Sprocket's next turn with what came of each action, after the replayed steps that said nothing had run", async () => {
+    const server = await notesServer();
+    const s = sprocketWith("Helper", server.id);
+    const chat = directChat(s.id);
+    faux.setResponses([calls([{ tool: `${server.name}_add_note`, args: { text: "Call Ada" } }]), fauxAssistantMessage("It's on the card.")]);
+    sendMessage(chat, "add a note to call Ada");
+    await idle();
+    let last = "";
+    faux.setResponses([(c) => ((last = JSON.stringify(c.messages.at(-1))), fauxAssistantMessage("Added."))]);
+    await actOnCard(cardIn(chat).id, { run: true });
+    await idle();
+    // The step's own result ("Nothing has run yet") is replayed before "It's on the card.", after the card's note: the
+    // last word must be what happened.
+    expect(last).toContain("Your user has run or skipped every action on your card");
+    expect(last).toContain("Your user ran it.");
+    expect(last).toContain("Added note 2.");
+  });
+
   it("runs all in order, re-checks each at the tap, and lets a message in first see what has run so far", async () => {
     const server = await notesServer();
     const s = sprocketWith("Helper", server.id);

@@ -2,9 +2,7 @@ import { useState } from "react";
 import { IconCheck as Check, IconChevronRight as ChevronRight, IconPlayerSkipForward as Skipped, IconPlug as Plug, IconX as X } from "@tabler/icons-react";
 import type { SprocketCardAction } from "@rails/shared";
 import { api } from "../../api.ts";
-
-/** An argument's value in a line: text as it is, the rest as JSON. */
-const show = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
+import { gist, readable, readableResult } from "./readable.ts";
 
 const Args = ({ args }: { args: Record<string, unknown> }) => {
   const list = Object.entries(args);
@@ -13,15 +11,12 @@ const Args = ({ args }: { args: Record<string, unknown> }) => {
       {list.map(([k, v]) => (
         <div key={k}>
           <dt>{k}</dt>
-          <dd>{show(v)}</dd>
+          <dd className={v !== null && typeof v === "object" ? "card-action-nested" : undefined}>{readable(v)}</dd>
         </div>
       ))}
     </dl>
   ) : null;
 };
-
-/** Its first text argument, to tell actions of the same tool apart once they're folded. */
-const gist = (args: Record<string, unknown>) => Object.values(args).find((v): v is string => typeof v === "string" && v.trim() !== "");
 
 const DONE_LABEL: Record<Exclude<SprocketCardAction["status"], "waiting">, string> = {
   running: "Running…",
@@ -82,7 +77,7 @@ export function CardActions({ messageId, actions }: { messageId: string; actions
                   {a.result && (
                     <div className="approval-result-wrap">
                       <p className="approval-result-label">{a.status === "failed" ? "What went wrong" : "What it returned"}</p>
-                      <div className="approval-result">{a.result}</div>
+                      <div className="approval-result">{readableResult(a.result)}</div>
                     </div>
                   )}
                 </details>
@@ -95,7 +90,10 @@ export function CardActions({ messageId, actions }: { messageId: string; actions
                 <Plug size={14} aria-hidden />
                 <span className="card-action-label">{a.label}</span>
               </p>
-              <p className="card-action-tool">{tool}</p>
+              <p className="card-action-tool">
+                {tool}
+                {a.destructive && <span className="card-action-tag">Destructive</span>}
+              </p>
               <Args args={a.args} />
               <div className="approval-actions">
                 {sure && <span className="card-action-warn">{a.server} marks this as destructive.</span>}
@@ -124,7 +122,11 @@ export function CardActions({ messageId, actions }: { messageId: string; actions
               {error}
             </p>
           )}
-          {confirming === "all" && <span className="card-action-warn">Some of these are marked destructive.</span>}
+          {confirming === "all" && (
+            <span className="card-action-warn">
+              {waiting.filter((a) => a.destructive).length === 1 ? "One of these is marked destructive." : "Some of these are marked destructive."}
+            </span>
+          )}
           <span className="grow" />
           {waiting.length > 1 && (
             <>

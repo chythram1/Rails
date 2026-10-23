@@ -926,11 +926,19 @@ function actionsText(actions: SprocketCardAction[]): string {
   return `Its actions (your user runs or skips each from the card):\n${lines.join("\n")}`;
 }
 
-/** Why this run started, when it isn't a message: a decided approval, or a card whose actions are all settled. */
+/**
+ * Why this run started, when it isn't a message: a decided approval, or a card whose actions are all settled. A card's
+ * outcomes are said here again, last: the steps that proposed them ("Nothing has run yet") are replayed after the
+ * card's own note, and models took them for the latest word.
+ */
 function whyNow(r: StoredRun): string[] {
   if (r.trigger === "approval") return ["Your user decided on the tool you asked to use (Rails' note above says what came of it). Go on from there."];
-  if (r.trigger === "actions")
-    return ["Your user has run or skipped every action on your card (Rails' note on the card above says what came of each). Tell them briefly what happened, without repeating the card, and go on from there."];
+  if (r.trigger === "actions") {
+    const actions = r.sourceId ? sprocketMessages.get(r.sourceId)?.card?.actions : undefined;
+    return [
+      `Your user has run or skipped every action on your card. This is what came of them now (it replaces "Nothing has run yet" from when you proposed them):${actions?.length ? `\n${actionsText(actions)}` : ""}\nTell them briefly what happened, without repeating the card, and go on from there.`,
+    ];
+  }
   return [];
 }
 
