@@ -24,12 +24,20 @@ export function sessionsOf(db: DatabaseSync, panels: { id: string; kind: string 
   return out;
 }
 
-/** The latest event kind each panel reported. */
+/** Events that end a wait, as the board reads them (bridge/board.ts): tool calls don't, a session waits on through them. */
+const ENDS_WAIT = new Set(["start", "prompt", "resumed", "turn_end", "stopped", "failed", "ended"]);
+
+/**
+ * The latest event kind each panel reported, or "waiting" while a wait is still open: an agent can report tool calls
+ * during one (Codex works on while its question waits; pi's tool call may come in just after its dialog).
+ */
 export function lastEvents(db: DatabaseSync, panelIds: string[]): Map<string, string> {
   const out = new Map<string, string>();
   for (const id of panelIds) {
-    const r = one<{ kind: string }>(db, "SELECT json_extract(event, '$.kind') AS kind FROM session_events WHERE panel_id = ? ORDER BY id DESC LIMIT 1", id);
-    if (r) out.set(id, r.kind);
+    const kinds = all<{ kind: string }>(db, "SELECT json_extract(event, '$.kind') AS kind FROM session_events WHERE panel_id = ? ORDER BY id DESC LIMIT 50", id).map((r) => r.kind);
+    if (!kinds.length) continue;
+    const waits = kinds.findIndex((k) => k === "waiting" || ENDS_WAIT.has(k));
+    out.set(id, kinds[waits] === "waiting" ? "waiting" : kinds[0]);
   }
   return out;
 }
