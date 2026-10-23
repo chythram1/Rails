@@ -18,10 +18,15 @@ Decisions:
 - **Not twice:** nothing wakes for a session the reporting one already wrote to in the last 10 minutes (ADR 0018),
   or has a handoff planned to (ADR 0015), and a pair of sessions wakes it once per file per 30 minutes.
 - **The wake** is a `finding` event in the project chat: the reporting session, the sessions and files named, and
-  the end of its reply. The Coordinator reads the reply and drafts that session a message with `suggest_message`
+  the end of its reply. It tells the Coordinator the reply may also name work for a session not listed (test run
+  10: a file of Codex's named next to work that was pi's), and to look for the old name in the other sessions'
+  files (`search_files`) when the reply renamed or changed something they use. The Coordinator reads the reply and drafts that session a message with `suggest_message`
   (what was found, by whom, where, what to do), or replies (quiet) when the file is only mentioned, used or fine, or
   the work there is already done. As with every draft, the user sends it.
-- **The decision model**, when one is set, is asked first: "does it name work another session has to do?", with
+- **The decision model**, when one is set, is asked first: "does it name work another session has to do, or a
+  change it made to something they use (a renamed field, a changed function or data shape) that their code has
+  to follow?" (test runs 9 and 10: Codex renamed a field the views read, said so only in its reply, and the views
+  broke silently), with
   the other sessions and what each owns or changed as context, and in the same call "does it ask the user
   something?". When it's sure (`FINDING_BAR`, 0.75, from runs 8 and 9) its answer decides: a finding wakes the Coordinator even when
   the reply names no file (the event then names no session, and the Coordinator finds out whose it is; not when

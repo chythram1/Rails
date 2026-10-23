@@ -96,10 +96,10 @@ export const QUESTIONS: Record<DecisionEntry["question"], { key: string; questio
     question: {
       type: "bool",
       instructions:
-        "This is the end of a coding agent's last message to its user, after it finished a turn. Other agent sessions work on the same project, each on its own files (listed). Does the message say that one of those other sessions has to change something in its own files: a mismatch, a bug, a missing piece, a follow-up?",
+        "This is the end of a coding agent's last message to its user, after it finished a turn. Other agent sessions work on the same project, each on its own files (listed). Does the message say that one of those other sessions has to change something in its own files: a mismatch, a bug, a missing piece, a follow-up, or a change it made to something they use (a renamed field, a changed function or data shape) that their code has to follow?",
       criteria: {
-        true: "It names a problem or a needed change in another session's files or area, which that session would have to act on.",
-        false: "It only reports its own work, or mentions other sessions' files as used, checked or fine, or the work there is already done.",
+        true: "It names a problem or a needed change in another session's files or area, which that session would have to act on; or it renamed or changed a field, function or data shape that other sessions' code uses, so their code has to follow.",
+        false: "It only reports its own work, which nothing outside its own files has to follow (new functions others may use are not a change they must make), or mentions other sessions' files as used, checked or fine, or the work there is already done.",
       },
     },
   },
