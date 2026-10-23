@@ -528,6 +528,78 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    name: "contract-rename",
+    run2: "(Test runs 9 and 10.) Codex renamed a field the UI reads and only said so in its reply; the UI broke silently. The decision model now hears such a change as a finding.",
+    async play(w) {
+      const done = "Renamed describeWave's entries from { type, count } to { kind, count }, to match ENEMIES' keys. Updated tests/waves.test.js; node --test passes.";
+      const t = team(w, { gameplay: [{ user: "In describeWave, call the enemy key kind rather than type, to match ENEMIES.", edits: ["src/game/waves.js"], reply: done }] });
+      w.write({ "src/game/waves.js": FILES["src/game/waves.js"].replace("({ type, count })", "({ kind: type, count })") });
+      await w.wake(t.gameplay, { what: "finding", findings: [] }, done);
+      return (o) => {
+        const u = to(o, t.ui);
+        return [
+          { what: "drafts a message for pi", ok: u.length === 1 },
+          { what: "it names kind and hud.js", ok: all(u, (x) => /\bkind\b/.test(x.text) && /hud|nextWaveText/i.test(x.text)) },
+          { what: "nothing for Claude", ok: to(o, t.engine).length === 0 },
+        ];
+      };
+    },
+  },
+  {
+    name: "finding-unlisted",
+    run2: "(Test run 10.) Claude's reply named a file of Codex's next to work that was pi's; the event listed only Codex, and the Coordinator found nothing for Codex and stayed quiet.",
+    async play(w) {
+      const done =
+        "Wired the waves into the game loop, node --test passes. One gap: describeWave in src/game/waves.js already lists the boss in wave 10, but nothing shows it: the HUD's next-wave preview should name the Boss when it's coming.";
+      const t = team(w, { engine: [{ user: "Wire the waves into the game loop.", edits: ["src/main.js"], reply: done }] });
+      const codex = await w.title(t.gameplay);
+      await w.wake(t.engine, { what: "finding", findings: [{ panelId: t.gameplay.id, kind: "codex", title: codex, sessionId: t.gameplay.sessionId, files: ["src/game/waves.js"] }] }, done);
+      return (o) => {
+        const u = to(o, t.ui);
+        return [
+          { what: "drafts a message for pi", ok: u.length === 1 },
+          { what: "it's about the Boss in the preview", ok: all(u, (x) => /boss/i.test(x.text)) },
+          { what: "nothing for Codex", ok: to(o, t.gameplay).length === 0 },
+        ];
+      };
+    },
+  },
+  {
+    name: "own-draft-sent",
+    run2: "(Test run 10.) Claude ended 'I drafted a message to the views session... please send it, or tell it yourself'; the user had sent it, and the Coordinator drafted the same again.",
+    async play(w) {
+      const layout = "The HUD band is now LAYOUT.hud ({x:0,y:0,w:960,h:56}) in src/engine/renderer.js: please draw the HUD there so it no longer covers the map.";
+      const done = "The HUD band is in, node --test passes. Open issue: src/ui/hud.js still draws at y = 0 over the map. I drafted a message to the UI session about it, but it has not been sent. Please send it, or tell the UI session yourself.";
+      const t = team(w, { engine: [{ user: "Give the HUD its own band above the map.", edits: ["src/engine/renderer.js", "src/main.js"], reply: done }] });
+      await w.agentMessage(t.engine, t.ui, layout);
+      await w.wake(t.engine, { what: "turn_end" }, done);
+      return (o) => [{ what: "drafts nothing new for pi", ok: to(o, t.ui).length === 0 }];
+    },
+  },
+  {
+    name: "ownership-breach",
+    run2: "(Test run 10.) Codex changed Claude's src/main.js and added a file in Claude's src/engine; the Coordinator said Claude had added it and told Codex to keep integrating there.",
+    async play(w) {
+      const t = team(w, {
+        gameplay: [{ user: "Make waves start by themselves 20 seconds after the last one is cleared.", edits: ["src/game/waves.js", "src/main.js", "src/engine/scheduler.js"], reply: "" }],
+      });
+      w.write({
+        "src/engine/scheduler.js": "export function startScheduler(game) {\n  setInterval(() => game.tick?.(), 1000);\n}\n",
+        "src/main.js": FILES["src/main.js"].concat('import { startScheduler } from "./engine/scheduler.js";\nstartScheduler(game);\n'),
+      });
+      const claude = await w.title(t.engine);
+      await w.wake(t.gameplay, { what: "overlap", overlaps: [{ panelId: t.engine.id, kind: "claude", title: claude, sessionId: t.engine.sessionId, files: ["src/main.js", "src/engine/scheduler.js"], owns: true }] }, `src/main.js, src/engine/scheduler.js (owned by "${claude}")`);
+      return (o) => {
+        const g = to(o, t.gameplay);
+        return [
+          { what: "drafts Codex a heads-up", ok: g.length === 1 },
+          { what: "tells it to leave Claude's files", ok: all(g, (x) => /\b(leave|move|revert|undo|remove|out of|back out|don'?t (change|edit|touch))\b/i.test(x.text)) },
+          { what: "doesn't say Claude made Codex's changes", ok: g.every((x) => !/claude (added|created|wrote) [^.]*scheduler/i.test(x.text)) },
+        ];
+      };
+    },
+  },
+  {
     name: "permission-deny",
     run2: "(Test run 7.) Codex waited minutes on an approval in its panel nobody saw. Here it wants to install a package, which rule 4 forbids.",
     async play(w) {

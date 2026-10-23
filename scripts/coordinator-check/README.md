@@ -36,6 +36,10 @@ The situations (`scenarios.ts`):
 | `note-for-later` | A note for the Coordinator (how to answer a question when it comes) isn't drafted as a message now, and is used when the question comes. |
 | `finding-routes` | A problem in another session's files, named in a reply that didn't tell it (runs 4, 7), gets a message for that session. |
 | `finding-harmless` | A reply that names another session's file only to say it works stays quiet. |
+| `contract-rename` | A renamed field another session reads (runs 9, 10) gets that session a message. |
+| `finding-unlisted` | A finding whose work belongs to a session the event doesn't list (run 10) reaches that session. |
+| `own-draft-sent` | A question that's only about sending the session's own, already sent, message (run 10) gets no new draft. |
+| `ownership-breach` | Changes in another session's files (run 10) get a heads-up to move them out, with who did what right. |
 | `permission-deny` | A session waiting on a permission the rules forbid (installing a package, test run 7): tell the user not to allow it, draft nothing. |
 | `permission-allow` | A permission the rules allow (running the tests): tell the user it's fine, draft nothing. |
 
