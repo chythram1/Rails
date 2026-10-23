@@ -361,7 +361,7 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
     ...(project && chat.kind !== "project" ? [projectChatCapability] : []),
     ...(project && s.coordinator ? replyCapabilities(s.rules, (sid) => made.push(sid)) : []),
     ...(chat.kind !== "project" ? [askUserCapability(endWith, ended), sendMessageCapability((text) => post(text)), showCardCapability((card) => show(card))] : []),
-    ...mcpCapabilities(servers.filter((x) => !x.error).map((x) => x.server), endWith, ended, chat.kind !== "project" ? propose : undefined),
+    ...mcpCapabilities(servers.filter((x) => !x.error).map((x) => x.server), propose),
     ...(skills.length ? [readSkillCapability(skills)] : []),
     ...(r.trigger === "automation" && chat.kind === "direct" ? [nothingNewCapability(endWith, ended, said)] : []),
     ...(team ? [passTurnCapability(team.members.filter((m) => m.id !== id), { hop: r.hop, queued: () => queuedIn(chatId), asking: () => waitingAsks(chatId).map((a) => a.sprocketId), said }, endWith, ended)] : []),
@@ -547,18 +547,6 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
       const asked = sprocketMessages.create(chatId, "sprocket", e.ask.question, postTime(chatId), { sprocketId: id, runId: r.id, ask: e.ask, steps: steps_ });
       steps_ = [];
       lastPosted = asked;
-      outcome = { asked: true };
-    }
-    if (e && "approval" in e) {
-      const { server, tool } = e.approval;
-      const card = sprocketMessages.create(chatId, "sprocket", `Wants to use ${server} ${tool}`, postTime(chatId), {
-        sprocketId: id,
-        runId: r.id,
-        approval: { ...e.approval, status: "pending" },
-        steps: steps_,
-      });
-      steps_ = [];
-      lastPosted = card;
       outcome = { asked: true };
     }
     if (lastPosted) {

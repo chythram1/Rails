@@ -11,8 +11,6 @@ export type TurnEnd =
   | { ask: SprocketAsk }
   /** Nothing more to do: it passed to a teammate whose turn already comes, after posting its part. */
   | { done: true }
-  /** A call to an MCP tool that asks first (ADR 0025, mcpTools.ts). */
-  | { approval: { serverId: string; server: string; tool: string; args: Record<string, unknown> } }
   /** An automation's run found nothing to tell its user (ADR 0032): what it checked, in a line. */
   | { quiet: string };
 
