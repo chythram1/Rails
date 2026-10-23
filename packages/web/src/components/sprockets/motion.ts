@@ -5,8 +5,8 @@
 import { useEffect, useRef, useSyncExternalStore, type RefObject } from "react";
 
 /** Playful identity: arrivals overshoot ~10%; three durations. */
-export const EASE_BACK = "cubic-bezier(0.34, 1.56, 0.64, 1)";
-export const DURATION = { quick: 150, standard: 250, slow: 400 };
+const EASE_BACK = "cubic-bezier(0.34, 1.56, 0.64, 1)";
+const DURATION = { quick: 150, standard: 250, slow: 400 };
 
 // ---- motion is on unless the OS asks for reduced motion (there's no in-app switch) ----
 const REDUCED = "(prefers-reduced-motion: reduce)";
@@ -122,10 +122,10 @@ const EXPRESSIONS: Record<string, () => [Frames, Frames, number]> = {
     return [f, f, 600];
   },
 };
-export type Expression = keyof typeof EXPRESSIONS;
+type Expression = keyof typeof EXPRESSIONS;
 
 /** Change the eyes for a moment: `kind`, or one picked at random. */
-export function express(svg: SVGSVGElement | null, kind?: Expression) {
+function express(svg: SVGSVGElement | null, kind?: Expression) {
   const eyes = svg?.querySelectorAll(".s-eye");
   if (!eyes || eyes.length < 2) return;
   const names = Object.keys(EXPRESSIONS);

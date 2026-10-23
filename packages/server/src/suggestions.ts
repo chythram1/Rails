@@ -19,7 +19,7 @@ export const SUGGESTION_MAX = 2000;
 /** Most messages one Coordinator can have waiting for one session (they don't replace each other). */
 export const MAX_PENDING_MESSAGES = 3;
 /** Longest reply the user may send (after editing one). */
-export const REPLY_MAX = 4000;
+const REPLY_MAX = 4000;
 
 const changes = listeners();
 /** A suggestion was made, sent, dismissed or expired. */

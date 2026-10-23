@@ -29,7 +29,7 @@ const MAP_WITHIN_MS = 2 * 60_000;
 type Send = (msg: object) => void;
 
 /** Rails' agent tools for Codex (ADR 0030), set by agentTools.ts: their specs, and what answers a call. */
-export interface CodexTools {
+interface CodexTools {
   spec: object[];
   call(panelId: string, tool: string, args: unknown, signal: AbortSignal): Promise<{ text: string; isError: boolean }>;
 }
@@ -44,7 +44,7 @@ const ANSWER_KEPT_MS = 10 * 60_000;
  * When a thread started. Codex's thread ids are UUIDv7s, whose first 48 bits are that time in ms; `createdAt` isn't
  * reliable: a thread that hasn't saved a turn reports the time it was read.
  */
-export function threadStarted(thread: { id?: unknown; createdAt?: unknown }): number {
+function threadStarted(thread: { id?: unknown; createdAt?: unknown }): number {
   const hex = typeof thread.id === "string" ? thread.id.replace(/-/g, "") : "";
   if (/^[0-9a-f]{12}7[0-9a-f]{19}$/i.test(hex)) return parseInt(hex.slice(0, 12), 16);
   return typeof thread.createdAt === "number" ? thread.createdAt * 1000 : Date.now();

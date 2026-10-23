@@ -117,7 +117,7 @@ async function listFolder(root: string, abs: string, rel: string): Promise<strin
   return `${rel || "."}/ (${more ? `the first ${Math.min(names.length, DIR_MAX_ENTRIES)} of many` : names.length} entries)\n${names.slice(0, DIR_MAX_ENTRIES).join("\n")}`;
 }
 
-export interface SearchMatch {
+interface SearchMatch {
   path: string;
   line: number;
   text: string;

@@ -10,7 +10,7 @@ import { Type } from "@earendil-works/pi-ai";
 import { CodemodeSandbox, parseCodemodeSource, renderToolSample, type CodemodeJsonSchema, type CodemodeOutputItem, type CodemodeResult } from "@earendil-works/pi-codemode";
 import { checkArgs, type Capability, type RunContext } from "./capabilities.ts";
 
-export const CODEMODE_TOOL_NAME = "codemode";
+const CODEMODE_TOOL_NAME = "codemode";
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_TIMEOUT_MS = 120_000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 10_000;
@@ -34,7 +34,7 @@ export interface CallRecord {
   error?: string;
 }
 
-export interface CodemodeHooks {
+interface CodemodeHooks {
   /** Values `load()` reads, kept per Sprocket. */
   store(): Record<string, unknown>;
   /** A successful script's `store()` writes. */

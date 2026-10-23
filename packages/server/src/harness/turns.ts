@@ -15,7 +15,7 @@ export type TurnEnd =
   | { quiet: string };
 
 /** A pass's note, shown on its line: what the teammate should do next. */
-export const PASS_NOTE_MAX = 160;
+const PASS_NOTE_MAX = 160;
 
 const QUESTION_MAX = 240;
 const OPTION_MAX = 80;
@@ -97,7 +97,7 @@ export function askUserCapability(end: (e: TurnEnd) => void, ended: () => boolea
 }
 
 /** Messages one run may post with send_message. */
-export const SENDS_MAX = 5;
+const SENDS_MAX = 5;
 
 /** `send_message`: a message of its own in the chat right away (a heads-up, a second message in a row); the turn goes on. */
 export function sendMessageCapability(post: (text: string) => void): Capability {

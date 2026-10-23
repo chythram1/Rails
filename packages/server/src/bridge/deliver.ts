@@ -20,10 +20,10 @@ const TAKE_MS = 3000;
 /** How long the pi extension has to say pi took a message. */
 const ACK_MS = 5000;
 /** How long a pi poll waits for a message before it's answered empty (the extension then polls again). */
-export const POLL_MS = 25_000;
+const POLL_MS = 25_000;
 
 /** What a reply to Claude Code starts with. pi and Codex show replies as the user's own messages, so they get none. */
-export const CLAUDE_ATTRIBUTION = "From your user, sent with Rails:";
+const CLAUDE_ATTRIBUTION = "From your user, sent with Rails:";
 
 const unreachable = (agent: string) => `Rails can't reach this ${agent} session (it may have started before Rails could see it). Reply in its panel.`;
 
@@ -70,7 +70,7 @@ function writeLine(path: string, line: string): Promise<void> {
 }
 
 /** A message for a pi session, as its extension receives it. `queue`: it may wait in pi's follow-up queue. */
-export interface PiMessage {
+interface PiMessage {
   id: string;
   text: string;
   queue: boolean;

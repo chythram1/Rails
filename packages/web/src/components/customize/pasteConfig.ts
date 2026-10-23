@@ -17,7 +17,7 @@ export interface PastedServer {
   checkArgs: string[];
 }
 
-export type Pasted = { servers: PastedServer[] } | { error: string };
+type Pasted = { servers: PastedServer[] } | { error: string };
 
 const PLACEHOLDER = /^<.*>$|^\$\{.+\}$|^\$[A-Z_][A-Z0-9_]*$|your[-_ ]?[a-z]|^x{4,}|replace[-_ ]?(me|with)|^\.\.\.$|^\*{3,}$/i;
 const PLACEHOLDER_ARG = /^<.*>$|\/path\/to\b|your[-_ ]?[a-z]|^\$\{.+\}$/i;

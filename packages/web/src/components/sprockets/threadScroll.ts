@@ -12,14 +12,14 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "re
 //   is out of view (the user scrolled up) and no reply is being written, it's dropped.
 
 /** Positions in the thread's scroll coordinates. `contentEnd` is where the messages end (the spacer's top). */
-export interface ThreadGeo {
+interface ThreadGeo {
   scrollTop: number;
   viewport: number;
   contentEnd: number;
 }
 
 /** Room reserved after the messages: `room` px when the content ended at `contentAt`. */
-export interface Page {
+interface Page {
   room: number;
   contentAt: number;
 }

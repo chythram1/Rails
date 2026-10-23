@@ -5,7 +5,7 @@ import { CARD_LIMITS as L, type CardBlock, type SprocketCard } from "@rails/shar
 import type { Capability } from "./capabilities.ts";
 
 /** Cards one run may show. */
-export const CARDS_MAX = 3;
+const CARDS_MAX = 3;
 
 const str = (max: number, description?: string) => Type.String({ minLength: 1, maxLength: max, ...(description ? { description } : {}) });
 

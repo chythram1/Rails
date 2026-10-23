@@ -44,7 +44,7 @@ const IDLE_MS = 5 * 60_000;
 /** How long connecting (and listing the tools) may take. */
 const CONNECT_MS = 20_000;
 /** How long one tool call may take. */
-export const CALL_MS = 120_000;
+const CALL_MS = 120_000;
 /** A result is trimmed to this for the model (and for an approval card). */
 export const RESULT_CHARS = 20_000;
 const ARGS_MAX = 50;
@@ -491,7 +491,7 @@ export async function callTool(serverId: string, tool: string, args: Record<stri
 const CALLBACK_PATH = "/mcp/oauth/callback";
 /** The status of a server that turned Rails away until someone signs in. */
 export const SIGN_IN_NEEDED = "It needs you to sign in.";
-export const redirectUrl = () => `http://127.0.0.1:${MCP_OAUTH_PORT}${CALLBACK_PATH}`;
+const redirectUrl = () => `http://127.0.0.1:${MCP_OAUTH_PORT}${CALLBACK_PATH}`;
 
 type Signing = { serverId: string; authUrl: string; pending: PendingSignIn<void>; cancelled?: boolean };
 let signing: Signing | undefined;

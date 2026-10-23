@@ -74,7 +74,7 @@ const clipEnds = (s: unknown) => {
  * (`{question, options | choices}`). Options are strings or `{label | value | title}`. A question without
  * options is open: it's answered by typing. Bounded, like everything agents report.
  */
-export function questionsOf(input: any): SessionQuestion[] | undefined {
+function questionsOf(input: any): SessionQuestion[] | undefined {
   const raw: any[] = Array.isArray(input?.questions) ? input.questions : typeof input?.question === "string" ? [input] : [];
   const label = (o: any) => clip(typeof o === "string" ? o : (o?.label ?? o?.value ?? o?.title), 100);
   const list = raw

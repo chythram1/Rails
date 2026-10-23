@@ -18,13 +18,13 @@ import { cardOf, onPanelForgotten, onShellCall, record } from "./bridge/index.ts
 import { panels, projects } from "./db.ts";
 
 /** Longest command whose changes count: longer ones would collect other sessions' edits too. */
-export const MAX_WINDOW_MS = 60_000;
+const MAX_WINDOW_MS = 60_000;
 /** Most changed files a snapshot looks at (a huge dirty tree isn't worth it). */
 const MAX_LISTED = 2000;
 /** The start is noted when Rails hears of it, a moment after the command began. */
 const SLACK_MS = 1_000;
 /** How long after a command ends Rails waits for other sessions' late edit reports. */
-export const LATE_REPORT_MS = 1_500;
+const LATE_REPORT_MS = 1_500;
 
 const READERS = new Set(["cat", "nl", "head", "tail", "less", "more", "wc", "ls", "rg", "grep", "egrep", "fgrep", "echo", "printf", "pwd", "cd", "stat", "file", "tree", "du", "which", "type", "true", "test", "[", "uniq", "cut", "diff", "cmp", "jq", "basename", "dirname", "realpath", "date", "awk"]);
 const GIT_READS = new Set(["status", "diff", "log", "show", "ls-files", "blame", "rev-parse", "grep", "describe"]);
@@ -56,7 +56,7 @@ export function readsOnly(command: string | undefined): boolean {
 }
 
 /** Each changed file's "mtime:size" ("" when it's gone), by absolute path. */
-export type Snapshot = Map<string, string>;
+type Snapshot = Map<string, string>;
 
 /** Paths from `git status --porcelain=v1 -z`: "XY path", and for renames and copies the old path after it. */
 export function porcelainPaths(out: string): string[] {

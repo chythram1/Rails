@@ -10,7 +10,7 @@ import { ServiceError } from "./errors.ts";
 
 const run = promisify(execFile);
 
-export const SOCKET = join(RAILS_HOME, "tmux.sock");
+const SOCKET = join(RAILS_HOME, "tmux.sock");
 const CONF = join(RAILS_HOME, "tmux.conf");
 
 writeFileSync(

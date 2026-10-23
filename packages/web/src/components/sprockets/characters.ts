@@ -21,7 +21,7 @@ type Point = [number, number];
 /** A body shape: a path, or an ellipse (bodies made of several shapes overlap into one blob). */
 export type Primitive = { d: string } | { cx: number; cy: number; rx: number; ry: number; rot?: number };
 
-export interface CharacterDef {
+interface CharacterDef {
   name: string;
   body: Primitive[];
   /** Stroke in the body colour, which rounds sharp tips (e.g. the moon's horns). */

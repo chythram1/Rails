@@ -16,7 +16,7 @@ const dir = () => join(RAILS_HOME, "skills");
 const FILES_MAX = 200;
 const COPY_MAX_BYTES = 5_000_000;
 /** A file a Sprocket reads is cut at this. */
-export const READ_MAX = 100_000;
+const READ_MAX = 100_000;
 const ID = /^[a-z0-9][a-z0-9-]*$/;
 
 // ---- SKILL.md ----
@@ -82,7 +82,7 @@ export function listSkills(): Skill[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function getSkill(id: string): Skill {
+function getSkill(id: string): Skill {
   const s = read(id);
   if (!s) throw new ServiceError("Not found", 404);
   return s;

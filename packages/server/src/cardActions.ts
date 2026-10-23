@@ -9,7 +9,7 @@ import { callTool, policyOf } from "./mcp.ts";
 import { requestReply, runsChanged } from "./runs.ts";
 
 /** How much of a call's result a card keeps (it goes to the model with up to four others). */
-export const ACTION_RESULT_CHARS = 4000;
+const ACTION_RESULT_CHARS = 4000;
 
 /** Actions being run, by message and index, so a double tap or a second device can't run one twice. */
 const busy = new Set<string>();

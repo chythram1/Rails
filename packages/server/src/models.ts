@@ -153,7 +153,7 @@ const KEY_CHECKS: Record<string, (key: string) => Request> = {
 };
 
 /** What a provider said about a key: it works, it's refused, or it couldn't be told. */
-export type KeyCheck = { verdict: "ok" } | { verdict: "rejected" } | { verdict: "unknown"; reason: string };
+type KeyCheck = { verdict: "ok" } | { verdict: "rejected" } | { verdict: "unknown"; reason: string };
 
 /** Ask the provider whether a key works, without using it for anything else. */
 export async function checkKey(providerId: string, key: string, fetchFn: typeof fetch = fetch): Promise<KeyCheck> {

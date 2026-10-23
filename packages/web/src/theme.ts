@@ -6,14 +6,14 @@ import { useEffect, useState } from "react";
  * the resolution there in step with this file), so a light page never flashes dark.
  */
 export type Appearance = "light" | "dark" | "system";
-export type Theme = "light" | "dark";
+type Theme = "light" | "dark";
 
 const KEY = "rails.appearance";
 const DARK = "(prefers-color-scheme: dark)";
 /** The browser's own bar (phones): each theme's canvas, `--bg` in styles.css. */
 const BAR: Record<Theme, string> = { light: "#ffffff", dark: "#1d1d1d" };
 
-export const resolveTheme = (appearance: Appearance, osDark: boolean): Theme =>
+const resolveTheme = (appearance: Appearance, osDark: boolean): Theme =>
   appearance === "system" ? (osDark ? "dark" : "light") : appearance;
 
 function saved(): Appearance {
@@ -48,7 +48,7 @@ export function initTheme() {
   });
 }
 
-export function setAppearance(appearance: Appearance) {
+function setAppearance(appearance: Appearance) {
   chosen = appearance;
   try {
     if (appearance === "system") localStorage.removeItem(KEY);

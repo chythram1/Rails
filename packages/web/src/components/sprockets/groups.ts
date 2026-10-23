@@ -1,7 +1,7 @@
 import type { Project, Sprocket } from "@rails/shared";
 
 /** A heading's worth of Sprockets: a project's, or the unattached ones ("General"). */
-export interface Group {
+interface Group {
   key: string;
   title: string;
   list: Sprocket[];
@@ -9,7 +9,7 @@ export interface Group {
 
 const GENERAL = "general";
 /** When it last spoke or was written to, in either of its chats. */
-export const lastActive = (s: Sprocket) =>
+const lastActive = (s: Sprocket) =>
   [s.direct.lastMessage?.createdAt, s.projectChat?.lastMessage?.createdAt, s.createdAt].filter((t): t is string => !!t).sort().at(-1)!;
 
 /**

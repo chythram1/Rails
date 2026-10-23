@@ -71,7 +71,7 @@ export function DecisionsSettings({ settings }: { settings: ModelSettings }) {
 }
 
 /** How risky a threshold is, from the model's evaluation: below `caution` it starts waking for messages that ask nothing. */
-export const thresholdRisk = (t: number): "safe" | "caution" | "danger" =>
+const thresholdRisk = (t: number): "safe" | "caution" | "danger" =>
   t < DECISION_THRESHOLD.danger ? "danger" : t < DECISION_THRESHOLD.caution ? "caution" : "safe";
 
 /**

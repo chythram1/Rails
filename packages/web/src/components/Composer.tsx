@@ -16,7 +16,7 @@ interface Props {
   mentions?: Mention[];
 }
 
-export interface Mention {
+interface Mention {
   name: string;
   /** Muted text after the name ("Lead"). */
   note?: string;

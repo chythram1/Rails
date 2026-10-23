@@ -73,7 +73,7 @@ export const REQUEST_TIMEOUT_MS = 90_000;
  * How long a provider gets to start answering before the request is sent again (resend.ts): it answers in a few
  * seconds, but now and then a request hears nothing at all.
  */
-export const FIRST_ANSWER_MS = 20_000;
+const FIRST_ANSWER_MS = 20_000;
 /**
  * The wait before trying the model again after a provider failure that may pass (pi-ai tells which). The run keeps
  * its place among the MAX_ACTIVE meanwhile, so it's short.
@@ -625,7 +625,7 @@ export function readableError(raw: string | undefined): string {
  * A team member's reply without its own name in front ("[Scout] …", "Scout: …"): the others' messages reach it
  * with their names in brackets, and models copy that.
  */
-export function withoutName(text: string, name: string): string {
+function withoutName(text: string, name: string): string {
   const n = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return text.replace(new RegExp(`^(\\[${n}\\]|\\*{0,2}${n}(:\\*{0,2}|\\*{0,2}:))\\s*`, "i"), "").trim();
 }
@@ -913,7 +913,7 @@ const TEXTING = [
 ].join("\n");
 
 /** The reminder when several events wait for one reply (not saved, not from the user). */
-export function severalEvents(events: SprocketMessage[]): string {
+function severalEvents(events: SprocketMessage[]): string {
   const what = { question: "asks your user in a dialog", turn_end: "ended its turn, maybe with a question", permission: "waits for your user's permission in its panel (tell them; draft nothing)", overlap: "changed files another session changed or owns", handoff: "finished a turn a handoff waits for", message: "drafted a message", finding: "ended its turn naming work in another session's files" } as const;
   const list = events.map((m, i) => `${i + 1}. "${m.event!.title}" ${what[m.event!.what] ?? "is waiting"}.`).join("\n");
   return `[Rails, not your user] ${events.length} events came in since your last reply, and this one reply answers all of them:\n${list}\nDeal with each in turn, as its own event says: draft what it needs (a reply, an answer, a handoff's message), or nothing where its event says so (a handoff the session already carried out, or one already done, gets cancelled instead), and say in a sentence what each was. Reply (quiet) only if none of them needs your user.`;
@@ -989,7 +989,7 @@ const queuedIn = (chatId: string) => sprocketRuns.list(["queued"], chatId).map((
  * Two texts that say the same: equal, or nearly the same words (a model repeating its message reworded a little).
  * Short ones only when equal.
  */
-export function alike(a: string, b: string): boolean {
+function alike(a: string, b: string): boolean {
   const words = (t: string) => t.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? [];
   const x = words(a);
   const y = words(b);
@@ -1032,7 +1032,7 @@ const handOnNudge = (from: string | undefined, names: string[]) =>
  * gives a step, apart from this member and the passer, who haven't written since: the turn should go on to them
  * ("Pam, draft it. Fred, check it after her." gives Pam the turn, then Fred's).
  */
-export function handOn(history: SprocketMessage[], r: Pick<StoredRun, "from" | "sourceId" | "sprocketId">, team: TeamInfo): string[] {
+function handOn(history: SprocketMessage[], r: Pick<StoredRun, "from" | "sourceId" | "sprocketId">, team: TeamInfo): string[] {
   if (!r.from || !r.sourceId) return [];
   const at = history.findIndex((m) => m.id === r.sourceId);
   if (at < 0) return [];
@@ -1056,7 +1056,7 @@ const SMALL_TALK = /^\W*(thanks|thank you|thx|ty|cheers|great work|good job|nice
  * When the user's latest message asks the whole team (in words, not @everyone, which gives each a turn), the
  * other members who haven't written since: the turn should go round to them.
  */
-export function notYet(history: SprocketMessage[], r: Pick<StoredRun, "sprocketId">, team: TeamInfo): string[] {
+function notYet(history: SprocketMessage[], r: Pick<StoredRun, "sprocketId">, team: TeamInfo): string[] {
   const at = history.findLastIndex((m) => m.author === "user");
   const text = history[at]?.text ?? "";
   if (at < 0 || !FOR_ALL.test(text) || /@everyone\b/i.test(text) || SMALL_TALK.test(text)) return [];

@@ -56,7 +56,7 @@ function bars(): { asks: number; question: number } {
  * findings it was right on scored 0.78 to 0.92; in run 9 its one wrong wake scored 0.71 and its right ones 0.85 to
  * 0.97. A wrong wake costs a run the Coordinator ends quiet; below the bar, the rule decides.
  */
-export const FINDING_BAR = 0.75;
+const FINDING_BAR = 0.75;
 
 /** How much of a message's end an event keeps (as watches.ts). */
 const EVENT_TAIL = 600;
@@ -66,7 +66,7 @@ const changes = listeners();
 export const onDecisionsChanged = changes.on;
 
 /** The typed questions, in the classifier API's shape. Plain wording: the model sees nothing else. */
-export const QUESTIONS: Record<DecisionEntry["question"], { key: string; question: ClassifierQuestion }> = {
+const QUESTIONS: Record<DecisionEntry["question"], { key: string; question: ClassifierQuestion }> = {
   turn_end: {
     key: "asks_user",
     question: {

@@ -49,7 +49,7 @@ export function setFindingJudge(fn: typeof judge): void {
   judge = fn;
 }
 
-export interface Finding {
+interface Finding {
   panelId: string;
   /** The other session's files the reply names, relative to the project. */
   files: string[];

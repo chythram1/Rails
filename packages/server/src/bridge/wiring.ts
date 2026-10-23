@@ -21,7 +21,7 @@ import { PORT, RAILS_HOME } from "../config.ts";
  * The agents' limit for one call of Rails' agent tools (Claude Code's `timeout` in ms; pi's in seconds, in
  * pi/rails.ts): above wait_for's 100 seconds (WAIT_MS in agentTools.ts). pi's own default is 60 s.
  */
-export const TOOL_TIMEOUT_MS = 150_000;
+const TOOL_TIMEOUT_MS = 150_000;
 
 const PI_EXTENSION = join(dirname(fileURLToPath(import.meta.url)), "pi", "rails.ts");
 
@@ -29,7 +29,7 @@ const PI_EXTENSION = join(dirname(fileURLToPath(import.meta.url)), "pi", "rails.
 const CLAUDE_MOD_SOURCE = join(dirname(fileURLToPath(import.meta.url)), "claude", "mod");
 const CLAUDE_MOD = join(RAILS_HOME, "claude-mod");
 /** The first Claude Code with mods in the terminal. */
-export const CLAUDE_MOD_SINCE = [2, 1, 287];
+const CLAUDE_MOD_SINCE = [2, 1, 287];
 /** Whether panels get the mod: set once Claude Code's version is known (`prepareClaudeMod`). */
 let claudeMod = false;
 

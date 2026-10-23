@@ -289,7 +289,7 @@ const INSTRUCTIONS =
   "Rails runs this session alongside other coding sessions in the same project, which may be changing the same code. Call the neighbours tool when you start a task and before you change files outside what you were asked to work on: it shows what the other sessions are doing, the files they changed lately and who owns which files. When another session has to act on something (a fix in files it owns, a change it must make because of work you finished), draft it with the message tool instead of changing its files; your user decides whether to send it. Don't message just to report progress or plans, or to ask for something you were told you'd get. When your next step needs another session to finish first, call wait_for instead of messaging it or checking again and again.";
 
 /** Run one of the tools for the agent in a panel, MCP's or Codex's: its text, and whether it failed. */
-export async function callTool(panelId: string, name: unknown, args: any, signal?: AbortSignal): Promise<{ text: string; isError: boolean }> {
+async function callTool(panelId: string, name: unknown, args: any, signal?: AbortSignal): Promise<{ text: string; isError: boolean }> {
   if (name !== "neighbours" && name !== "message" && name !== "wait_for") return { text: `No tool "${name}".`, isError: true };
   try {
     const text =
