@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useLive } from "./useLive.ts";
 import type { ModelSettings } from "@rails/shared";
 import { api } from "../api.ts";
-import { socket } from "../ws.ts";
 import { Dropdown, type DropdownOption } from "./Dropdown.tsx";
 
 /**
@@ -22,23 +21,8 @@ export function fetchModelSettings(): Promise<ModelSettings> {
 
 /** The model settings (providers, models, default), kept fresh across devices. */
 export function useModelSettings() {
-  const [settings, setSettings] = useState<ModelSettings | null>(cached);
-  const [error, setError] = useState("");
-  const load = useCallback(async () => {
-    try {
-      setSettings(await fetchModelSettings());
-      setError("");
-    } catch (e: any) {
-      setError(e.message);
-    }
-  }, []);
-  useEffect(() => {
-    void load();
-    return socket.on((m) => {
-      if (m.type === "models.changed") void load();
-    });
-  }, [load]);
-  return { settings, error, reload: load };
+  const { data: settings, error, reload } = useLive(fetchModelSettings, (m) => m.type === "models.changed", { initial: cached });
+  return { settings, error, reload };
 }
 
 /**

@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { IconChevronRight as ChevronRight } from "@tabler/icons-react";
 import { DECISION_THRESHOLD, type DecisionEntry, type DecisionLog, type ModelSettings } from "@rails/shared";
 import { api } from "../../api.ts";
 import { timeAgo } from "../../util.ts";
-import { socket } from "../../ws.ts";
 import { Dropdown } from "../Dropdown.tsx";
+import { useLive } from "../useLive.ts";
 import { PanelIcon } from "../PanelMenu.tsx";
 import { useOpenSettings } from "./context.ts";
 
@@ -135,22 +135,7 @@ const providerName = (settings: ModelSettings, id: string) => settings.providers
  * next to what Rails' rules did, and which of its answers woke the Coordinator.
  */
 function RecentDecisions() {
-  const [log, setLog] = useState<DecisionLog | null>(null);
-  const [error, setError] = useState("");
-  const load = useCallback(async () => {
-    try {
-      setLog(await api.decisions());
-      setError("");
-    } catch (e: any) {
-      setError(e.message);
-    }
-  }, []);
-  useEffect(() => {
-    void load();
-    return socket.on((m) => {
-      if (m.type === "decisions.changed") void load();
-    });
-  }, [load]);
+  const { data: log, error } = useLive(api.decisions, (m) => m.type === "decisions.changed");
 
   if (!log) return error ? <p className="error" role="alert">{error}</p> : null;
   return (
