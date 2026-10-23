@@ -646,6 +646,11 @@ function eventText(m: SprocketMessage): string {
 
 /** How recent the receiving session's own reply has to be for a handoff's event to show it. */
 const THEY_DID_MS = 30 * 60_000;
+/**
+ * How much of that reply it shows. Agents' summaries are long and say what they did early on: in test run 9 the end
+ * alone (800 characters) left out that Claude had already wired src/game in, and the handoff asked it again.
+ */
+const THEY_DID_MAX = 3000;
 
 /**
  * What the handoff's receiving session said at the end of its own last turn, if lately (test runs 7 and 8: it had
@@ -655,7 +660,7 @@ function theyDid(h: NonNullable<SprocketMessage["event"]>["handoff"] & {}): stri
   const last = sessionEvents.list(h.to.panelId).findLast((x) => x.event?.kind === "turn_end" && typeof x.event.text === "string" && x.event.text.trim());
   if (!last || Date.now() - Date.parse(last.at) > THEY_DID_MS) return "";
   const text: string = last.event.text.trim();
-  return `"${h.to.title}" ended a turn of its own lately; the end of its last reply:\n"""\n${text.length > 800 ? `…${text.slice(-800)}` : text}\n"""\nIf that (or its files) shows it has already done what the handoff asks, don't ask it again: cancel the handoff with cancel_handoff ("${h.id.slice(0, 8)}") and reply (quiet). If it did part of it, draft only the rest.\n`;
+  return `"${h.to.title}" ended a turn of its own lately; its last reply${text.length > THEY_DID_MAX ? " (the start of it)" : ""}:\n"""\n${text.length > THEY_DID_MAX ? `${text.slice(0, THEY_DID_MAX)}…` : text}\n"""\nIf that (or its files) shows it has already done what the handoff asks, don't ask it again: cancel the handoff with cancel_handoff ("${h.id.slice(0, 8)}") and reply (quiet). If it did part of it, draft only the rest.\n`;
 }
 
 /**

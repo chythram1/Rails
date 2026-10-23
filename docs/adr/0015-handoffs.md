@@ -41,8 +41,8 @@ Decisions:
   unless it passes `missing: true` (only what the session's own message left out).
 - **A handoff whose work is already done:** in test runs 7 and 8 the receiving session had already done what the
   handoff asked on its own (wired `src/game` in while wiring `src/ui`), and the draft cost it a turn to say so.
-  The event also shows the end of the receiving session's own last reply, when it ended a turn in the last 30
-  minutes; if that shows the work is done, the Coordinator cancels the handoff and stays quiet.
+  The event also shows the receiving session's own last reply (its first 3,000 characters: summaries say what
+  was done early, and in run 9 the end alone left it out), when it ended a turn in the last 30 minutes; if that shows the work is done, the Coordinator cancels the handoff and stays quiet.
 - **Stored in the `handoffs` table** with its sessions' titles, kept current as the sessions report prompts and
   turn ends (a handoff is often planned before a session has a title of its own). A turn the user stopped
   isn't finished, so it doesn't count.
