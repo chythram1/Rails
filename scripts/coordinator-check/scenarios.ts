@@ -3,6 +3,7 @@
 // World, wakes the Coordinator the way Rails would, and returns the checks for what it did.
 import type { Panel } from "@rails/shared";
 import { handoffs } from "../../packages/server/src/db.ts";
+import { idle } from "../../packages/server/src/runs.ts";
 import type { Draft, Outcome, Turn, World } from "./world.ts";
 
 export interface Check {
@@ -346,6 +347,27 @@ export const SCENARIOS: Scenario[] = [
         { what: "drafts nothing new for pi", ok: to(o, t.ui).length === 0 },
         { what: "the handoff doesn't stay waiting", ok: !handoffs.pending(w.coordinator.id).some((h) => h.id === id) },
       ];
+    },
+  },
+  {
+    name: "note-for-later",
+    run2: "(Dialog check, ADR 0027.) The user told the Coordinator how to answer pi's question when it came; it drafted that note to pi as a message straight away.",
+    async play(w) {
+      const t = team(w, { ui: [{ user: "Build the title screen. Ask me what to call the game with your question tool when you get to the title, then wait.", edits: ["src/ui/title.js"], reply: "" }] });
+      w.say("When the UI session asks what to call the game, answer exactly: Brassworks Defense (not one of its options).");
+      await idle();
+      const early = w.outcome().drafts.filter((d) => !d.fromAgent).length;
+      const questions = [{ question: "What should the game be called?", options: ["Gearworks", "Cogsworth"] }];
+      w.ask(t.ui, questions);
+      await w.wake(t.ui, { what: "question", questions }, questions[0].question);
+      return (o) => {
+        const u = to(o, t.ui);
+        return [
+          { what: "drafts nothing when told", ok: early === 0 },
+          { what: "no message to pi", ok: u.every((x) => x.mode !== "message") },
+          { what: "answers the question with the name", ok: u.some((x) => x.mode === "answer") && all(u.filter((x) => x.mode === "answer"), (x) => /^brassworks defense\.?$/i.test(x.text.trim())) },
+        ];
+      };
     },
   },
   {

@@ -28,6 +28,7 @@ The situations (`scenarios.ts`):
 | `done-not-continue` | A handoff to a finished session doesn't tell it to continue, or to talk to another session. |
 | `several-events` | Two events that come in together (a go-ahead and a dialog, test run 6) both get an answer. |
 | `handoff-covered` | A handoff the finished session already carried out with its own message isn't drafted again (runs 4 to 6). |
+| `note-for-later` | A note for the Coordinator (how to answer a question when it comes) isn't drafted as a message now, and is used when the question comes. |
 | `permission-deny` | A session waiting on a permission the rules forbid (installing a package, test run 7): tell the user not to allow it, draft nothing. |
 | `permission-allow` | A permission the rules allow (running the tests): tell the user it's fine, draft nothing. |
 
