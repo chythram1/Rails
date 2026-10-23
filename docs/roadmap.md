@@ -29,8 +29,8 @@ Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
 - **Customize, next parts** (ADR 0025): more connectors (each checked first), plugins
   (bundles of skills, servers and prompts), MCP tools in the project chat, Sprockets writing their own skills
 - **Automate, next parts** (ADR 0032): Rails events as triggers (a session finished a turn, waits for the user,
-  a panel ended), sessions in panels as what runs (after a worktree per session), setting one up from a
-  Sprocket's chat ("check this every morning"), and starter prompts
+  a panel ended), sessions in panels as what runs (after a worktree per session), and setting one up from a
+  Sprocket's chat ("check this every morning")
 - **Custom harness:** Rails' own agent loop as an additional provider
 - Plugins and MCP server management
 - Multi-user accounts, remote runners

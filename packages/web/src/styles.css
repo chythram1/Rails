@@ -1329,14 +1329,14 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 /* ---- Customize (ADR 0025): a page of cards per tab (connectors, skills, prompts), and one item open full width
    with an editor of Settings rows (.set-group, .set-row). ---- */
 .cz-page { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; container-type: inline-size; }
-.cz-page-inner { max-width: 1040px; margin: 0 auto; padding: 56px 40px 72px; }
-.cz-title { margin: 0; font: 600 36px/1.1 var(--grotesk); letter-spacing: -0.03em; }
-.cz-lead { margin: 10px 0 0; max-width: 60ch; color: var(--muted); text-wrap: pretty; }
+.cz-page-inner { max-width: 1040px; margin: 0 auto; padding: 40px 40px 64px; }
+.cz-title { margin: 0; font: 600 28px/1.15 var(--grotesk); letter-spacing: -0.02em; }
+.cz-lead { margin: 6px 0 0; max-width: 60ch; color: var(--muted); text-wrap: pretty; }
 /* Customize's tabs as a column beside the page (navigation rows, as Settings' sections), then the tab's title with its
    action at the right, and Yours · Discover beside a full-width search. */
-.cz-layout { max-width: 1200px; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 48px; }
-.cz-nav { position: sticky; top: 0; align-self: start; padding-top: 6px; }
-.cz-nav-title { margin: 0 0 10px; padding: 0 10px; color: var(--text-2); font-size: 14px; font-weight: 500; }
+.cz-layout { max-width: 1200px; display: grid; grid-template-columns: 184px minmax(0, 1fr); gap: 32px; }
+.cz-nav { position: sticky; top: 0; align-self: start; padding-top: 4px; }
+.cz-nav-title { margin: 0 0 8px; padding: 0 10px; color: var(--text-2); font-size: 14px; font-weight: 500; }
 .cz-nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .cz-nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--row-r); color: var(--text-2); font-size: 14px; text-decoration: none; white-space: nowrap; }
 .cz-nav-item > span { display: inline-flex; color: var(--muted); }
@@ -1346,8 +1346,8 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 @media (hover: hover) { .cz-nav-item:hover:not([aria-current="page"]), .cz-nav-item:hover:not([aria-current="page"]) > span { background: var(--tint); color: var(--tint-ink); } }
 .cz-main { min-width: 0; }
 .cz-head-row { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 16px 24px; }
-.cz-head-row .cz-add { flex: none; margin-top: 4px; height: 36px; }
-.cz-toolbar { display: flex; align-items: stretch; gap: 12px; margin: 28px 0 0; }
+.cz-head-row .cz-add { flex: none; height: 36px; }
+.cz-toolbar { display: flex; align-items: stretch; gap: 12px; margin: 20px 0 0; }
 .cz-toolbar .cz-search { flex: 1; width: auto; height: 40px; padding: 0 12px; gap: 10px; }
 .cz-toolbar .cz-search input { font-size: 14px; }
 .cz-search {
@@ -1364,7 +1364,7 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
    staggered row (every other one smaller and lower), arrows and dots under the words. */
 .cz-banner {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "text marks" "nav marks";
-  gap: 20px 32px; align-items: center; margin: 32px 0 0; padding: 32px 32px 24px; background: var(--surface-2); min-height: 200px;
+  gap: 20px 32px; align-items: center; margin: 24px 0 0; padding: 28px 28px 20px; background: var(--surface-2); min-height: 200px;
 }
 .cz-banner-text { grid-area: text; }
 .cz-banner-eyebrow { margin: 0 0 8px; color: var(--muted); font: 600 11.5px/1.4 var(--font); letter-spacing: 0.08em; text-transform: uppercase; }
@@ -1400,27 +1400,26 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
   .cz-banner-marks .cz-slide li { transition: none; opacity: 1; }
 }
 /* Sections: a heading with its count and a muted line, then a grid of cards. */
-.cz-section { margin: 40px 0 0; }
-.cz-section-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 14px; }
-.cz-section-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.cz-section { margin: 28px 0 0; }
+.cz-section-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 12px; }
+.cz-section-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .cz-section-blurb { margin: 0; color: var(--muted); font-size: 13px; }
 .cz-section-link { margin-left: auto; font-size: 13px; }
 .cz-section .cz-count { margin-left: 8px; }
-.cz-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 16px; }
+.cz-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 12px; }
 /* A card: square, on --surface-2 (as the Sprockets gallery's), the mark top left, the name a link over the whole card,
    two muted lines and a small line of facts; one action top right above the link. */
-.cz-card { position: relative; display: flex; align-items: flex-start; gap: 16px; min-width: 0; padding: 20px; background: var(--surface-2); border: 1px solid transparent; }
+.cz-card { position: relative; display: flex; align-items: flex-start; gap: 14px; min-width: 0; padding: 16px; background: var(--surface-2); border: 1px solid transparent; }
 @media (hover: hover) { .cz-card:has(.cz-card-name[href]:hover), .cz-card-add:hover { background: var(--tint); } }
 .cz-card:has(.cz-card-name:focus-visible) { outline: 2px solid var(--blue); outline-offset: -2px; }
 .cz-card-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
-.cz-card-title { display: flex; flex-direction: column; gap: 1px; margin-bottom: 4px; }
+.cz-card-title { display: flex; flex-direction: column; gap: 1px; margin-bottom: 2px; }
 .cz-card-name { font-size: 16px; font-weight: 600; color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
-.cz-card-kind { color: var(--muted); font-size: 12.5px; }
+.cz-card-kind { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
 .cz-card-name[href]::after { content: ""; position: absolute; inset: 0; }
 .cz-card-name:focus-visible { outline: none; }
-.cz-card-desc { margin: 0; color: var(--text-2); font-size: 13.5px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.cz-card-detail { margin: 2px 0 0; color: var(--muted); font: 12px/1.5 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cz-card-meta { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; }
+.cz-card-desc { margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.cz-card-detail { margin: 0; color: var(--muted); font: 12px/1.5 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cz-card-warn { color: var(--red); }
 .cz-card-action { position: relative; z-index: 1; flex: none; }
 .cz-plus { border: 1px solid var(--border-strong); background: var(--surface); }
@@ -1429,7 +1428,7 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 @keyframes cz-spin { to { rotate: 360deg; } }
 /* A card that adds something: dashed and transparent, the whole card one button. */
 .cz-card-add { padding: 0; background: transparent; border: 1px dashed var(--border-strong); }
-.cz-card-add-btn { display: flex; align-items: flex-start; gap: 16px; width: 100%; padding: 20px; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.cz-card-add-btn { display: flex; align-items: flex-start; gap: 14px; width: 100%; padding: 16px; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; font: inherit; }
 .cz-card-add-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
 .cz-logo-add { color: var(--muted); border-style: dashed; }
 /* A mark: a square ruled tile, the brand mark (or an icon) centred. */
@@ -1439,7 +1438,6 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
   border: 1px solid var(--border-strong); background: var(--surface); color: var(--text);
 }
 .cz-logo > svg { width: 50%; height: 50%; }
-.cz-card > .cz-logo, .cz-card-add-btn > .cz-logo { --size: 44px; }
 /* One item open: the head is the way back and the actions; a connector's page and a server's editor start with a hero
    (the 64px mark, the name in Space Grotesk, who makes it, its status). */
 .cz-detail { flex: 1; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }
@@ -1472,7 +1470,7 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .cz-gone { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px; text-align: center; }
 @container (max-width: 640px) {
   .cz-page-inner { padding: 64px 16px 48px; }
-  .cz-title { font-size: 30px; }
+  .cz-title { font-size: 26px; }
   .cz-cards { grid-template-columns: 1fr; }
   .cz-banner { grid-template-columns: 1fr; grid-template-areas: "text" "marks" "nav"; padding: 24px 20px 16px; }
   .cz-banner-marks { --scale: 0.72; }
@@ -1498,9 +1496,7 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 /* Automate (ADR 0032): Customize's page of cards and editor, with a Sprocket's face as the mark, a schedule control and
    the runs as ruled rows. */
 /* Automate's page (ADR 0032): an overview strip, then cards with their last runs. */
-.au-head { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 16px 24px; }
-.au-head .cz-add { flex: none; margin-top: 6px; }
-.au-overview { list-style: none; margin: 28px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--border); }
+.au-overview { list-style: none; margin: 20px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--border); }
 .au-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 14px 16px; }
 .au-stat + .au-stat { border-left: 1px solid var(--border); }
 .au-stat-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 13px; }
@@ -1508,7 +1504,8 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .au-stat-icon.needed { color: var(--red); }
 .au-stat-value { margin-top: 6px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .au-stat-note { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.au-search { width: 100%; height: 36px; margin-top: 16px; }
+.au-search { width: 100%; height: 40px; padding: 0 12px; gap: 10px; margin-top: 12px; }
+.au-search input { font-size: 14px; }
 .au-error { margin: 12px 0 0; }
 .au-cards { grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); }
 .au-card { flex-direction: column; align-items: stretch; gap: 12px; }
@@ -1560,6 +1557,8 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .au-schedule-words { margin: 0; }
 .au-schedule + .sp-field-foot { padding-top: 12px; }
 .au-actions { display: flex; justify-content: flex-end; gap: 8px; }
+/* A template's Sprocket that can't do it yet: what it lacks and where to give it that, under its row. */
+.au-lacks { margin: 0; padding: 10px 12px; background: var(--surface-2); border-left: 2px solid var(--amber); color: var(--text-2); font-size: 13px; text-wrap: pretty; }
 .au-state { display: flex; flex-direction: column; gap: 8px; }
 .au-runs { list-style: none; margin: 0; padding: 0; }
 .au-run { display: flex; flex-direction: column; gap: 4px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 13px; }

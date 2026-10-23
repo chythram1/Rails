@@ -26,6 +26,7 @@ import { api } from "../../api.ts";
 import { href, navigate, type CustomizeTab, type Route } from "../../router.ts";
 import { useStore } from "../../store.tsx";
 import { MenuButton } from "../Menu.tsx";
+import { PageNav } from "../PageNav.tsx";
 import { Segmented } from "../Segmented.tsx";
 import { ConnectorLogo } from "./ConnectorLogo.tsx";
 import { ConnectorPage } from "./ConnectorPage.tsx";
@@ -120,94 +121,77 @@ function Gallery({ tab, servers, skills, prompts }: { tab: CustomizeTab; servers
 
   return (
     <div className="cz-page">
-      <div className="cz-page-inner cz-layout">
-        <nav className="cz-nav" aria-labelledby="cz-nav-title">
-          <h1 id="cz-nav-title" className="cz-nav-title">
-            Customize
-          </h1>
-          <ul>
-            {TABS.map((t) => (
-              <li key={t.id}>
-                <a href={href.customize(t.id)} className="cz-nav-item" aria-current={t.id === tab ? "page" : undefined}>
-                  <span aria-hidden>{t.icon}</span>
-                  {t.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <div className="cz-main">
-          <div className="cz-head-row">
-            <div>
-              <h2 className="cz-title">{current.label}</h2>
-              <p className="cz-lead">{current.lead}</p>
-            </div>
-            {tab === "connectors" && (
-              <MenuButton
-                label="Add custom server"
-                title="Add an MCP server that isn't in the list"
-                plain
-                className="btn cz-add"
-                icon={<span className="cz-add-label">Add custom server</span>}
-                align="right"
-                items={[
-                  { label: "A server on the web, by its URL", icon: <Plug size={16} />, onSelect: () => void newServer("http") },
-                  { label: "A program on this computer", icon: <Terminal size={16} />, onSelect: () => void newServer("stdio") },
-                ]}
-              />
-            )}
-            {tab === "skills" && (
-              <button type="button" className="btn cz-add" onClick={() => void newSkill()}>
-                New skill
-              </button>
-            )}
-            {tab === "prompts" && (
-              <button type="button" className="btn cz-add" onClick={() => void newPrompt()}>
-                New prompt
-              </button>
-            )}
+      <PageNav id="cz" title="Customize" items={TABS.map((t) => ({ href: href.customize(t.id), label: t.label, icon: t.icon, current: t.id === tab }))}>
+        <div className="cz-head-row">
+          <div>
+            <h2 className="cz-title">{current.label}</h2>
+            <p className="cz-lead">{current.lead}</p>
           </div>
-          <div className="cz-toolbar">
-            {tab !== "prompts" && (
-              <Segmented
-                name="cz-mode"
-                aria-labelledby="cz-mode-label"
-                value={mode}
-                options={[
-                  { value: "yours", label: "Yours" },
-                  { value: "discover", label: "Discover" },
-                ]}
-                onChange={setMode}
-              />
-            )}
-            <span id="cz-mode-label" className="sr-only">
-              Show
-            </span>
-            <label className="cz-search">
-              <Search size={16} aria-hidden />
-              <input type="search" placeholder={`Search ${current.label.toLowerCase()}`} aria-label={`Search ${current.label.toLowerCase()}`} value={query} onChange={(e) => setQuery(e.target.value)} />
-            </label>
-          </div>
-          {error && (
-            <p className="error" role="alert">
-              {error}
-            </p>
+          {tab === "connectors" && (
+            <MenuButton
+              label="Add custom server"
+              title="Add an MCP server that isn't in the list"
+              plain
+              className="btn cz-add"
+              icon={<span className="cz-add-label">Add custom server</span>}
+              align="right"
+              items={[
+                { label: "A server on the web, by its URL", icon: <Plug size={16} />, onSelect: () => void newServer("http") },
+                { label: "A program on this computer", icon: <Terminal size={16} />, onSelect: () => void newServer("stdio") },
+              ]}
+            />
           )}
-          {tab === "connectors" &&
-            (mode === "discover" ? (
-              <DiscoverConnectors servers={servers} query={q} onError={setError} onCustom={(t) => void newServer(t)} />
-            ) : (
-              <YourConnectors servers={servers} query={q} onBrowse={() => setMode("discover")} onCustom={(t) => void newServer(t)} />
-            ))}
-          {tab === "skills" &&
-            (mode === "discover" ? (
-              <DiscoverSkills skills={skills} query={q} onError={setError} />
-            ) : (
-              <YourSkills skills={skills} query={q} onNew={() => void newSkill()} onBrowse={() => setMode("discover")} />
-            ))}
-          {tab === "prompts" && <YourPrompts prompts={prompts} query={q} onNew={() => void newPrompt()} />}
+          {tab === "skills" && (
+            <button type="button" className="btn cz-add" onClick={() => void newSkill()}>
+              New skill
+            </button>
+          )}
+          {tab === "prompts" && (
+            <button type="button" className="btn cz-add" onClick={() => void newPrompt()}>
+              New prompt
+            </button>
+          )}
         </div>
-      </div>
+        <div className="cz-toolbar">
+          {tab !== "prompts" && (
+            <Segmented
+              name="cz-mode"
+              aria-labelledby="cz-mode-label"
+              value={mode}
+              options={[
+                { value: "yours", label: "Yours" },
+                { value: "discover", label: "Discover" },
+              ]}
+              onChange={setMode}
+            />
+          )}
+          <span id="cz-mode-label" className="sr-only">
+            Show
+          </span>
+          <label className="cz-search">
+            <Search size={16} aria-hidden />
+            <input type="search" placeholder={`Search ${current.label.toLowerCase()}`} aria-label={`Search ${current.label.toLowerCase()}`} value={query} onChange={(e) => setQuery(e.target.value)} />
+          </label>
+        </div>
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
+        {tab === "connectors" &&
+          (mode === "discover" ? (
+            <DiscoverConnectors servers={servers} query={q} onError={setError} onCustom={(t) => void newServer(t)} />
+          ) : (
+            <YourConnectors servers={servers} query={q} onBrowse={() => setMode("discover")} onCustom={(t) => void newServer(t)} />
+          ))}
+        {tab === "skills" &&
+          (mode === "discover" ? (
+            <DiscoverSkills skills={skills} query={q} onError={setError} />
+          ) : (
+            <YourSkills skills={skills} query={q} onNew={() => void newSkill()} onBrowse={() => setMode("discover")} />
+          ))}
+        {tab === "prompts" && <YourPrompts prompts={prompts} query={q} onNew={() => void newPrompt()} />}
+      </PageNav>
     </div>
   );
 }
@@ -232,9 +216,9 @@ function Section({ title, count, blurb, children, action }: { title: string; cou
 }
 
 /**
- * A card: a mark, the name (a link that covers the card) over what kind it is, two lines on what it does, its command
- * or address (`detail`, in mono), a small line of facts, and at the top right one action (a "+" or a check) that
- * sits above the link.
+ * A card: a mark, the name (a link that covers the card) over one muted line of what it is and its facts (what needs
+ * doing first, in red), two lines on what it does, its command or address (`detail`, in mono), and at the top right
+ * one action (a "+" or a check) that sits above the link.
  */
 function Card(props: {
   href?: string;
@@ -259,19 +243,26 @@ function Card(props: {
           ) : (
             <span className="cz-card-name">{props.name}</span>
           )}
-          {props.kind && <span className="cz-card-kind">{props.kind}</span>}
+          {(props.kind || props.warn || props.meta) && (
+            <span className="cz-card-kind">
+              {[
+                props.kind,
+                props.warn && (
+                  <span key="warn" className="cz-card-warn">
+                    {props.warn}
+                  </span>
+                ),
+                props.meta,
+              ]
+                .filter(Boolean)
+                .flatMap((x, i) => (i ? [" · ", x] : [x]))}
+            </span>
+          )}
         </span>
         {props.text && <p className="cz-card-desc">{props.text}</p>}
         {props.detail && (
           <p className="cz-card-detail" title={props.detail}>
             {props.detail}
-          </p>
-        )}
-        {(props.meta || props.warn) && (
-          <p className="cz-card-meta">
-            {props.warn && <span className="cz-card-warn">{props.warn}</span>}
-            {props.warn && props.meta && " · "}
-            {props.meta}
           </p>
         )}
       </div>

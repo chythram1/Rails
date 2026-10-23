@@ -155,7 +155,8 @@ packages/
   last run still goes (Skipped). The run's turn note says when its last run was and what it reported, and it may end
   with `nothing_new` (its line is hidden, the run is Nothing new). When the run ends, the automation records Done, Needs
   you (a card or question waits), or Failed, and turns itself off after 3 failures in a row. Changes broadcast
-  `automations.changed`.
+  `automations.changed`. Templates (`web/src/components/automate/templates.ts`) are web-only: one fills in a new
+  automation's name, prompt and schedule, and nothing records where it came from.
 - **Auth:** one access token, generated on first run into `~/.rails/config.json` or set with `RAILS_TOKEN`.
   `POST /api/auth/login` exchanges it for an httpOnly cookie, and both `/api/*` and the WebSocket
   upgrade check that cookie. The web app also accepts `?token=` once, then removes it from the URL.

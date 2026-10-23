@@ -8,6 +8,7 @@ import {
   IconClock as Clock,
   IconDots as Dots,
   IconGauge as Gauge,
+  IconLayoutDashboard as Dashboard,
   IconLoader2 as Loader,
   IconPlayerPause as Pause,
   IconPlayerPlay as Play,
@@ -15,39 +16,61 @@ import {
   IconPlus as Plus,
   IconSearch as Search,
   IconSparkles as Sparkles,
+  IconTemplate as Template,
 } from "@tabler/icons-react";
-import { AUTOMATION_RECENT, scheduleText, type Automation, type AutomationOutcome, type Sprocket as SprocketData } from "@rails/shared";
+import { AUTOMATION_RECENT, scheduleText, type Automation, type AutomationOutcome, type McpServer, type Sprocket as SprocketData } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate, type Route } from "../../router.ts";
 import { timeAgo } from "../../util.ts";
 import { useConfirm } from "../ConfirmDialog.tsx";
 import { MenuButton } from "../Menu.tsx";
 import { useModelSettings } from "../ModelSelect.tsx";
+import { PageNav } from "../PageNav.tsx";
+import { useStore } from "../../store.tsx";
 import { Sprocket } from "../sprockets/Sprocket.tsx";
 import { useSprockets } from "../sprockets/useSprockets.ts";
 import { AutomationEditor } from "./AutomationEditor.tsx";
 import { NewAutomation } from "./NewAutomation.tsx";
+import { templateById } from "./templates.ts";
+import { Templates } from "./Templates.tsx";
 import { OUTCOME, soon, successRate, took, useAutomations } from "./useAutomations.ts";
 
 type AutomateRoute = Extract<Route, { name: "automate" }>;
 
 /**
- * Automate (ADR 0032): prompts a Sprocket runs on a schedule. The page says how they're doing at a glance (an overview
- * strip), then a card for each (On, then Off). One opens full width in its place; a new one is a draft until Create.
+ * Automate (ADR 0032): prompts a Sprocket runs on a schedule, with two tabs beside the page. The Dashboard says how
+ * they're doing at a glance (an overview strip), then a card for each (On, then Off); Templates are starting points.
+ * One opens full width in its place; a new one is a draft until Create, filled in from a template if it came from one.
  */
 export function AutomatePage({ route }: { route: AutomateRoute }) {
   const { list: sprockets } = useSprockets();
+  const { mcpServers } = useStore();
   if (route.view === "new")
-    return <div className="cz-detail">{sprockets && <NewAutomation sprockets={sprockets} />}</div>;
+    return (
+      <div className="cz-detail">
+        {sprockets && mcpServers && <NewAutomation key={route.template ?? ""} sprockets={sprockets} servers={mcpServers} template={templateById(route.template)} />}
+      </div>
+    );
   if (route.view === "item")
     return <div className="cz-detail">{sprockets && <AutomationEditor key={route.id} id={route.id} sprockets={sprockets} />}</div>;
-  return <Gallery sprockets={sprockets ?? []} />;
+  return <Gallery key={route.view} tab={route.view} sprockets={sprockets ?? []} servers={mcpServers ?? []} />;
 }
+
+const TABS = [
+  { id: "list", label: "Dashboard", icon: <Dashboard size={18} stroke={1.6} />, href: href.automate(), lead: "How your automations are doing: what needs you, how their runs went, and what runs next." },
+  {
+    id: "templates",
+    label: "Templates",
+    icon: <Template size={18} stroke={1.6} />,
+    href: href.automateTemplates(),
+    lead: "Starting points to make your own. Each opens as a new automation to change before you create it.",
+  },
+] as const;
 
 /** Whether its last run, or Rails pausing it, wants the user to look. */
 const needsYou = (a: Automation) => !!a.pausedReason || a.lastRun?.outcome === "needs_you" || a.lastRun?.outcome === "failed";
 
-function Gallery({ sprockets }: { sprockets: SprocketData[] }) {
+function Gallery({ tab, sprockets, servers }: { tab: "list" | "templates"; sprockets: SprocketData[]; servers: McpServer[] }) {
   const { list, error } = useAutomations();
   const { settings: models } = useModelSettings();
   const [query, setQuery] = useState("");
@@ -96,14 +119,15 @@ function Gallery({ sprockets }: { sprockets: SprocketData[] }) {
     );
   };
 
+  const current = TABS.find((t) => t.id === tab)!;
   return (
     <div className="cz-page">
       {confirmDialog}
-      <div className="cz-page-inner">
-        <div className="au-head">
+      <PageNav id="au" title="Automate" items={TABS.map((t) => ({ href: t.href, label: t.label, icon: t.icon, current: t.id === tab }))}>
+        <div className="cz-head-row">
           <div>
-            <h1 className="cz-title">Automate</h1>
-            <p className="cz-lead">Prompts your Sprockets run on a schedule, while Rails' server is on. Each run posts in the Sprocket's chat, and anything it wants to change waits there for you.</p>
+            <h2 className="cz-title">{current.label}</h2>
+            <p className="cz-lead">{current.lead}</p>
           </div>
           <a className="btn primary cz-add" href={href.newAutomation()}>
             <span className="cz-add-label">
@@ -111,47 +135,69 @@ function Gallery({ sprockets }: { sprockets: SprocketData[] }) {
             </span>
           </a>
         </div>
-        {!!list?.length && <Overview list={list} />}
-        {!!list?.length && (
+        {tab === "list" && !!list?.length && <Overview list={list} />}
+        {(tab === "templates" || !!list?.length) && (
           <label className="cz-search au-search">
-            <Search size={15} aria-hidden />
-            <input type="search" placeholder="Search automations" aria-label="Search automations" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <Search size={16} aria-hidden />
+            <input
+              type="search"
+              placeholder={tab === "templates" ? "Search templates" : "Search automations"}
+              aria-label={tab === "templates" ? "Search templates" : "Search automations"}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
           </label>
         )}
-        {(error || actionError) && (
-          <p className="error au-error" role="alert">
-            {error || actionError}
-          </p>
+        {tab === "templates" && <Templates query={query} servers={servers} sprockets={sprockets} />}
+        {tab === "list" && (
+          <>
+            {(error || actionError) && (
+              <p className="error au-error" role="alert">
+                {error || actionError}
+              </p>
+            )}
+            {list && !list.length && (
+              <section className="cz-section" aria-label="No automations yet">
+                <ul className="cz-cards">
+                  <li className="cz-card cz-card-add">
+                    <button type="button" className="cz-card-add-btn" onClick={() => navigate(href.newAutomation())}>
+                      <span className="cz-logo cz-logo-add" aria-hidden>
+                        <Plus size={18} />
+                      </span>
+                      <span className="cz-card-text">
+                        <span className="cz-card-name">New automation</span>
+                        <span className="cz-card-desc">Pick a Sprocket, say what it should do, and when. For example, every weekday at 9: “Tell me what changed in Linear since yesterday.”</span>
+                      </span>
+                    </button>
+                  </li>
+                  <li className="cz-card cz-card-add">
+                    <button type="button" className="cz-card-add-btn" onClick={() => navigate(href.automateTemplates())}>
+                      <span className="cz-logo cz-logo-add" aria-hidden>
+                        <Template size={18} />
+                      </span>
+                      <span className="cz-card-text">
+                        <span className="cz-card-name">Start from a template</span>
+                        <span className="cz-card-desc">A morning brief of your agent sessions, Linear triage, new Sentry errors and more.</span>
+                      </span>
+                    </button>
+                  </li>
+                </ul>
+              </section>
+            )}
+            {list && !!list.length && !shown.length && <p className="muted cz-none">Nothing matches “{query.trim()}”.</p>}
+            {!!on.length && (
+              <Section title="On" count={on.length}>
+                {on.map(card)}
+              </Section>
+            )}
+            {!!off.length && (
+              <Section title="Off" count={off.length}>
+                {off.map(card)}
+              </Section>
+            )}
+          </>
         )}
-        {list && !list.length && (
-          <section className="cz-section" aria-label="No automations yet">
-            <ul className="cz-cards">
-              <li className="cz-card cz-card-add">
-                <button type="button" className="cz-card-add-btn" onClick={() => navigate(href.newAutomation())}>
-                  <span className="cz-logo cz-logo-add" aria-hidden>
-                    <Plus size={18} />
-                  </span>
-                  <span className="cz-card-text">
-                    <span className="cz-card-name">New automation</span>
-                    <span className="cz-card-desc">Pick a Sprocket, say what it should do, and when. For example, every weekday at 9: “Tell me what changed in Linear since yesterday.”</span>
-                  </span>
-                </button>
-              </li>
-            </ul>
-          </section>
-        )}
-        {list && !!list.length && !shown.length && <p className="muted cz-none">Nothing matches “{query.trim()}”.</p>}
-        {!!on.length && (
-          <Section title="On" count={on.length}>
-            {on.map(card)}
-          </Section>
-        )}
-        {!!off.length && (
-          <Section title="Off" count={off.length}>
-            {off.map(card)}
-          </Section>
-        )}
-      </div>
+      </PageNav>
     </div>
   );
 }

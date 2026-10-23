@@ -20,8 +20,12 @@ export type Route =
   | { name: "customize"; view: "app"; tab: "connectors"; app: McpAppId }
   /** Something new in Customize, not created until the user says so. */
   | { name: "customize"; view: "new"; tab: CustomizeTab; draft: CustomizeDraft }
-  /** Automate (ADR 0032): the list of automations, a new one (not created until Create), or one by id. */
-  | { name: "automate"; view: "list" | "new" }
+  /**
+   * Automate (ADR 0032): the dashboard of automations, the templates, a new one (not created until Create; `template`
+   * fills it in from one), or one by id.
+   */
+  | { name: "automate"; view: "list" | "templates" }
+  | { name: "automate"; view: "new"; template?: string }
   | { name: "automate"; view: "item"; id: string };
 
 export type CustomizeTab = "connectors" | "skills" | "prompts";
@@ -55,7 +59,8 @@ export function parse(hash: string): Route {
     return { name: "customize", view: "home", tab: "connectors" };
   }
   if (parts[0] === "automate") {
-    if (parts[1] === "new") return { name: "automate", view: "new" };
+    if (parts[1] === "new") return { name: "automate", view: "new", ...(parts[2] ? { template: parts[2] } : {}) };
+    if (parts[1] === "templates") return { name: "automate", view: "templates" };
     if (parts[1]) return { name: "automate", view: "item", id: parts[1] };
     return { name: "automate", view: "list" };
   }
@@ -65,7 +70,9 @@ export function parse(hash: string): Route {
 export const href = {
   home: () => "#/",
   automate: () => "#/automate",
-  newAutomation: () => "#/automate/new",
+  automateTemplates: () => "#/automate/templates",
+  /** A new automation, filled in from a template if one is given. */
+  newAutomation: (template?: string) => `#/automate/new${template ? `/${encodeURIComponent(template)}` : ""}`,
   automation: (id: string) => `#/automate/${encodeURIComponent(id)}`,
   /** Home with a saved prompt filled in. */
   homeWithPrompt: (promptId: string) => `#/new/${encodeURIComponent(promptId)}`,
