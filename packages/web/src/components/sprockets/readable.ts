@@ -1,9 +1,5 @@
 // How a tool call's arguments read on a card (ADR 0031), apart from React so it can be tested.
 
-/**
- * An argument's value to read: text as it is (its line breaks kept), a number or yes/no as written, and objects and
- * lists indented one key or item per line ("title: Ideas", "- …"), as real tools' arguments nest (Notion's pages).
- */
 /** An id, a hash or a key: a long run of letters, digits and dashes with no space. Nothing to read. */
 const idLike = (s: string) => /^[A-Za-z0-9_-]{16,}$/.test(s) && /\d/.test(s);
 
@@ -34,6 +30,10 @@ export function readableResult(text: string): string {
   }
 }
 
+/**
+ * An argument's value to read: text as it is (its line breaks kept), a number or yes/no as written, and objects and
+ * lists indented one key or item per line ("title: Ideas", "- …"), as real tools' arguments nest (Notion's pages).
+ */
 export function readable(v: unknown, depth = 0): string {
   const pad = "  ".repeat(depth);
   if (v === null || v === undefined) return "none";

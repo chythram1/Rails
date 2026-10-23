@@ -84,9 +84,9 @@ export const api = {
   skillSources: () => req<SkillSource[]>("/api/skills/sources"),
   /** Copy a skill folder in: one of skillSources' paths, or a folder chosen in the server's picker (no path). */
   importSkill: (path?: string) => req<Skill | null>("/api/skills/import", { method: "POST", body: JSON.stringify(path ? { path } : {}) }),
-  /** Allow or deny an MCP call a Sprocket asked for (ADR 0025). */
   /** Run or skip a card's action (`index`), or every action still waiting (ADR 0031). */
   actOnCard: (messageId: string, run: boolean, index?: number) => req(`/api/cards/${enc(messageId)}/actions`, { method: "POST", body: JSON.stringify({ run, ...(index !== undefined ? { index } : {}) }) }),
+  /** Allow or deny an MCP call a Sprocket asked for (ADR 0025). */
   decideApproval: (messageId: string, allow: boolean) => req(`/api/approvals/${enc(messageId)}`, { method: "POST", body: JSON.stringify({ allow }) }),
   prompts: () => req<SavedPrompt[]>("/api/prompts"),
   createPrompt: (body: SavedPromptInput) => req<SavedPrompt>("/api/prompts", { method: "POST", body: JSON.stringify(body) }),

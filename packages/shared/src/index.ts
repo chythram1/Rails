@@ -513,10 +513,10 @@ export interface SprocketInput {
 }
 
 /**
- * Who wrote a chat message: the user, the Sprocket, Rails itself (setup hints and errors), or a session
- * event Rails woke a Coordinator with.
+ * Who wrote a chat message: the user, the Sprocket, Rails itself (setup hints and errors), a session event Rails
+ * woke a Coordinator with, a pass (a team member gave a teammate the turn, ADR 0023, shown as a line, not a bubble),
+ * or an automation's line (ADR 0032).
  */
-/** `pass`: a team member gave a teammate the turn (ADR 0023), shown as a line, not a bubble. */
 export type SprocketAuthor = "user" | "sprocket" | "notice" | "event" | "pass" | "automation";
 
 /** A question a Sprocket asked the user (ADR 0023, ask_user). */

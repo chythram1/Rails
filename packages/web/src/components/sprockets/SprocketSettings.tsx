@@ -59,9 +59,9 @@ let lastTab: Tab = "about";
  * scrolls. Everything saves as you go: a field when you leave it, a choice at once, and a quiet "Saved" in the
  * header confirms it. Its core memory is its own business. Moving it to another project deletes its project chat
  * (ADR 0021), so that asks first. The panel has its own URL (`#/sprockets/<id>/settings`): its toggle, Escape or
- * the browser's back button close it.
+ * the browser's back button close it. `onProjectChat`: it opened beside the project chat, so closing it goes back
+ * there.
  */
-/** `onProjectChat`: it opened beside the project chat, so closing it goes back there. */
 export function SprocketSettings({ sprocket, all, onProjectChat = false }: { sprocket: SprocketData; all: SprocketData[]; onProjectChat?: boolean }) {
   const { id, name } = sprocket;
   const { projects } = useStore();

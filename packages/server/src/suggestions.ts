@@ -209,7 +209,6 @@ const movesOn = (e: SessionEvent) => e.kind === "prompt" || e.kind === "tool" ||
 /** For a Codex question it may work on past (ADR 0027), its tools don't count: it's still asked. */
 const movesOnFrom = (card: SessionCard | undefined) => (e: SessionEvent) => movesOn(e) && !(e.kind === "tool" && card?.dialog?.kind === "steer");
 
-/** Expire a panel's pending answers, or (`all`) its messages too. */
 /** A chat was cleared (ADR 0021): what waited under its replies can't be sent from it anymore. */
 export function expireInChat(chatId: string): void {
   let any = false;
@@ -217,6 +216,7 @@ export function expireInChat(chatId: string): void {
   if (any) changes.emit();
 }
 
+/** Expire a panel's pending answers, or (`all`) its messages too. */
 function expireFor(panelId: string, { all = false, error }: { all?: boolean; error?: string } = {}) {
   let any = false;
   for (const s of suggestions.pendingFor(panelId))
@@ -224,7 +224,6 @@ function expireFor(panelId: string, { all = false, error }: { all?: boolean; err
   if (any) changes.emit();
 }
 
-/** Expire suggestions as sessions move on (answers) or end (everything). */
 /** pi put a queued message back in its editor when the user stopped its run: it wasn't sent after all. */
 function returned(panelId: string, text: string): void {
   for (const s of suggestions.sentTo(panelId))
@@ -252,6 +251,7 @@ function checkPickup(panel: Panel, id: string, sentAt: string): void {
   }, pickup.ms).unref?.();
 }
 
+/** Expire suggestions as sessions move on (answers) or end (everything). */
 export function startSuggestions(): void {
   onReturned(returned);
   onEvents((panel, events) => {

@@ -112,9 +112,9 @@ const clientOf = (s: StoredMcpServer) => secretsOf(s.id).client ?? (appOf(s) ? r
 
 // ---- the library ----
 
-/** What a Sprocket may do with a tool: the user's choice, else allow for read-only tools and ask for the rest. */
 /** A tool reads only if the server marks it so, or its connector's entry says all its tools do. */
 const readsOnly = (server: StoredMcpServer, tool: StoredTool) => tool.readOnly || connectorById(server.connector)?.readOnly === true;
+/** What a Sprocket may do with a tool: the user's choice, else allow for read-only tools and ask for the rest. */
 export const policyOf = (server: StoredMcpServer, tool: StoredTool): McpToolPolicy => server.policies[tool.name] ?? (readsOnly(server, tool) ? "allow" : "ask");
 
 function view(s: StoredMcpServer): McpServer {

@@ -919,7 +919,6 @@ export function severalEvents(events: SprocketMessage[]): string {
   return `[Rails, not your user] ${events.length} events came in since your last reply, and this one reply answers all of them:\n${list}\nDeal with each in turn, as its own event says: draft what it needs (a reply, an answer, a handoff's message), or nothing where its event says so (a handoff the session already carried out, or one already done, gets cancelled instead), and say in a sentence what each was. Reply (quiet) only if none of them needs your user.`;
 }
 
-/** The reminder after the chat (not saved, not from the user). */
 /** A tool's name as a button's label: its title as it is, or "add_note" as "Add note". */
 const labelOf = (title: string) => (/[\s]/.test(title) ? title : (title.charAt(0).toUpperCase() + title.slice(1)).replace(/[_-]+/g, " "));
 
@@ -979,13 +978,10 @@ function automationNow(r: StoredRun): string {
   ].join("\n");
 }
 
+/** The reminder after the chat (not saved, not from the user). */
 const TEXTING_NOW =
   "[Rails, not your user] Reply as chat messages: each paragraph is one, so put blank lines between short paragraphs of one or two sentences, with no headings or bold. A long answer is more messages, not longer ones.";
 
-/**
- * Where a team's round stands, for the member about to reply (ADR 0023): what the user last asked, who gave it the
- * turn, and how many passes are left.
- */
 /** The members whose turns are queued in a chat, in order. */
 const queuedIn = (chatId: string) => sprocketRuns.list(["queued"], chatId).map((q) => q.sprocketId);
 
@@ -1071,6 +1067,10 @@ export function notYet(history: SprocketMessage[], r: Pick<StoredRun, "sprocketI
 /** Names as a sentence: "Pam", "Pam and Bo", "Pam, Bo and Al". */
 const list = (names: string[]) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
 
+/**
+ * Where a team's round stands, for the member about to reply (ADR 0023): what the user last asked, who gave it the
+ * turn, and how many passes are left.
+ */
 function roundNow(history: SprocketMessage[], r: StoredRun, team: TeamInfo): string {
   const at = history.findLastIndex((m) => m.author === "user");
   const asked = at >= 0 ? history[at].text : "";

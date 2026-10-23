@@ -812,11 +812,11 @@ export const sprocketMessages = {
   runOf(id: string): string | undefined {
     return (db.prepare("SELECT run_id FROM sprocket_messages WHERE id = ?").get(id) as { run_id: string | null } | undefined)?.run_id ?? undefined;
   },
-  /** Record what came of an approval (ADR 0025). */
   /** Replace a card's actions (ADR 0031): the card is the record of what ran. */
   setCardActions(id: string, actions: SprocketCardAction[]): void {
     db.prepare("UPDATE sprocket_messages SET card = json_set(card, '$.actions', json(?)) WHERE id = ? AND card IS NOT NULL").run(JSON.stringify(actions), id);
   },
+  /** Record what came of an approval (ADR 0025). */
   setApproval(id: string, approval: SprocketApproval): void {
     db.prepare("UPDATE sprocket_messages SET approval = ? WHERE id = ?").run(JSON.stringify(approval), id);
   },
@@ -1245,7 +1245,6 @@ export const handoffs = {
   },
 };
 
-/** Which files or folders sessions own (ADR 0016). */
 /** The names the user gave sessions in Rails. */
 export const sessionNames = {
   get(provider: string, sessionId: string): string | undefined {
@@ -1264,6 +1263,7 @@ export const sessionNames = {
   },
 };
 
+/** Which files or folders sessions own (ADR 0016). */
 export const owners = {
   list(projectId: string): { panelId: string; path: string }[] {
     return (db.prepare("SELECT panel_id, path FROM owners WHERE project_id = ? ORDER BY created_at, rowid").all(projectId) as { panel_id: string; path: string }[]).map(
