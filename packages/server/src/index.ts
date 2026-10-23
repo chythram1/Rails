@@ -19,9 +19,9 @@ import { panels, projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
 import { listFolder, previewFile } from "./tree.ts";
 import { nameSession } from "./names.ts";
-import type { ConnectorInput, McpServerInput, OpenPanel, SavedPromptInput, SkillInput, SprocketTeamInput, SprocketInput, SprocketSettings } from "@rails/shared";
+import type { ConnectorInput, McpAppInput, McpServerInput, OpenPanel, SavedPromptInput, SkillInput, SprocketTeamInput, SprocketInput, SprocketSettings } from "@rails/shared";
 import { createPrompt, deletePrompt, listPrompts, updatePrompt } from "./customize.ts";
-import { addConnector, cancelSignIn as cancelMcpSignIn, createServer, deleteServer, disconnectAll, listServers, pasteSignIn, signOut, startSignIn as startMcpSignIn, testServer, updateServer } from "./mcp.ts";
+import { addConnector, cancelSignIn as cancelMcpSignIn, createServer, deleteServer, disconnectAll, listApps, listServers, pasteSignIn, setApp, signOut, startSignIn as startMcpSignIn, testServer, updateServer } from "./mcp.ts";
 import { createSkill, deleteSkill, importSkill, listSkills, skillSources, updateSkill } from "./skills.ts";
 import { decideApproval } from "./approvals.ts";
 import { closePanel, getWorkspace, openPanel, saveLayout } from "./panels.ts";
@@ -221,6 +221,8 @@ app.get("/api/projects/:id/files", async (c) => c.json(await listFolder(getProje
 app.get("/api/projects/:id/files/content", async (c) => c.json(await previewFile(getProject(c.req.param("id")).path, c.req.query("path") ?? "")));
 // ---- Customize (ADR 0025): saved prompts, MCP servers, skills ----
 app.get("/api/mcp", (c) => c.json(listServers()));
+app.get("/api/mcp/apps", (c) => c.json(listApps()));
+app.put("/api/mcp/apps/:id", async (c) => c.json(await setApp(c.req.param("id"), await c.req.json<McpAppInput>())));
 app.post("/api/mcp", async (c) => c.json(createServer(await c.req.json<McpServerInput>()), 201));
 app.put("/api/mcp/:id", async (c) => c.json(updateServer(c.req.param("id"), await c.req.json<McpServerInput>())));
 app.delete("/api/mcp/:id", (c) => {

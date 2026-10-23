@@ -3,6 +3,7 @@ import { IconDots as Dots, IconExternalLink as ExternalLink } from "@tabler/icon
 import { connectorById, MCP_DESCRIPTION_MAX, MCP_NAME_MAX, type McpServer, type McpServerInput, type McpSignIn, type McpToolPolicy } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
+import { useStore } from "../../store.tsx";
 import { timeAgo } from "../../util.ts";
 import { MenuButton } from "../Menu.tsx";
 import { Segmented } from "../Segmented.tsx";
@@ -213,10 +214,23 @@ export function McpEditor({ server: s }: { server: McpServer }) {
 /** Whether the last connection worked, and when. */
 function Status({ server: s }: { server: McpServer }) {
   const setup = connectorById(s.connector)?.setup;
+  const { mcpApps } = useStore();
+  const shared = s.signIn?.app && mcpApps?.find((a) => a.id === s.signIn!.app)?.clientId;
   if (s.status.state !== "ok" && s.signIn?.state !== "signed-in" && (setup === "sign-in" || setup === "own-app"))
     return (
       <p className="cz-status small" role="status">
-        <span className="cz-dot needed" aria-hidden /> {setup === "own-app" && !s.signIn?.clientId ? "Set up your app, then sign in." : "Sign in to connect it."}
+        <span className="cz-dot needed" aria-hidden />{" "}
+        {setup === "own-app" && !s.signIn?.clientId && !shared ? (
+          s.signIn?.app ? (
+            <>
+              <a href={href.mcpApp(s.signIn.app)}>Set up your Google app</a>, then sign in.
+            </>
+          ) : (
+            "Set up your app, then sign in."
+          )
+        ) : (
+          "Sign in to connect it."
+        )}
       </p>
     );
   const count = (p: McpToolPolicy) => s.tools.filter((t) => t.policy === p).length;
@@ -356,8 +370,14 @@ function SignIn({ server: s, signIn, onSave }: { server: McpServer; signIn: McpS
       <details className="cz-signin-app" open={!!signIn.clientId || /register themselves/.test(signIn.error ?? "")}>
         <summary>Your own app</summary>
         <p className="set-intro">
-          Some services (Google's, for one) don't let apps register themselves. Register an app with the service, give it the redirect address below,
-          and enter its client ID and secret here.
+          {signIn.app ? (
+            <>
+              It signs in with <a href={href.mcpApp(signIn.app)}>your Google app</a>, which every Google connector shares. An app set here is for this one
+              only, in its place.
+            </>
+          ) : (
+            "Some services (Google's, for one) don't let apps register themselves. Register an app with the service, give it the redirect address below, and enter its client ID and secret here."
+          )}
         </p>
         <div className="set-row cz-redirect-row">
           <div className="set-text">

@@ -30,6 +30,7 @@ import { Segmented } from "../Segmented.tsx";
 import { ConnectorLogo } from "./ConnectorLogo.tsx";
 import { ConnectorPage } from "./ConnectorPage.tsx";
 import { McpEditor, serverSummary } from "./McpEditor.tsx";
+import { AppSetup } from "./AppSetup.tsx";
 import { NewItem } from "./NewItem.tsx";
 import { PromptEditor } from "./PromptEditor.tsx";
 import { SkillEditor } from "./SkillEditor.tsx";
@@ -52,9 +53,13 @@ const modes: Partial<Record<CustomizeTab, Mode>> = {};
  * One item opens full width in its place, with a way back. A Sprocket picks its servers and skills in its settings.
  */
 export function CustomizePage({ route }: { route: CustomizeRoute }) {
-  const { mcpServers, skills, savedPrompts } = useStore();
+  const { mcpServers, mcpApps, skills, savedPrompts } = useStore();
   if (!mcpServers || !skills || !savedPrompts) return null;
 
+  if (route.view === "app") {
+    const app = mcpApps?.find((a) => a.id === route.app);
+    return <div className="cz-detail">{app ? <AppSetup app={app} /> : null}</div>;
+  }
   if (route.view === "new")
     return (
       <div className="cz-detail">
@@ -287,7 +292,19 @@ function DiscoverConnectors({ servers, query, onError, onCustom }: { servers: Mc
         const list = shown.filter((c) => c.group === g.id);
         if (!list.length) return null;
         return (
-          <Section key={g.id} title={g.title} count={list.length} blurb={g.blurb}>
+          <Section
+            key={g.id}
+            title={g.title}
+            count={list.length}
+            blurb={g.blurb}
+            action={
+              g.id === "google" ? (
+                <a className="cz-section-link" href={href.mcpApp("google")}>
+                  Your Google app
+                </a>
+              ) : undefined
+            }
+          >
             {list.map((c) => {
               const added = servers.find((s) => s.connector === c.id);
               return (

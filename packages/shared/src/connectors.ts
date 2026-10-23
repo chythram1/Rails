@@ -12,6 +12,12 @@ export type ConnectorSetup = "sign-in" | "none" | "token" | "own-app" | "folder"
 
 export type ConnectorGroup = "accounts" | "docs" | "google" | "local";
 
+/**
+ * An app (OAuth client) the user registers once with a service and every connector of that service uses (Google's,
+ * which let no app register itself): set up in Customize, kept with the other secrets.
+ */
+export type McpAppId = "google";
+
 export interface Connector {
   /** Also the name the server gets when added (`<id>_<tool>` for Sprockets). */
   id: string;
@@ -36,18 +42,24 @@ export interface Connector {
   guide?: string;
   /** Every tool only reads, though the server doesn't mark them so: they start as Allow instead of Ask. */
   readOnly?: boolean;
+  /** `own-app`: the shared app it signs in with, once the user has set it up (an app of its own overrides it). */
+  app?: McpAppId;
+  /** `own-app`: the scopes the app must be allowed, for its setup page (the service's own list). */
+  scopes?: string[];
 }
 
 export const CONNECTOR_GROUPS: { id: ConnectorGroup; title: string; blurb: string }[] = [
   { id: "accounts", title: "Your accounts", blurb: "Sign in, or paste a token. Rails keeps it on this computer." },
   { id: "docs", title: "Docs and knowledge", blurb: "No account needed." },
-  { id: "google", title: "Google Workspace", blurb: "In preview at Google: needs your own app in Google Cloud." },
+  { id: "google", title: "Google Workspace", blurb: "In preview at Google. Set up your Google app once, then each is one sign-in." },
   { id: "local", title: "On this computer", blurb: "Programs Rails runs here, with your access." },
 ];
 
 const GOOGLE_GUIDE = "https://developers.google.com/workspace/guides/configure-mcp-servers";
+/** Google's scopes for each MCP server (its guide, "Set up the OAuth consent screen"). */
+const DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.readonly", "https://www.googleapis.com/auth/drive.file"];
 const GOOGLE_ABOUT =
-  "Google's MCP servers are in preview: you need to be in the Google Workspace Developer Preview Program, then register an app in Google Cloud (a Web application client marked for an AI-powered agent) with Rails' redirect address, and enter its client ID and secret here.";
+  "Google's MCP servers are in preview: you need to be in the Google Workspace Developer Preview Program, and to register an app for Rails in Google Cloud once. Customize walks you through it, and every Google connector then signs in with that app.";
 
 export const CONNECTORS: Connector[] = [
   {
@@ -180,6 +192,8 @@ export const CONNECTORS: Connector[] = [
     setup: "own-app",
     url: "https://drivemcp.googleapis.com/mcp/v1",
     guide: GOOGLE_GUIDE,
+    app: "google",
+    scopes: DRIVE_SCOPES,
   },
   {
     id: "google-sheets",
@@ -191,6 +205,8 @@ export const CONNECTORS: Connector[] = [
     setup: "own-app",
     url: "https://sheetsmcp.googleapis.com/mcp/v1",
     guide: GOOGLE_GUIDE,
+    app: "google",
+    scopes: [...DRIVE_SCOPES, "https://www.googleapis.com/auth/spreadsheets.readonly", "https://www.googleapis.com/auth/spreadsheets"],
   },
   {
     id: "google-calendar",
@@ -202,6 +218,8 @@ export const CONNECTORS: Connector[] = [
     setup: "own-app",
     url: "https://calendarmcp.googleapis.com/mcp/v1",
     guide: GOOGLE_GUIDE,
+    app: "google",
+    scopes: ["https://www.googleapis.com/auth/calendar.calendarlist.readonly", "https://www.googleapis.com/auth/calendar.events.freebusy", "https://www.googleapis.com/auth/calendar.events.readonly"],
   },
   {
     id: "gmail",
@@ -213,6 +231,8 @@ export const CONNECTORS: Connector[] = [
     setup: "own-app",
     url: "https://gmailmcp.googleapis.com/mcp/v1",
     guide: GOOGLE_GUIDE,
+    app: "google",
+    scopes: ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.compose"],
   },
   {
     id: "filesystem",

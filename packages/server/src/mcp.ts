@@ -23,6 +23,9 @@ import {
   MCP_DESCRIPTION_MAX,
   MCP_NAME_MAX,
   MCP_TOOL_POLICIES,
+  type McpApp,
+  type McpAppId,
+  type McpAppInput,
   type McpServer,
   type McpServerInput,
   type McpSignIn,
@@ -69,6 +72,43 @@ function writeSecrets(data: Secrets) {
   renameSync(tmp, secretsFile());
 }
 const secretsOf = (id: string) => readSecrets()[id] ?? {};
+
+// ---- shared apps: an app the user registers once with a service, for all its connectors (Google's) ----
+
+const MCP_APPS: McpAppId[] = ["google"];
+type Apps = Partial<Record<McpAppId, { id: string; secret?: string }>>;
+const appsFile = () => join(RAILS_HOME, "mcp-apps.json");
+const readApps = (): Apps => (existsSync(appsFile()) ? (JSON.parse(readFileSync(appsFile(), "utf8")) as Apps) : {});
+
+/** A shared app as the browser sees it: its client ID and whether its secret is set. */
+function appView(id: McpAppId): McpApp {
+  const app = readApps()[id];
+  return { id, ...(app ? { clientId: app.id } : {}), clientSecret: !!app?.secret, redirectUrl: redirectUrl() };
+}
+export const listApps = (): McpApp[] => MCP_APPS.map(appView);
+
+/**
+ * Set or change a shared app (a value sets, null removes). Servers that signed in with the old one are signed out:
+ * their tokens and registration were for it.
+ */
+export async function setApp(id: string, body: McpAppInput | undefined): Promise<McpApp> {
+  if (!MCP_APPS.includes(id as McpAppId)) throw new ServiceError("Not found", 404);
+  const apps = readApps();
+  const next = mergeClient(apps[id as McpAppId], body ?? {});
+  if (next) apps[id as McpAppId] = next;
+  else delete apps[id as McpAppId];
+  const tmp = appsFile() + ".tmp";
+  writeFileSync(tmp, JSON.stringify(apps, null, 2), { mode: 0o600 });
+  renameSync(tmp, appsFile());
+  for (const s of mcpServers.list()) if (appOf(s) === id && !secretsOf(s.id).client) await signOut(s.id);
+  customizeChanged();
+  return appView(id as McpAppId);
+}
+
+/** The shared app a server can sign in with: its connector's. */
+const appOf = (s: StoredMcpServer): McpAppId | undefined => connectorById(s.connector)?.app;
+/** The app a server signs in with: its own, else its connector's shared one, if set. */
+const clientOf = (s: StoredMcpServer) => secretsOf(s.id).client ?? (appOf(s) ? readApps()[appOf(s)!] : undefined);
 
 // ---- the library ----
 
@@ -250,7 +290,8 @@ export async function addConnector(connectorId: string, body: ConnectorInput | u
     c.id,
   );
   if (c.setup === "sign-in") return startSignIn(made.id);
-  if (c.setup === "own-app") return made;
+  // With the shared app set up (Google's), it signs in like any other; without, its page says what to do.
+  if (c.setup === "own-app") return c.app && readApps()[c.app] ? startSignIn(made.id) : made;
   return testServer(made.id);
 }
 
@@ -470,7 +511,7 @@ function oauthStore(id: string): McpOAuthStateStore {
 }
 
 function oauthProvider(s: StoredMcpServer, onRedirect: (url: URL) => void = () => {}) {
-  const client = secretsOf(s.id).client;
+  const client = clientOf(s);
   return new McpOAuthProvider({
     serverUrl: s.url,
     redirectUrl: redirectUrl(),
@@ -502,6 +543,7 @@ function signInView(s: StoredMcpServer): McpSignIn {
     ...(client ? { clientId: client.id } : {}),
     clientSecret: !!client?.secret,
     redirectUrl: redirectUrl(),
+    ...(appOf(s) ? { app: appOf(s) } : {}),
   };
 }
 

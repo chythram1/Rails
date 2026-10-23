@@ -170,7 +170,7 @@ export function NewItem({ draft }: { draft: CustomizeDraft }) {
                   </button>
                 </div>
               ))}
-              <div>
+              <div className="cz-secret-more">
                 <button type="button" className="btn small" onClick={() => setSecrets((rows) => [...rows, { key: nextKey.current++, name: "", value: "" }])}>
                   {transport === "stdio" ? "Add a variable" : "Add a header"}
                 </button>

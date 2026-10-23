@@ -1,3 +1,4 @@
+import type { McpAppId } from "@rails/shared";
 import { useEffect, useState } from "react";
 
 export type Route =
@@ -15,6 +16,8 @@ export type Route =
    * of yours by id, or a connector (shared CONNECTORS) not added yet by its catalog id.
    */
   | { name: "customize"; view: "home" | "connector" | "mcp" | "skill" | "prompt"; tab: CustomizeTab; id?: string }
+  /** A service's shared app (Google's): the steps to register it, and its client ID and secret. */
+  | { name: "customize"; view: "app"; tab: "connectors"; app: McpAppId }
   /** Something new in Customize, not created until the user says so. */
   | { name: "customize"; view: "new"; tab: CustomizeTab; draft: CustomizeDraft }
   | { name: "automate" };
@@ -39,6 +42,7 @@ export function parse(hash: string): Route {
   }
   if (parts[0] === "new" && parts[1]) return { name: "home", promptId: parts[1] };
   if (parts[0] === "customize") {
+    if (parts[1] === "apps" && parts[2] === "google") return { name: "customize", view: "app", tab: "connectors", app: "google" };
     // Under "new", apart from the items' own ids (a skill's id comes from its name, so one could be "new").
     if (parts[1] === "new" && parts[2] && Object.hasOwn(DRAFT_TABS, parts[2])) return { name: "customize", view: "new", tab: DRAFT_TABS[parts[2] as CustomizeDraft], draft: parts[2] as CustomizeDraft };
     if (parts[1] === "mcp" && parts[2]) return { name: "customize", view: "mcp", tab: "connectors", id: parts[2] };
@@ -71,6 +75,8 @@ export const href = {
   mcpServer: (id: string) => `#/customize/mcp/${encodeURIComponent(id)}`,
   skill: (id: string) => `#/customize/skills/${encodeURIComponent(id)}`,
   prompt: (id: string) => `#/customize/prompts/${encodeURIComponent(id)}`,
+  /** A service's shared app (its setup steps). */
+  mcpApp: (id: McpAppId) => `#/customize/apps/${id}`,
   /** Something new, created only when the user says so. */
   newItem: (draft: CustomizeDraft) => `#/customize/new/${draft}`,
 };

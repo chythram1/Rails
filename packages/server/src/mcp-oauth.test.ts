@@ -111,6 +111,34 @@ describe("signing in to MCP servers", () => {
     await fake.close();
   });
 
+  it("signs Google's connectors in with the one shared app, and out again when it changes", async () => {
+    const fake = await fakeOAuthMcp({ registration: false, clientId: "my-google-app", clientSecret: "shh" });
+    // A Google connector's server, pointed at the fake service.
+    const s = mcp.createServer({ name: "drive-fake", transport: "http", url: fake.url }, "google-drive");
+    expect(s.signIn).toMatchObject({ app: "google" });
+    expect(mcp.listApps()).toEqual([{ id: "google", clientSecret: false, redirectUrl: s.signIn!.redirectUrl }]);
+
+    const app = await mcp.setApp("google", { clientId: "my-google-app", clientSecret: "shh" });
+    expect(app).toMatchObject({ clientId: "my-google-app", clientSecret: true });
+    expect(JSON.stringify(mcp.listApps())).not.toContain("shh");
+    expect(readFileSync(join(RAILS_HOME, "mcp-apps.json"), "utf8")).toContain("shh");
+
+    const started = await mcp.startSignIn(s.id);
+    expect(new URL(started.signIn!.authUrl!).searchParams.get("client_id")).toBe("my-google-app");
+    await fetch(await approve(started.signIn!.authUrl!));
+    await until(() => view(s.id).signIn!.state === "signed-in");
+    // The server's own app is still its own to set; the shared one isn't shown as its.
+    expect(view(s.id).signIn!.clientId).toBeUndefined();
+
+    // Another app signs out the servers that used the old one.
+    await mcp.setApp("google", { clientId: "another-app" });
+    expect(view(s.id).signIn!.state).not.toBe("signed-in");
+    await expect(mcp.setApp("nope", {})).rejects.toThrow("Not found");
+    await mcp.setApp("google", { clientId: null });
+    expect(mcp.listApps()[0].clientId).toBeUndefined();
+    await fake.close();
+  });
+
   it("asks for a sign-in when only the calls are turned away", async () => {
     const fake = await fakeOAuthMcp({ openList: true });
     const s = mcp.createServer({ name: "open-list", transport: "http", url: fake.url });

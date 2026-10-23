@@ -1,4 +1,4 @@
-import type { ConnectorInput, DecisionLog, FolderListing, GitStatus, McpServer, McpServerInput, ModelSettings, OpenPanel, Panel, Profile, ProfileChange, Project, ProviderInfo, RecentFolder, SavedPrompt, SavedPromptInput, ServerInfo, SessionKey, SessionSummary, SignIn, Skill, SkillInput, SkillSource, Sprocket, SprocketInput, SprocketMessage, SprocketSettings, SprocketTeam, SprocketTeamInput, Suggestion, Workspace } from "@rails/shared";
+import type { ConnectorInput, DecisionLog, FolderListing, GitStatus, McpApp, McpAppId, McpAppInput, McpServer, McpServerInput, ModelSettings, OpenPanel, Panel, Profile, ProfileChange, Project, ProviderInfo, RecentFolder, SavedPrompt, SavedPromptInput, ServerInfo, SessionKey, SessionSummary, SignIn, Skill, SkillInput, SkillSource, Sprocket, SprocketInput, SprocketMessage, SprocketSettings, SprocketTeam, SprocketTeamInput, Suggestion, Workspace } from "@rails/shared";
 
 export class Unauthorized extends Error {}
 
@@ -62,6 +62,8 @@ export const api = {
   saveLayout: (projectId: string, layout: unknown) =>
     req(`/api/projects/${enc(projectId)}/layout`, { method: "PUT", body: JSON.stringify({ layout }) }),
   mcpServers: () => req<McpServer[]>("/api/mcp"),
+  mcpApps: () => req<McpApp[]>("/api/mcp/apps"),
+  setMcpApp: (id: McpAppId, body: McpAppInput) => req<McpApp>("/api/mcp/apps/" + enc(id), { method: "PUT", body: JSON.stringify(body) }),
   createMcpServer: (body: McpServerInput) => req<McpServer>("/api/mcp", { method: "POST", body: JSON.stringify(body) }),
   updateMcpServer: (id: string, body: McpServerInput) => req<McpServer>("/api/mcp/" + enc(id), { method: "PUT", body: JSON.stringify(body) }),
   deleteMcpServer: (id: string) => req("/api/mcp/" + enc(id), { method: "DELETE" }),

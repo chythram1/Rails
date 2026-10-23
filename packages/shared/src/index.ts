@@ -1,6 +1,7 @@
 // Shared domain + wire types. Terms are defined in docs/CONTEXT.md.
 
 export * from "./connectors.ts";
+import type { McpAppId } from "./connectors.ts";
 export type ProviderId = "claude" | "codex" | "pi";
 
 export interface ProviderInfo {
@@ -166,6 +167,22 @@ export interface McpSignIn {
   clientSecret: boolean;
   /** Where the service sends the browser back: to give such a service when registering the app. */
   redirectUrl: string;
+  /** The shared app it signs in with when it has none of its own (its connector's, e.g. the user's Google app). */
+  app?: McpAppId;
+}
+
+/** A shared app (OAuth client) the user registered with a service, for all its connectors. The secret never comes back. */
+export interface McpApp {
+  id: McpAppId;
+  clientId?: string;
+  clientSecret: boolean;
+  /** The address to give the service when registering it. */
+  redirectUrl: string;
+}
+/** Body of "set a shared app": a value sets, null removes. */
+export interface McpAppInput {
+  clientId?: string | null;
+  clientSecret?: string | null;
 }
 
 /**

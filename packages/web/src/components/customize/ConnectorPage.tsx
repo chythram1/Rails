@@ -13,7 +13,10 @@ import { EditorHead } from "./fields.tsx";
  * server; its editor takes over from there (and runs the sign-in).
  */
 export function ConnectorPage({ connector: c, added }: { connector: Connector; added: McpServer[] }) {
-  const { profile } = useStore();
+  const { profile, mcpApps } = useStore();
+  /** Its service's shared app (Google's): set up once, or not yet. */
+  const app = c.app ? mcpApps?.find((a) => a.id === c.app) : undefined;
+  const needsApp = !!c.app && !app?.clientId;
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -35,14 +38,18 @@ export function ConnectorPage({ connector: c, added }: { connector: Connector; a
     "sign-in": `Sign in with your ${c.by} account. Rails keeps the token on this computer and renews it.`,
     none: "No account needed: it works as soon as it's added.",
     token: c.token?.help ?? "",
-    "own-app": "Register an app with the service, then enter its client ID and secret on the next page. It shows the redirect address to give the app.",
+    "own-app": c.app
+      ? needsApp
+        ? "Google lets no app register itself: set up your Google app once (about ten minutes), and every Google connector signs in with it."
+        : "Sign in with your Google account, through the Google app you set up."
+      : "Register an app with the service, then enter its client ID and secret on the next page. It shows the redirect address to give the app.",
     folder: `Pick the folder it may use. The picker opens on ${computer}'s screen.`,
   };
   const action: Record<Connector["setup"], string> = {
     "sign-in": "Connect",
     none: "Connect",
     token: "Connect",
-    "own-app": "Add it",
+    "own-app": c.app ? "Connect" : "Add it",
     folder: "Choose a folder…",
   };
   const where = c.url ?? [c.command, ...(c.args ?? []), c.setup === "folder" ? "<folder>" : ""].filter(Boolean).join(" ");
@@ -93,9 +100,15 @@ export function ConnectorPage({ connector: c, added }: { connector: Connector; a
               </div>
             )}
             <div className="cz-connect-actions">
-              <button className="btn primary" disabled={busy || (c.setup === "token" && !token.trim())}>
-                {busy ? (c.setup === "folder" ? "Choose it in the window that opened…" : "Connecting…") : action[c.setup]}
-              </button>
+              {needsApp ? (
+                <a className="btn primary" href={href.mcpApp(c.app!)}>
+                  Set up your Google app
+                </a>
+              ) : (
+                <button className="btn primary" disabled={busy || (c.setup === "token" && !token.trim())}>
+                  {busy ? (c.setup === "folder" ? "Choose it in the window that opened…" : "Connecting…") : action[c.setup]}
+                </button>
+              )}
               {c.guide && (
                 <a className="cz-guide" href={c.guide} target="_blank" rel="noreferrer">
                   Setup guide <ExternalLink size={14} aria-hidden />

@@ -1369,6 +1369,7 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .cz-section-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 14px; }
 .cz-section-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
 .cz-section-blurb { margin: 0; color: var(--muted); font-size: 13px; }
+.cz-section-link { margin-left: auto; font-size: 13px; }
 .cz-section .cz-count { margin-left: 8px; }
 .cz-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
 /* A card: square, on --surface-2 (as the Sprockets gallery's), the mark top left, the name a link over the whole card,
@@ -1464,6 +1465,16 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .cz-signin-row { display: flex; gap: 8px; align-items: center; }
 .cz-signin-row > .input { flex: 1; min-width: 0; }
 .set-row > .cz-signin-secret { width: min(300px, 50%); flex-shrink: 0; }
+/* A service's shared app (AppSetup): numbered steps with links out, the scopes and redirect to copy, its connectors. */
+.cz-steps { margin: 0; padding: 14px 0 0 22px; display: flex; flex-direction: column; gap: 12px; color: var(--text-2); line-height: 1.6; }
+.cz-steps li::marker { color: var(--muted); font: 500 13px var(--mono); }
+.cz-steps a { display: inline-flex; align-items: center; gap: 3px; }
+.cz-steps .cz-redirect { margin-top: 8px; }
+.cz-scopes { white-space: pre; overflow-x: auto; overflow-wrap: normal; }
+.cz-app-status { padding-top: 12px; }
+.cz-app-connectors { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; }
+.cz-app-connectors li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+.cz-app-connectors li .muted { margin-left: auto; }
 .cz-redirect-row { flex-direction: column; align-items: stretch; gap: 8px; }
 .cz-redirect { display: block; padding: 8px 12px; border: 1px solid var(--border); background: var(--surface-2); font: 12.5px/1.5 var(--mono); color: var(--text); overflow-wrap: anywhere; user-select: all; }
 .cz-signin-error { margin: 0 0 10px; overflow-wrap: anywhere; }
@@ -1472,6 +1483,7 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .cz-signin-app > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .cz-signin-app[open] > summary { margin-bottom: 2px; }
 .cz-secret-add { gap: 8px; }
+.cz-secret-more { padding-top: 10px; }
 .cz-secret-add > .input { flex: 1; min-width: 0; }
 .cz-secret-add > .input:first-child { flex: 0 1 40%; }
 /* Tools in two groups (can change things, read-only), each a small head with its "All" control over ruled rows:

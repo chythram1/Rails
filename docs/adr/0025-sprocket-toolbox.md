@@ -69,5 +69,17 @@ Consequences:
   Their marks come from simple-icons (CC0), copied in rather than installed.
 - **Customize is a page of cards** with Connectors, Skills and Prompts tabs, each with Yours and Discover (Rails'
   connectors; the user's agents' skills to copy in). One item opens full width in its place.
+- **Fewer fields to fill in** (added after researching other apps, `scratch/research/customize/findings.md`).
+  Google's MCP servers let no app register itself (no dynamic registration, no client metadata documents), and every
+  self-hosted app (n8n, Home Assistant) has users register their own; one-click sign-in would need an app the Rails
+  project registers and has Google verify, with a yearly security assessment for Gmail and Drive. So the user
+  registers one Google app, once: Customize's "Your Google app" page (`AppSetup.tsx`) gives the steps with a link to
+  each Google Cloud page, the scopes and redirect address to copy, and takes its client ID and secret, kept in
+  `RAILS_HOME/mcp-apps.json` (readable only by the user). Every Google connector signs in with it (`Connector.app`),
+  unless a server has an app of its own; changing it signs those servers out. GitHub's connector opens GitHub's new
+  fine-grained token page filled in (its token templates), so a token is a click and a paste. A new custom server
+  takes a pasted config: the README's `mcpServers` JSON, a `claude mcp add` / `codex mcp add` line or Codex's TOML;
+  placeholder values are left for the user to fill in.
 - Not yet: plugins (bundles of skills, servers and prompts), MCP in the project chat, Sprockets writing their own
-  skills.
+  skills, client metadata documents (pi-mcp supports them; Rails would publish one file), and signing in from
+  another device without pasting the address back.
