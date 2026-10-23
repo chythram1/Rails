@@ -97,11 +97,15 @@ const BRIDGE_BODY_LIMIT = 4 * 1024 * 1024;
 /** Whether a bridge request comes from the panel itself: over loopback, with its token. */
 const fromPanel = (c: Context, panelId: string) =>
   LOOPBACK.has(getConnInfo(c).remote.address ?? "") && bridgeTokenOk(panelId, c.req.header("authorization")?.replace(/^Bearer\s+/i, ""));
+// Everything under a panel's bridge path is for that panel alone.
+app.use("/bridge/:panelId/*", async (c, next) => {
+  if (!fromPanel(c, c.req.param("panelId"))) return c.json({ error: "Unauthorized" }, 401);
+  await next();
+});
 // Agent tools (ADR 0018): an MCP server for the agent in the panel (Streamable HTTP with plain JSON replies; no
 // event stream, so GET is refused, as the transport allows).
 app.post("/bridge/:panelId/mcp", bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({}, 413) }), async (c) => {
   const panelId = c.req.param("panelId");
-  if (!fromPanel(c, panelId)) return c.json({ error: "Unauthorized" }, 401);
   // The request's signal ends a wait_for when the agent gives up on the call (interrupted, or its time ran out).
   const reply = await mcpRequest(panelId, await c.req.json().catch(() => null), c.req.raw.signal);
   return reply ? c.json(reply) : c.body(null, 202);
@@ -110,12 +114,10 @@ app.get("/bridge/:panelId/mcp", (c) => c.body(null, 405));
 // The pi extension's long poll for replies the user sends (ADR 0010).
 app.get("/bridge/:panelId/pi/inbox", async (c) => {
   const panelId = c.req.param("panelId");
-  if (!fromPanel(c, panelId)) return c.json({ error: "Unauthorized" }, 401);
   return c.json({ messages: await piInbox.poll(panelId, c.req.raw.signal) });
 });
 app.post("/bridge/:panelId/pi/delivered", async (c) => {
   const panelId = c.req.param("panelId");
-  if (!fromPanel(c, panelId)) return c.json({ error: "Unauthorized" }, 401);
   type Delivered = { id?: unknown; ok?: unknown; queued?: unknown; error?: unknown };
   const body = await c.req.json<Delivered>().catch(() => ({}) as Delivered);
   piInbox.ack(panelId, body.id, body.ok, body.queued, body.error);
@@ -124,12 +126,10 @@ app.post("/bridge/:panelId/pi/delivered", async (c) => {
 // Rails' Claude Code mod: its poll for answers to an open question dialog, and whether it took one (ADR 0028).
 app.get("/bridge/:panelId/claude/inbox", async (c) => {
   const panelId = c.req.param("panelId");
-  if (!fromPanel(c, panelId)) return c.json({ error: "Unauthorized" }, 401);
   return c.json({ messages: await claudeInbox.poll(panelId, c.req.raw.signal) });
 });
 app.post("/bridge/:panelId/claude/delivered", async (c) => {
   const panelId = c.req.param("panelId");
-  if (!fromPanel(c, panelId)) return c.json({ error: "Unauthorized" }, 401);
   type Delivered = { id?: unknown; ok?: unknown; error?: unknown };
   const body = await c.req.json<Delivered>().catch(() => ({}) as Delivered);
   claudeInbox.ack(panelId, body.id, body.ok, false, body.error);
@@ -137,7 +137,6 @@ app.post("/bridge/:panelId/claude/delivered", async (c) => {
 });
 app.post("/bridge/:panelId/:source/:event", bodyLimit({ maxSize: BRIDGE_BODY_LIMIT, onError: (c) => c.json({}, 413) }), async (c) => {
   const panelId = c.req.param("panelId");
-  if (!fromPanel(c, panelId)) return c.json({ error: "Unauthorized" }, 401);
   const body = await c.req.json().catch(() => ({}));
   receive(panelId, c.req.param("source"), c.req.param("event"), body, { inbox: c.req.query("inbox")?.slice(0, 300) || undefined });
   return c.json({});
