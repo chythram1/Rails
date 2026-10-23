@@ -421,6 +421,16 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
     const queued = queuedIn(chatId);
     return askedTeammates(said, t.members.filter((m) => m.id !== id && !queued.includes(m.id)));
   };
+  /** Teammates the message that gave it the turn left a later step for, when it passed to none of them. */
+  const unhanded = (t: TeamInfo): string[] => {
+    const last = agent.state.messages.at(-1);
+    if (end || stale() || steps > MAX_STEPS || r.hop >= TEAM_TURNS_MAX) return [];
+    if (last?.role !== "assistant" || (last as AssistantMessage).stopReason !== "stop") return [];
+    if (sprocketMessages.list(chatId).some((m) => m.author === "user" && Date.parse(m.createdAt) > start)) return [];
+    const queued = queuedIn(chatId);
+    const history = sprocketMessages.list(chatId);
+    return [...new Set([...handOn(history, r, t), ...notYet(history, r, t)])].filter((name) => !queued.includes(t.members.find((m) => m.name === name)!.id));
+  };
 
   let steps = 0;
   let lastTyping = 0;
@@ -453,10 +463,14 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
       if (!stale()) await agent.continue();
     }
     // A member that asked a teammate something without passing the turn: once more, to pass it or leave it (ADR 0023).
+    // Or that was given the turn by a message that left a teammate a later step, and didn't pass it on.
     const asked = team ? unpassed(team) : [];
-    if (asked.length) {
+    const after = team && !asked.length ? unhanded(team) : [];
+    if (asked.length || after.length) {
       nudged = true;
-      agent.state.messages = [...agent.state.messages, { role: "user", content: nudge(asked), timestamp: Date.now() }];
+      const from = team!.members.find((m) => m.id === r.from)?.name ?? "A teammate";
+      const everyone = !handOn(sprocketMessages.list(chatId), r, team!).length;
+      agent.state.messages = [...agent.state.messages, { role: "user", content: asked.length ? nudge(asked) : handOnNudge(everyone ? undefined : from, after), timestamp: Date.now() }];
       await agent.continue();
     }
     return live ? finish() : save();
@@ -909,6 +923,47 @@ export function askedTeammates(text: string, members: { name: string }[]): strin
 const nudge = (names: string[]) =>
   `[Rails, not your user] You asked ${list(names)} something but didn't pass the turn, so ${names.length === 1 ? "they" : "none of them"} won't see it until your user writes again. If ${names.length === 1 ? "they" : "one of them"} should answer now, call pass_turn (with their name and a note); don't write your message again. If it was for your user, or just in passing, end here without writing anything.`;
 
+/**
+ * Rails' reminder to a member that didn't pass on the turn to `names`: `from`'s message gave them a later step, or
+ * (no `from`) the user asked everyone and they haven't answered.
+ */
+const handOnNudge = (from: string | undefined, names: string[]) =>
+  `[Rails, not your user] ${from ? `${from}'s message also gave ${list(names)} a step after yours` : `Your user asked all of you, and ${list(names)} ${names.length === 1 ? "hasn't" : "haven't"} answered yet`}, but you didn't pass the turn, so ${names.length === 1 ? "they" : "none of them"} won't take it until your user writes again. If it's ${names.length === 1 ? "their" : "one of their"} turn now, call pass_turn (with their name and a note); don't write your message again. If your message changes that plan, end here without writing anything.`;
+
+/**
+ * The teammates the message that gave this run the turn (its passer's last before the pass) asks something or
+ * gives a step, apart from this member and the passer, who haven't written since: the turn should go on to them
+ * ("Pam, draft it. Fred, check it after her." gives Pam the turn, then Fred's).
+ */
+export function handOn(history: SprocketMessage[], r: Pick<StoredRun, "from" | "sourceId" | "sprocketId">, team: TeamInfo): string[] {
+  if (!r.from || !r.sourceId) return [];
+  const at = history.findIndex((m) => m.id === r.sourceId);
+  if (at < 0) return [];
+  const by = history.slice(0, at).findLastIndex((m) => m.author === "sprocket" && m.sprocketId === r.from);
+  if (by < 0) return [];
+  const since = history.slice(by + 1);
+  const others = team.members.filter((m) => m.id !== r.sprocketId && m.id !== r.from && !since.some((x) => x.author === "sprocket" && x.sprocketId === m.id));
+  return askedTeammates(history[by].text, others);
+}
+
+/** A message for the whole team, without @everyone ("what do you all think?"). */
+const FOR_ALL = /\b(everyone|everybody|all of you|each of you|you all|y'all|you guys|whole team|the team)\b|\bteam\s*[?!]/i;
+
+/** Thanks, greetings and goodbyes to the team, which one answer covers. */
+const SMALL_TALK = /^\W*(thanks|thank you|thx|ty|cheers|great work|good job|nice work|well done|bye|goodbye|good night|night|hi|hello|hey|morning|good morning)\b/i;
+
+/**
+ * When the user's latest message asks the whole team (in words, not @everyone, which gives each a turn), the
+ * other members who haven't written since: the turn should go round to them.
+ */
+export function notYet(history: SprocketMessage[], r: Pick<StoredRun, "sprocketId">, team: TeamInfo): string[] {
+  const at = history.findLastIndex((m) => m.author === "user");
+  const text = history[at]?.text ?? "";
+  if (at < 0 || !FOR_ALL.test(text) || /@everyone\b/i.test(text) || SMALL_TALK.test(text)) return [];
+  const since = history.slice(at + 1);
+  return team.members.filter((m) => m.id !== r.sprocketId && !since.some((x) => x.author === "sprocket" && x.sprocketId === m.id)).map((m) => m.name);
+}
+
 /** Names as a sentence: "Pam", "Pam and Bo", "Pam, Bo and Al". */
 const list = (names: string[]) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
 
@@ -919,6 +974,8 @@ function roundNow(history: SprocketMessage[], r: StoredRun, team: TeamInfo): str
   const note = r.sourceId ? history.find((m) => m.id === r.sourceId && m.author === "pass")?.text : undefined;
   const others = team.members.filter((m) => m.id !== r.sprocketId).map((m) => m.name);
   const next = queuedIn(r.chatId).flatMap((q) => team.members.find((m) => m.id === q && m.id !== r.sprocketId)?.name ?? []);
+  const later = from ? handOn(history, r, team).filter((n) => !next.includes(n)) : [];
+  const round = notYet(history, r, team).filter((n) => !next.includes(n) && !later.includes(n));
   const open = waitingAsks(r.chatId).flatMap((a) => {
     const who = a.sprocketId !== r.sprocketId && team.members.find((m) => m.id === a.sprocketId)?.name;
     return who ? [`${who} asked ${JSON.stringify(a.question)}`] : [];
@@ -928,6 +985,12 @@ function roundNow(history: SprocketMessage[], r: StoredRun, team: TeamInfo): str
     from
       ? `${from} gave you the turn${note ? ` (${JSON.stringify(note)})` : ""}, pass ${r.hop} of ${TEAM_TURNS_MAX}: do what they asked of you, and post it here.`
       : "Your user's message came to you.",
+    ...(later.length
+      ? [`${from}'s message also gives ${list(later)} a step after yours: once your part is posted, pass the turn to ${later[0]}${later.length > 1 ? ` (and ask them to pass it on to ${list(later.slice(1))})` : ""}, unless your part changes that plan.`]
+      : []),
+    ...(round.length
+      ? [`Your user asked all of you, and ${list(round)} ${round.length === 1 ? "hasn't" : "haven't"} answered yet: give your own answer, then pass the turn to ${round[0]}${round.length > 1 ? ` (they pass it on)` : ""}.`]
+      : []),
     ...(next.length ? [`${list(next)} ${next.length === 1 ? "has" : "have"} a turn after yours and will answer for themselves: give only your own answer, and don't pass the turn to them.`] : []),
     ...(open.length ? [`Waiting for your user's answer: ${open.join("; ")}. Your user answers that themselves: don't ask it again, and don't pass anyone the turn for it.`] : []),
     `Write only your own message (your teammates write theirs in their turns), and don't repeat what's been said. If someone${others.length ? ` (${others.join(", ")})` : ""} should take the next step, write your message, then call pass_turn with their name; otherwise just answer, and your user picks it up.`,
@@ -951,7 +1014,9 @@ function teamPrompt(team: TeamInfo & { self: string }, projectName: string | und
     "Talk like one person in a group chat: write your message, as yourself, from your own role. Your teammates write their own messages in their own turns: never write lines for them or play out the conversation yourself. Don't repeat what a teammate already said (if they said what you'd say, add only what's new, or just agree in a few words).",
     `To give a teammate the next step (a question only they can answer, part of the work, their take), write your message to them, naming them plainly (no @), then call pass_turn with their name and a few words on what they should do: they go next, and your turn ends there. Do your own part in your message first: post the work itself (the draft, the answer, the list), not that you'll do it. Pass the turn only when someone has something to do; not to thank, agree or greet, and not to pass on what your user already asked them. Give it back to whoever gave it to you only with something new for them (an answer that needs their reply, your part done for them to build on), never just to report back. When your user asks you all for a conversation (a number of turns, a debate), keep it going: end your message with something for a teammate to answer and pass them the turn, until it has had the turns your user asked for. After ${TEAM_TURNS_MAX} passes in a row Rails waits for your user.`,
     ...(lead
-      ? [`You lead: messages for the team in general come to you. Answer them yourself when you can; when a teammate's role fits better, say what you need from them and pass them the turn.`]
+      ? [
+          `You lead: messages for the team in general come to you. Answer them yourself when you can; when a teammate's role fits better, say what you need from them and pass them the turn.`,
+        ]
       : []),
     ...(projectName
       ? [`Rails' events about ${JSON.stringify(projectName)} (sessions that wait for your user, overlaps, handoffs, agents' drafts) go to its project chat, not here: read them with project_chat when they matter.`]

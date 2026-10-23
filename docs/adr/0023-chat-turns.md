@@ -96,3 +96,16 @@ without anyone passing them the turn: a follow-up went straight to whoever spoke
 the reviewer, 3 of 3 tries on Jev), and "what do you all think?" to part of the team (the lead and one member, never
 the third). The lead passing on is slower by a run, but the user can see why each member speaks: an @, a question
 it asked, or a pass. Decision models still serve the Coordinator (ADR 0012, 0013, 0029).
+
+Amendment (2026-10-23, later): the turn goes on. Without the model, "what do you all think?" got only the lead's
+answer (3 of 3; it's told to answer the team's messages), and a member given a step in a plan ("Pam, draft it.
+Fred, check it after her.") sometimes didn't pass on to the next (1 of 3). Now, in `runs.ts`:
+- **Hand-on** (`handOn`): a member given the turn by a message that also gives teammates a later step (by
+  `askedTeammates`), who haven't written since, is told to pass the turn to them once its part is posted.
+- **Round** (`notYet`): when the user's latest message asks the whole team in words ("you all", "everyone", "the
+  team"; not `@everyone`, which gives each a turn, nor thanks or greetings), each member is told who hasn't
+  answered yet and to pass the turn to them.
+- A member that ends without passing to them is reminded once, as for a teammate it asked (one model call, and
+  what it writes then isn't posted).
+Live (gpt-6-luna, gpt-6-sol, gpt-5.6-terra): the plan's hand-on 3 of 3, "what do you all think?" round all three
+members 3 of 3, "thanks everyone!" only the lead.

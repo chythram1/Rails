@@ -99,7 +99,8 @@ describe("team chats", () => {
 
   it("lets only @mentions pick members: a plain name or 'everyone' goes to the lead, @everyone to all", async () => {
     const { team } = crew();
-    faux.setResponses([reply("Lead here."), reply("Lead again.")]);
+    // "everyone" in words: the lead, reminded to pass it round, leaves it (what it writes then isn't posted).
+    faux.setResponses([reply("Lead here."), reply("Lead again."), reply("Not posted.")]);
     sendMessage(team.id, "Bo, what do you think?");
     await idle();
     sendMessage(team.id, "One idea from everyone, and reference cy");
@@ -272,6 +273,59 @@ describe("team chats", () => {
     await idle();
     expect(faux.getPendingResponseCount()).toBe(0);
     expect(said(team.id).at(-1)).toBe("Ada: Thanks Bo!");
+  });
+
+  it("tells a member given the turn to pass it on to whoever the passer gave a later step, and reminds it once", async () => {
+    const { team } = crew();
+    const passOnly = (to: string) =>
+      fauxAssistantMessage([fauxToolCall("codemode", { code: `await tools.pass_turn({ to: ${JSON.stringify(to)}, note: "check it" })` })], { stopReason: "toolUse" });
+    let told = "";
+    let reminded = "";
+    faux.setResponses([
+      pass("Bo, draft step 1. Cy, check it after Bo.", "Bo", "draft step 1"),
+      (c) => ((told = seen(c)), reply("Here's the draft.")),
+      (c) => ((reminded = seen(c)), passOnly("Cy")),
+      reply("Looks good."),
+    ]);
+    sendMessage(team.id, "Plan the post.");
+    await idle();
+    expect(told).toContain("Ada's message also gives Cy a step after yours: once your part is posted, pass the turn to Cy");
+    expect(reminded).toContain("Ada's message also gave Cy a step after yours, but you didn't pass the turn");
+    expect(said(team.id).slice(1)).toEqual(["Ada: Bo, draft step 1. Cy, check it after Bo.", "pass: Ada → Bo", "Bo: Here's the draft.", "pass: Bo → Cy", "Cy: Looks good."]);
+
+    // A pass that gives no one else a step: no reminder, no extra call.
+    faux.setResponses([pass("Bo, one more line?", "Bo"), reply("Added.")]);
+    sendMessage(team.id, "One more line.");
+    await idle();
+    expect(faux.getPendingResponseCount()).toBe(0);
+    expect(said(team.id).at(-1)).toBe("Bo: Added.");
+  });
+
+  it("goes round the team when the user asks all of them in words, reminding a member that doesn't pass it on", async () => {
+    const { team } = crew();
+    const passOnly = (to: string) =>
+      fauxAssistantMessage([fauxToolCall("codemode", { code: `await tools.pass_turn({ to: ${JSON.stringify(to)}, note: "your take" })` })], { stopReason: "toolUse" });
+    let told = "";
+    let reminded = "";
+    faux.setResponses([
+      (c) => ((told = seen(c)), reply("I like it.")),
+      (c) => ((reminded = seen(c)), passOnly("Bo")),
+      pass("Too long.", "Cy"),
+      reply("Ship it."),
+    ]);
+    sendMessage(team.id, "What do you all think?");
+    await idle();
+    expect(told).toContain("Your user asked all of you, and Bo and Cy haven't answered yet: give your own answer, then pass the turn to Bo");
+    expect(reminded).toContain("Your user asked all of you, and Bo and Cy haven't answered yet, but you didn't pass the turn");
+    expect(said(team.id).slice(1)).toEqual(["Ada: I like it.", "pass: Ada → Bo", "Bo: Too long.", "pass: Bo → Cy", "Cy: Ship it."]);
+    expect(faux.getPendingResponseCount()).toBe(0); // Cy, the last, isn't reminded
+
+    // Thanks to everyone: the lead's answer covers it.
+    faux.setResponses([reply("Anytime!")]);
+    sendMessage(team.id, "Thanks everyone!");
+    await idle();
+    expect(said(team.id).at(-1)).toBe("Ada: Anytime!");
+    expect(faux.getPendingResponseCount()).toBe(0);
   });
 
   it("drops a member's own name from the front of its message", async () => {
