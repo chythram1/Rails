@@ -450,22 +450,26 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
 
   /** Asked to pass the turn it forgot: what it writes now isn't posted (its message is in already). */
   let nudged = false;
+  /**
+   * Whether it ended its turn on its own without passing it, and may still be reminded to: it wasn't stopped, has
+   * passes left, and the user hasn't written since it started.
+   */
+  const mayNudge = (): boolean => {
+    const last = agent.state.messages.at(-1);
+    if (end || stale() || steps > MAX_STEPS || r.hop >= TEAM_TURNS_MAX) return false;
+    if (last?.role !== "assistant" || (last as AssistantMessage).stopReason !== "stop") return false;
+    return !sprocketMessages.list(chatId).some((m) => m.author === "user" && Date.parse(m.createdAt) > start);
+  };
   /** The teammates its last message asks something, when it ended its turn without passing it to anyone. */
   const unpassed = (t: TeamInfo): string[] => {
-    const last = agent.state.messages.at(-1);
-    if (end || stale() || steps > MAX_STEPS || r.hop >= TEAM_TURNS_MAX) return [];
-    if (last?.role !== "assistant" || (last as AssistantMessage).stopReason !== "stop") return [];
-    if (sprocketMessages.list(chatId).some((m) => m.author === "user" && Date.parse(m.createdAt) > start)) return [];
+    if (!mayNudge()) return [];
     const said = [...posted.values(), ...sent].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).at(-1)?.text ?? "";
     const queued = queuedIn(chatId);
     return askedTeammates(said, t.members.filter((m) => m.id !== id && !queued.includes(m.id)));
   };
   /** Teammates the message that gave it the turn left a later step for, when it passed to none of them. */
   const unhanded = (t: TeamInfo): string[] => {
-    const last = agent.state.messages.at(-1);
-    if (end || stale() || steps > MAX_STEPS || r.hop >= TEAM_TURNS_MAX) return [];
-    if (last?.role !== "assistant" || (last as AssistantMessage).stopReason !== "stop") return [];
-    if (sprocketMessages.list(chatId).some((m) => m.author === "user" && Date.parse(m.createdAt) > start)) return [];
+    if (!mayNudge()) return [];
     const queued = queuedIn(chatId);
     const history = sprocketMessages.list(chatId);
     return [...new Set([...handOn(history, r, t), ...(inRound(r) ? notYet(history, r, t) : [])])].filter((name) => !queued.includes(t.members.find((m) => m.name === name)!.id));
@@ -567,10 +571,7 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
         outcome = { passed: { passTo: e.passTo, sourceId: line.id } };
       }
     }
-    const reply = added.filter((m): m is AssistantMessage => m.role === "assistant").at(-1);
-    if (steps > MAX_STEPS) notice(chatId, `Stopped after ${MAX_STEPS} steps.`, id);
-    else if (reply?.stopReason === "error") notice(chatId, `The model returned an error: ${readableError(reply.errorMessage)}`, id);
-    else if (!posted.size && !sent.length && !e) notice(chatId, "The model sent an empty reply.", id);
+    endNotice(added.filter((m): m is AssistantMessage => m.role === "assistant").at(-1), !posted.size && !sent.length && !e);
     changed();
     return outcome;
   }
@@ -592,9 +593,14 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
       const saved = sprocketMessages.create(chatId, "sprocket", text, startedAt, { activity: summarize(capabilities, done), steps: work, sprocketId: id, runId: r.id });
       suggestions.attach(made.splice(0), saved.id);
     }
+    endNotice(reply, !text);
+  }
+
+  /** Rails' line when a run ended badly: stopped at its step limit, a model error, or (`empty`) nothing written. */
+  function endNotice(reply: AssistantMessage | undefined, empty: boolean): void {
     if (steps > MAX_STEPS) notice(chatId, `Stopped after ${MAX_STEPS} steps.`, id);
     else if (reply?.stopReason === "error") notice(chatId, `The model returned an error: ${readableError(reply.errorMessage)}`, id);
-    else if (!text) notice(chatId, "The model sent an empty reply.", id);
+    else if (empty) notice(chatId, "The model sent an empty reply.", id);
   }
 }
 
