@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { IconArrowDown as ArrowDown, IconArrowRight as ArrowRight, IconChevronLeft as ChevronLeft } from "@tabler/icons-react";
 import { TEAM_TURNS_MAX, findMentions, type Sprocket as SprocketData, type SprocketChatInfo, type SprocketTeam, type SprocketMessage } from "@rails/shared";
 import { api } from "../../api.ts";
@@ -19,6 +19,7 @@ import { COLORS } from "./characters.ts";
 import { SPIN_MS, useSprocketMotion } from "./motion.ts";
 import { useThreadScroll } from "./threadScroll.ts";
 import { bubbles, typingTime } from "./bubbles.ts";
+import { blocks, type Block } from "./marks.ts";
 import { Card } from "./Card.tsx";
 import { ApprovalCard } from "./ApprovalCard.tsx";
 
@@ -362,12 +363,17 @@ export function SprocketChat({
                           </>
                         )}
                         {m.approval && <ApprovalCard messageId={m.id} approval={m.approval} name={by?.name ?? "A deleted Sprocket"} />}
-                        {!m.card && !m.approval && parts.map((part, j) => (
-                          <p key={j} className="sp-bubble">
-                            {m.author === "sprocket" && j === 0 && <span className="sr-only">{by?.name ?? "A deleted Sprocket"}: </span>}
-                            {m.author === "notice" ? part : text(part)}
-                          </p>
-                        ))}
+                        {!m.card && !m.approval && parts.map((part, j) => {
+                          const read = m.author === "notice" ? undefined : blocks(part);
+                          // A code block can't go in a <p>.
+                          const Bubble = read?.some((b) => b.kind === "fence") ? "div" : "p";
+                          return (
+                            <Bubble key={j} className="sp-bubble">
+                              {m.author === "sprocket" && j === 0 && <span className="sr-only">{by?.name ?? "A deleted Sprocket"}: </span>}
+                              {read ? <Marked blocks={read} text={text} /> : part}
+                            </Bubble>
+                          );
+                        })}
                         {!!options?.length && (
                           <div className="sp-ask" role="group" aria-label="Answers to pick">
                             {options.map((o) => (
@@ -444,6 +450,31 @@ export function SprocketChat({
         </Composer>
       </div>
     </section>
+  );
+}
+
+/** A bubble's code blocks, `code` and **bold** (marks.ts); `text` draws the plain text (with its @mentions). */
+function Marked({ blocks: read, text }: { blocks: Block[]; text: (t: string) => ReactNode }) {
+  return read.map((b, i) =>
+    b.kind === "fence" ? (
+      <pre key={i} className="sp-pre">
+        <code>{b.code}</code>
+      </pre>
+    ) : (
+      <Fragment key={i}>
+        {b.marks.map((m, k) =>
+          m.kind === "code" ? (
+            <code key={k} className="sp-code">
+              {m.text}
+            </code>
+          ) : m.kind === "strong" ? (
+            <strong key={k}>{text(m.text)}</strong>
+          ) : (
+            <Fragment key={k}>{text(m.text)}</Fragment>
+          ),
+        )}
+      </Fragment>
+    ),
   );
 }
 

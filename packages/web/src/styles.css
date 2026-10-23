@@ -917,6 +917,12 @@ textarea.input { resize: vertical; line-height: 1.5; }
   margin: 0; max-width: min(560px, 85%); padding: 9px 14px; background: var(--surface-2);
   font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
 }
+/* What a bubble's Markdown says (marks.ts): `code` and code blocks in the mono face, on --surface. */
+.sp-bubble strong { font-weight: 600; }
+.sp-code { padding: 1px 4px; background: var(--surface); font: 0.86em/1 var(--mono); }
+.sp-pre { margin: 6px 0; padding: 8px 10px; overflow-x: auto; background: var(--surface); font: 12.5px/1.6 var(--mono); white-space: pre; }
+.sp-pre:first-child { margin-top: 0; }
+.sp-pre:last-child { margin-bottom: 0; }
 /* Replies are bubbles too, on the left, as in a text app; Rails' own notices sit in the middle. */
 .sp-message.sprocket { align-items: flex-start; }
 .sp-message.sprocket .sp-bubble { max-width: min(620px, 85%); }

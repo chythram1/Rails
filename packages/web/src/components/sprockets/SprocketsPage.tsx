@@ -14,6 +14,7 @@ import { SprocketCreator } from "./SprocketCreator.tsx";
 import { SprocketSettings } from "./SprocketSettings.tsx";
 import { groupSprockets } from "./groups.ts";
 import { useSprockets } from "./useSprockets.ts";
+import { plain } from "./marks.ts";
 
 type SprocketsRoute = Extract<Route, { name: "sprockets" }>;
 
@@ -304,6 +305,6 @@ function preview(chat: SprocketChatInfo, nameOf?: (id: string) => string | undef
   if (m.event) return `${m.event.title}: ${m.event.questions?.[0]?.question ?? m.text}`;
   if (m.author === "user") return `You: ${m.text}`;
   if (m.author === "pass") return `${nameOf?.(m.sprocketId) ?? "A deleted Sprocket"} → ${(m.passTo && nameOf?.(m.passTo)) ?? "a teammate"}${m.text ? `: ${m.text}` : ""}`;
-  const text = m.card ? (m.card.title ? `Card: ${m.card.title}` : "A card") : m.approval?.status === "pending" ? `Wants to use ${m.approval.server} ${m.approval.tool}` : m.text;
+  const text = m.card ? (m.card.title ? `Card: ${m.card.title}` : "A card") : m.approval?.status === "pending" ? `Wants to use ${m.approval.server} ${m.approval.tool}` : plain(m.text);
   return nameOf && m.author === "sprocket" ? `${nameOf(m.sprocketId) ?? "A deleted Sprocket"}: ${text}` : text;
 }
