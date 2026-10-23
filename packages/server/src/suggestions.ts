@@ -10,7 +10,7 @@ import { claudeInbox, deliver, piInbox } from "./bridge/deliver.ts";
 import { steerCodex } from "./bridge/codex.ts";
 import { ASKING, type SessionEvent } from "./bridge/events.ts";
 import { cardOf, onEvents, onPanelForgotten, onReturned } from "./bridge/index.ts";
-import { panels, sprockets, suggestions } from "./db.ts";
+import { panels, sessionEvents, sprockets, suggestions } from "./db.ts";
 import { ServiceError } from "./errors.ts";
 import { listeners } from "./util.ts";
 
@@ -154,8 +154,10 @@ export async function sendSuggestion(id: string, rawText: unknown): Promise<Sugg
   if (!suggestions.setStatus(id, ["pending", "failed"], "sending", { text, edited: text !== s.text })) throw new ServiceError("It's already being sent.", 409);
   changes.emit();
   try {
+    const sentAt = new Date().toISOString();
     const { queued } = await deliver(panel!, card!, deliveredText(text, s.attachment, s.from), { queue: s.mode === "message" });
     suggestions.setStatus(id, ["sending"], "sent", { queued });
+    if (!queued) checkPickup(panel!, id, sentAt);
   } catch (e) {
     suggestions.setStatus(id, ["sending"], "failed", { error: (e as Error).message });
   }
@@ -230,9 +232,33 @@ function returned(panelId: string, text: string): void {
       changes.emit();
 }
 
+/**
+ * How long an idle session has to show it took a message. Claude Code reports the prompt it starts within a second
+ * (UserPromptSubmit, verified with 2.1.309), Codex its user message item; `ms` is changed only by tests.
+ */
+export const pickup = { ms: 15_000 };
+
+/**
+ * Claude Code's message socket and Codex's queue only accept a message (pi's extension says whether pi took it,
+ * deliver.ts): if the idle session it went to reports nothing within `pickup.ms`, the sent card says so, rather than
+ * a plain "Sent" the user would trust (the pattern of herdr's prompt-stalled check). Anything it reports later
+ * clears it.
+ */
+function checkPickup(panel: Panel, id: string, sentAt: string): void {
+  if (panel.kind !== "claude" && panel.kind !== "codex") return;
+  setTimeout(() => {
+    const took = sessionEvents.list(panel.id).some((r) => r.at >= sentAt);
+    if (!took && suggestions.setUnconfirmed(id, true)) changes.emit();
+  }, pickup.ms).unref?.();
+}
+
 export function startSuggestions(): void {
   onReturned(returned);
   onEvents((panel, events) => {
+    // It reported something: whatever was sent to it without a sign it took it, it has now.
+    let took = false;
+    for (const s of suggestions.sentTo(panel.id)) if (s.unconfirmed) took = suggestions.setUnconfirmed(s.id, false) || took;
+    if (took) changes.emit();
     if (events.some((e) => e.kind === "ended")) expireFor(panel.id, { all: true, error: "The session ended." });
     else if (events.some((e) => e.kind === "start" && e.from)) expireFor(panel.id, { all: true, error: "The panel moved on to another session." });
     else if (events.some(movesOnFrom(cardOf(panel)))) expireFor(panel.id);

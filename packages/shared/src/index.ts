@@ -675,6 +675,11 @@ export interface Suggestion {
   error?: string;
   /** Sent while the session was busy: it's in the session's own queue, for after its current turn. */
   queued?: boolean;
+  /**
+   * Sent to an idle session that showed no sign of taking it (no event within a few seconds; Claude Code's socket
+   * and Codex's queue only accept). Cleared when the session reports anything.
+   */
+  unconfirmed?: boolean;
   createdAt: string;
   /** When its status last changed (sent, dismissed, expired). */
   updatedAt: string;

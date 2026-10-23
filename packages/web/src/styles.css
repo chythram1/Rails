@@ -1069,6 +1069,8 @@ ul.sp-event-quote { display: flex; flex-direction: column; gap: 6px; }
 .sp-suggestion-label { flex: none; white-space: nowrap; margin-right: -2px; }
 .sp-suggestion-head .sp-suggestion-label { margin-right: 0; color: var(--pink); font: 11px/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
 .sp-suggestion-line > svg { flex: none; }
+/* A sent message the session hasn't shown it took (Suggestion.unconfirmed). */
+.sp-suggestion-warn { margin: 4px 0 0; color: var(--amber); font-size: 13px; }
 .sp-suggestion-text {
   display: block; width: auto; max-height: 12lh; padding: 0; border: 0; background: none;
   font-size: 15px; line-height: 1.5; resize: none; overflow-y: auto;

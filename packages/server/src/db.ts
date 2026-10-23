@@ -233,6 +233,8 @@ addColumn("suggestions", "queued", "INTEGER NOT NULL DEFAULT 0");
 addColumn("suggestions", "attachment", "TEXT");
 /** On an agent's message: the session that drafted it, as JSON {panelId, kind, title} (ADR 0018). */
 addColumn("suggestions", "sender", "TEXT");
+/** On a sent suggestion: 1 while the idle session it went to hasn't shown it took it (Suggestion.unconfirmed). */
+addColumn("suggestions", "unconfirmed", "INTEGER NOT NULL DEFAULT 0");
 addColumn("suggestions", "edited", "INTEGER NOT NULL DEFAULT 0");
 /** On an answer Rails can give a pi dialog itself: JSON {id, option?, text?} (ADR 0027). */
 addColumn("suggestions", "dialog", "TEXT");
@@ -857,6 +859,7 @@ type SuggestionRow = {
   sender: string | null;
   dialog: string | null;
   queued: number;
+  unconfirmed: number;
   edited: number;
   status: Suggestion["status"];
   error: string | null;
@@ -880,6 +883,7 @@ const toSuggestion = (r: SuggestionRow): Suggestion & { sprocketId: string; mess
   status: r.status,
   ...(r.error ? { error: r.error } : {}),
   ...(r.queued ? { queued: true } : {}),
+  ...(r.unconfirmed ? { unconfirmed: true } : {}),
   ...(r.edited ? { edited: true } : {}),
   createdAt: r.created_at,
   updatedAt: r.updated_at,
@@ -985,6 +989,10 @@ export const suggestions = {
   /** Forget suggestions that never got a reply to show them under. */
   drop(ids: string[]): void {
     for (const id of ids) db.prepare("DELETE FROM suggestions WHERE id = ? AND message_id IS NULL").run(id);
+  },
+  /** Mark a sent one as not yet taken by its session, or (false) as taken. True when that changed it. */
+  setUnconfirmed(id: string, on: boolean): boolean {
+    return db.prepare("UPDATE suggestions SET unconfirmed = ? WHERE id = ? AND status = 'sent' AND unconfirmed != ?").run(on ? 1 : 0, id, on ? 1 : 0).changes > 0;
   },
   /** Change the status if it's one of `from`. False when it wasn't (someone else changed it first). Once edited, it stays edited. */
   setStatus(id: string, from: Suggestion["status"][], to: Suggestion["status"], extra: { error?: string; text?: string; queued?: boolean; edited?: boolean } = {}): boolean {

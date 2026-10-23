@@ -58,6 +58,7 @@ export function SuggestionCard({ suggestion: s, projectId }: { suggestion: Sugge
           <span className="sp-event-title truncate" title={s.title}>{shortTitle(s.title)}</span>
           {s.queued && <span className="sp-suggestion-label">· after its current turn</span>}
         </p>
+        {s.unconfirmed && <p className="sp-suggestion-warn">No sign it got there yet. Check its panel before you send it again.</p>}
         <blockquote className="sp-event-quote">{s.text}</blockquote>
         {s.attachment && <Attachment attachment={s.attachment} />}
       </div>

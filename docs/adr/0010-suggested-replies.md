@@ -52,6 +52,10 @@ Decisions:
     on the way, or one that arrived as pi started on something else, shows as not sent.
   - Codex: `thread/queue/add` on its daemon, shown as the user's message.
   The send's outcome (sent, or failed and why) is shown on the card; the agent's reaction is in its panel.
+  *Amended:* Claude Code's socket and Codex's queue only accept a message. So when one goes to an idle session
+  that then reports nothing for 15 s (Claude Code reports the prompt it starts within a second, verified with
+  2.1.309), the sent card adds "No sign it got there yet. Check its panel before you send it again." Anything the
+  session reports later clears it. Queued messages and pi (which confirms) aren't checked.
 
 Consequences:
 - The bridge's waiting state treats a question reported twice (Claude Code's question then its permission

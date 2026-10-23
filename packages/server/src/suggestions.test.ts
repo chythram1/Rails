@@ -12,7 +12,7 @@ import { panels, projects, settings, sprocketMessages, suggestions } from "./db.
 import { models, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
 import { createSprocket, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
-import { dialogAnswer, dismissSuggestion, sendSuggestion, startSuggestions, suggest } from "./suggestions.ts";
+import { dialogAnswer, dismissSuggestion, pickup, sendSuggestion, startSuggestions, suggest } from "./suggestions.ts";
 
 const look = { character: "bell", color: "purple", accessory: "none" } as const;
 const faux = fauxProvider();
@@ -206,6 +206,30 @@ describe("messages the user asks for", () => {
     const [t] = (await messageThroughRun(lead.id, panel.id, "And then stop.")).suggestions!;
     receive(panel.id, "claude", "SessionEnd", {});
     expect(listMessages(projectChat(lead.id)).at(-1)!.suggestions![0]).toMatchObject({ id: t.id, status: "expired", error: "The session ended." });
+  });
+
+  it("says when an idle session shows no sign it took a message, until it reports something", async () => {
+    const { lead, panel } = setup();
+    const [s] = (await messageThroughRun(lead.id, panel.id, "Summarize.")).suggestions!;
+    pickup.ms = 30;
+    try {
+      expect(await sendSuggestion(s.id, s.text)).toMatchObject({ status: "sent" });
+      expect(suggestions.get(s.id)!.unconfirmed).toBeUndefined();
+      await new Promise((r) => setTimeout(r, 80));
+      expect(suggestions.get(s.id)).toMatchObject({ status: "sent", unconfirmed: true });
+      receive(panel.id, "claude", "UserPromptSubmit", { prompt: "Summarize." });
+      expect(suggestions.get(s.id)!.unconfirmed).toBeUndefined();
+      // One it took at once is never marked.
+      const [t] = (await messageThroughRun(lead.id, panel.id, "And then stop.")).suggestions!;
+      receive(panel.id, "claude", "Stop", { last_assistant_message: "Done." });
+      const sent = sendSuggestion(t.id, t.text);
+      await sent;
+      receive(panel.id, "claude", "UserPromptSubmit", { prompt: "And then stop." });
+      await new Promise((r) => setTimeout(r, 80));
+      expect(suggestions.get(t.id)!.unconfirmed).toBeUndefined();
+    } finally {
+      pickup.ms = 15_000;
+    }
   });
 
   it("drops what waited for a session when its panel moves on to another (Codex's /new)", async () => {
