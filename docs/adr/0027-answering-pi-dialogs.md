@@ -1,6 +1,6 @@
 # ADR 0027: Rails answers pi's dialogs where it can
 
-Status: accepted. It changes ADR 0010's "Rails can't answer dialogs" for pi.
+Status: accepted. It changes ADR 0010's "Rails can't answer dialogs" for pi (and Codex; Claude Code in ADR 0028).
 
 In every test run from 4 to 7 the Coordinator suggested the right answer to a pi question dialog, and the user
 still had to open pi's panel to pick it: Rails never types into a panel, and pi has no question tool of its own.

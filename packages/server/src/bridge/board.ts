@@ -21,7 +21,7 @@ export interface SessionCard {
    * The pi dialog it waits on, when Rails can answer it (ADR 0027): its id, kind, the options of its (first)
    * question, and how many questions it holds.
    */
-  dialog?: { id: string; kind: "select" | "input" | "questionnaire" | "steer"; options: string[]; questions: number };
+  dialog?: { id: string; kind: "select" | "input" | "questionnaire" | "steer" | "claude"; options: string[]; questions: number };
   error?: string;
   /** The latest prompt: what the session was asked to do. */
   intent?: string;
@@ -75,7 +75,7 @@ export function foldCard(panel: { id: string; kind: PanelKind; title: string; se
             id: e.dialog.id,
             kind: e.dialog.kind,
             options: e.dialog.options ?? e.questions?.[0]?.options ?? [],
-            questions: e.dialog.kind === "questionnaire" || e.dialog.kind === "steer" ? (e.questions?.length ?? 0) : 1,
+            questions: e.dialog.kind === "questionnaire" || e.dialog.kind === "steer" || e.dialog.kind === "claude" ? (e.questions?.length ?? 0) : 1,
           };
         c.status = "waiting";
         break;

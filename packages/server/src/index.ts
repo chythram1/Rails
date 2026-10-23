@@ -12,7 +12,8 @@ import { serverInfo, onSignedOutEverywhere, signOutEverywhere } from "./account.
 import { mcpRequest } from "./agentTools.ts";
 import { accessToken, HOST, PORT } from "./config.ts";
 import { watchCodex } from "./bridge/codex.ts";
-import { piInbox } from "./bridge/deliver.ts";
+import { prepareClaudeMod } from "./bridge/wiring.ts";
+import { claudeInbox, piInbox } from "./bridge/deliver.ts";
 import { loadAttention, receive, tokenOk as bridgeTokenOk } from "./bridge/index.ts";
 import { panels, projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
@@ -115,6 +116,20 @@ app.post("/bridge/:panelId/pi/delivered", async (c) => {
   type Delivered = { id?: unknown; ok?: unknown; queued?: unknown; error?: unknown };
   const body = await c.req.json<Delivered>().catch(() => ({}) as Delivered);
   piInbox.ack(panelId, body.id, body.ok, body.queued, body.error);
+  return c.json({});
+});
+// Rails' Claude Code mod: its poll for answers to an open question dialog, and whether it took one (ADR 0028).
+app.get("/bridge/:panelId/claude/inbox", async (c) => {
+  const panelId = c.req.param("panelId");
+  if (!fromPanel(c, panelId)) return c.json({ error: "Unauthorized" }, 401);
+  return c.json({ messages: await claudeInbox.poll(panelId, c.req.raw.signal) });
+});
+app.post("/bridge/:panelId/claude/delivered", async (c) => {
+  const panelId = c.req.param("panelId");
+  if (!fromPanel(c, panelId)) return c.json({ error: "Unauthorized" }, 401);
+  type Delivered = { id?: unknown; ok?: unknown; error?: unknown };
+  const body = await c.req.json<Delivered>().catch(() => ({}) as Delivered);
+  claudeInbox.ack(panelId, body.id, body.ok, false, body.error);
   return c.json({});
 });
 app.post("/bridge/:panelId/:source/:event", bodyLimit({ maxSize: BRIDGE_BODY_LIMIT, onError: (c) => c.json({}, 413) }), async (c) => {
@@ -356,6 +371,7 @@ startSuggestions(); // suggested replies expire as their sessions move on
 startDecisions(); // the fast decision model judges in shadow, if the user picked one
 resumeRuns(); // Sprocket runs cut off by the last shutdown say so; queued ones start (ADR 0023)
 watchCodex(panels.all()); // Codex panels that survived a restart
+void prepareClaudeMod(); // Rails' Claude Code mod, for answering its questions (ADR 0028)
 
 void tmuxVersion().then((v) => {
   if (!v) console.warn("warning: tmux isn't installed, so panels can't run. Run `make system-deps`.");

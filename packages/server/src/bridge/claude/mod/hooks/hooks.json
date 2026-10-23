@@ -1,0 +1,4 @@
+{
+  "description": "Rails' mod: answers to AskUserQuestion from Rails (ADR 0028)",
+  "modules": ["./register.js"]
+}

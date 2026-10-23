@@ -147,3 +147,8 @@ export class PiInbox {
 }
 
 export const piInbox = new PiInbox();
+/**
+ * Answers for Claude Code's question dialogs (ADR 0028): Rails' mod polls while one is open, as the pi extension
+ * does, and says whether the dialog took the answer. Only answers go this way: replies use the message socket.
+ */
+export const claudeInbox = new PiInbox();

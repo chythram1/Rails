@@ -36,12 +36,13 @@ export type SessionEvent =
  */
 export interface DialogRef {
   id: string;
-  kind: "select" | "input" | "questionnaire" | "steer";
+  /** `claude`: Claude Code's question dialog, answered through Rails' mod by the tool call's id (ADR 0028). */
+  kind: "select" | "input" | "questionnaire" | "steer" | "claude";
   options?: string[];
 }
 
 function dialogOf(v: any): DialogRef | undefined {
-  if (typeof v?.id !== "string" || !v.id || !["select", "input", "questionnaire"].includes(v.kind)) return undefined;
+  if (typeof v?.id !== "string" || !v.id || !["select", "input", "questionnaire"].includes(v.kind)) return undefined; // pi's kinds
   const options = Array.isArray(v.options) ? v.options.filter((o: unknown) => typeof o === "string").slice(0, 50).map((o: string) => clip(o, 200)) : undefined;
   return { id: v.id.slice(0, 200), kind: v.kind, ...(v.kind === "select" ? { options: options ?? [] } : {}) };
 }
@@ -113,6 +114,14 @@ export function fromClaude(hook: string, input: any, extra: { inbox?: string } =
           ...(tool === "Bash" && typeof ti.command === "string" ? { command: clip(ti.command, 200) } : {}),
         },
       ];
+    }
+    case "dialog": {
+      // Rails' mod (ADR 0028): Claude's question dialog is open and can be answered from Rails, by this id.
+      const id = typeof input?.id === "string" && input.id ? input.id.slice(0, 200) : undefined;
+      const options = (Array.isArray(input?.options) ? input.options : []).slice(0, 20).map((o: unknown) => clip(o, 200)).filter(Boolean);
+      const question = clip(input?.question, 500);
+      if (!id || !question) return [];
+      return [{ kind: "waiting", reason: "question", questions: [{ question, options }], dialog: { id, kind: "claude", options } }];
     }
     case "PermissionRequest": {
       const tool = clip(input?.tool_name, 100) || "a tool";

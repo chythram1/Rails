@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { CodexWatcher } from "./bridge/codex.ts";
-import { PiInbox, piInbox } from "./bridge/deliver.ts";
+import { claudeInbox, PiInbox, piInbox } from "./bridge/deliver.ts";
 import { receive, record } from "./bridge/index.ts";
 import { fromCodex } from "./bridge/events.ts";
 import { panels, projects, settings, sprocketMessages, suggestions } from "./db.ts";
@@ -471,5 +471,26 @@ describe("answering Codex's questions (ADR 0027)", () => {
     await expect(late).rejects.toThrow("Codex refused the answer: expected turn mismatch");
     void watcher.steer("t1", undefined, "Dark");
     expect(sent.at(-1).method).toBe("thread/queue/add");
+  });
+});
+
+describe("answering Claude Code's questions (ADR 0028)", () => {
+  it("sends the answer to Rails' mod, which closes the dialog, and says why when it couldn't", async () => {
+    const { lead, panel } = setup();
+    receive(panel.id, "claude", "dialog", { id: "toolu_1", question: "Dark or light?", options: ["Dark", "Light"] });
+    receive(panel.id, "claude", "PreToolUse", { tool_name: "AskUserQuestion", tool_input: { questions: [{ question: "Dark or light?", options: [{ label: "Dark" }, { label: "Light" }] }] } });
+    const s = suggest(lead.id, panel, "Fix sidebar", "light");
+    expect(s).toMatchObject({ mode: "answer", dialog: { id: "toolu_1", text: "Light" } });
+    suggestions.attach([s.id], sprocketMessages.create(projectChat(lead.id), "sprocket", "Drafted.", new Date().toISOString()).id);
+    const poll = claudeInbox.poll(panel.id, new AbortController().signal);
+    const sent = sendSuggestion(s.id, undefined);
+    const [m] = await poll;
+    expect(m.answer).toEqual({ dialog: "toolu_1", text: "Light" });
+    claudeInbox.ack(panel.id, m.id, false, false, "The dialog has closed.");
+    expect(await sent).toMatchObject({ status: "failed", error: "The dialog has closed." });
+    // Without the mod (an older Claude Code): no dialog id, so the panel.
+    const { lead: l2, panel: p2 } = setup();
+    receive(p2.id, "claude", "PreToolUse", { tool_name: "AskUserQuestion", tool_input: { questions: [{ question: "Dark or light?", options: [] }] } });
+    expect(suggest(l2.id, p2, "Fix sidebar", "Dark").dialog).toBeUndefined();
   });
 });

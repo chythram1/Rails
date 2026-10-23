@@ -6,7 +6,7 @@
 // dialog answered); a message doesn't, and a busy session gets it in its own queue, after its current turn.
 import { shortTitle, type Panel, type Suggestion } from "@rails/shared";
 import { AGENT, type SessionCard } from "./bridge/board.ts";
-import { deliver, piInbox } from "./bridge/deliver.ts";
+import { claudeInbox, deliver, piInbox } from "./bridge/deliver.ts";
 import { steerCodex } from "./bridge/codex.ts";
 import { ASKING, type SessionEvent } from "./bridge/events.ts";
 import { cardOf, onEvents, onPanelForgotten, onReturned } from "./bridge/index.ts";
@@ -46,8 +46,8 @@ const plain = (s: string) =>
 export function dialogAnswer(dialog: SessionCard["dialog"], text: string): Suggestion["dialog"] {
   if (!dialog || dialog.questions !== 1 || !text.trim()) return undefined;
   const option = dialog.options.findIndex((o) => plain(o) === plain(text));
-  // Codex takes the answer as text: the option's own label when the draft names one.
-  if (dialog.kind === "steer") return { id: dialog.id, text: option >= 0 ? dialog.options[option] : text.trim() };
+  // Codex and Claude Code take the answer as text: the option's own label when the draft names one.
+  if (dialog.kind === "steer" || dialog.kind === "claude") return { id: dialog.id, text: option >= 0 ? dialog.options[option] : text.trim() };
   if (dialog.kind === "select") return option >= 0 ? { id: dialog.id, option } : undefined;
   if (dialog.kind === "questionnaire" && option >= 0) return { id: dialog.id, option };
   return { id: dialog.id, text: text.trim() };
@@ -103,7 +103,7 @@ export function suggest(
       if (old.messageId) suggestions.setStatus(old.id, ["pending"], "replaced");
       else suggestions.drop([old.id]); // from this same run: never shown
     }
-  const dialog = mode === "answer" && (panel.kind === "pi" || panel.kind === "codex") ? dialogAnswer(cardOf(panel).dialog, text) : undefined;
+  const dialog = mode === "answer" && panel.kind !== "shell" ? dialogAnswer(cardOf(panel).dialog, text) : undefined;
   const s = suggestions.create({ sprocketId, panelId: panel.id, kind: panel.kind, title, sessionId: panel.sessionId, mode, text, rule, attachment, from, dialog });
   changes.emit();
   return shown(s);
@@ -185,7 +185,7 @@ async function answerDialog(s: Stored): Promise<Suggestion> {
       const thread = panel!.sessionId ?? card!.sessionId;
       if (!thread) throw new Error("Rails can't reach this Codex session. Answer it in its panel.");
       await steerCodex(thread, open ? s.dialog!.id : undefined, s.dialog!.text ?? s.text);
-    } else await piInbox.answer(panel!.id, s.dialog!);
+    } else await (panel!.kind === "claude" ? claudeInbox : piInbox).answer(panel!.id, s.dialog!);
     suggestions.setStatus(s.id, ["sending"], "sent");
   } catch (e) {
     suggestions.setStatus(s.id, ["sending"], "failed", { error: (e as Error).message });
