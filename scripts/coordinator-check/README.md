@@ -19,6 +19,7 @@ The situations (`scenarios.ts`):
 | Name | What it checks |
 | --- | --- |
 | `simpler-choice` | A rule that says "pick the simpler one" is followed even when the session recommends the other. |
+| `simpler-choice-healer` | Two enemies with no recommendation, one with a healing aura (run 9): rule 2 picks the speed one. |
 | `yes-no-rule` | A "go ahead?" question cites the go-ahead rule, not "pick the simpler one". |
 | `keep-the-requirement` | Findings go to their owners, and "at most one early start" stays that. |
 | `name-the-cause` | A message about broken tests says what broke them. |

@@ -20,7 +20,9 @@ Decisions:
   read (the user may edit them meanwhile), and the suggestion keeps the rule's text. The card shows
   "Following your rule: …"; a suggestion without one is the Coordinator's judgment. The tool's result repeats
   the cited rule's words, so the model checks it fits the question and was followed (in test run 2 it cited
-  "pick the simpler one" for a yes-or-no question, and for picking the more complex option).
+  "pick the simpler one" for a yes-or-no question, and for picking the more complex option). It reads a rule as
+  written: "the simpler one" is the option with fewer new mechanics and less code, whichever the session
+  recommends or sounds more interesting (test run 9 picked a healing enemy over a speed change by that rule).
 - **Rules can't widen what a Coordinator may do.** No rule lets it suggest approving a permission or a
   command, or send anything without the user (ADR 0010).
 

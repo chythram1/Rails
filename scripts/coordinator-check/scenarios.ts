@@ -111,6 +111,24 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    name: "simpler-choice-healer",
+    run2: "(Test run 9.) Codex offered a speed-burst enemy and a healing one with no recommendation; the Coordinator cited 'pick the simpler one' and picked the healer for its 'clear support role'.",
+    async play(w) {
+      const ask =
+        "Two steampunk options, both using the existing wave health scaling:\n\n1. **Boiler Runner** — a pressurized automaton that accelerates below 50% health.\n   - Base health: **85**\n   - Speed: **70 px/s**, rising to **126 px/s** when damaged\n   - Reward: **12 gold**; leak: **1 life**\n   - Introduced wave 4: **2 per wave**, increasing to 3 on wave 6, 4 on wave 8, and 5 on wave 10.\n   - Copper boiler silhouette; vents glow orange when accelerating. Frost still slows it.\n\n2. **Clockwork Mender** — a repair drone that supports nearby enemies.\n   - Base health: **70**\n   - Speed: **42 px/s**\n   - Restores **8 HP per second** to other enemies within **96 px**; healing scales with wave health. Cannot heal itself or exceed maximum health.\n   - Reward: **14 gold**; leak: **1 life**\n   - Introduced wave 5: **1 per wave**, increasing to 2 on waves 8–10.\n   - Teal repair tank, brass wrench arms, and visible healing pulses.\n\nWhich should I build: **Boiler Runner** or **Clockwork Mender**?";
+      const t = team(w, { gameplay: [{ user: "Phase 4. Add a fifth enemy type that suits the steampunk theme. Before you write any code, propose two options (what each does and its numbers) and ask me which one to build. Then stop and wait for my answer.", reply: ask }] });
+      await w.wake(t.gameplay, { what: "turn_end" }, ask);
+      return (o) => {
+        const d = to(o, t.gameplay);
+        return [
+          { what: "answers Codex", ok: d.some((x) => x.mode === "reply") },
+          { what: "picks the Boiler Runner", ok: all(d, (x) => /boiler/i.test(x.text) && !/\b(go with|pick|choose|build|add|take|want) (the )?(clockwork )?mender/i.test(x.text)) },
+          { what: "cites rule 2", ok: all(d, (x) => x.rule === 2) },
+        ];
+      };
+    },
+  },
+  {
     name: "yes-no-rule",
     run2: "pi asked whether to go ahead with showing hotkeys, in a dialog; the Coordinator answered yes but cited 'pick the simpler one' instead of 'go ahead'.",
     async play(w) {
