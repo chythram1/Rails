@@ -24,7 +24,7 @@ export const SETTINGS: SettingEntry[] = [
   { section: "general", rowId: "tmux", label: "tmux", phrases: ["terminal", "panels"] },
   { section: "general", rowId: "node", label: "Node.js", phrases: ["runtime"] },
   { section: "models", rowId: "default-model", label: "Default model", phrases: ["model", "LLM", "Sprocket model"] },
-  { section: "models", rowId: "decision-model", label: "Decision model", phrases: ["fast decisions", "System 1", "classifier", "Jev", "TypeSafe", "GPT-6 Luna", "shadow log", "team routing", "who answers"] },
+  { section: "models", rowId: "decision-model", label: "Decision model", phrases: ["fast decisions", "System 1", "classifier", "Jev", "TypeSafe", "GPT-6 Luna", "shadow log"] },
   { section: "models", rowId: "decision-threshold", label: "Wake threshold", phrases: ["decision threshold", "Jev threshold", "confidence", "how sure", "sensitivity", "slider"] },
   { section: "account", rowId: "avatar", label: "Avatar", phrases: ["profile", "picture", "photo", "icon"] },
   { section: "account", rowId: "name", label: "Name", phrases: ["profile", "display name", "computer name", "machine", "rename"] },

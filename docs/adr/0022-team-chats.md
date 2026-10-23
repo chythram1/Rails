@@ -11,7 +11,8 @@ message, and how Sprockets keep from replying to each other without end.
 Decisions:
 - **A team** has a name and two to four Sprockets, attached to a project or not. The first is its **lead** (★).
   A Sprocket can be in any number of teams, and teams belong to no project. There can be any number of teams.
-- **Who answers.** The user's message goes to the members it's for, in the order it names them:
+- **Who answers.** (The decision model's part is superseded: ADR 0023's amendment, 2026-10-23.) The user's message
+  goes to the members it's for, in the order it names them:
   - those it names: @mentions ("@Doc Keeper", or the start of just one member's name, "@Doc") and whole names
     without an @ ("Pixel, what colour?"). A name always counts, with a decision model or without, so naming
     someone works the same either way (a name in passing, "what did Pixel mean?", picks Pixel too);
@@ -82,8 +83,8 @@ Decisions:
 
 Consequences:
 - One message to a team can cost up to 10 runs; the user sees each one once it's written.
-- With a decision model, a team's latest messages go to its provider as well as the model's; Settings → Models
-  says so.
+- With a decision model, a team's latest messages went to its provider as well as the model's (no longer: ADR
+  0023's amendment).
 - Who answers the user is a judgment, so it can be wrong; an @mention always reaches who it names. A member that
   forgets the @ ends the round; the user picks it up from there.
 - Sprockets pass work along by name, which the user can follow in the chat, rather than through a hidden tool.

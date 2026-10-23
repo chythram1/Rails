@@ -1,8 +1,8 @@
 // Team chats (ADR 0022, 0023): the user and two to four Sprockets. The user's message goes to those it @mentions,
-// else (a tapped option) to whoever asked, else to whom the decision model picks, else to members whose questions
-// wait for an answer, else the lead. A member gives a teammate the turn with pass_turn (back and forth too), at most
+// else (a tapped option) to whoever asked, else to members whose questions wait for an answer, else the lead (never
+// a model's guess). A member gives a teammate the turn with pass_turn (back and forth too), at most
 // TEAM_TURNS_MAX times in a row.
-import { fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall, type ClassifierContext, type ClassifierResult, type Provider, type TranscriptContext } from "@earendil-works/pi-ai";
+import { fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall, type Provider, type TranscriptContext } from "@earendil-works/pi-ai";
 import { beforeEach, describe, expect, it } from "vitest";
 import { TEAM_TURNS_MAX } from "@rails/shared";
 import { passTurnCapability } from "./harness/turns.ts";
@@ -15,18 +15,17 @@ import { clearChat, createSprocket, deleteSprocket, listMessages, sendMessage, u
 const faux = fauxProvider();
 models.setProvider(faux.provider);
 const ref = refOf(faux.getModel());
-/** A scripted decision model: who a message is for. */
-let judged: (context: ClassifierContext) => Partial<ClassifierResult> = () => ({});
-let gate: Promise<void> = Promise.resolve();
+/** A decision model that counts its calls: team chats never ask it who answers. */
+let judgeCalls = 0;
 const judge: Provider = {
   ...faux.provider,
   id: "judge",
   name: "Judge",
   getModels: () => [],
   getAllModels: () => [{ type: "classifier", id: "judge-1", name: "Judge", api: "judge", provider: "judge", baseUrl: "", input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 32000 }] as never,
-  classify: async (_model, context) => {
-    await gate;
-    return { api: "judge", provider: "judge", model: "judge-1", answers: {}, stopReason: "stop", timestamp: Date.now(), ...judged(context) };
+  classify: async () => {
+    judgeCalls++;
+    return { api: "judge", provider: "judge", model: "judge-1", answers: {}, stopReason: "stop", timestamp: Date.now() };
   },
 };
 models.setProvider(judge);
@@ -34,13 +33,7 @@ const look = { character: "cog", color: "green", accessory: "none" } as const;
 beforeEach(() => {
   settings.set("defaultModel", ref);
   settings.set("decisionModel", null);
-  gate = Promise.resolve();
 });
-/** Once Rails knows who answers the user's message and every reply is in. */
-async function settled() {
-  while (listTeams().some((t) => t.routing)) await new Promise((r) => setTimeout(r, 5));
-  await idle();
-}
 
 const sprocket = (name: string) => createSprocket({ name, look });
 /** Ada, Bo and Cy in a team called Crew, Ada leading. */
@@ -120,37 +113,24 @@ describe("team chats", () => {
     expect(said(team.id).filter((l) => !l.startsWith("user"))).toEqual(["Ada: Lead here.", "Ada: Lead again.", "Ada: A.", "Bo: B.", "Cy: C.", "Cy: Cy here.", "Bo: Doc here."]);
   });
 
-  it("asks the decision model who a message without @ is for, and falls back to the lead", async () => {
+  it("never asks the decision model who answers: without an @, the asker of a waiting question, else the lead", async () => {
     const { team } = crew();
     settings.set("decisionModel", "judge/judge-1");
-    let asked: ClassifierContext | undefined;
-    let open = () => {};
-    gate = new Promise((r) => (open = r));
-    judged = (c) => {
-      if ("member_0" in c.questions) asked = c;
-      return { answers: { member_0: { type: "bool", probability: 0.2 }, member_1: { type: "bool", probability: 0.9 }, member_2: { type: "bool", probability: 0.55 } } };
-    };
-    faux.setResponses([reply("On it.")]);
+    faux.setResponses([pass("Bo, check the docs?", "Bo"), reply("Two pages are behind.")]);
     sendMessage(team.id, "Can someone check the docs?");
-    // Nobody's face shows while the model judges; then only Bo answers (Cy is below the bar).
-    expect(listTeams().find((t) => t.id === team.id)).toMatchObject({ routing: true, waiting: [] });
-    open();
-    await settled();
-    expect(Object.keys(asked!.questions)).toEqual(["member_0", "member_1", "member_2"]);
-    expect(asked!.state).toMatchObject({ new_message_from_user: "Can someone check the docs?" });
-    judged = () => ({ stopReason: "error", errorMessage: "down" });
-    faux.setResponses([reply("Here.")]);
-    sendMessage(team.id, "And the tests?");
-    await settled();
-    expect(said(team.id)).toEqual(["user: Can someone check the docs?", "Bo: On it.", "user: And the tests?", "Ada: Here."]);
-    // With an @mention it isn't asked.
-    let more = 0;
-    judged = () => (more++, {});
-    faux.setResponses([reply("Yes.")]);
-    sendMessage(team.id, "@Cy ready?");
-    await settled();
-    expect(said(team.id).at(-1)).toBe("Cy: Yes.");
-    expect(more).toBe(0);
+    await idle();
+    faux.setResponses([reply("Noted.")]);
+    sendMessage(team.id, "Good point, fix that");
+    await idle();
+    expect(said(team.id).slice(-2)).toEqual(["user: Good point, fix that", "Ada: Noted."]); // the lead, not Bo who spoke last
+    faux.setResponses([ask("Which mood?", ["Calm", "Bold"]), ask("What does it do?", [])]);
+    sendMessage(team.id, "@Bo @Cy ask me something");
+    await idle();
+    faux.setResponses([reply("A calm sprout."), reply("Got it.")]);
+    sendMessage(team.id, "Calm, and it tracks habits");
+    await idle();
+    expect(said(team.id).slice(-2)).toEqual(["Bo: A calm sprout.", "Cy: Got it."]); // both askers
+    expect(judgeCalls).toBe(0);
   });
 
   it("shows a question's options, waits, and gives the answer to whoever asked, even without an @", async () => {
@@ -207,50 +187,6 @@ describe("team chats", () => {
     expect(results[0]).toMatch(/no teammate called "Zed"/);
   });
 
-  it("with the decision model, gives a typed message to whoever it's for while a question waits; a tap goes to the asker", async () => {
-    const { team } = crew();
-    settings.set("decisionModel", "judge/judge-1");
-    let state: Record<string, unknown> = {};
-    let calls = 0;
-    let pick = 0;
-    judged = (c) => {
-      calls++;
-      state = c.state as Record<string, unknown>;
-      return { answers: Object.fromEntries([0, 1, 2].map((i) => [`member_${i}`, { type: "bool", probability: i === pick ? 0.9 : 0.1 }])) };
-    };
-    faux.setResponses([ask("Which mood?", ["Calm", "Bold"])]);
-    sendMessage(team.id, "@Bo icon idea? Ask me first.");
-    await settled();
-    const question = listMessages(team.id).at(-1)!;
-
-    // For Ada, says the model: Ada answers, and Bo's question still waits.
-    faux.setResponses([reply("Cy writes the copy.")]);
-    sendMessage(team.id, "Love it. Ada, who writes the copy?");
-    await settled();
-    expect(state.questions_waiting_for_the_users_answer).toEqual(["Bo: Which mood?"]);
-    expect(said(team.id).at(-1)).toBe("Ada: Cy writes the copy.");
-    expect(listMessages(team.id).find((m) => m.id === question.id)?.ask?.answer).toBeUndefined();
-
-    // A tapped option goes to Bo without asking the model.
-    const before = calls;
-    faux.setResponses([reply("Calm: a sprout.")]);
-    sendMessage(team.id, "calm");
-    await settled();
-    expect(calls).toBe(before);
-    expect(said(team.id).at(-1)).toBe("Bo: Calm: a sprout.");
-    expect(listMessages(team.id).find((m) => m.id === question.id)?.ask?.answer).toBe("calm");
-
-    // The model failing: a typed answer goes to whoever asked.
-    faux.setResponses([ask("What does it do?", [])]);
-    sendMessage(team.id, "@Cy ask me something");
-    await settled();
-    judged = () => ({ stopReason: "error", errorMessage: "down" });
-    faux.setResponses([reply("Got it.")]);
-    sendMessage(team.id, "It tracks habits");
-    await settled();
-    expect(said(team.id).at(-1)).toBe("Cy: Got it.");
-  });
-
   it("won't pass the turn to a member whose turn already comes, and tells a member who answers after it", async () => {
     const { team } = crew();
     let result = "";
@@ -266,7 +202,7 @@ describe("team chats", () => {
       reply("Green."),
     ]);
     sendMessage(team.id, "@everyone a colour each.");
-    await settled();
+    await idle();
     expect(told).toContain("Bo and Cy have a turn after yours");
     expect(result).toMatch(/Bo already has a turn coming after yours: they'll answer it themselves/);
     expect(said(team.id).slice(1)).toEqual(["Ada: Mine: red.", "Bo: Blue.", "Cy: Green."]);
@@ -277,7 +213,7 @@ describe("team chats", () => {
     // Told to answer themselves after already answering, models wrote it again; now the run just ends.
     faux.setResponses([pass("Red. Bo, yours?", "Bo"), reply("Blue."), reply("Green.")]);
     sendMessage(team.id, "@everyone a colour each.");
-    await settled();
+    await idle();
     expect(said(team.id).slice(1)).toEqual(["Ada: Red. Bo, yours?", "Bo: Blue.", "Cy: Green."]);
   });
 
@@ -296,7 +232,7 @@ describe("team chats", () => {
       fauxAssistantMessage(draft.replace("my draft", "the draft")), // said again, reworded a little
     ]);
     sendMessage(team.id, "Draft the launch post.");
-    await settled();
+    await idle();
     expect(result).toMatch(/You haven't written anything in the chat this turn/);
     expect(said(team.id).slice(1)).toEqual([`Ada: ${draft}`]);
   });
@@ -320,20 +256,20 @@ describe("team chats", () => {
     let reminded = "";
     faux.setResponses([reply("Bo, which colour?"), (c) => ((reminded = seen(c)), passOnly("Bo")), reply("Blue.")]);
     sendMessage(team.id, "Pick a colour.");
-    await settled();
+    await idle();
     expect(reminded).toContain("You asked Bo something but didn't pass the turn");
     expect(said(team.id).slice(1)).toEqual(["Ada: Bo, which colour?", "pass: Ada → Bo", "Bo: Blue."]);
 
     // It leaves it: what it writes then isn't posted.
     faux.setResponses([reply("What do you think, Cy?"), reply("It was for the user, never mind.")]);
     sendMessage(team.id, "Another?");
-    await settled();
+    await idle();
     expect(said(team.id).at(-1)).toBe("Ada: What do you think, Cy?");
 
     // Only mentioned in passing: no reminder.
     faux.setResponses([reply("Thanks Bo!")]);
     sendMessage(team.id, "Done.");
-    await settled();
+    await idle();
     expect(faux.getPendingResponseCount()).toBe(0);
     expect(said(team.id).at(-1)).toBe("Ada: Thanks Bo!");
   });
@@ -342,9 +278,9 @@ describe("team chats", () => {
     const { team } = crew();
     faux.setResponses([reply("[Ada] Sure."), reply("**Bo:** Yes.")]);
     sendMessage(team.id, "Ready?");
-    await settled();
+    await idle();
     sendMessage(team.id, "@Bo ready?");
-    await settled();
+    await idle();
     expect(said(team.id)).toEqual(["user: Ready?", "Ada: Sure.", "user: @Bo ready?", "Bo: Yes."]);
   });
 
@@ -433,20 +369,20 @@ describe("team chats", () => {
     const { team } = crew(["Pam", "Fred"]);
     faux.setResponses([ask("Dark or light?", ["Dark", "Light"]), ask("What should the game be called?", [])]);
     sendMessage(team.id, "@everyone Ask me one question each.");
-    await settled();
+    await idle();
     expect(waitingAsks(team.id).map((a) => nameOf(a.sprocketId))).toEqual(["Pam", "Fred"]);
     // Pam's option is tapped: she's told Fred's question waits, and passing to him for it just ends her turn.
     let told = "";
     faux.setResponses([(c) => ((told = seen(c)), pass("Got it: dark. Fred, ask what the game should be called.", "Fred")), reply("Not reached.")]);
     sendMessage(team.id, "Dark");
-    await settled();
+    await idle();
     expect(told).toContain('Waiting for your user\'s answer: Fred asked "What should the game be called?"');
     expect(said(team.id).slice(-2)).toEqual(["user: Dark", "Pam: Got it: dark. Fred, ask what the game should be called."]);
     expect(waitingAsks(team.id).map((a) => nameOf(a.sprocketId))).toEqual(["Fred"]); // still once
     // Your answer to Fred then reaches him, and nothing waits any more.
     faux.setResponses([reply("Brassworks it is."), reply("Not reached.")]);
     sendMessage(team.id, "Brassworks Defense");
-    await settled();
+    await idle();
     expect(said(team.id).at(-1)).toBe("Fred: Brassworks it is.");
     expect(waitingAsks(team.id)).toEqual([]);
   });

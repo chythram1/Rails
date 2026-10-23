@@ -10,8 +10,7 @@ import { useOpenSettings } from "./context.ts";
 
 /**
  * Settings → Models → Fast decisions (ADR 0012, 0013): a picker and a threshold. A decision model, once picked, hears
- * the questions Rails' rules miss and wakes the Coordinator for them when it's at least as sure as the threshold, and
- * says who a team message is for (ADR 0022);
+ * the questions Rails' rules miss and wakes the Coordinator for them when it's at least as sure as the threshold;
  * Off turns it off (the threshold stays, greyed out). What it decided is under a collapsed "Recent decisions", for
  * when a wake needs explaining. (`RAILS_DECISIONS=shadow`, a developer setting,
  * keeps it to judging, to evaluate a model.)
@@ -34,8 +33,7 @@ export function DecisionsSettings({ settings }: { settings: ModelSettings }) {
       <h3 id="decisions-title">Fast decisions</h3>
       <p className="set-intro">
         A small, fast model hears questions Rails' rules miss, such as one without a question mark, and wakes the Coordinator
-        for them. It also tells who in a team a message without an @mention is for. It sees the end of sessions' messages in projects with a
-        Coordinator, and teams' latest messages, which go to its provider.
+        for them. It sees the end of sessions' messages in projects with a Coordinator, which go to its provider.
       </p>
       <div className="set-row" id="setting-decision-model" data-settings-row tabIndex={-1}>
         <div className="set-text">

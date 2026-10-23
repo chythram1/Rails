@@ -404,8 +404,6 @@ export interface SprocketTeam extends SprocketChatInfo {
   replying?: string;
   /** Members whose turns are queued, in order (ADR 0023). */
   waiting: string[];
-  /** Rails is working out who the user's latest message is for (the decision model is judging it). */
-  routing?: boolean;
   createdAt: string;
 }
 

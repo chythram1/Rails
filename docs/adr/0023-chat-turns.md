@@ -83,10 +83,16 @@ Decisions:
   in order (ADR 0008).
 
 Consequences:
-- Who answers is predictable: the @mentions, a tapped option, the decision model's pick, an open question, then
-  the lead. A model can still forget to call `pass_turn`; the reminder catches the usual case (it asked a teammate
+- Who answers is predictable: the @mentions, a tapped option, an open question, then the lead (the decision
+  model's pick is gone; see the amendment). A model can still forget to call `pass_turn`; the reminder catches the usual case (it asked a teammate
   by name), at the cost of one model call when it fires, and otherwise the round ends and you pick it up.
 - Members can argue back and forth on their own, up to 10 passes.
 - Restarting the server no longer loses a team's queue, and a run that was cut off says so instead of vanishing.
-- `@everyone` is the only way to ask every member at once without a decision model; "everyone, …" without the
-  @ goes to the lead.
+- `@everyone` is the only way to ask every member at once; "everyone, …" without the @ goes to the lead.
+
+Amendment (2026-10-23): no decision model picks who answers. A message without an @ goes to the members whose
+questions wait for an answer, else the lead, with or without a decision model. With one, members answered the user
+without anyone passing them the turn: a follow-up went straight to whoever spoke last ("good point, fix that" to
+the reviewer, 3 of 3 tries on Jev), and "what do you all think?" to part of the team (the lead and one member, never
+the third). The lead passing on is slower by a run, but the user can see why each member speaks: an @, a question
+it asked, or a pass. Decision models still serve the Coordinator (ADR 0012, 0013, 0029).

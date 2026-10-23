@@ -129,7 +129,7 @@ packages/
   Each has its direct chat, and an attached one its project's chat, where events land (ADR 0021, `sprocket_chats`;
   `GET`/`POST /api/chats/:id/messages`, `DELETE` to clear). Team chats (ADR 0022, `teams.ts`, `/api/teams`) hold two to four
   Sprockets: the user's message goes to the members it @mentions (`@everyone` for all), else (a tapped option) to
-  whoever asked, else to whom the decision model picks, else to members whose questions wait, else the lead; members pass the
+  whoever asked, else to members whose questions wait, else the lead (no model guesses, ADR 0023); members pass the
   turn with `pass_turn` (ADR 0023, `harness/turns.ts`), back and forth too, at most 10 in a row, and one that asks a teammate
   without passing is reminded once. Replies show a bubble per paragraph, one after another (`bubbles.ts`). Runs are rows
   (`sprocket_runs`, ADR 0023): a user message, a pass or (for a Coordinator) an event queues one in that chat (`runs.ts`), one
