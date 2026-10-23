@@ -4,7 +4,8 @@ A harness for trying Rails the way it's meant to be used: real coding agents (Cl
 a Sprocket looking after the project, and you acting as the user, on a brief big enough to need coordination. It
 sets everything up, shows you what needs you, keeps a log of what you did, reports the numbers, and cleans up.
 The first run (a tower-defense game, three agents, about 1.5 hours) found the bugs fixed in ADR 0016 and the
-decisions in it; `gearworks.example.json` repeats it.
+decisions in it; `gearworks.example.json` repeats it. `briefs/ledger.md` is a second, different brief (a
+budget app in the DOM, owners app / domain / views; `ledger.example.json`), so fixes aren't tuned to one game.
 
 ```sh
 cp scripts/test-run/gearworks.example.json my-run.json   # edit: name, project folder, home, ports

@@ -1,0 +1,43 @@
+{
+  "name": "ledger-1",
+  "project": "/Users/you/code/rails-ledger-test-1",
+  "brief": "briefs/ledger.md",
+  "rails": {
+    "home": "/tmp/rails-dev",
+    "reuseHome": true,
+    "port": 4319,
+    "webPort": 5180
+  },
+  "decisionModel": "typesafe/jev-latest",
+  "sprocket": {
+    "name": "Foreman",
+    "model": "openai/gpt-6-luna",
+    "description": "You coordinate three coding agents building a browser budget app (BRIEF.md): Claude Code owns the app shell, store and router (src/app), Codex owns the domain logic (src/domain), pi owns the views (src/views). Keep module ownership clean, keep answers short, and tell me plainly when something needs my decision.",
+    "rules": [
+      "If a session asks whether to go ahead with its plan or the next step, say yes.",
+      "If it asks me to choose between approaches, pick the simpler one that keeps plain JavaScript modules with no build step.",
+      "If it asks about wording, colours or layout details, pick something sensible and say we'll adjust it after trying the app.",
+      "Never agree to add dependencies, frameworks, build tools or a server.",
+      "If it asks whether to commit, say no: I commit at milestones.",
+      "If it asks whether to run node --check or node --test, say yes.",
+      "If it asks to change a file another session owns (see BRIEF.md), tell it to leave that file and say what it needs instead."
+    ]
+  },
+  "agents": [
+    {
+      "name": "app",
+      "kind": "claude",
+      "model": "Sonnet 5.5"
+    },
+    {
+      "name": "domain",
+      "kind": "codex"
+    },
+    {
+      "name": "views",
+      "kind": "pi",
+      "model": "gpt-6-luna"
+    }
+  ],
+  "nameSessions": true
+}
