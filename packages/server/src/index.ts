@@ -39,6 +39,7 @@ import { startOverlaps } from "./overlaps.ts";
 import { cancelHandoff, startHandoffs } from "./handoffs.ts";
 import { clearOwner, startOwners } from "./owners.ts";
 import { startShellEdits } from "./shellEdits.ts";
+import { startFindings } from "./findings.ts";
 import { dismissSuggestion, sendSuggestion, startSuggestions } from "./suggestions.ts";
 import { decisionLog, setDecisionModel, setDecisionThreshold, startDecisions } from "./decisions.ts";
 import { version as tmuxVersion } from "./tmux.ts";
@@ -372,6 +373,7 @@ startDecisions(); // the fast decision model judges in shadow, if the user picke
 resumeRuns(); // Sprocket runs cut off by the last shutdown say so; queued ones start (ADR 0023)
 watchCodex(panels.all()); // Codex panels that survived a restart
 void prepareClaudeMod(); // Rails' Claude Code mod, for answering its questions (ADR 0028)
+startFindings(); // a reply that names work in another session's files wakes the Coordinator (ADR 0029)
 
 void tmuxVersion().then((v) => {
   if (!v) console.warn("warning: tmux isn't installed, so panels can't run. Run `make system-deps`.");

@@ -20,7 +20,7 @@ export function EventRow({ message, projectId, name }: { message: SprocketMessag
       <p className="sp-event-head">
         <PanelIcon kind={e.kind} />
         <span className="sp-event-title truncate" title={e.title}>{shortTitle(e.title)}</span>
-        <span className="sp-event-what">{e.what === "message" ? "wants to tell" : e.what === "handoff" ? "finished a turn; hand off to" : e.what === "overlap" ? (e.overlaps?.every((o) => o.owns) ? "changed files owned by" : "changed the same files as") : e.what === "turn_end" ? "is waiting for your reply" : e.what === "permission" ? "is waiting for your permission" : "is asking you"}</span>
+        <span className="sp-event-what">{e.what === "message" ? "wants to tell" : e.what === "handoff" ? "finished a turn; hand off to" : e.what === "overlap" ? (e.overlaps?.every((o) => o.owns) ? "changed files owned by" : "changed the same files as") : e.what === "finding" ? "found something for" : e.what === "turn_end" ? "is waiting for your reply" : e.what === "permission" ? "is waiting for your permission" : "is asking you"}</span>
         {open && (
           <a className="sp-event-open" href={open}>
             Open<span className="sr-only"> {e.title}</span>
@@ -50,6 +50,21 @@ export function EventRow({ message, projectId, name }: { message: SprocketMessag
             </li>
           ))}
         </ul>
+      ) : e.what === "finding" ? (
+        <>
+          <ul className="sp-event-quote">
+            {e.findings?.map((f) => (
+              <li key={f.panelId}>
+                <span className="sp-event-with">
+                  <PanelIcon kind={f.kind} />
+                  <span className="truncate" title={f.title}>{shortTitle(f.title)}</span>
+                </span>
+                <span className="sp-event-files">{f.files.join(" · ")}</span>
+              </li>
+            ))}
+          </ul>
+          <blockquote className="sp-event-quote">{message.text}</blockquote>
+        </>
       ) : e.questions?.length ? (
         <ul className="sp-event-quote">
           {e.questions.map((q, i) => (
@@ -63,7 +78,7 @@ export function EventRow({ message, projectId, name }: { message: SprocketMessag
         <blockquote className="sp-event-quote">{message.text}</blockquote>
       )}
       {e.byModel && <p className="sp-event-note">Rails' rules didn't catch this; its decision model did.</p>}
-      {e.quiet && <p className="sp-event-note">{name} looked: {e.what === "overlap" ? "they don't clash." : e.what === "handoff" ? "it isn't done yet." : "nothing needed from you."}</p>}
+      {e.quiet && <p className="sp-event-note">{name} looked: {e.what === "overlap" ? "they don't clash." : e.what === "handoff" ? "it isn't done yet." : e.what === "finding" ? "nothing for them to do." : "nothing needed from you."}</p>}
     </div>
   );
 }

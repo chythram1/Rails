@@ -371,6 +371,45 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    name: "finding-routes",
+    run2: "(Test runs 4 and 7.) Claude found a problem in pi's files and said so in its reply, without telling pi: nothing woke anyone (ADR 0029 wakes the Coordinator now).",
+    async play(w) {
+      const done =
+        "Wired the HUD into src/main.js, and node --test passes. One thing for the UI: hud.js's nextWaveText names enemies from its own NAMES map, which has no beetle, so wave 4's preview reads \"undefined ×4\".";
+      const t = team(w, {
+        gameplay: [{ user: "Add an armoured Beetle for waves 4 and up.", edits: ["src/game/enemies.js", "src/game/waves.js"], reply: "Added the Beetle (armour 2) to ENEMIES and to waves 4 and up." }],
+        engine: [{ user: "Wire the HUD's next-wave preview into the game loop.", edits: ["src/main.js"], reply: done }],
+      });
+      w.write({ "src/game/enemies.js": FILES["src/game/enemies.js"].replace("  boss:", '  beetle: { name: "Beetle", health: 60, speed: 40, gold: 6, armour: 2 },\n  boss:') });
+      const pi = await w.title(t.ui);
+      await w.wake(t.engine, { what: "finding", findings: [{ panelId: t.ui.id, kind: "pi", title: pi, sessionId: t.ui.sessionId, files: ["src/ui/hud.js"] }] }, done);
+      return (o) => {
+        const u = to(o, t.ui);
+        return [
+          { what: "drafts a message for pi", ok: u.length === 1 && u[0].mode === "message" },
+          { what: "it names the Beetle and hud.js", ok: all(u, (x) => /beetle/i.test(x.text) && /hud|NAMES|nextWaveText/i.test(x.text)) },
+          { what: "nothing for the others", ok: to(o, t.engine).length === 0 && to(o, t.gameplay).length === 0 },
+          { what: "doesn't tell pi to talk to another session", ok: u.every((x) => !RELAY.test(x.text)) },
+        ];
+      };
+    },
+  },
+  {
+    name: "finding-harmless",
+    run2: "(ADR 0029.) A reply names pi's file next to \"should\" and \"still\", but only to say it works: the rule wakes the Coordinator, which should stay quiet.",
+    async play(w) {
+      const done =
+        "Wired the HUD into src/main.js, and node --test passes. I checked src/ui/hud.js: nextWaveText still reads describeWave, which works with the new waves, so nothing should change there.";
+      const t = team(w, { engine: [{ user: "Wire the HUD's next-wave preview into the game loop.", edits: ["src/main.js"], reply: done }] });
+      const pi = await w.title(t.ui);
+      await w.wake(t.engine, { what: "finding", findings: [{ panelId: t.ui.id, kind: "pi", title: pi, sessionId: t.ui.sessionId, files: ["src/ui/hud.js"] }] }, done);
+      return (o) => [
+        { what: "drafts nothing", ok: o.drafts.filter((d) => !d.fromAgent).length === 0 },
+        { what: "stays quiet", ok: o.quiet },
+      ];
+    },
+  },
+  {
     name: "permission-deny",
     run2: "(Test run 7.) Codex waited minutes on an approval in its panel nobody saw. Here it wants to install a package, which rule 4 forbids.",
     async play(w) {

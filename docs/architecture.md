@@ -71,7 +71,8 @@ packages/
   panels are open), which also gives new Codex panels their session id. Events fold into board cards
   (`bridge/board.ts`); panels waiting for the user or with a failed turn are broadcast as
   `panels.attention` (red dots). Files two live sessions both changed in the last 30 minutes are broadcast as
-  `panels.overlaps` (amber marks; `overlaps.ts`, ADR 0014). Attached Sprockets read the board through their capabilities (`harness/project.ts`).
+  `panels.overlaps` (amber marks; `overlaps.ts`, ADR 0014). A turn end whose reply names a problem in another
+  session's files, without telling it, wakes the Coordinator as a finding (`findings.ts`, ADR 0029). Attached Sprockets read the board through their capabilities (`harness/project.ts`).
   Recorded events also go to the watches (`watches.ts`, ADR 0009): when a session asks the user something (a
   dialog, or a turn that ends with a question) or waits for their permission (ADR 0026: the Coordinator only says
   what it's for and whether its rules allow it) and nobody answers within 20 s, Rails puts an event in the

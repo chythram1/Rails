@@ -588,9 +588,10 @@ export interface SprocketEvent {
    * It asked in a dialog (or a form), it ended its turn with what looks like a question, it waits for the user's
    * permission in its panel (ADR 0026: the text says what for), it changed files other sessions changed shortly
    * before (ADR 0014), it finished a turn a handoff waits for (ADR 0015), or it drafted a message for another
-   * session (ADR 0018), shown under the event, with the text as the event's.
+   * session (ADR 0018), shown under the event, with the text as the event's, or it ended a turn whose reply names
+   * work in another session's files (a finding, ADR 0029), with the end of the reply as the text.
    */
-  what: "question" | "turn_end" | "permission" | "overlap" | "handoff" | "message";
+  what: "question" | "turn_end" | "permission" | "overlap" | "handoff" | "message" | "finding";
   questions?: SessionQuestion[];
   /** The Coordinator looked and decided the user needn't hear about it. */
   quiet?: boolean;
@@ -601,6 +602,8 @@ export interface SprocketEvent {
    * `owns`, the files it owns (ADR 0016).
    */
   overlaps?: { panelId: string; kind: PanelKind; title: string; sessionId?: string; files: string[]; owns?: boolean }[];
+  /** For a finding: the sessions whose files the reply names, and those files (relative to the project). */
+  findings?: { panelId: string; kind: PanelKind; title: string; sessionId?: string; files: string[] }[];
   /** For a handoff: which one, the session it's for and what to pass on. */
   handoff?: { id: string; to: HandoffSession & { sessionId?: string }; note: string };
   /** For a message: the session it's for. */
@@ -783,12 +786,18 @@ export interface DecisionEntry {
   /** The session's title and agent then. */
   title: string;
   kind: PanelKind;
-  /** "turn_end": does the end of its message ask the user something? "dialog": what is a dialog Rails doesn't know? */
-  question: "turn_end" | "dialog";
+  /**
+   * "turn_end": does the end of its message ask the user something? "dialog": what is a dialog Rails doesn't know?
+   * "finding": does the message name work another session has to do (ADR 0029; judged in shadow only)?
+   */
+  question: "turn_end" | "dialog" | "finding";
   /** What was judged: the end of the message, or the dialog's title. */
   text: string;
-  /** Rails' own decision: "asks" or "doesn't ask" for a turn end, "unknown" for a dialog (it doesn't wake anyone). */
-  rails: "asks" | "doesn't ask" | "unknown";
+  /**
+   * Rails' own decision: "asks" or "doesn't ask" for a turn end, "unknown" for a dialog (it doesn't wake anyone),
+   * "finding" or "no finding" for a finding (its rule, findings.ts).
+   */
+  rails: "asks" | "doesn't ask" | "unknown" | "finding" | "no finding";
   /** The model's answer: "asks" / "doesn't ask", or the dialog's kind, with its probability (0–1). */
   answer?: { label: string; probability: number };
   /** For a turn end that woke the Coordinator: whether it found something for the user. */

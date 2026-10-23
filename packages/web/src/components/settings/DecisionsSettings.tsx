@@ -188,13 +188,13 @@ function summary({ summary: s, entries }: DecisionLog): string {
 
 /** One judgment: the session, what was judged, and the two verdicts side by side. */
 function Judgment({ entry: e }: { entry: DecisionEntry }) {
-  const differs = e.question === "turn_end" && e.answer && e.answer.label !== e.rails;
+  const differs = e.question !== "dialog" && e.answer && e.answer.label !== e.rails;
   return (
     <li className="decision">
       <p className="decision-head">
         <PanelIcon kind={e.kind} />
         <span className="decision-title truncate" title={e.title}>{e.title}</span>
-        <span className="muted">{e.question === "turn_end" ? "ended its turn" : "showed a dialog"}</span>
+        <span className="muted">{e.question === "turn_end" ? "ended its turn" : e.question === "finding" ? "ended its turn (work for others?)" : "showed a dialog"}</span>
         <span className="grow" />
         <time className="muted" dateTime={e.at} title={new Date(e.at).toLocaleString()}>{timeAgo(e.at)}</time>
       </p>

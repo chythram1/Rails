@@ -7,16 +7,20 @@
 // - A turn end: "does it ask the user something?", next to looksLikeQuestion's answer.
 // - A dialog Rails doesn't know (a pi extension's, without questions): "a question, an approval or something
 //   else?" Rails never wakes anyone for those.
+// - A turn end that doesn't ask, with other sessions around: "does it name work another session has to do?",
+//   next to findings.ts's rule (ADR 0029). Only ever logged: the rule wakes, so findings work without a model.
 // - Bounded: a short text per question, a deadline per call, a few calls a minute. Failures are logged.
 // - It may also wake the Coordinator where the rules didn't, when it's sure (ADR 0013): a turn end the rules
 //   thought didn't ask (ACT_ASKS), a dialog it calls a question (ACT_QUESTION). It only adds wakes, never cancels
 //   one, and not if the session moved on while it was asked. `RAILS_DECISIONS=shadow` keeps it to judging.
 import type { ClassifierAnswer, ClassifierContext, ClassifierQuestion } from "@earendil-works/pi-ai";
 import { DECISION_THRESHOLD, type DecisionEntry, type DecisionLog, type Panel } from "@rails/shared";
-import { AGENT } from "./bridge/board.ts";
+import { AGENT, OVERLAP_MS, rel } from "./bridge/board.ts";
 import { ASKING, type SessionEvent } from "./bridge/events.ts";
-import { onEvents } from "./bridge/index.ts";
-import { decisions, settings, sprockets } from "./db.ts";
+import { cardOf, onEvents } from "./bridge/index.ts";
+import { decisions, panels, projects, settings, sprockets } from "./db.ts";
+import { findingsIn } from "./findings.ts";
+import { projectOwners } from "./owners.ts";
 import { ServiceError } from "./errors.ts";
 import { decisionsInShadow } from "./config.ts";
 import { classifierChoices, decisionThreshold, findClassifier, models, modelsChanged } from "./models.ts";
@@ -79,12 +83,24 @@ export const QUESTIONS: Record<DecisionEntry["question"], { key: string; questio
       },
     },
   },
+  finding: {
+    key: "names_work_for_another",
+    question: {
+      type: "bool",
+      instructions:
+        "This is the end of a coding agent's last message to its user, after it finished a turn. Other agent sessions work on the same project, each on its own files (listed). Does the message say that one of those other sessions has to change something in its own files: a mismatch, a bug, a missing piece, a follow-up?",
+      criteria: {
+        true: "It names a problem or a needed change in another session's files or area, which that session would have to act on.",
+        false: "It only reports its own work, or mentions other sessions' files as used, checked or fine, or the work there is already done.",
+      },
+    },
+  },
 };
 
 const tail = (s: string) => (s.length > TEXT ? "…" + s.slice(-TEXT) : s);
 
 /** What a session event asks the model, if anything: the question and the text it judges. */
-export function toJudge(e: SessionEvent): { question: DecisionEntry["question"]; text: string; rails: DecisionEntry["rails"] } | undefined {
+export function toJudge(e: SessionEvent): { question: DecisionEntry["question"]; text: string; rails: DecisionEntry["rails"]; context?: Record<string, string> } | undefined {
   if (e.kind === "turn_end" && e.text.trim()) return { question: "turn_end", text: tail(e.text.trim()), rails: looksLikeQuestion(e.text) ? "asks" : "doesn't ask" };
   if (e.kind === "waiting" && !e.questions?.length && !ASKING.has(e.reason) && e.reason !== "question" && e.reason !== "approval" && !e.reason.startsWith("permission"))
     return { question: "dialog", text: e.reason, rails: "unknown" };
@@ -94,6 +110,7 @@ export function toJudge(e: SessionEvent): { question: DecisionEntry["question"];
 function readAnswer(question: DecisionEntry["question"], a: ClassifierAnswer | undefined): DecisionEntry["answer"] {
   if (!a) return undefined;
   if (question === "turn_end" && a.type === "bool") return a.probability >= 0.5 ? { label: "asks", probability: a.probability } : { label: "doesn't ask", probability: 1 - a.probability };
+  if (question === "finding" && a.type === "bool") return a.probability >= 0.5 ? { label: "finding", probability: a.probability } : { label: "no finding", probability: 1 - a.probability };
   if (a.type === "choice") return { label: a.choice, probability: a.probabilities[a.choice] ?? a.confidence };
 }
 
@@ -109,7 +126,8 @@ async function judge(panel: Panel, item: NonNullable<ReturnType<typeof toJudge>>
   const ref = settings.get("decisionModel");
   const model = ref ? findClassifier(ref) : undefined;
   if (!model) return;
-  const id = decisions.create({ panelId: panel.id, title: panel.title, kind: panel.kind, ...item });
+  const { context: extra, ...entry } = item;
+  const id = decisions.create({ panelId: panel.id, title: panel.title, kind: panel.kind, ...entry });
   decisions.setTitle(id, await sessionTitle(panel).catch(() => panel.title));
   const now = Date.now();
   while (recent.length && now - recent[0] > 60_000) recent.shift();
@@ -119,7 +137,7 @@ async function judge(panel: Panel, item: NonNullable<ReturnType<typeof toJudge>>
   }
   recent.push(now);
   const { key, question } = QUESTIONS[item.question];
-  const state: Record<string, string> = { agent: AGENT[panel.kind], [item.question === "turn_end" ? "message_end" : "dialog_title"]: item.text };
+  const state: Record<string, string> = { agent: AGENT[panel.kind], [item.question === "dialog" ? "dialog_title" : "message_end"]: item.text, ...extra };
   const context: ClassifierContext = { state, questions: { [key]: question } };
   const started = Date.now();
   try {
@@ -130,7 +148,8 @@ async function judge(panel: Panel, item: NonNullable<ReturnType<typeof toJudge>>
       const answer = readAnswer(item.question, result.answers[key]);
       // pi-ai prices a call at its catalog price, which is 0 for models it has no price for (Jev): no cost then, rather than $0.
       decisions.finish(id, { answer, model: result.model, latencyMs, cost: result.usage?.cost.total || undefined });
-      const wake = decisionsInShadow() ? undefined : wakeFor(item, answer, id);
+      // A finding's judgment is only logged (ADR 0029): Rails' rule does the waking, with or without a model.
+      const wake = decisionsInShadow() || item.question === "finding" ? undefined : wakeFor(item, answer, id);
       if (wake) wakeFromModel(panel.id, position, wake);
     }
   } catch (e) {
@@ -150,6 +169,27 @@ export function wakeFor(item: NonNullable<ReturnType<typeof toJudge>>, answer: D
   if (item.question === "dialog" && answer.label === "question" && answer.probability >= bar.question) return { what: "question", text: item.text, decisionId };
 }
 
+/**
+ * A turn end as a finding to judge (ADR 0029): one that doesn't ask, in a project with other live sessions, with
+ * them (and what each owns or changed lately) as context, and findings.ts's answer as Rails' own.
+ */
+export async function findingToJudge(panel: Panel, raw: string): Promise<NonNullable<ReturnType<typeof toJudge>> | undefined> {
+  const text = raw.trim();
+  if (!text || looksLikeQuestion(text)) return undefined;
+  const project = projects.get(panel.projectId);
+  const others = project ? panels.list(project.id).filter((p) => p.id !== panel.id && p.kind !== "shell" && cardOf(p).status !== "ended") : [];
+  if (!project || !others.length) return undefined;
+  const owners = projectOwners(project.id);
+  const lines = await Promise.all(
+    others.map(async (p) => {
+      const owns = owners.find((o) => o.panelId === p.id)?.paths ?? [];
+      const changed = [...new Set(cardOf(p).edits.filter((e) => Date.now() - Date.parse(e.at) < OVERLAP_MS).map((e) => rel(project.path, e.file)))].slice(0, 12);
+      return `- "${await sessionTitle(p).catch(() => p.title)}" (${AGENT[p.kind]})${owns.length ? `, owns ${owns.join(", ")}` : ""}${changed.length ? `, changed lately ${changed.join(", ")}` : ""}`;
+    }),
+  );
+  return { question: "finding", text: tail(text), rails: findingsIn(panel, text).length ? "finding" : "no finding", context: { other_sessions: lines.join("\n") } };
+}
+
 /** Resolves once every judgment in flight has its answer (for tests). */
 export async function settled(): Promise<void> {
   while (inFlight.size) await Promise.all([...inFlight]);
@@ -167,13 +207,22 @@ export function startDecisions(): void {
     if (!settings.get("decisionModel") || !sprockets.coordinatorOf(panel.projectId)) return;
     // Where the panel's events are now (the watches have already seen these): a later event makes the judgment stale.
     const position = eventPosition(panel.id);
-    for (const e of events) {
-      const item = toJudge(e);
-      if (!item) continue;
+    const run = (item: NonNullable<ReturnType<typeof toJudge>>) => {
       const p = judge(panel, item, position)
         .catch((err) => console.error("decisions:", err))
         .finally(() => inFlight.delete(p));
       inFlight.add(p);
+    };
+    for (const e of events) {
+      const item = toJudge(e);
+      if (item) run(item);
+      if (e.kind === "turn_end") {
+        const p = findingToJudge(panel, e.text)
+          .then((f) => f && run(f))
+          .catch((err) => console.error("decisions:", err))
+          .finally(() => inFlight.delete(p));
+        inFlight.add(p);
+      }
     }
   });
 }
