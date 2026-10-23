@@ -30,6 +30,7 @@ import { Segmented } from "../Segmented.tsx";
 import { ConnectorLogo } from "./ConnectorLogo.tsx";
 import { ConnectorPage } from "./ConnectorPage.tsx";
 import { McpEditor, serverSummary } from "./McpEditor.tsx";
+import { NewItem } from "./NewItem.tsx";
 import { PromptEditor } from "./PromptEditor.tsx";
 import { SkillEditor } from "./SkillEditor.tsx";
 
@@ -54,6 +55,12 @@ export function CustomizePage({ route }: { route: CustomizeRoute }) {
   const { mcpServers, skills, savedPrompts } = useStore();
   if (!mcpServers || !skills || !savedPrompts) return null;
 
+  if (route.view === "new")
+    return (
+      <div className="cz-detail">
+        <NewItem key={route.draft} draft={route.draft} />
+      </div>
+    );
   if (route.view !== "home") {
     const server = route.view === "mcp" ? mcpServers.find((s) => s.id === route.id) : undefined;
     const skill = route.view === "skill" ? skills.find((s) => s.id === route.id) : undefined;
@@ -96,21 +103,10 @@ function Gallery({ tab, servers, skills, prompts }: { tab: CustomizeTab; servers
     modes[tab] = m;
     setModeState(m);
   };
-  const run = async (work: () => Promise<unknown>) => {
-    setError("");
-    try {
-      await work();
-    } catch (e: any) {
-      setError(e.message);
-    }
-  };
-  const newServer = (transport: "http" | "stdio") =>
-    run(async () => {
-      const made = await api.createMcpServer({ transport });
-      navigate(href.mcpServer(made.id));
-    });
-  const newSkill = () => run(async () => navigate(href.skill((await api.createSkill({})).id)));
-  const newPrompt = () => run(async () => navigate(href.prompt((await api.createPrompt({})).id)));
+  // New ones open as drafts: nothing is created until their page's Create.
+  const newServer = (transport: "http" | "stdio") => navigate(href.newItem(transport));
+  const newSkill = () => navigate(href.newItem("skill"));
+  const newPrompt = () => navigate(href.newItem("prompt"));
   const q = query.trim().toLowerCase();
 
   return (
