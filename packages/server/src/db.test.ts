@@ -2,7 +2,8 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { RAILS_HOME } from "./config.ts";
-import { panels, projects, sessionEvents } from "./db.ts";
+import { panels, projects, sessionEvents, settings, sprocketChats, sprockets, tx } from "./db.ts";
+import { createSprocket } from "./sprockets.ts";
 
 describe("the database file", () => {
   it("takes writes while someone else is reading it (sqlite3 in a terminal, a backup)", () => {
@@ -19,5 +20,28 @@ describe("the database file", () => {
       reader.exec("ROLLBACK");
       reader.close();
     }
+  });
+});
+
+describe("transactions", () => {
+  it("undoes every write of one that throws, nested ones too", () => {
+    expect(() =>
+      tx(() => {
+        settings.set("tx-test", "1");
+        tx(() => settings.set("tx-test-inner", "1")); // joins the outer one
+        throw new Error("boom");
+      }),
+    ).toThrow("boom");
+    expect(settings.get("tx-test")).toBeUndefined();
+    expect(settings.get("tx-test-inner")).toBeUndefined();
+  });
+
+  it("deletes a Sprocket whole, with the team it was the last member of", () => {
+    const s = createSprocket({ name: "Solo", look: { character: "bean", color: "teal", accessory: "none" } });
+    const team = sprocketChats.createTeam("Just me", [s.id]);
+    sprockets.remove(s.id);
+    expect(sprockets.get(s.id)).toBeUndefined();
+    expect(sprocketChats.get(team.id)).toBeUndefined();
+    expect(sprocketChats.of(s.id, "direct")).toBeUndefined();
   });
 });

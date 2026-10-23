@@ -5,6 +5,23 @@ import type { AutomationMark, AutomationOutcome, AutomationRun, AutomationSchedu
 import { RAILS_HOME } from "./config.ts";
 
 const db = new DatabaseSync(join(RAILS_HOME, "rails.db"));
+
+/**
+ * Run `fn`'s writes as one: all of them or, if it throws, none. Inside another transaction it joins that one, so
+ * a write that is one step of a larger one (a team removed with its last member) commits with it.
+ */
+export function tx<T>(fn: () => T): T {
+  if (db.isTransaction) return fn();
+  db.exec("BEGIN");
+  try {
+    const result = fn();
+    db.exec("COMMIT");
+    return result;
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+}
 // Write-ahead logging, so someone reading the file (sqlite3 in a terminal, a backup) can't block a write, and a
 // short wait for another writer instead of failing at once. Without them, session events got lost. The wait is
 // synchronous (node:sqlite), so it holds the event loop, but only while another process writes to the file,
@@ -201,8 +218,7 @@ addColumn("mcp_servers", "connector", "TEXT");
  */
 export function assignChats(): void {
   const now = new Date().toISOString();
-  db.exec("BEGIN");
-  try {
+  tx(() => {
     const lacking = (kind: SprocketChatKind, where: string) =>
       db.prepare(`SELECT id, project_id FROM sprockets WHERE ${where} AND id NOT IN (SELECT sprocket_id FROM sprocket_chats WHERE kind = ?)`).all(kind) as {
         id: string;
@@ -218,11 +234,7 @@ export function assignChats(): void {
         WHERE c.sprocket_id = sprocket_messages.sprocket_id AND c.kind = CASE WHEN s.project_id IS NULL THEN 'direct' ELSE 'project' END
       ) WHERE chat_id IS NULL
     `);
-    db.exec("COMMIT");
-  } catch (e) {
-    db.exec("ROLLBACK");
-    throw e;
-  }
+  });
 }
 assignChats();
 addColumn("panels", "bridge_token", "TEXT");
@@ -501,8 +513,10 @@ export const sprockets = {
   create(name: string, look: SprocketLook) {
     const id = randomUUID();
     const now = new Date().toISOString();
-    db.prepare("INSERT INTO sprockets (id, name, look, created_at) VALUES (?, ?, ?, ?)").run(id, name, JSON.stringify(look), now);
-    db.prepare("INSERT INTO sprocket_chats (id, kind, sprocket_id, created_at) VALUES (?, 'direct', ?, ?)").run(randomUUID(), id, now);
+    tx(() => {
+      db.prepare("INSERT INTO sprockets (id, name, look, created_at) VALUES (?, ?, ?, ?)").run(id, name, JSON.stringify(look), now);
+      db.prepare("INSERT INTO sprocket_chats (id, kind, sprocket_id, created_at) VALUES (?, 'direct', ?, ?)").run(randomUUID(), id, now);
+    });
     return this.get(id)!;
   },
   update(id: string, name: string, look: SprocketLook): void {
@@ -517,12 +531,14 @@ export const sprockets = {
    * keeps it to one per project.
    */
   setProject(id: string, projectId: string | null): void {
-    db.prepare("DELETE FROM sprocket_messages WHERE chat_id IN (SELECT id FROM sprocket_chats WHERE sprocket_id = ? AND kind = 'project')").run(id);
-    db.prepare("DELETE FROM sprocket_chats WHERE sprocket_id = ? AND kind = 'project'").run(id);
-    db.prepare("DELETE FROM suggestions WHERE sprocket_id = ?").run(id);
-    db.prepare("UPDATE sprockets SET project_id = ?, codemode_store = '{}', coordinator = ? WHERE id = ?").run(projectId, projectId ? 1 : 0, id);
-    if (projectId)
-      db.prepare("INSERT INTO sprocket_chats (id, kind, sprocket_id, project_id, created_at) VALUES (?, 'project', ?, ?, ?)").run(randomUUID(), id, projectId, new Date().toISOString());
+    tx(() => {
+      db.prepare("DELETE FROM sprocket_messages WHERE chat_id IN (SELECT id FROM sprocket_chats WHERE sprocket_id = ? AND kind = 'project')").run(id);
+      db.prepare("DELETE FROM sprocket_chats WHERE sprocket_id = ? AND kind = 'project'").run(id);
+      db.prepare("DELETE FROM suggestions WHERE sprocket_id = ?").run(id);
+      db.prepare("UPDATE sprockets SET project_id = ?, codemode_store = '{}', coordinator = ? WHERE id = ?").run(projectId, projectId ? 1 : 0, id);
+      if (projectId)
+        db.prepare("INSERT INTO sprocket_chats (id, kind, sprocket_id, project_id, created_at) VALUES (?, 'project', ?, ?, ?)").run(randomUUID(), id, projectId, new Date().toISOString());
+    });
   },
   coordinatorOf(projectId: string) {
     const r = db.prepare("SELECT * FROM sprockets WHERE project_id = ? AND coordinator = 1").get(projectId) as SprocketRow | undefined;
@@ -555,22 +571,24 @@ export const sprockets = {
    * leads where it led, and a team with nobody left goes.
    */
   remove(id: string): void {
-    db.prepare("DELETE FROM sprocket_messages WHERE chat_id IN (SELECT id FROM sprocket_chats WHERE sprocket_id = ? AND kind != 'team')").run(id);
-    db.prepare("DELETE FROM sprocket_chats WHERE sprocket_id = ? AND kind != 'team'").run(id);
-    const teams = (db.prepare("SELECT chat_id FROM sprocket_chat_members WHERE sprocket_id = ?").all(id) as { chat_id: string }[]).map((r) => r.chat_id);
-    db.prepare("DELETE FROM sprocket_chat_members WHERE sprocket_id = ?").run(id);
-    for (const chatId of teams) {
-      const [lead] = sprocketChats.members(chatId);
-      if (lead) db.prepare("UPDATE sprocket_chats SET sprocket_id = ? WHERE id = ?").run(lead, chatId);
-      else sprocketChats.removeTeam(chatId);
-    }
-    db.prepare("DELETE FROM suggestions WHERE sprocket_id = ?").run(id);
-    db.prepare("DELETE FROM sprocket_runs WHERE sprocket_id = ? AND status IN ('queued', 'waiting')").run(id);
-    db.prepare("DELETE FROM sprocket_usage WHERE sprocket_id = ?").run(id);
-    db.prepare("DELETE FROM sprocket_tools WHERE sprocket_id = ?").run(id);
-    db.prepare("DELETE FROM automation_runs WHERE automation_id IN (SELECT id FROM automations WHERE sprocket_id = ?)").run(id);
-    db.prepare("DELETE FROM automations WHERE sprocket_id = ?").run(id);
-    db.prepare("DELETE FROM sprockets WHERE id = ?").run(id);
+    tx(() => {
+      db.prepare("DELETE FROM sprocket_messages WHERE chat_id IN (SELECT id FROM sprocket_chats WHERE sprocket_id = ? AND kind != 'team')").run(id);
+      db.prepare("DELETE FROM sprocket_chats WHERE sprocket_id = ? AND kind != 'team'").run(id);
+      const teams = (db.prepare("SELECT chat_id FROM sprocket_chat_members WHERE sprocket_id = ?").all(id) as { chat_id: string }[]).map((r) => r.chat_id);
+      db.prepare("DELETE FROM sprocket_chat_members WHERE sprocket_id = ?").run(id);
+      for (const chatId of teams) {
+        const [lead] = sprocketChats.members(chatId);
+        if (lead) db.prepare("UPDATE sprocket_chats SET sprocket_id = ? WHERE id = ?").run(lead, chatId);
+        else sprocketChats.removeTeam(chatId);
+      }
+      db.prepare("DELETE FROM suggestions WHERE sprocket_id = ?").run(id);
+      db.prepare("DELETE FROM sprocket_runs WHERE sprocket_id = ? AND status IN ('queued', 'waiting')").run(id);
+      db.prepare("DELETE FROM sprocket_usage WHERE sprocket_id = ?").run(id);
+      db.prepare("DELETE FROM sprocket_tools WHERE sprocket_id = ?").run(id);
+      db.prepare("DELETE FROM automation_runs WHERE automation_id IN (SELECT id FROM automations WHERE sprocket_id = ?)").run(id);
+      db.prepare("DELETE FROM automations WHERE sprocket_id = ?").run(id);
+      db.prepare("DELETE FROM sprockets WHERE id = ?").run(id);
+    });
   },
 };
 
@@ -607,8 +625,10 @@ export const sprocketChats = {
   },
   /** Delete its messages, and note when (a reply started before then is dropped). */
   clear(id: string): void {
-    db.prepare("DELETE FROM sprocket_messages WHERE chat_id = ?").run(id);
-    db.prepare("UPDATE sprocket_chats SET cleared_at = ? WHERE id = ?").run(new Date().toISOString(), id);
+    tx(() => {
+      db.prepare("DELETE FROM sprocket_messages WHERE chat_id = ?").run(id);
+      db.prepare("UPDATE sprocket_chats SET cleared_at = ? WHERE id = ?").run(new Date().toISOString(), id);
+    });
   },
   /** Team chats (ADR 0022), oldest first. */
   teams(): StoredChat[] {
@@ -629,15 +649,19 @@ export const sprocketChats = {
     this.setMembers(id, members);
   },
   setMembers(id: string, members: string[]): void {
-    db.prepare("DELETE FROM sprocket_chat_members WHERE chat_id = ?").run(id);
-    members.forEach((m, i) => db.prepare("INSERT INTO sprocket_chat_members (chat_id, sprocket_id, position) VALUES (?, ?, ?)").run(id, m, i));
+    tx(() => {
+      db.prepare("DELETE FROM sprocket_chat_members WHERE chat_id = ?").run(id);
+      members.forEach((m, i) => db.prepare("INSERT INTO sprocket_chat_members (chat_id, sprocket_id, position) VALUES (?, ?, ?)").run(id, m, i));
+    });
   },
   /** A team, its members, its messages and its runs. */
   removeTeam(id: string): void {
-    db.prepare("DELETE FROM sprocket_messages WHERE chat_id = ?").run(id);
-    db.prepare("DELETE FROM sprocket_runs WHERE chat_id = ?").run(id);
-    db.prepare("DELETE FROM sprocket_chat_members WHERE chat_id = ?").run(id);
-    db.prepare("DELETE FROM sprocket_chats WHERE id = ? AND kind = 'team'").run(id);
+    tx(() => {
+      db.prepare("DELETE FROM sprocket_messages WHERE chat_id = ?").run(id);
+      db.prepare("DELETE FROM sprocket_runs WHERE chat_id = ?").run(id);
+      db.prepare("DELETE FROM sprocket_chat_members WHERE chat_id = ?").run(id);
+      db.prepare("DELETE FROM sprocket_chats WHERE id = ? AND kind = 'team'").run(id);
+    });
   },
 };
 
@@ -1249,15 +1273,10 @@ export const owners = {
   /** Replace what a panel owns. */
   set(projectId: string, panelId: string, paths: string[]): void {
     const now = new Date().toISOString();
-    db.exec("BEGIN");
-    try {
+    tx(() => {
       db.prepare("DELETE FROM owners WHERE panel_id = ?").run(panelId);
       for (const p of paths) db.prepare("INSERT INTO owners (panel_id, project_id, path, created_at) VALUES (?, ?, ?, ?)").run(panelId, projectId, p, now);
-      db.exec("COMMIT");
-    } catch (e) {
-      db.exec("ROLLBACK");
-      throw e;
-    }
+    });
   },
   /** True when it owned anything. */
   clear(panelId: string): boolean {
@@ -1400,8 +1419,10 @@ export const mcpServers = {
     db.prepare("UPDATE mcp_servers SET status = ? WHERE id = ?").run(JSON.stringify(status), id);
   },
   remove(id: string): void {
-    db.prepare("DELETE FROM mcp_servers WHERE id = ?").run(id);
-    db.prepare("DELETE FROM sprocket_tools WHERE kind = 'mcp' AND item_id = ?").run(id);
+    tx(() => {
+      db.prepare("DELETE FROM mcp_servers WHERE id = ?").run(id);
+      db.prepare("DELETE FROM sprocket_tools WHERE kind = 'mcp' AND item_id = ?").run(id);
+    });
   },
 };
 
@@ -1416,15 +1437,10 @@ export const sprocketTools = {
     return (db.prepare("SELECT sprocket_id FROM sprocket_tools WHERE kind = ? AND item_id = ?").all(kind, itemId) as { sprocket_id: string }[]).map((r) => r.sprocket_id);
   },
   set(sprocketId: string, kind: "mcp" | "skill", ids: string[]): void {
-    db.exec("BEGIN");
-    try {
+    tx(() => {
       db.prepare("DELETE FROM sprocket_tools WHERE sprocket_id = ? AND kind = ?").run(sprocketId, kind);
       for (const id of new Set(ids)) db.prepare("INSERT INTO sprocket_tools (sprocket_id, kind, item_id) VALUES (?, ?, ?)").run(sprocketId, kind, id);
-      db.exec("COMMIT");
-    } catch (e) {
-      db.exec("ROLLBACK");
-      throw e;
-    }
+    });
   },
   /** A skill is gone: no Sprocket has it any more. */
   dropSkill(id: string): void {
@@ -1508,8 +1524,10 @@ export const automations = {
     );
   },
   remove(id: string): void {
-    db.prepare("DELETE FROM automation_runs WHERE automation_id = ?").run(id);
-    db.prepare("DELETE FROM automations WHERE id = ?").run(id);
+    tx(() => {
+      db.prepare("DELETE FROM automation_runs WHERE automation_id = ?").run(id);
+      db.prepare("DELETE FROM automations WHERE id = ?").run(id);
+    });
   },
 };
 
