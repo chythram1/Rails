@@ -36,7 +36,13 @@ Decisions:
   runs 4 to 6 a session told the other what the handoff was for mid-turn, so the handoff's draft said it again.
   When a handoff fires, its event shows the Coordinator the messages the finished session wrote to the other one
   since the handoff was planned (sent, or still waiting for the user); if they cover it, the Coordinator cancels
-  the handoff and stays quiet, else it drafts only what they left out.
+  the handoff and stays quiet, else it drafts only what they left out. When two handoffs fired in one run (test
+  run 8) it drafted the covered one anyway, so `suggest_message` now refuses a handoff's message in that case
+  unless it passes `missing: true` (only what the session's own message left out).
+- **A handoff whose work is already done:** in test runs 7 and 8 the receiving session had already done what the
+  handoff asked on its own (wired `src/game` in while wiring `src/ui`), and the draft cost it a turn to say so.
+  The event also shows the end of the receiving session's own last reply, when it ended a turn in the last 30
+  minutes; if that shows the work is done, the Coordinator cancels the handoff and stays quiet.
 - **Stored in the `handoffs` table** with its sessions' titles, kept current as the sessions report prompts and
   turn ends (a handoff is often planned before a session has a title of its own). A turn the user stopped
   isn't finished, so it doesn't count.

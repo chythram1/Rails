@@ -10,6 +10,7 @@ import { models, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
 import { createSprocket, deleteSprocket, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
 import { deliveredText } from "./suggestions.ts";
+import { messageFromAgent } from "./agentTools.ts";
 import { startWatches } from "./watches.ts";
 
 const look = { character: "cog", color: "green", accessory: "none" } as const;
@@ -198,6 +199,52 @@ describe("handoffs that can't happen", () => {
     expireHandoffs();
     expect(pending()).toEqual([]);
     expect(notices(lead.id)).toEqual(["Handoff from \u201cAuth\u201d to \u201cUI\u201d expired: \u201cAuth\u201d didn't finish within a day."]);
+  });
+
+  it("show what the receiving session said at the end of its own last turn", async () => {
+    const { auth, ui, plan } = setup();
+    plan();
+    receive(ui.id, "pi", "prompt", { text: "Switch to the new login" });
+    receive(ui.id, "pi", "agent_end", { text: "The UI already calls /login." }); // runs 7 and 8: it had done it
+    let prompt = "";
+    faux.setResponses([
+      (context) => {
+        prompt = JSON.stringify(context.messages.at(-1)?.content);
+        return fauxAssistantMessage("(quiet)");
+      },
+    ]);
+    receive(auth.id, "claude", "Stop", { last_assistant_message: "Done: /login now issues tokens." });
+    await vi.waitFor(() => expect(prompt).not.toBe(""));
+    await idle();
+    expect(prompt).toContain("ended a turn of its own lately");
+    expect(prompt).toContain("The UI already calls /login.");
+  });
+
+  it("refuse to repeat what the finished session already wrote to the other, unless it adds what's missing", async () => {
+    const { lead, auth, ui, plan, pending } = setup();
+    const h = plan();
+    await messageFromAgent(auth.id, ui.id.slice(0, 8), "Use /login now: it returns { token }.");
+    const send = (extra: string) => `return await tools.suggest_message({ session: "x", handoff: ${JSON.stringify(h.id.slice(0, 8))}, message: "Use /login."${extra} })`;
+    let prompt = "";
+    let refused = "";
+    faux.setResponses([
+      (context) => {
+        prompt = JSON.stringify(context.messages.at(-1)?.content);
+        return fauxAssistantMessage([fauxToolCall("codemode", { code: send("") })], { stopReason: "toolUse" });
+      },
+      (context) => {
+        refused = JSON.stringify(context.messages.at(-1)?.content);
+        return fauxAssistantMessage([fauxToolCall("codemode", { code: send(", missing: true") })], { stopReason: "toolUse" });
+      },
+      fauxAssistantMessage("Drafted only what was missing."),
+    ]);
+    receive(auth.id, "claude", "Stop", { last_assistant_message: "Done: /login now issues tokens." });
+    await vi.waitFor(() => expect(refused).not.toBe(""));
+    await idle();
+    expect(prompt).toContain("it has written to");
+    expect(refused).toContain("already wrote to");
+    expect(listMessages(projectChat(lead.id)).at(-1)!.suggestions?.[0]).toMatchObject({ panelId: ui.id, text: "Use /login." });
+    expect(pending()).toEqual([]);
   });
 
   it("get no message once cancelled, even if the Coordinator still tries", async () => {

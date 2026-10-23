@@ -6,7 +6,7 @@
 import { HANDOFF_NOTE_MAX } from "@rails/shared";
 import { Type } from "@earendil-works/pi-ai";
 import { cardOf } from "../bridge/index.ts";
-import { handoffs, panels, sprockets, type StoredHandoff } from "../db.ts";
+import { handoffs, panels, sprockets, suggestions, type StoredHandoff } from "../db.ts";
 import { completeHandoff, dropHandoff, findHandoff, HANDOFF_TTL_MS, planHandoff } from "../handoffs.ts";
 import { MAX_OWNED, setOwner } from "../owners.ts";
 import { MAX_PENDING_MESSAGES, suggest, SUGGESTION_MAX, type Purpose } from "../suggestions.ts";
@@ -76,6 +76,7 @@ export function replyCapabilities(rules: string[], made: (id: string) => void): 
         session,
         message: Type.String({ description: "The message, as your user would write it." }),
         handoff: Type.Optional(Type.String({ description: "The id of the handoff this message carries out, when Rails woke you for one." })),
+        missing: Type.Optional(Type.Boolean({ description: "With `handoff`, when the finished session already wrote to that session itself: true if this adds only what its own message left out." })),
       }),
       effect: "act",
       log: {
@@ -85,6 +86,11 @@ export function replyCapabilities(rules: string[], made: (id: string) => void): 
       run: async (args, ctx) => {
         // A handoff's message goes to the session the handoff is for.
         const h = args.handoff === undefined ? undefined : findHandoff(ctx.sprocketId, args.handoff);
+        // The finished session already told the other one itself (test runs 4 to 8): the same again is noise.
+        if (h && !args.missing && suggestions.byAgent(h.from.panelId, h.createdAt).some((s) => s.panelId === h.to.panelId && ["pending", "sending", "sent"].includes(s.status)))
+          throw new Error(
+            `"${h.from.title}" already wrote to "${h.to.title}" itself since you planned this handoff (its message is in the event). If that covers what the handoff is for, cancel it with cancel_handoff and draft nothing. If it leaves something out, draft only what's missing, with missing: true.`,
+          );
         const { title } = await draft(ctx, "suggest_message", h ? h.to.panelId : args.session, args.message, { purpose: "message" }, h);
         return `Drafted. Your user sees it under your message and decides whether to send it to "${title}"; if it's busy, it gets it after its current turn.${h ? " That carries out the handoff." : ""} Don't repeat the message in your message.`;
       },
