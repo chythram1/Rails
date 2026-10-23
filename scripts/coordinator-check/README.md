@@ -28,6 +28,10 @@ The situations (`scenarios.ts`):
 | `done-not-continue` | A handoff to a finished session doesn't tell it to continue, or to talk to another session. |
 | `several-events` | Two events that come in together (a go-ahead and a dialog, test run 6) both get an answer. |
 | `handoff-covered` | A handoff the finished session already carried out with its own message isn't drafted again (runs 4 to 6). |
+| `covered-pair` | Two handoffs in one run, one of them already covered by the session's own message (run 8): only the other gets a draft. |
+| `overlap-while-working` | An additive change to a file whose owner is still working on it (run 8) stays quiet. |
+| `overlap-shared-test` | Coordinates updated in a test another session added to (run 8) stay quiet. |
+| `handoff-already-done` | A handoff whose work the receiving session already did (runs 7, 8) isn't drafted again. |
 | `note-for-later` | A note for the Coordinator (how to answer a question when it comes) isn't drafted as a message now, and is used when the question comes. |
 | `finding-routes` | A problem in another session's files, named in a reply that didn't tell it (runs 4, 7), gets a message for that session. |
 | `finding-harmless` | A reply that names another session's file only to say it works stays quiet. |

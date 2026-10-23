@@ -350,6 +350,106 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    name: "covered-pair",
+    run2: "(Test run 8.) Claude messaged pi the new layout itself; then both of its handoffs (pi and Codex) fired in one run, and the Coordinator drafted pi's again.",
+    async play(w) {
+      const layout =
+        "Engine phase 2: the canvas is now 960 x 728, with a HUD band above the map and a shop band below it. Import LAYOUT from ../engine/renderer.js: { hud: {x:0,y:0,w:960,h:56}, map: {x:0,y:56,w:960,h:576}, shop: {x:0,y:632,w:960,h:96} }. Draw the HUD in LAYOUT.hud and the shop and tower panel in LAYOUT.shop; clicks carry zone = 'hud' | 'map' | 'shop'.";
+      const done =
+        "The canvas is now 960 x 728: a HUD band, the map, and a shop band, exported as LAYOUT from src/engine/renderer.js. I drafted the UI session a message with the LAYOUT rectangles and click zones. New effect helpers in src/engine/fx.js: createShake() and createParticles(), or emit fx:burst {x, y} and fx:shake {magnitude, duration} from game code. node --test passes.";
+      const t = team(w, {
+        engine: [{ user: "Phase 2: a layout where nothing covers the map (HUD band above, shop band below), plus screen-shake and particle helpers the game can use.", edits: ["src/engine/renderer.js", "src/engine/fx.js", "src/main.js", "index.html"], reply: done }],
+      });
+      const toUi = "tell the pi session the new layout is ready and to move the HUD, shop and tower panel into it so nothing covers the map";
+      const toGame = "tell the Codex session which effect helpers it added (screen shake, particles) so it can use them for hits and explosions";
+      const ui = w.handoff(t.engine, t.ui, toUi);
+      const game = w.handoff(t.engine, t.gameplay, toGame);
+      w.history("Phase 2 is starting. Please plan these handoffs: (1) when the Claude session is done, tell the pi session the new layout is ready and to move the HUD, shop and tower panel into it so nothing covers the map; (2) when the Claude session is done, tell the Codex session which effect helpers it added so it can use them for hits and explosions.", "Planned both handoffs.");
+      await w.agentMessage(t.engine, t.ui, layout);
+      const [pi, codex] = await Promise.all([w.title(t.ui), w.title(t.gameplay)]);
+      await w.wakeAll([
+        { panel: t.engine, event: { what: "handoff", handoff: { id: ui, to: { panelId: t.ui.id, kind: "pi", title: pi, sessionId: t.ui.sessionId }, note: toUi } }, text: done },
+        { panel: t.engine, event: { what: "handoff", handoff: { id: game, to: { panelId: t.gameplay.id, kind: "codex", title: codex, sessionId: t.gameplay.sessionId }, note: toGame } }, text: done },
+      ]);
+      return (o) => [
+        { what: "drafts nothing new for pi", ok: to(o, t.ui).length === 0 },
+        { what: "pi's handoff doesn't stay waiting", ok: !handoffs.pending(w.coordinator.id).some((h) => h.id === ui) },
+        { what: "drafts Codex's handoff", ok: to(o, t.gameplay).some((x) => x.attachment) },
+      ];
+    },
+  },
+  {
+    name: "overlap-while-working",
+    run2: "(Test run 8.) pi added a field to Codex's src/game/state.js while Codex was still adding its own, as the user asked both; the Coordinator called it compatible and drafted pi a 'review it after Codex' note anyway.",
+    async play(w) {
+      const t = team(w, {
+        gameplay: [{ user: "Phase 3: the Boss splits into 3 Swarms when it dies; keep any new state as a small additive field in src/game/state.js.", edits: ["src/game/state.js", "src/game/enemies.js"], reply: "" }],
+        ui: [
+          {
+            user: "Phase 3: show a 2-second 'Wave n' banner when a wave starts; add a waveBannerTimer field to createState() in src/game/state.js for it.",
+            edits: ["src/game/state.js", "src/ui/hud.js"],
+            reply: "Added waveBannerTimer: 0 to createState() in src/game/state.js and the banner in hud.js. Codex is editing state.js too; I only added my field.",
+          },
+        ],
+      });
+      w.write({ "src/game/state.js": "export function createState() {\n  return { gold: 150, lives: 20, wave: 0, splitQueue: [], waveBannerTimer: 0 };\n}\n" });
+      const codex = await w.title(t.gameplay);
+      await w.wake(t.ui, { what: "overlap", overlaps: [{ panelId: t.gameplay.id, kind: "codex", title: codex, sessionId: t.gameplay.sessionId, files: ["src/game/state.js"], owns: true }] }, `src/game/state.js (owned by "${codex}")`);
+      return (o) => [
+        { what: "drafts nothing", ok: o.drafts.filter((d) => !d.fromAgent).length === 0 },
+        { what: "stays quiet", ok: o.quiet },
+      ];
+    },
+  },
+  {
+    name: "overlap-shared-test",
+    run2: "(Test run 8.) Claude updated a shared test's coordinates for its new layout after Codex had added a case to it; the Coordinator said both were compatible, then drafted Claude a 'preserve Codex's assertions' note.",
+    async play(w) {
+      const t = team(w, {
+        gameplay: [{ user: "Add an integration test that places a tower and starts wave 1.", edits: ["tests/gameplay-integration.test.js", "src/game/game.js"], reply: "Added tests/gameplay-integration.test.js: places a Gear Gun and starts wave 1. node --test passes." }],
+        engine: [
+          {
+            user: "Phase 2: a HUD band above the map and a shop band below it, so nothing covers the map.",
+            edits: ["src/engine/renderer.js", "src/main.js", "tests/gameplay-integration.test.js"],
+            reply: "The map now sits between a HUD band and a shop band. In tests/gameplay-integration.test.js I only changed the canvas height and the tile click's y to the new layout; Codex's assertions are as they were. node --test passes.",
+          },
+        ],
+      });
+      const codex = await w.title(t.gameplay);
+      await w.wake(t.engine, { what: "overlap", overlaps: [{ panelId: t.gameplay.id, kind: "codex", title: codex, sessionId: t.gameplay.sessionId, files: ["tests/gameplay-integration.test.js"], owns: false }] }, `tests/gameplay-integration.test.js (also changed by "${codex}")`);
+      return (o) => [
+        { what: "drafts nothing", ok: o.drafts.filter((d) => !d.fromAgent).length === 0 },
+        { what: "stays quiet", ok: o.quiet },
+      ];
+    },
+  },
+  {
+    name: "handoff-already-done",
+    run2: "(Test runs 7 and 8.) Claude had already wired src/game into src/main.js on its own; when Codex finished, the handoff still told Claude to wire it, which cost a turn.",
+    async play(w) {
+      const t = team(w, {
+        engine: [
+          {
+            user: "pi has finished src/ui. Please wire src/ui into src/main.js.",
+            edits: ["src/main.js"],
+            reply: "src/ui is wired into src/main.js, and so is src/game: its modules were already there, so main.js now imports all seven, runs their update(state, dt) in order and calls setEventEmitter(emit) at boot. A headless smoke test of start, place a tower and wave 1 passes.",
+          },
+        ],
+        gameplay: [{ user: "Finish src/game to the brief.", edits: ["src/game/game.js", "src/game/towers.js"], reply: "src/game is done: every module exports update(state, dt), drawable ones render(ctx, state); setEventEmitter(emit) wires events. node --test passes." }],
+      });
+      w.write({ "src/main.js": 'import * as state from "./game/state.js";\nimport * as waves from "./game/waves.js";\nimport * as towers from "./game/towers.js";\nimport * as ui from "./ui/index.js";\n// update order: waves, towers, projectiles, enemies\nstate.setEventEmitter?.(emit);\n' });
+      const note = "tell the Claude session to wire src/game into src/main.js";
+      const id = w.handoff(t.gameplay, t.engine, note);
+      w.history("When the Codex session is done, tell the Claude session to wire src/game into src/main.js.", "Planned: when Codex finishes, I'll draft that for Claude.");
+      const claude = await w.title(t.engine);
+      await w.wake(t.gameplay, { what: "handoff", handoff: { id, to: { panelId: t.engine.id, kind: "claude", title: claude, sessionId: t.engine.sessionId }, note } }, "src/game is done: every module exports update(state, dt), drawable ones render(ctx, state); setEventEmitter(emit) wires events. node --test passes.");
+      return (o) => [
+        { what: "doesn't tell Claude to wire it again", ok: to(o, t.engine).every((x) => !/\bwire\b/i.test(x.text) || /already/i.test(x.text)) },
+        { what: "the handoff doesn't stay waiting", ok: !handoffs.pending(w.coordinator.id).some((h) => h.id === id) },
+      ];
+    },
+  },
+  {
     name: "note-for-later",
     run2: "(Dialog check, ADR 0027.) The user told the Coordinator how to answer pi's question when it came; it drafted that note to pi as a message straight away.",
     async play(w) {
