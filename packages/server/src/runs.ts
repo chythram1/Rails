@@ -346,7 +346,7 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
     ...(chat.kind !== "project" ? [askUserCapability(endWith, ended), sendMessageCapability((text) => post(text)), showCardCapability((card) => show(card))] : []),
     ...mcpCapabilities(servers.filter((x) => !x.error).map((x) => x.server), endWith, ended),
     ...(skills.length ? [readSkillCapability(skills)] : []),
-    ...(team ? [passTurnCapability(team.members.filter((m) => m.id !== id), { hop: r.hop, queued: () => queuedIn(chatId), said: () => posted.size > 0 || sent.length > 0 }, endWith, ended)] : []),
+    ...(team ? [passTurnCapability(team.members.filter((m) => m.id !== id), { hop: r.hop, queued: () => queuedIn(chatId), asking: () => waitingAsks(chatId).map((a) => a.sprocketId), said: () => posted.size > 0 || sent.length > 0 }, endWith, ended)] : []),
   ];
   // The run log: every call's outcome, and the ones going now (scripts can run several at once).
   const done: { name: string; args: unknown; status: CallRecord["status"] }[] = [];
@@ -861,12 +861,17 @@ function roundNow(history: SprocketMessage[], r: StoredRun, team: TeamInfo): str
   const note = r.sourceId ? history.find((m) => m.id === r.sourceId && m.author === "pass")?.text : undefined;
   const others = team.members.filter((m) => m.id !== r.sprocketId).map((m) => m.name);
   const next = queuedIn(r.chatId).flatMap((q) => team.members.find((m) => m.id === q && m.id !== r.sprocketId)?.name ?? []);
+  const open = waitingAsks(r.chatId).flatMap((a) => {
+    const who = a.sprocketId !== r.sprocketId && team.members.find((m) => m.id === a.sprocketId)?.name;
+    return who ? [`${who} asked ${JSON.stringify(a.question)}`] : [];
+  });
   return [
     `Your user's latest message: ${JSON.stringify(asked.length > 600 ? asked.slice(0, 600) + "…" : asked)}.`,
     from
       ? `${from} gave you the turn${note ? ` (${JSON.stringify(note)})` : ""}, pass ${r.hop} of ${TEAM_TURNS_MAX}: do what they asked of you, and post it here.`
       : "Your user's message came to you.",
     ...(next.length ? [`${list(next)} ${next.length === 1 ? "has" : "have"} a turn after yours and will answer for themselves: give only your own answer, and don't pass the turn to them.`] : []),
+    ...(open.length ? [`Waiting for your user's answer: ${open.join("; ")}. Your user answers that themselves: don't ask it again, and don't pass anyone the turn for it.`] : []),
     `Write only your own message (your teammates write theirs in their turns), and don't repeat what's been said. If someone${others.length ? ` (${others.join(", ")})` : ""} should take the next step, write your message, then call pass_turn with their name; otherwise just answer, and your user picks it up.`,
   ].join("\n");
 }

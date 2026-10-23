@@ -42,6 +42,10 @@ Decisions:
     next member, who was going to answer anyway). The member is told who answers after it. If it has already
     posted its part, its turn just ends there, with no pass line: told to answer itself after answering, models
     wrote their message again;
+  - a member whose question waits for your answer (`ask_user`). Your answer gives it its next turn; a turn now made
+    it ask the same question again (seen live: Pam got her answer, then passed to Fred "to ask" what he already
+    had). It's handled like a member whose turn already comes, and a member's turn note lists its teammates'
+    questions still waiting for you;
   - a pass before the member has written anything this turn: models passed with only a note, and the teammate
     had nothing to check or go on.
   A refusal comes back to the member as the call's error, so it can still answer in the same run. Passing back to

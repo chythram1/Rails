@@ -22,13 +22,14 @@ const OPTION_MAX = 80;
 
 /**
  * `pass_turn` for a team member's run. `others` are its teammates; `hop` passes led here, `queued` are the
- * teammates whose turns already come (as after @everyone), and `said` whether the run has posted a message yet.
+ * teammates whose turns already come (as after @everyone), `asking` those whose question waits for the user's
+ * answer, and `said` whether the run has posted a message yet.
  * `end` records the pass, once per run. Passing back to whoever passed it is fine: a conversation goes back and
  * forth, and TEAM_TURNS_MAX stops it.
  */
 export function passTurnCapability(
   others: { id: string; name: string }[],
-  turn: { hop: number; queued: () => string[]; said: () => boolean },
+  turn: { hop: number; queued: () => string[]; asking: () => string[]; said: () => boolean },
   end: (e: TurnEnd) => void,
   ended: () => boolean,
 ): Capability {
@@ -52,6 +53,13 @@ export function passTurnCapability(
         // Its part is posted and the teammate goes next anyway: end the turn, or models wrote their message again.
         end({ done: true });
         return `${target.name} already has a turn coming after yours and will see your message. Your turn ends here.`;
+      }
+      // A teammate waiting on its own question to the user: a turn now would ask it again (seen live, models
+      // passed to have them ask what they already had). The user's answer gives them their next turn.
+      if (turn.asking().includes(target.id)) {
+        if (!turn.said()) throw new Error(`${target.name}'s question is waiting for your user's answer, and their answer gives ${target.name} the next turn. Give your own answer, and don't pass the turn to them.`);
+        end({ done: true });
+        return `${target.name}'s question is already waiting for your user's answer, and their answer gives ${target.name} the next turn. Your turn ends here.`;
       }
       if (turn.hop + 1 > TEAM_TURNS_MAX)
         throw new Error(`The turn has been passed ${TEAM_TURNS_MAX} times since your user wrote: post your result here, and your user decides what's next.`);

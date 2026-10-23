@@ -5,10 +5,11 @@
 import { fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall, type ClassifierContext, type ClassifierResult, type Provider, type TranscriptContext } from "@earendil-works/pi-ai";
 import { beforeEach, describe, expect, it } from "vitest";
 import { TEAM_TURNS_MAX } from "@rails/shared";
+import { passTurnCapability } from "./harness/turns.ts";
 import { projects, settings, sprockets } from "./db.ts";
 import { createTeam, deleteTeam, listTeams, mentioned, updateTeam } from "./teams.ts";
 import { models, refOf } from "./models.ts";
-import { idle } from "./runs.ts";
+import { idle, waitingAsks } from "./runs.ts";
 import { clearChat, createSprocket, deleteSprocket, listMessages, sendMessage, updateSettings } from "./sprockets.ts";
 
 const faux = fauxProvider();
@@ -426,6 +427,38 @@ describe("team chats", () => {
     release();
     await idle();
     expect(said(team.id)).toEqual([]);
+  });
+
+  it("doesn't pass the turn to a member whose question waits for the user (it asked again, seen live)", async () => {
+    const { team } = crew(["Pam", "Fred"]);
+    faux.setResponses([ask("Dark or light?", ["Dark", "Light"]), ask("What should the game be called?", [])]);
+    sendMessage(team.id, "@everyone Ask me one question each.");
+    await settled();
+    expect(waitingAsks(team.id).map((a) => nameOf(a.sprocketId))).toEqual(["Pam", "Fred"]);
+    // Pam's option is tapped: she's told Fred's question waits, and passing to him for it just ends her turn.
+    let told = "";
+    faux.setResponses([(c) => ((told = seen(c)), pass("Got it: dark. Fred, ask what the game should be called.", "Fred")), reply("Not reached.")]);
+    sendMessage(team.id, "Dark");
+    await settled();
+    expect(told).toContain('Waiting for your user\'s answer: Fred asked "What should the game be called?"');
+    expect(said(team.id).slice(-2)).toEqual(["user: Dark", "Pam: Got it: dark. Fred, ask what the game should be called."]);
+    expect(waitingAsks(team.id).map((a) => nameOf(a.sprocketId))).toEqual(["Fred"]); // still once
+    // Your answer to Fred then reaches him, and nothing waits any more.
+    faux.setResponses([reply("Brassworks it is."), reply("Not reached.")]);
+    sendMessage(team.id, "Brassworks Defense");
+    await settled();
+    expect(said(team.id).at(-1)).toBe("Fred: Brassworks it is.");
+    expect(waitingAsks(team.id)).toEqual([]);
+  });
+
+  it("refuses a pass to a member whose question waits before the passer has said anything", async () => {
+    const ends: unknown[] = [];
+    const cap = (said: boolean) =>
+      passTurnCapability([{ id: "f", name: "Fred" }], { hop: 0, queued: () => [], asking: () => ["f"], said: () => said }, (e) => ends.push(e), () => false);
+    await expect(cap(false).run({ to: "Fred", note: "ask it" }, {} as never)).rejects.toThrow(/Fred's question is waiting for your user's answer/);
+    expect(ends).toEqual([]);
+    expect(await cap(true).run({ to: "Fred", note: "ask it" }, {} as never)).toMatch(/Your turn ends here/);
+    expect(ends).toEqual([{ done: true }]);
   });
 
   it("gives each member the tools of its direct chat, and pass_turn and ask_user", async () => {
