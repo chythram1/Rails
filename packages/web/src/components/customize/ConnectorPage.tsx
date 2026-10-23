@@ -82,7 +82,14 @@ export function ConnectorPage({ connector: c, added }: { connector: Connector; a
                 <label htmlFor="cz-token" className="set-label">
                   {c.token.label}
                 </label>
-                <input id="cz-token" className="input" type="password" autoComplete="off" spellCheck={false} value={token} onChange={(e) => setToken(e.target.value)} />
+                <div className="cz-connect-field">
+                  <input id="cz-token" className="input" type="password" autoComplete="off" spellCheck={false} value={token} onChange={(e) => setToken(e.target.value)} />
+                  {c.token.create && (
+                    <a className="btn" href={c.token.create.url} target="_blank" rel="noreferrer">
+                      {c.token.create.label} <ExternalLink size={14} aria-hidden />
+                    </a>
+                  )}
+                </div>
               </div>
             )}
             <div className="cz-connect-actions">

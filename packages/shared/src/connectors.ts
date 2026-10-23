@@ -27,8 +27,11 @@ export interface Connector {
   url?: string;
   command?: string;
   args?: string[];
-  /** `token`: the header it goes in, and what to put before it. */
-  token?: { header: string; prefix: string; label: string; help: string };
+  /**
+   * `token`: the header it goes in, and what to put before it. `create` opens the service's page for making one,
+   * filled in as far as the service allows, so it's a click and a paste.
+   */
+  token?: { header: string; prefix: string; label: string; help: string; create?: { url: string; label: string } };
   /** A page on setting it up. */
   guide?: string;
   /** Every tool only reads, though the server doesn't mark them so: they start as Allow instead of Ask. */
@@ -130,7 +133,19 @@ export const CONNECTORS: Connector[] = [
       header: "Authorization",
       prefix: "Bearer ",
       label: "Personal access token",
-      help: "Make one at github.com → Settings → Developer settings → Personal access tokens. Its access is what Sprockets get.",
+      help: "Make a fine-grained token on GitHub: it opens filled in (repository contents, issues and pull requests, 90 days). Pick the repositories it may reach, generate it and paste it here. Its access is what Sprockets get.",
+      // GitHub's token templates (docs.github.com, "Pre-filling fine-grained personal access token details").
+      create: {
+        url: `https://github.com/settings/personal-access-tokens/new?${new URLSearchParams({
+          name: "Rails",
+          description: "For Rails' Sprockets, through GitHub's MCP server. What this token may do is what they may do.",
+          expires_in: "90",
+          contents: "write",
+          issues: "write",
+          pull_requests: "write",
+        })}`,
+        label: "Make one on GitHub",
+      },
     },
     guide: "https://github.com/github/github-mcp-server",
   },

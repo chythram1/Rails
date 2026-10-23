@@ -1417,7 +1417,11 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .cz-already { margin: -16px 0 0; color: var(--muted); font-size: 13px; }
 .cz-connect { display: flex; flex-direction: column; gap: 14px; padding-top: 14px; }
 .cz-connect-how { margin: 0; color: var(--text-2); font-size: 14px; text-wrap: pretty; }
-.cz-connect-token { display: flex; flex-direction: column; gap: 6px; max-width: 420px; }
+.cz-connect-token { display: flex; flex-direction: column; gap: 6px; max-width: 560px; }
+/* The token field, and the service's page for making one beside it. */
+.cz-connect-field { display: flex; flex-wrap: wrap; gap: 8px; }
+.cz-connect-field .input { flex: 1 1 260px; min-width: 0; }
+.cz-connect-field .btn { white-space: nowrap; }
 .cz-connect-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
 .cz-guide { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
 .cz-where { font: 12.5px/1.5 var(--mono); color: var(--text-2); overflow-wrap: anywhere; text-align: right; }
