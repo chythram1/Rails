@@ -109,6 +109,16 @@ export class CodexWatcher {
       });
   }
 
+  /**
+   * The connection closed: requests waiting for an answer get none, so they fail now (a thread Rails was starting
+   * would otherwise hold its folder's new threads until the server restarts).
+   */
+  disconnected() {
+    const waiting = [...this.replies.values()];
+    this.replies.clear();
+    for (const reply of waiting) reply(undefined, { message: "the connection to Codex closed" });
+  }
+
   handle(msg: any) {
     if (msg?.id !== undefined && msg.method === undefined) {
       this.replies.get(msg.id)?.(msg.result, msg.error);
@@ -456,6 +466,7 @@ function connect(mapped: () => string[]) {
   socket.on("error", () => {}); // the daemon isn't running yet (the first codex starts it): retried on close
   socket.on("close", () => {
     ws = undefined;
+    watcher?.disconnected();
     const stillNeeded = launching || watcher?.hasPending() || panels.all().some((p) => p.kind === "codex");
     if (stillNeeded) retry = setTimeout(() => ((retry = undefined), connect(() => panels.all().flatMap((p) => (p.kind === "codex" && p.sessionId ? [p.sessionId] : [])))), 2000);
   });

@@ -301,6 +301,21 @@ describe("Codex watcher, Rails' tools (ADR 0030)", () => {
     expect(panels.get(waiting.id)?.sessionId).toBe("t-theirs"); // held while Rails started its own, then the panel's
   });
 
+  it("gives up a start the connection dropped during, and doesn't hold the folder's threads after", async () => {
+    const { project, sent, w } = setup();
+    const waiting = panels.create({ projectId: project.id, kind: "codex", title: "Codex" });
+    w.expect(waiting.id, project.path);
+    const started = w.startThread(project.path);
+    w.handle({ id: sent.at(-1).id, result: { config: { projects: { [project.path]: { trust_level: "trusted" } } } } });
+    await new Promise((r) => setTimeout(r));
+    expect(sent.at(-1)).toMatchObject({ method: "thread/start" });
+    w.disconnected(); // the daemon went away before answering
+    await expect(started).rejects.toThrow("connection");
+    // The panel's own thread, once reconnected, isn't held for a start that will never answer.
+    w.handle({ method: "thread/started", params: { thread: { id: "t-later", cwd: project.path, createdAt: Date.now() / 1000 } } });
+    expect(panels.get(waiting.id)?.sessionId).toBe("t-later");
+  });
+
   it("starts none in a folder Codex doesn't trust yet: its thread would stay read-only", async () => {
     const { project, sent, w } = setup();
     const started = w.startThread(project.path, [project.path, "/repo"]);
