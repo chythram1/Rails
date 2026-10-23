@@ -38,19 +38,21 @@ import { SkillEditor } from "./SkillEditor.tsx";
 type CustomizeRoute = Extract<Route, { name: "customize" }>;
 type Mode = "yours" | "discover";
 
-const TABS: { id: CustomizeTab; label: string }[] = [
-  { id: "connectors", label: "Connectors" },
-  { id: "skills", label: "Skills" },
-  { id: "prompts", label: "Prompts" },
+/** The tabs, each with its icon and the line under its title. */
+const TABS: { id: CustomizeTab; label: string; icon: React.ReactNode; lead: string }[] = [
+  { id: "connectors", label: "Connectors", icon: <Plug size={18} stroke={1.6} />, lead: "MCP servers that let your Sprockets work with your tools and data: Linear, Notion, GitHub and more, or any server of your own." },
+  { id: "skills", label: "Skills", icon: <Book size={18} stroke={1.6} />, lead: "Instructions for a kind of work (a SKILL.md), which a Sprocket reads when it applies." },
+  { id: "prompts", label: "Prompts", icon: <Message size={18} stroke={1.6} />, lead: "Messages you send often. Home and every chat can fill one in, and Sprockets can read them." },
 ];
 
 /** Yours or Discover per tab, kept while the app is open (coming back from an item lands where you were). */
 const modes: Partial<Record<CustomizeTab, Mode>> = {};
 
 /**
- * Customize (ADR 0025): what Sprockets can use, as a page of cards. Tabs for connectors (MCP servers), skills and
- * saved prompts; Yours shows what's here, Discover what can be added (Rails' connectors, your agents' skills).
- * One item opens full width in its place, with a way back. A Sprocket picks its servers and skills in its settings.
+ * Customize (ADR 0025): what Sprockets can use, as a page of cards with its tabs beside it: connectors (MCP servers),
+ * skills and saved prompts. Yours shows what's here, Discover what can be added (Rails' connectors, your agents'
+ * skills). One item opens full width in its place, with a way back. A Sprocket picks its servers and skills in its
+ * settings, under Tools.
  */
 export function CustomizePage({ route }: { route: CustomizeRoute }) {
   const { mcpServers, mcpApps, skills, savedPrompts } = useStore();
@@ -114,80 +116,97 @@ function Gallery({ tab, servers, skills, prompts }: { tab: CustomizeTab; servers
   const newPrompt = () => navigate(href.newItem("prompt"));
   const q = query.trim().toLowerCase();
 
+  const current = TABS.find((t) => t.id === tab)!;
+
   return (
     <div className="cz-page">
-      <div className="cz-page-inner">
-        <h1 className="cz-title">Customize</h1>
-        <p className="cz-lead">What your Sprockets can use. Give each one the connectors and skills it needs in its settings, under Tools.</p>
-        <div className="cz-toolbar">
-          <nav className="cz-tabs" aria-label="Customize">
+      <div className="cz-page-inner cz-layout">
+        <nav className="cz-nav" aria-labelledby="cz-nav-title">
+          <h1 id="cz-nav-title" className="cz-nav-title">
+            Customize
+          </h1>
+          <ul>
             {TABS.map((t) => (
-              <a key={t.id} href={href.customize(t.id)} className="cz-tab" aria-current={t.id === tab ? "page" : undefined}>
-                {t.label}
-              </a>
+              <li key={t.id}>
+                <a href={href.customize(t.id)} className="cz-nav-item" aria-current={t.id === tab ? "page" : undefined}>
+                  <span aria-hidden>{t.icon}</span>
+                  {t.label}
+                </a>
+              </li>
             ))}
-          </nav>
-          {tab !== "prompts" && (
-            <Segmented
-              name="cz-mode"
-              aria-labelledby="cz-mode-label"
-              value={mode}
-              options={[
-                { value: "yours", label: "Yours" },
-                { value: "discover", label: "Discover" },
-              ]}
-              onChange={setMode}
-            />
+          </ul>
+        </nav>
+        <div className="cz-main">
+          <div className="cz-head-row">
+            <div>
+              <h2 className="cz-title">{current.label}</h2>
+              <p className="cz-lead">{current.lead}</p>
+            </div>
+            {tab === "connectors" && (
+              <MenuButton
+                label="Add custom server"
+                title="Add an MCP server that isn't in the list"
+                plain
+                className="btn cz-add"
+                icon={<span className="cz-add-label">Add custom server</span>}
+                align="right"
+                items={[
+                  { label: "A server on the web, by its URL", icon: <Plug size={16} />, onSelect: () => void newServer("http") },
+                  { label: "A program on this computer", icon: <Terminal size={16} />, onSelect: () => void newServer("stdio") },
+                ]}
+              />
+            )}
+            {tab === "skills" && (
+              <button type="button" className="btn cz-add" onClick={() => void newSkill()}>
+                New skill
+              </button>
+            )}
+            {tab === "prompts" && (
+              <button type="button" className="btn cz-add" onClick={() => void newPrompt()}>
+                New prompt
+              </button>
+            )}
+          </div>
+          <div className="cz-toolbar">
+            {tab !== "prompts" && (
+              <Segmented
+                name="cz-mode"
+                aria-labelledby="cz-mode-label"
+                value={mode}
+                options={[
+                  { value: "yours", label: "Yours" },
+                  { value: "discover", label: "Discover" },
+                ]}
+                onChange={setMode}
+              />
+            )}
+            <span id="cz-mode-label" className="sr-only">
+              Show
+            </span>
+            <label className="cz-search">
+              <Search size={16} aria-hidden />
+              <input type="search" placeholder={`Search ${current.label.toLowerCase()}`} aria-label={`Search ${current.label.toLowerCase()}`} value={query} onChange={(e) => setQuery(e.target.value)} />
+            </label>
+          </div>
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
           )}
-          <span id="cz-mode-label" className="sr-only">
-            Show
-          </span>
-          <span className="grow" />
-          <label className="cz-search">
-            <Search size={15} aria-hidden />
-            <input type="search" placeholder="Search" aria-label={`Search ${tab}`} value={query} onChange={(e) => setQuery(e.target.value)} />
-          </label>
-          <MenuButton
-            label="Add"
-            title="Add a connector, skill or prompt"
-            plain
-            className="btn primary cz-add"
-            icon={
-              <span className="cz-add-label">
-                <Plus size={16} aria-hidden /> Add
-              </span>
-            }
-            align="right"
-            items={[
-              { label: "Browse connectors", icon: <Plug size={16} />, onSelect: () => (navigate(href.customize("connectors")), (modes.connectors = "discover"), setMode("discover")) },
-              { label: "Custom server with a URL", icon: <Plug size={16} />, onSelect: () => void newServer("http") },
-              { label: "Custom server with a command", icon: <Terminal size={16} />, onSelect: () => void newServer("stdio") },
-              "separator",
-              { label: "New skill", icon: <Book size={16} />, onSelect: () => void newSkill() },
-              { label: "Copy in a skill", icon: <Book size={16} />, onSelect: () => ((modes.skills = "discover"), navigate(href.customize("skills")), setMode("discover")) },
-              "separator",
-              { label: "New prompt", icon: <Message size={16} />, onSelect: () => void newPrompt() },
-            ]}
-          />
+          {tab === "connectors" &&
+            (mode === "discover" ? (
+              <DiscoverConnectors servers={servers} query={q} onError={setError} onCustom={(t) => void newServer(t)} />
+            ) : (
+              <YourConnectors servers={servers} query={q} onBrowse={() => setMode("discover")} onCustom={(t) => void newServer(t)} />
+            ))}
+          {tab === "skills" &&
+            (mode === "discover" ? (
+              <DiscoverSkills skills={skills} query={q} onError={setError} />
+            ) : (
+              <YourSkills skills={skills} query={q} onNew={() => void newSkill()} onBrowse={() => setMode("discover")} />
+            ))}
+          {tab === "prompts" && <YourPrompts prompts={prompts} query={q} onNew={() => void newPrompt()} />}
         </div>
-        {error && (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        )}
-        {tab === "connectors" &&
-          (mode === "discover" ? (
-            <DiscoverConnectors servers={servers} query={q} onError={setError} onCustom={(t) => void newServer(t)} />
-          ) : (
-            <YourConnectors servers={servers} query={q} onBrowse={() => setMode("discover")} onCustom={(t) => void newServer(t)} />
-          ))}
-        {tab === "skills" &&
-          (mode === "discover" ? (
-            <DiscoverSkills skills={skills} query={q} onError={setError} />
-          ) : (
-            <YourSkills skills={skills} query={q} onNew={() => void newSkill()} onBrowse={() => setMode("discover")} />
-          ))}
-        {tab === "prompts" && <YourPrompts prompts={prompts} query={q} onNew={() => void newPrompt()} />}
       </div>
     </div>
   );
@@ -213,22 +232,41 @@ function Section({ title, count, blurb, children, action }: { title: string; cou
 }
 
 /**
- * A card: a mark, the name (a link that covers the card), a line or two under it, a small line of facts, and at the
- * top right one action (a "+" or a check) that sits above the link.
+ * A card: a mark, the name (a link that covers the card) over what kind it is, two lines on what it does, its command
+ * or address (`detail`, in mono), a small line of facts, and at the top right one action (a "+" or a check) that
+ * sits above the link.
  */
-function Card(props: { href?: string; mark: React.ReactNode; name: string; text: string; meta?: React.ReactNode; action?: React.ReactNode; warn?: string }) {
+function Card(props: {
+  href?: string;
+  mark: React.ReactNode;
+  name: string;
+  kind?: string;
+  text?: string;
+  detail?: string;
+  meta?: React.ReactNode;
+  action?: React.ReactNode;
+  warn?: string;
+}) {
   return (
     <li className="cz-card">
       {props.mark}
       <div className="cz-card-text">
-        {props.href ? (
-          <a className="cz-card-name" href={props.href}>
-            {props.name}
-          </a>
-        ) : (
-          <span className="cz-card-name">{props.name}</span>
+        <span className="cz-card-title">
+          {props.href ? (
+            <a className="cz-card-name" href={props.href}>
+              {props.name}
+            </a>
+          ) : (
+            <span className="cz-card-name">{props.name}</span>
+          )}
+          {props.kind && <span className="cz-card-kind">{props.kind}</span>}
+        </span>
+        {props.text && <p className="cz-card-desc">{props.text}</p>}
+        {props.detail && (
+          <p className="cz-card-detail" title={props.detail}>
+            {props.detail}
+          </p>
         )}
-        <p className="cz-card-desc">{props.text}</p>
         {(props.meta || props.warn) && (
           <p className="cz-card-meta">
             {props.warn && <span className="cz-card-warn">{props.warn}</span>}
@@ -313,8 +351,9 @@ function DiscoverConnectors({ servers, query, onError, onCustom }: { servers: Mc
                   href={added ? href.mcpServer(added.id) : href.connector(c.id)}
                   mark={<ConnectorLogo id={c.id} />}
                   name={c.name}
+                  kind={`by ${c.by}`}
                   text={c.description}
-                  meta={`by ${c.by} · ${SETUP_LABEL[c.setup]}`}
+                  meta={SETUP_LABEL[c.setup]}
                   action={
                     added ? (
                       <span className="cz-added" title="Added" aria-label={`${c.name} is added`}>
@@ -446,7 +485,9 @@ function YourConnectors({ servers, query, onBrowse, onCustom }: { servers: McpSe
               href={href.mcpServer(s.id)}
               mark={<ConnectorLogo server={s} />}
               name={c && s.name === c.id ? c.name : s.name}
-              text={s.description || c?.description || (s.transport === "http" ? s.url : [s.command, ...s.args].join(" ")) || "Not set up yet"}
+              kind={c ? `by ${c.by}` : s.transport === "http" ? "On the web" : "On this computer"}
+              text={s.description || c?.description}
+              detail={(s.transport === "http" ? s.url : [s.command, ...s.args].join(" ")) || "Not set up yet"}
               warn={state.warn}
               meta={[state.text, users ? `${users} Sprocket${users === 1 ? "" : "s"}` : "No Sprocket yet"].filter(Boolean).join(" · ")}
               action={
@@ -471,7 +512,7 @@ function YourSkills({ skills, query, onNew, onBrowse }: { skills: Skill[]; query
   const shown = skills.filter((s) => matches(query, s.name, s.description));
   return (
     <>
-      <Section title="Your skills" count={skills.length} blurb="Instructions for a kind of work (a SKILL.md), which a Sprocket reads when it applies.">
+      <Section title="Your skills" count={skills.length}>
         {shown.map((s) => (
           <Card
             key={s.id}
@@ -482,13 +523,12 @@ function YourSkills({ skills, query, onNew, onBrowse }: { skills: Skill[]; query
               </span>
             }
             name={s.name}
+            kind={s.files.length ? `${s.files.length + 1} files` : undefined}
             text={s.description || "No description yet: say when to use it."}
-            meta={[s.files.length ? `${s.files.length + 1} files` : "", s.usedBy.length ? `${s.usedBy.length} Sprocket${s.usedBy.length === 1 ? "" : "s"}` : "No Sprocket yet"]
-              .filter(Boolean)
-              .join(" · ")}
+            meta={s.usedBy.length ? `${s.usedBy.length} Sprocket${s.usedBy.length === 1 ? "" : "s"}` : "No Sprocket yet"}
           />
         ))}
-        {!query && <AddCard icon={<Plus size={20} />} title="New skill" text="Write the instructions yourself." onClick={onNew} />}
+        {!query && !skills.length && <AddCard icon={<Plus size={20} />} title="New skill" text="Write the instructions yourself." onClick={onNew} />}
         {!query && <AddCard icon={<Book size={20} />} title="Copy one in" text="From your agents' skills, or a folder." onClick={onBrowse} />}
       </Section>
       {query && !shown.length && <p className="muted cz-none">None of yours match.</p>}
@@ -574,7 +614,7 @@ function YourPrompts({ prompts, query, onNew }: { prompts: SavedPrompt[]; query:
   const shown = prompts.filter((p) => matches(query, p.name, p.text));
   return (
     <>
-      <Section title="Saved prompts" count={prompts.length} blurb="Messages you send often. Home and every chat can fill one in, and Sprockets can read them.">
+      <Section title="Saved prompts" count={prompts.length}>
         {shown.map((p) => (
           <Card
             key={p.id}
@@ -588,7 +628,7 @@ function YourPrompts({ prompts, query, onNew }: { prompts: SavedPrompt[]; query:
             text={p.text || "Empty"}
           />
         ))}
-        {!query && <AddCard icon={<Plus size={20} />} title="New prompt" text="A message to fill in from Home or a chat." onClick={onNew} />}
+        {!query && !prompts.length && <AddCard icon={<Plus size={20} />} title="New prompt" text="A message to fill in from Home or a chat." onClick={onNew} />}
       </Section>
       {query && !shown.length && <p className="muted cz-none">None match.</p>}
     </>
