@@ -44,10 +44,26 @@ const recorded = listeners<[panel: Panel, events: SessionEvent[]]>();
 /** A panel reported events (after they're stored). Sprocket watches follow sessions through this. */
 export const onEvents = recorded.on;
 
-/** Record events from a panel and update what depends on them. */
+const moves = listeners<[panel: Panel]>();
+/** A panel moved on to another session (panels.ts tells browsers). */
+export const onSessionMoved = moves.on;
+
+/**
+ * Record events from a panel and update what depends on them. A start with another session than the panel's is
+ * Claude Code's `/clear` or `/resume`, or pi's `/new`, `/resume` or `/fork`: the panel follows it, as a Codex panel
+ * follows its thread (bridge/codex.ts), unless another panel has that session. Its sidebar row, title, drafts and
+ * handoffs go by the panel's session.
+ */
 export function record(panelId: string, events: SessionEvent[], sessionId?: string): void {
-  const panel = panels.get(panelId);
+  let panel = panels.get(panelId);
   if (!panel || !events.length) return;
+  for (const e of events) {
+    if (e.kind !== "start" || !e.sessionId || !panel.sessionId || e.sessionId === panel.sessionId || panels.bySession(e.sessionId)) continue;
+    e.from ??= panel.sessionId;
+    panels.setSession(panel.id, e.sessionId);
+    panel = panels.get(panelId)!;
+    moves.emit(panel);
+  }
   for (const e of events) sessionEvents.add(panelId, sessionId ?? (e.kind === "start" ? e.sessionId : undefined), e);
   setAttention(panelId, attentionOf(cardOf(panel)));
   recorded.emit(panel, events);

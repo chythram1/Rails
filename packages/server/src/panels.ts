@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { userInfo } from "node:os";
 import type { OpenPanel, Panel, PanelKind, ProviderId, Workspace } from "@rails/shared";
 import { layouts, panels } from "./db.ts";
-import { bridgeEnv, forgetPanel } from "./bridge/index.ts";
+import { bridgeEnv, forgetPanel, onSessionMoved } from "./bridge/index.ts";
 import { onCodexSession, startCodexThread, unwatchCodexIfIdle, watchCodex } from "./bridge/codex.ts";
 import { bridgeFlags } from "./bridge/wiring.ts";
 import { ServiceError } from "./errors.ts";
@@ -78,6 +78,8 @@ export function linkCodexThread(panelId: string, threadId: string): void {
   changed(panel.projectId);
 }
 onCodexSession(linkCodexThread);
+// Claude Code's and pi's panels follow their session to another (`/clear`, `/new`, `/resume`; bridge/index.ts).
+onSessionMoved((panel) => changed(panel.projectId));
 
 /** Stop a panel's tmux session (if still there), drop the panel and tell every browser. */
 async function removePanel(panel: Panel): Promise<void> {

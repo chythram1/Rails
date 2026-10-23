@@ -52,3 +52,12 @@ and the Coordinator sees "moved on to a new session". The known risk: the user's
 with one Rails Codex panel, can move that panel when it starts or resumes a thread. With two panels there, Rails
 doesn't guess. Verified live with 0.163.
 
+*Amended (Claude Code and pi):* their panels follow another session too. Claude Code's `/clear` and `/resume`, and
+pi's `/new`, `/resume` and `/fork`, report a start with the new session's id (`SessionStart`, `session_start`), and
+there's no doubt whose it is, since it comes through the panel's own token. Before this the card followed it but the
+panel kept its old session: the sidebar showed the new session as not open (opening it would have started a second
+panel on a running session), the old one led to a panel that had moved on, and drafts for the old session didn't
+expire. Now the panel moves to it, as a Codex panel does, unless another panel already has that session. Verified
+live with Claude Code's `/clear` (2.1.309) and pi's `/new` (1.3); the other commands rest on the same start report,
+unchecked.
+

@@ -1,13 +1,13 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { panels, projects } from "../db.ts";
+import { panels, projects, sessionEvents } from "../db.ts";
 import { linkCodexThread } from "../panels.ts";
 import { boardText, foldCard, sharedFiles } from "./board.ts";
 import { CodexWatcher, setCodexTools } from "./codex.ts";
 import { bridgeFlags } from "./wiring.ts";
 import { fromClaude, fromCodex, fromPi } from "./events.ts";
-import { attentionList, bridgeEnv, cardOf, receive, tokenOk } from "./index.ts";
+import { attentionList, bridgeEnv, cardOf, onSessionMoved, receive, tokenOk } from "./index.ts";
 import { projectCapabilities } from "../harness/project.ts";
 import { WAIT_MS } from "../agentTools.ts";
 import { admit } from "../watches.ts";
@@ -183,6 +183,30 @@ describe("bridge", () => {
     const board = (await projectCapabilities.find((c) => c.name === "project_board")!.run({}, { sprocketId: "s", project, signal: new AbortController().signal })) as string;
     expect(board).toMatch(/asked \(latest in its transcript, [^)]*\): x{100}/);
     expect(board).toMatch(/last reply \(in its transcript, [^)]*\): Here's a plan\./);
+  });
+});
+
+describe("a Claude Code or pi panel moving to another session", () => {
+  const project = projects.create("app", `/tmp/moves-${Math.random()}`);
+  const starts = (panelId: string) => sessionEvents.list(panelId).filter((r) => r.event?.kind === "start").map((r) => r.event);
+
+  it("follows /clear and /new, but not to a session another panel has", () => {
+    const moved: string[] = [];
+    const off = onSessionMoved((p) => moved.push(p.id));
+    const claude = panels.create({ projectId: project.id, kind: "claude", title: "Claude Code", sessionId: `c1-${Math.random()}` });
+    const pi = panels.create({ projectId: project.id, kind: "pi", title: "pi", sessionId: `p1-${Math.random()}` });
+    const first = claude.sessionId!;
+    receive(claude.id, "claude", "SessionStart", { session_id: first }); // its own start
+    expect(moved).toEqual([]);
+    receive(claude.id, "claude", "SessionStart", { session_id: "c2" }); // /clear
+    expect(panels.get(claude.id)?.sessionId).toBe("c2");
+    expect(starts(claude.id).at(-1)).toEqual({ kind: "start", sessionId: "c2", from: first });
+    receive(pi.id, "pi", "session_start", { sessionId: "p2" }); // /new
+    expect(panels.get(pi.id)?.sessionId).toBe("p2");
+    receive(pi.id, "pi", "session_start", { sessionId: "c2" }); // /resume to the session Claude's panel has
+    expect(panels.get(pi.id)?.sessionId).toBe("p2");
+    expect(moved).toEqual([claude.id, pi.id]);
+    off();
   });
 });
 

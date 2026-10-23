@@ -239,6 +239,13 @@ describe("messages the user asks for", () => {
     expect(suggestions.get(t.id)).toMatchObject({ status: "expired", error: "The panel moved on to another session." });
   });
 
+  it("drops them when Claude Code's /clear starts another session in the panel", async () => {
+    const { lead, panel } = setup();
+    const [t] = (await messageThroughRun(lead.id, panel.id, "Summarize.")).suggestions!;
+    receive(panel.id, "claude", "SessionStart", { session_id: `cleared-${Math.random()}` });
+    expect(suggestions.get(t.id)).toMatchObject({ status: "expired", error: "The panel moved on to another session." });
+  });
+
   it("points the Coordinator to suggest_message when it tries to answer a session that isn't asking", () => {
     const { lead, panel } = setup();
     receive(panel.id, "claude", "UserPromptSubmit", { prompt: "go" });
