@@ -20,7 +20,11 @@ Decisions:
   with `set_owner` (files or folders relative to the project, at most 10 per session, no path owned twice). Owners
   are in its instructions, so it routes requests by them, and listed on its job page, each removable. An edit to
   files another live session owns wakes the Coordinator like an overlap (ADR 0014), marked "owned by", whether or
-  not the owner changed them lately; the most specific owned path wins. Owners go when their panel closes.
+  not the owner changed them lately; the most specific owned path wins. Owners go when their panel closes. The
+  event says which owned files the changing session's own prompts never named: those it wasn't asked to change
+  (test run 10: Codex wired its scheduler into Claude's `src/main.js` and `src/app/`), and the Coordinator drafts
+  it a heads-up to move its change into its own files, unless the brief makes them shared. Files its prompts
+  named were asked for, so a session told to "add a field in src/game/state.js" isn't flagged.
 - **Edits made by shell commands count.** When a session runs a shell command (Claude Code's Bash, through a
   PreToolUse hook now matching it too; pi's bash, whose end the extension now reports; Codex's command items), Rails
   notes the project's changed files with `git status` and each file's modification time and size, at the start and

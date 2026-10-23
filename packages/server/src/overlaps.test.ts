@@ -4,6 +4,7 @@ import { OVERLAP_MS } from "./bridge/board.ts";
 import { forgetPanel, receive } from "./bridge/index.ts";
 import { panels, projects, settings } from "./db.ts";
 import { models, refOf } from "./models.ts";
+import { setOwner } from "./owners.ts";
 import { BATCH_MS, OverlapWakes, overlapList, startOverlaps } from "./overlaps.ts";
 import { idle } from "./runs.ts";
 import { createSprocket, directChat, listMessages, projectChat, updateSettings } from "./sprockets.ts";
@@ -117,6 +118,31 @@ describe("overlaps", () => {
     expect(prompt).toContain('also changed by \\"Refactor auth\\" (pi, id');
     expect(prompt).toContain('\\"src/auth.ts\\"'); // quoted: a file name can't break out of the list
     expect(system).toContain("draft a short heads-up with suggest_message for the session that changed the files second");
+  });
+
+  it("says which owned files the session's own prompts never named (test run 10)", async () => {
+    for (const [ask, expected] of [
+      ["Add a session timeout", 'Its prompts never named \\"src/auth.ts\\" (owned by \\"Refactor auth\\")'],
+      ["Add a session timeout in src/auth.ts", "Its prompts named the owned files it changed"],
+    ]) {
+      const { path, s, a, b } = setup(true);
+      setOwner(projects.get(b.projectId)!, b, ["src/auth.ts"]);
+      let prompt = "";
+      faux.setResponses([
+        (context) => {
+          prompt = JSON.stringify(context.messages.at(-1)?.content);
+          return fauxAssistantMessage("(quiet)");
+        },
+      ]);
+      vi.useFakeTimers();
+      receive(a.id, "claude", "UserPromptSubmit", { prompt: ask, cwd: path });
+      receive(a.id, "claude", "PostToolUse", write(path, "src/auth.ts"));
+      vi.advanceTimersByTime(BATCH_MS);
+      vi.useRealTimers();
+      await vi.waitFor(() => expect(prompt).not.toBe(""));
+      await idle();
+      expect(prompt).toContain(expected);
+    }
   });
 
   it("clears the marks when a session ends, a panel closes or the window passes", () => {

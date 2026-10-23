@@ -43,7 +43,9 @@ Decisions (proposed):
     suggestions); the text has the suggestions' length limit (`SUGGESTION_MAX`). Its description tells the agent
     to draft such a message even for something small, rather than only noting it in its reply (test run 8: "the UI
     session can drop that payload when convenient" reached only the user); what it still leaves in a reply is a
-    finding (ADR 0029).
+    finding (ADR 0029). When a session's question wakes the Coordinator, the event lists the messages it drafted
+    itself lately and their status, so a question that's only "please send my message" gets no second draft
+    (test run 10).
     As built: the session is found by its id (at least 6 characters) or its title as `neighbours` shows it. The
     event row reads "“UI” wants to tell", with no quote: the card under it is headed "Message for “Engine”" and
     holds the text, with a muted line under it, "Written by the session “UI”. Send it only if you'd say it
