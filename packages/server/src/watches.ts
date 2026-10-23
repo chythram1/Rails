@@ -77,9 +77,20 @@ function asks(line: string): boolean {
 }
 
 /**
+ * Whether a line that introduces a list (ends with ":") asks the user for a go-ahead or a choice in an earlier
+ * sentence ("Should I go ahead? The choice is:"): by the asking phrases only, as "Why did it fail?" there is no ask.
+ */
+function asksBefore(line: string): boolean {
+  if (!/:["')\]*_]*$/.test(line)) return false;
+  const sentences = line.replace(/[*_]+/g, "").toLowerCase().split(/(?<=[.!?])\s+/);
+  return sentences.some((s) => !PLEASANTRY.test(s) && ASKS.some((re) => re.test(s)));
+}
+
+/**
  * Whether a message ends by asking the user something: its last sentence, or the line above the options
- * it lists last ("Which do you prefer?" then "1. A", "2. B"). A question earlier on ("Why did it fail? The
- * cache was stale.") doesn't count. Code and URLs are skipped, so `a ? b : c` or `?page=2` don't either.
+ * it lists last ("Which do you prefer?" then "1. A", "2. B"; or "Should I go ahead? The choice is:" then
+ * the options). A question earlier on ("Why did it fail? The cache was stale.") doesn't count. Code and URLs
+ * are skipped, so `a ? b : c` or `?page=2` don't either.
  */
 export function looksLikeQuestion(text: string): boolean {
   const lines = text
@@ -92,7 +103,7 @@ export function looksLikeQuestion(text: string): boolean {
   if (!lines.length) return false;
   if (asks(lines.at(-1)!)) return true;
   const above = lines.findLastIndex((l) => !LIST_ITEM.test(l));
-  return above >= 0 && above < lines.length - 1 && asks(lines[above]);
+  return above >= 0 && above < lines.length - 1 && (asks(lines[above]) || asksBefore(lines[above]));
 }
 
 /** The end of a message, from the start of a line where possible. */

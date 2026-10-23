@@ -21,6 +21,8 @@ describe("looksLikeQuestion", () => {
       "Before I proceed with deleting the old tables, I need your go-ahead.",
       "Here's the plan:\n1. Rename\n2. Move\n\n**Does this look right?**",
       "Which approach do you prefer?\n1. Inline it\n2. Extract a helper",
+      // Test run 8: the question, then what the choice is, then the options.
+      "Should I go ahead with 1–4? The one real decision is the blur behavior:\n- **Pause on blur and on hidden (recommended):** safest.\n- **Pause on hidden only:** for a second monitor.",
     ])
       expect(looksLikeQuestion(text), text).toBe(true);
   });
@@ -37,6 +39,7 @@ describe("looksLikeQuestion", () => {
       "Why did it fail? The cache was stale, so I cleared it and reran the build.",
       "Done! Anything else?",
       "Summary:\n- fixed the login bug\n- updated 3 tests",
+      "Why did it fail? The cache was stale. What I changed:\n- cleared it\n- reran the build",
     ])
       expect(looksLikeQuestion(text), text).toBe(false);
   });

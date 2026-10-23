@@ -18,7 +18,7 @@ Decisions:
   - a session asks in a dialog or a form (Claude Code's AskUserQuestion, a pi question tool, Codex's request
     for input), or ends its turn with a question (`looksLikeQuestion`: the last sentence, or the line above
     the options it lists last, ends with a question mark or asks with "should I", "want me to", "let me know
-    which"…; earlier questions, code, URLs and pleasantries like "anything else?" don't count);
+    which"…, or that line ends with a colon after such an ask, as in "Should I go ahead? The choice is:"; earlier questions, code, URLs and pleasantries like "anything else?" don't count);
   - the user gets 20 s to answer first: anything the session does meanwhile (a prompt, a tool, the answer)
     means it's moving again, and nothing wakes;
   - one wake per wait (agents may report a wait twice), and at most one per session per minute (a sooner
