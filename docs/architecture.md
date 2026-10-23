@@ -148,6 +148,14 @@ packages/
   `127.0.0.1` (OpenAI: port 1455). The web renders each Sprocket as an SVG character from data
   (`components/sprockets/`); idle motion is CSS, eyes follow the pointer only in the creator, and the
   loops stop when the OS asks for reduced motion.
+- **Automations** (ADR 0032, `automations.ts`, `/api/automations`): a Sprocket, a prompt and a schedule (`schedules.ts`:
+  presets or a cron, in a timezone, through croner; at most every 15 minutes). The server keeps each one's next run and
+  looks every 30 s: one that's due posts its line in the Sprocket's direct chat (author `automation`) and queues a run
+  there (trigger `automation`), once however many times it was missed while the server was off, and never while its
+  last run still goes (Skipped). The run's turn note says when its last run was and what it reported, and it may end
+  with `nothing_new` (its line is hidden, the run is Nothing new). When the run ends, the automation records Done, Needs
+  you (a card or question waits), or Failed, and turns itself off after 3 failures in a row. Changes broadcast
+  `automations.changed`.
 - **Auth:** one access token, generated on first run into `~/.rails/config.json` or set with `RAILS_TOKEN`.
   `POST /api/auth/login` exchanges it for an httpOnly cookie, and both `/api/*` and the WebSocket
   upgrade check that cookie. The web app also accepts `?token=` once, then removes it from the URL.

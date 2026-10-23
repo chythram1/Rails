@@ -1,4 +1,4 @@
-import type { ConnectorInput, DecisionLog, FolderListing, GitStatus, McpApp, McpAppId, McpAppInput, McpServer, McpServerInput, ModelSettings, OpenPanel, Panel, Profile, ProfileChange, Project, ProviderInfo, RecentFolder, SavedPrompt, SavedPromptInput, ServerInfo, SessionKey, SessionSummary, SignIn, Skill, SkillInput, SkillSource, Sprocket, SprocketInput, SprocketMessage, SprocketSettings, SprocketTeam, SprocketTeamInput, Suggestion, Workspace } from "@rails/shared";
+import type { Automation, AutomationInput, AutomationRun, ConnectorInput, DecisionLog, FolderListing, GitStatus, McpApp, McpAppId, McpAppInput, McpServer, McpServerInput, ModelSettings, OpenPanel, Panel, Profile, ProfileChange, Project, ProviderInfo, RecentFolder, SavedPrompt, SavedPromptInput, ServerInfo, SessionKey, SessionSummary, SignIn, Skill, SkillInput, SkillSource, Sprocket, SprocketInput, SprocketMessage, SprocketSettings, SprocketTeam, SprocketTeamInput, Suggestion, Workspace } from "@rails/shared";
 
 export class Unauthorized extends Error {}
 
@@ -92,6 +92,12 @@ export const api = {
   createPrompt: (body: SavedPromptInput) => req<SavedPrompt>("/api/prompts", { method: "POST", body: JSON.stringify(body) }),
   updatePrompt: (id: string, body: SavedPromptInput) => req<SavedPrompt>("/api/prompts/" + enc(id), { method: "PUT", body: JSON.stringify(body) }),
   deletePrompt: (id: string) => req("/api/prompts/" + enc(id), { method: "DELETE" }),
+  automations: () => req<Automation[]>("/api/automations"),
+  automation: (id: string) => req<{ automation: Automation; runs: AutomationRun[] }>("/api/automations/" + enc(id)),
+  createAutomation: (body: AutomationInput) => req<Automation>("/api/automations", { method: "POST", body: JSON.stringify(body) }),
+  updateAutomation: (id: string, body: AutomationInput) => req<Automation>("/api/automations/" + enc(id), { method: "PATCH", body: JSON.stringify(body) }),
+  deleteAutomation: (id: string) => req("/api/automations/" + enc(id), { method: "DELETE" }),
+  runAutomation: (id: string) => req<AutomationRun>(`/api/automations/${enc(id)}/run`, { method: "POST" }),
   git: (projectId: string) => req<GitStatus>(`/api/projects/${enc(projectId)}/git`),
   files: (projectId: string, dir: string) => req<FolderListing>(`/api/projects/${enc(projectId)}/files?dir=${enc(dir)}`),
   fileText: (projectId: string, path: string) => req<{ text: string; cut: boolean }>(`/api/projects/${enc(projectId)}/files/content?path=${enc(path)}`),

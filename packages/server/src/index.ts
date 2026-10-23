@@ -19,8 +19,9 @@ import { panels, projects } from "./db.ts";
 import { gitDiff, gitStatus } from "./git.ts";
 import { listFolder, previewFile } from "./tree.ts";
 import { nameSession } from "./names.ts";
-import type { ConnectorInput, McpAppInput, McpServerInput, OpenPanel, SavedPromptInput, SkillInput, SprocketTeamInput, SprocketInput, SprocketSettings } from "@rails/shared";
+import type { AutomationInput, ConnectorInput, McpAppInput, McpServerInput, OpenPanel, SavedPromptInput, SkillInput, SprocketTeamInput, SprocketInput, SprocketSettings } from "@rails/shared";
 import { createPrompt, deletePrompt, listPrompts, updatePrompt } from "./customize.ts";
+import { createAutomation, deleteAutomation, getAutomation, listAutomations, runAutomation, startAutomations, stopAutomations, updateAutomation } from "./automations.ts";
 import { addConnector, cancelSignIn as cancelMcpSignIn, createServer, deleteServer, disconnectAll, listApps, listServers, pasteSignIn, setApp, signOut, startSignIn as startMcpSignIn, testServer, updateServer } from "./mcp.ts";
 import { createSkill, deleteSkill, importSkill, listSkills, skillSources, updateSkill } from "./skills.ts";
 import { decideApproval } from "./approvals.ts";
@@ -266,6 +267,17 @@ app.delete("/api/prompts/:id", (c) => {
   return c.json({ ok: true });
 });
 
+// ---- automations (ADR 0032) ----
+app.get("/api/automations", (c) => c.json(listAutomations()));
+app.post("/api/automations", async (c) => c.json(createAutomation(await c.req.json<AutomationInput>()), 201));
+app.get("/api/automations/:id", (c) => c.json(getAutomation(c.req.param("id"))));
+app.patch("/api/automations/:id", async (c) => c.json(updateAutomation(c.req.param("id"), await c.req.json<AutomationInput>())));
+app.delete("/api/automations/:id", (c) => {
+  deleteAutomation(c.req.param("id"));
+  return c.json({ ok: true });
+});
+app.post("/api/automations/:id/run", (c) => c.json(runAutomation(c.req.param("id")), 201));
+
 // ---- git (read-only) ----
 app.get("/api/projects/:id/git", async (c) => c.json(await gitStatus(getProject(c.req.param("id")).path)));
 
@@ -380,6 +392,7 @@ startDecisions(); // the fast decision model judges in shadow, if the user picke
 resumeRuns(); // Sprocket runs cut off by the last shutdown say so; queued ones start (ADR 0023)
 watchCodex(panels.all()); // Codex panels that survived a restart
 void prepareClaudeMod(); // Rails' Claude Code mod, for answering its questions (ADR 0028)
+startAutomations(); // automations run when they're due, once for any missed while the server was off (ADR 0032)
 startFindings(); // a reply that names work in another session's files wakes the Coordinator (ADR 0029)
 
 void tmuxVersion().then((v) => {
@@ -406,6 +419,7 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 const shutdown = () => {
+  stopAutomations();
   hub.detachAll(); // panel processes keep running in tmux
   // MCP servers Rails started (ADR 0025) stop with it; give them a moment.
   void Promise.race([disconnectAll(), new Promise((r) => setTimeout(r, 1500))]).finally(() => process.exit(0));

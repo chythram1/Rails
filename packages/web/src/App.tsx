@@ -4,7 +4,7 @@ import { CustomizePage } from "./components/customize/CustomizePage.tsx";
 import { Notices } from "./components/ConfirmDialog.tsx";
 import { Home } from "./components/Home.tsx";
 import { Login } from "./components/Login.tsx";
-import { Placeholder } from "./components/Placeholder.tsx";
+import { AutomatePage } from "./components/automate/AutomatePage.tsx";
 import { SettingsContext } from "./components/settings/context.ts";
 import { SettingsDialog } from "./components/settings/SettingsDialog.tsx";
 import type { SettingsSection } from "./components/settings/search.ts";
@@ -111,7 +111,7 @@ function Shell() {
           {route.name === "workspace" && <Workspace key={route.projectId} projectId={route.projectId} openKey={route.openKey} />}
           {route.name === "sprockets" && <SprocketsPage route={route} />}
           {route.name === "customize" && <CustomizePage route={route} />}
-          {route.name === "automate" && <Placeholder title="Automate" body="Scheduled and triggered agent runs will live here." />}
+          {route.name === "automate" && <AutomatePage route={route} />}
         </main>
         {settings && (
           <SettingsDialog

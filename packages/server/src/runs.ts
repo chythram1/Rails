@@ -10,6 +10,7 @@ import { isRetryableAssistantError, type Api, type AssistantMessage, type Messag
 import { CARD_ACTIONS_MAX, TEAM_TURNS_MAX, actionSettled, cardText, type Handoff, type SprocketCard, type SprocketCardAction, type SprocketMessage } from "@rails/shared";
 import { AGENT } from "./bridge/board.ts";
 import {
+  automationRuns,
   handoffs,
   panels,
   projects,
@@ -39,7 +40,7 @@ import { mcpCapabilities, resultText, type Proposal } from "./harness/mcpTools.t
 import { readSkillCapability, skillsPrompt } from "./harness/skills.ts";
 import { listSkills } from "./skills.ts";
 import { serversFor } from "./mcp.ts";
-import { askUserCapability, passTurnCapability, sendMessageCapability, type TurnEnd } from "./harness/turns.ts";
+import { askUserCapability, nothingNewCapability, passTurnCapability, sendMessageCapability, type TurnEnd } from "./harness/turns.ts";
 import { findModel, models } from "./models.ts";
 import { projectOwners } from "./owners.ts";
 import { resendWhenSilent } from "./resend.ts";
@@ -145,6 +146,17 @@ export function requestReply(
   if (!sprocketRuns.list(["queued"], chatId).some((r) => r.sprocketId === who)) sprocketRuns.create({ chatId, sprocketId: who, trigger, sourceId, from, hop });
   changed();
   pump();
+}
+
+/**
+ * Queue an automation's run (ADR 0032) in its Sprocket's direct chat, for the line `lineId` it posted there. Unlike
+ * requestReply it doesn't fold into a run already queued: the automation tracks this run. Returns its id.
+ */
+export function queueAutomationRun(chatId: string, sprocketId: string, lineId: string): string {
+  const r = sprocketRuns.create({ chatId, sprocketId, trigger: "automation", sourceId: lineId });
+  changed();
+  pump();
+  return r.id;
 }
 
 /** Cancel a chat's queued runs, and with `waiting` its questions waiting for an answer too. */
@@ -281,12 +293,13 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   if (!s) return;
   const team = chat.kind === "team" ? teamInfo(chat) : undefined;
   if (team && !team.members.some((m) => m.id === id)) return; // it left the team meanwhile
-  const history = sprocketMessages.list(chatId).filter((m) => m.author !== "notice");
+  // An automation's run that found nothing new left no trace in the chat (ADR 0032).
+  const history = sprocketMessages.list(chatId).filter((m) => m.author !== "notice" && !m.automation?.quiet);
   const last = history.at(-1);
   // Nothing new to answer since its last run there started: from the user or an event, in a team from a teammate.
   const since = sprocketRuns.lastStart(chatId, id, r.id);
   const fresh = history.filter(
-    (m) => (!since || Date.parse(m.createdAt) > Date.parse(since)) && (m.author === "user" || m.author === "event" || (!!team && m.sprocketId !== id)),
+    (m) => (!since || Date.parse(m.createdAt) > Date.parse(since)) && (m.author === "user" || m.author === "event" || m.author === "automation" || (!!team && m.sprocketId !== id)),
   );
   // A decided approval (ADR 0025) or a card's settled actions (ADR 0031) are new even though no message came: the
   // Sprocket goes on with what came of them.
@@ -348,6 +361,7 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
     ...(chat.kind !== "project" ? [askUserCapability(endWith, ended), sendMessageCapability((text) => post(text)), showCardCapability((card) => show(card))] : []),
     ...mcpCapabilities(servers.filter((x) => !x.error).map((x) => x.server), endWith, ended, chat.kind !== "project" ? propose : undefined),
     ...(skills.length ? [readSkillCapability(skills)] : []),
+    ...(r.trigger === "automation" && chat.kind === "direct" ? [nothingNewCapability(endWith, ended, () => posted.size > 0 || sent.length > 0)] : []),
     ...(team ? [passTurnCapability(team.members.filter((m) => m.id !== id), { hop: r.hop, queued: () => queuedIn(chatId), asking: () => waitingAsks(chatId).map((a) => a.sprocketId), said: () => posted.size > 0 || sent.length > 0 }, endWith, ended)] : []),
   ];
   // The run log: every call's outcome, and the ones going now (scripts can run several at once).
@@ -550,6 +564,10 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
       const activity = summarize(capabilities, done);
       if (activity) sprocketMessages.setActivity(lastPosted.id, activity);
       suggestions.attach(made.splice(0), lastPosted.id); // a Coordinator's drafts, under its last message
+    }
+    if (e && "quiet" in e) {
+      automationRuns.setQuiet(r.id, e.quiet);
+      if (r.sourceId) sprocketMessages.setAutomationQuiet(r.sourceId);
     }
     if (e && "passTo" in e) {
       // Your message after this run started takes the team elsewhere (teams.ts): its pass doesn't count then.
@@ -757,6 +775,9 @@ function toLlm(m: SprocketMessage, model: Model<Api>, self: string, team: TeamIn
   const timestamp = Date.parse(m.createdAt);
   if (author === "user") return { role: "user", content: text, timestamp };
   if (author === "event") return { role: "user", content: eventText(m), timestamp };
+  // An automation's line (ADR 0032): Rails' note, with the instructions it ran with then.
+  if (author === "automation")
+    return { role: "user", content: `[Rails] Your automation "${m.automation?.name ?? "?"}" ran (${m.automation?.trigger === "manual" ? "run by hand" : "scheduled"}) with these instructions:\n${text}`, timestamp };
   const nameOf = (sid: string) => team?.members.find((x) => x.id === sid)?.name ?? sprockets.get(sid)?.name ?? "A Sprocket that was deleted";
   // A pass line (ADR 0023) is Rails' note, whoever passed.
   if (author === "pass")
@@ -933,6 +954,7 @@ function actionsText(actions: SprocketCardAction[]): string {
  */
 function whyNow(r: StoredRun): string[] {
   if (r.trigger === "approval") return ["Your user decided on the tool you asked to use (Rails' note above says what came of it). Go on from there."];
+  if (r.trigger === "automation") return [automationNow(r)];
   if (r.trigger === "actions") {
     const actions = r.sourceId ? sprocketMessages.get(r.sourceId)?.card?.actions : undefined;
     return [
@@ -940,6 +962,25 @@ function whyNow(r: StoredRun): string[] {
     ];
   }
   return [];
+}
+
+/**
+ * What an automation's run is for (ADR 0032): its instructions are the line above, and when its last run was and
+ * what that one reported stands in for remembering where it left off.
+ */
+function automationNow(r: StoredRun): string {
+  const line = r.sourceId ? sprocketMessages.get(r.sourceId) : undefined;
+  const mark = line?.automation;
+  if (!mark) return "Your automation's run started.";
+  const before = automationRuns.list(mark.id, 10).find((x) => x.sprocketRunId !== r.id && x.outcome !== "running" && x.outcome !== "skipped");
+  const last = before
+    ? `Its last run was ${before.createdAt}${before.summary ? ` and reported: ${JSON.stringify(before.summary)}` : ""}${before.outcome === "failed" ? " (it failed)" : ""}.`
+    : "This is its first run.";
+  return [
+    `Your automation "${mark.name}" is running now (${mark.trigger === "manual" ? "your user ran it by hand" : "on its schedule"}); nobody is watching the chat as it runs. Do what its instructions above say, as a new request: do it again even if an earlier run did the same. ${last}`,
+    "Only when its instructions leave nothing to tell this time (they ask about changes and nothing changed, or nothing matched what they ask about), call nothing_new with a one-line summary of what you checked, instead of writing anything.",
+    "Tools that ask your user first put their calls on a card for them to run or skip later; say what's waiting there.",
+  ].join("\n");
 }
 
 const TEXTING_NOW =

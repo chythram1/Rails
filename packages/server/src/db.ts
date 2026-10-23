@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { DecisionEntry, Handoff, Panel, PanelKind, Project, Sprocket, SprocketApproval, SprocketAsk, SprocketAuthor, SprocketCard, SprocketCardAction, SprocketChatKind, SprocketEvent, SprocketLook, SprocketMessage, SavedPrompt, Suggestion } from "@rails/shared";
+import type { AutomationMark, AutomationOutcome, AutomationRun, AutomationSchedule, AutomationTrigger, DecisionEntry, Handoff, Panel, PanelKind, Project, Sprocket, SprocketApproval, SprocketAsk, SprocketAuthor, SprocketCard, SprocketCardAction, SprocketChatKind, SprocketEvent, SprocketLook, SprocketMessage, SavedPrompt, Suggestion } from "@rails/shared";
 import { RAILS_HOME } from "./config.ts";
 
 const db = new DatabaseSync(join(RAILS_HOME, "rails.db"));
@@ -136,6 +136,38 @@ addColumn("sprocket_messages", "ask", "TEXT");
 addColumn("sprocket_messages", "card", "TEXT");
 /** On an approval (ADR 0025): the SprocketApproval, as JSON. */
 addColumn("sprocket_messages", "approval", "TEXT");
+/** On an automation's line (ADR 0032): the AutomationMark, as JSON. */
+addColumn("sprocket_messages", "automation", "TEXT");
+// Automations (ADR 0032): a Sprocket, a prompt and a schedule (AutomationSchedule as JSON, in `timezone`), and its
+// runs. `next_run_at` is when it's due (none while off, or once a schedule stops firing); a run row points at the
+// Sprocket run it started and the line it posted.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS automations (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    sprocket_id TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    schedule TEXT NOT NULL,
+    timezone TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    paused_reason TEXT,
+    next_run_at TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS automation_runs (
+    id TEXT PRIMARY KEY,
+    automation_id TEXT NOT NULL,
+    sprocket_run_id TEXT,
+    message_id TEXT,
+    trigger TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    summary TEXT,
+    created_at TEXT NOT NULL,
+    ended_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS automation_runs_by_automation ON automation_runs (automation_id, created_at);
+  CREATE INDEX IF NOT EXISTS automation_runs_by_run ON automation_runs (sprocket_run_id);
+`);
 // Customize (ADR 0025): MCP servers (their secret values are in mcp-secrets.json, not here), and what each
 // Sprocket has: servers and skills (skills are folders in RAILS_HOME/skills, by folder name).
 db.exec(`
@@ -536,6 +568,8 @@ export const sprockets = {
     db.prepare("DELETE FROM sprocket_runs WHERE sprocket_id = ? AND status IN ('queued', 'waiting')").run(id);
     db.prepare("DELETE FROM sprocket_usage WHERE sprocket_id = ?").run(id);
     db.prepare("DELETE FROM sprocket_tools WHERE sprocket_id = ?").run(id);
+    db.prepare("DELETE FROM automation_runs WHERE automation_id IN (SELECT id FROM automations WHERE sprocket_id = ?)").run(id);
+    db.prepare("DELETE FROM automations WHERE sprocket_id = ?").run(id);
     db.prepare("DELETE FROM sprockets WHERE id = ?").run(id);
   },
 };
@@ -620,6 +654,7 @@ type MessageRow = {
   ask: string | null;
   card: string | null;
   approval: string | null;
+  automation: string | null;
 };
 const toMessage = (r: MessageRow): SprocketMessage => ({
   id: r.id,
@@ -634,6 +669,7 @@ const toMessage = (r: MessageRow): SprocketMessage => ({
   ...(r.ask ? { ask: JSON.parse(r.ask) } : {}),
   ...(r.card ? { card: JSON.parse(r.card) } : {}),
   ...(r.approval ? { approval: JSON.parse(r.approval) } : {}),
+  ...(r.automation ? { automation: JSON.parse(r.automation) } : {}),
 });
 
 export const sprocketMessages = {
@@ -666,6 +702,7 @@ export const sprocketMessages = {
       ask,
       card,
       approval,
+      automation,
     }: {
       activity?: string;
       steps?: unknown[];
@@ -676,6 +713,7 @@ export const sprocketMessages = {
       ask?: SprocketAsk;
       card?: SprocketCard;
       approval?: SprocketApproval;
+      automation?: AutomationMark;
     } = {},
   ): SprocketMessage {
     const chat = sprocketChats.get(chatId);
@@ -694,9 +732,10 @@ export const sprocketMessages = {
       ...(ask ? { ask } : {}),
       ...(card ? { card } : {}),
       ...(approval ? { approval } : {}),
+      ...(automation ? { automation } : {}),
     };
     db.prepare(
-      "INSERT INTO sprocket_messages (id, sprocket_id, chat_id, author, text, created_at, activity, steps, event, run_id, pass_to, ask, card, approval) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO sprocket_messages (id, sprocket_id, chat_id, author, text, created_at, activity, steps, event, run_id, pass_to, ask, card, approval, automation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     ).run(
       m.id,
       m.sprocketId,
@@ -712,6 +751,7 @@ export const sprocketMessages = {
       ask ? JSON.stringify(ask) : null,
       card ? JSON.stringify(card) : null,
       approval ? JSON.stringify(approval) : null,
+      automation ? JSON.stringify(automation) : null,
     );
     return m;
   },
@@ -740,6 +780,10 @@ export const sprocketMessages = {
     const r = db.prepare("SELECT * FROM sprocket_messages WHERE id = ?").get(id) as MessageRow | undefined;
     return r && toMessage(r);
   },
+  /** The messages a run posted, in order. */
+  ofRun(runId: string): SprocketMessage[] {
+    return (db.prepare("SELECT * FROM sprocket_messages WHERE run_id = ? ORDER BY created_at, rowid").all(runId) as MessageRow[]).map(toMessage);
+  },
   /** The run a message came from, if a run posted it. */
   runOf(id: string): string | undefined {
     return (db.prepare("SELECT run_id FROM sprocket_messages WHERE id = ?").get(id) as { run_id: string | null } | undefined)?.run_id ?? undefined;
@@ -753,6 +797,10 @@ export const sprocketMessages = {
     db.prepare("UPDATE sprocket_messages SET approval = ? WHERE id = ?").run(JSON.stringify(approval), id);
   },
   /** Mark an event the Coordinator decided the user needn't hear about. */
+  /** An automation's run found nothing new (ADR 0032): its line isn't shown. */
+  setAutomationQuiet(id: string): void {
+    db.prepare("UPDATE sprocket_messages SET automation = json_set(automation, '$.quiet', json('true')) WHERE id = ? AND automation IS NOT NULL").run(id);
+  },
   setQuiet(id: string): void {
     db.prepare("UPDATE sprocket_messages SET event = json_set(event, '$.quiet', json('true')) WHERE id = ? AND event IS NOT NULL").run(id);
   },
@@ -767,7 +815,7 @@ export const sprocketMessages = {
 
 export type RunStatus = "queued" | "running" | "waiting" | "done" | "failed" | "cancelled";
 /** `approval`: the user allowed or denied an MCP call the Sprocket asked for (ADR 0025). */
-export type RunTrigger = "user" | "pass" | "event" | "approval" | "actions";
+export type RunTrigger = "user" | "pass" | "event" | "approval" | "actions" | "automation";
 type RunRow = {
   id: string;
   chat_id: string;
@@ -1383,3 +1431,154 @@ export const sprocketTools = {
     db.prepare("DELETE FROM sprocket_tools WHERE kind = 'skill' AND item_id = ?").run(id);
   },
 };
+
+export interface StoredAutomation {
+  id: string;
+  name: string;
+  sprocketId: string;
+  prompt: string;
+  schedule: AutomationSchedule;
+  timezone: string;
+  enabled: boolean;
+  pausedReason?: string;
+  nextRunAt?: string;
+  createdAt: string;
+}
+type AutomationRow = {
+  id: string;
+  name: string;
+  sprocket_id: string;
+  prompt: string;
+  schedule: string;
+  timezone: string;
+  enabled: number;
+  paused_reason: string | null;
+  next_run_at: string | null;
+  created_at: string;
+};
+const toAutomation = (r: AutomationRow): StoredAutomation => ({
+  id: r.id,
+  name: r.name,
+  sprocketId: r.sprocket_id,
+  prompt: r.prompt,
+  schedule: JSON.parse(r.schedule),
+  timezone: r.timezone,
+  enabled: !!r.enabled,
+  ...(r.paused_reason ? { pausedReason: r.paused_reason } : {}),
+  ...(r.next_run_at ? { nextRunAt: r.next_run_at } : {}),
+  createdAt: r.created_at,
+});
+
+/** Automations (ADR 0032), oldest first. */
+export const automations = {
+  list(): StoredAutomation[] {
+    return (db.prepare("SELECT * FROM automations ORDER BY created_at, rowid").all() as AutomationRow[]).map(toAutomation);
+  },
+  get(id: string): StoredAutomation | undefined {
+    const r = db.prepare("SELECT * FROM automations WHERE id = ?").get(id) as AutomationRow | undefined;
+    return r && toAutomation(r);
+  },
+  create(a: Omit<StoredAutomation, "id" | "createdAt" | "pausedReason">): StoredAutomation {
+    const id = randomUUID();
+    db.prepare("INSERT INTO automations (id, name, sprocket_id, prompt, schedule, timezone, enabled, next_run_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+      id,
+      a.name,
+      a.sprocketId,
+      a.prompt,
+      JSON.stringify(a.schedule),
+      a.timezone,
+      a.enabled ? 1 : 0,
+      a.nextRunAt ?? null,
+      new Date().toISOString(),
+    );
+    return this.get(id)!;
+  },
+  /** Every field given is set; `pausedReason` and `nextRunAt` as given (undefined clears them). */
+  update(id: string, a: Omit<StoredAutomation, "id" | "createdAt">): void {
+    db.prepare("UPDATE automations SET name = ?, sprocket_id = ?, prompt = ?, schedule = ?, timezone = ?, enabled = ?, paused_reason = ?, next_run_at = ? WHERE id = ?").run(
+      a.name,
+      a.sprocketId,
+      a.prompt,
+      JSON.stringify(a.schedule),
+      a.timezone,
+      a.enabled ? 1 : 0,
+      a.pausedReason ?? null,
+      a.nextRunAt ?? null,
+      id,
+    );
+  },
+  remove(id: string): void {
+    db.prepare("DELETE FROM automation_runs WHERE automation_id = ?").run(id);
+    db.prepare("DELETE FROM automations WHERE id = ?").run(id);
+  },
+};
+
+type AutomationRunRow = {
+  id: string;
+  automation_id: string;
+  sprocket_run_id: string | null;
+  message_id: string | null;
+  trigger: AutomationTrigger;
+  outcome: AutomationOutcome;
+  summary: string | null;
+  created_at: string;
+  ended_at: string | null;
+};
+export type StoredAutomationRun = AutomationRun & { sprocketRunId?: string; messageId?: string };
+const toAutomationRun = (r: AutomationRunRow): StoredAutomationRun => ({
+  id: r.id,
+  automationId: r.automation_id,
+  trigger: r.trigger,
+  outcome: r.outcome,
+  ...(r.summary ? { summary: r.summary } : {}),
+  createdAt: r.created_at,
+  ...(r.ended_at ? { endedAt: r.ended_at } : {}),
+  ...(r.sprocket_run_id ? { sprocketRunId: r.sprocket_run_id } : {}),
+  ...(r.message_id ? { messageId: r.message_id } : {}),
+});
+
+/** An automation's runs (ADR 0032). */
+export const automationRuns = {
+  create(r: { automationId: string; trigger: AutomationTrigger; outcome: AutomationOutcome; sprocketRunId?: string; messageId?: string; summary?: string }): StoredAutomationRun {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    const ended = r.outcome === "running" ? null : now;
+    db.prepare("INSERT INTO automation_runs (id, automation_id, sprocket_run_id, message_id, trigger, outcome, summary, created_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+      id,
+      r.automationId,
+      r.sprocketRunId ?? null,
+      r.messageId ?? null,
+      r.trigger,
+      r.outcome,
+      r.summary ?? null,
+      now,
+      ended,
+    );
+    return this.get(id)!;
+  },
+  get(id: string): StoredAutomationRun | undefined {
+    const r = db.prepare("SELECT * FROM automation_runs WHERE id = ?").get(id) as AutomationRunRow | undefined;
+    return r && toAutomationRun(r);
+  },
+  /** The run a Sprocket run belongs to, if an automation started it. */
+  bySprocketRun(sprocketRunId: string): StoredAutomationRun | undefined {
+    const r = db.prepare("SELECT * FROM automation_runs WHERE sprocket_run_id = ?").get(sprocketRunId) as AutomationRunRow | undefined;
+    return r && toAutomationRun(r);
+  },
+  /** An automation's runs, newest first. */
+  list(automationId: string, limit = 50): StoredAutomationRun[] {
+    return (db.prepare("SELECT * FROM automation_runs WHERE automation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?").all(automationId, limit) as AutomationRunRow[]).map(toAutomationRun);
+  },
+  /** Runs still going, across automations. */
+  running(): StoredAutomationRun[] {
+    return (db.prepare("SELECT * FROM automation_runs WHERE outcome = 'running' ORDER BY created_at").all() as AutomationRunRow[]).map(toAutomationRun);
+  },
+  end(id: string, outcome: AutomationOutcome, summary?: string): void {
+    db.prepare("UPDATE automation_runs SET outcome = ?, summary = COALESCE(?, summary), ended_at = ? WHERE id = ?").run(outcome, summary ?? null, new Date().toISOString(), id);
+  },
+  /** A run that found nothing new says so itself (nothing_new), before it ends. */
+  setQuiet(sprocketRunId: string, summary: string): void {
+    db.prepare("UPDATE automation_runs SET outcome = 'quiet', summary = ?, ended_at = ? WHERE sprocket_run_id = ? AND outcome = 'running'").run(summary, new Date().toISOString(), sprocketRunId);
+  },
+};
+

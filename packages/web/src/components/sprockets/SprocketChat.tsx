@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { IconArrowDown as ArrowDown, IconArrowRight as ArrowRight, IconChevronLeft as ChevronLeft } from "@tabler/icons-react";
+import { IconArrowDown as ArrowDown, IconArrowRight as ArrowRight, IconChevronLeft as ChevronLeft, IconClock as Clock } from "@tabler/icons-react";
 import { TEAM_TURNS_MAX, findMentions, type Sprocket as SprocketData, type SprocketChatInfo, type SprocketTeam, type SprocketMessage } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href } from "../../router.ts";
@@ -136,7 +136,8 @@ export function SprocketChat({
   const load = useCallback(async () => {
     const n = ++loads.current;
     try {
-      const list = await api.chatMessages(chatId);
+      // An automation's run that found nothing new leaves no line (ADR 0032): its runs list in Automate has it.
+      const list = (await api.chatMessages(chatId)).filter((m) => !m.automation?.quiet);
       if (n !== loads.current) return; // a newer load is on its way, and an older answer would undo it
       initial.current ??= new Set(list.map((m) => m.id));
       // Something came back (a reply, or Rails' notice that none will): stop showing the face for the message sent.
@@ -335,6 +336,25 @@ export function SprocketChat({
                       {to && <Sprocket look={to.look} size={16} seed={to.id} still />}
                       <span className="sp-pass-to">{to?.name ?? "A deleted Sprocket"}</span>
                       {m.text && <span className="sp-pass-note">{m.text}</span>}
+                    </p>
+                  </li>
+                );
+              }
+              // An automation started a run (ADR 0032): a line naming it, as a pass line is.
+              if (m.author === "automation") {
+                return (
+                  <li key={m.id} className={"sp-message pass" + (pop ? " pop" : "")}>
+                    {label && <time className="sp-stamp" dateTime={m.createdAt}>{stamp(m.createdAt)}</time>}
+                    <p className="sp-pass">
+                      <Clock size={14} aria-hidden />
+                      {m.automation ? (
+                        <a className="sp-pass-to" href={href.automation(m.automation.id)}>
+                          {m.automation.name}
+                        </a>
+                      ) : (
+                        <span className="sp-pass-to">An automation</span>
+                      )}
+                      <span className="sp-pass-note">{m.automation?.trigger === "manual" ? "run now" : "on its schedule"}</span>
                     </p>
                   </li>
                 );

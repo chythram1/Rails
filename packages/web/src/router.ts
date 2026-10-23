@@ -20,7 +20,8 @@ export type Route =
   | { name: "customize"; view: "app"; tab: "connectors"; app: McpAppId }
   /** Something new in Customize, not created until the user says so. */
   | { name: "customize"; view: "new"; tab: CustomizeTab; draft: CustomizeDraft }
-  | { name: "automate" };
+  /** Automate (ADR 0032): the list of automations, a new one (not created until Create), or one by id. */
+  | { name: "automate"; view: "list" | "new" | "item"; id?: string };
 
 export type CustomizeTab = "connectors" | "skills" | "prompts";
 /** What a new item in Customize is: a skill, a prompt, or a custom server with a URL or a command. */
@@ -52,12 +53,19 @@ export function parse(hash: string): Route {
     if (parts[1] === "skills" || parts[1] === "prompts") return { name: "customize", view: "home", tab: parts[1] };
     return { name: "customize", view: "home", tab: "connectors" };
   }
-  if (parts[0] === "automate") return { name: "automate" };
+  if (parts[0] === "automate") {
+    if (parts[1] === "new") return { name: "automate", view: "new" };
+    if (parts[1]) return { name: "automate", view: "item", id: parts[1] };
+    return { name: "automate", view: "list" };
+  }
   return { name: "home" };
 }
 
 export const href = {
   home: () => "#/",
+  automate: () => "#/automate",
+  newAutomation: () => "#/automate/new",
+  automation: (id: string) => `#/automate/${encodeURIComponent(id)}`,
   /** Home with a saved prompt filled in. */
   homeWithPrompt: (promptId: string) => `#/new/${encodeURIComponent(promptId)}`,
   project: (projectId: string) => `#/p/${encodeURIComponent(projectId)}`,

@@ -1,6 +1,6 @@
 # ADR 0032: Automations
 
-Status: proposed (builds on ADR 0006's Sprocket runs, ADR 0023's turn engine, ADR 0025's toolbox and ADR 0031's
+Status: accepted (builds on ADR 0006's Sprocket runs, ADR 0023's turn engine, ADR 0025's toolbox and ADR 0031's
 card actions; the Automate item in the sidebar has been a placeholder until now).
 
 Everything a Sprocket does starts with a message: the user's, a teammate's pass, or an event its Coordinator is woken
@@ -27,14 +27,16 @@ open meanwhile.
 - **Writes wait on cards.** Unattended runs use the toolbox as it is set: allow tools run, ask tools become card
   actions (ADR 0031) that wait for Run or Skip. An automation can't send, create or delete anything the user didn't
   allow, and nothing about this is new code.
-- **Every run has an outcome.** The run ends with one of: **Done** (it posted a reply), **Nothing new** (it ends with a
-  capability that records a one-line summary and posts nothing in the chat, so a quiet check doesn't fill the chat),
+- **Every run has an outcome.** While it goes it's **Running**; it ends with one of: **Done** (it posted a reply),
+  **Nothing new** (it calls `nothing_new` with a one-line summary instead of writing; its line in the chat is hidden
+  and left out of the Sprocket's history, so a quiet check doesn't fill the chat; refused once the run has written),
   **Needs you** (it left card actions or a question waiting), **Failed** (an error, with Rails' readable message),
   **Skipped** (the previous run of this automation hadn't finished, or the automation was paused). The summary is the
   first line of its reply, or what it gave Nothing new.
 - **Schedules**: Once, Hourly, Daily, Weekdays, Weekly (days and a time), or Custom (a cron expression), each in a
   timezone (the browser's when created). Rails refuses a cron that can never fire and one that fires more often than
-  every 15 minutes. **Run now** runs one at once, whatever the schedule.
+  every 15 minutes. **Run now** runs one at once, whatever the schedule, even while it's off. A Once turns itself off
+  after it runs.
 - **Due rule**: an automation is due when its schedule's latest fire time is later than its last run (or its
   creation, if it never ran). So after the server was down it runs once, not once per missed time; a new automation
   never runs for times before it existed; and nothing runs while the server is off, which the Automate page says.

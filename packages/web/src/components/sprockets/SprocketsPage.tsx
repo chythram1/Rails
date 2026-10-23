@@ -307,6 +307,7 @@ function preview(chat: SprocketChatInfo, nameOf?: (id: string) => string | undef
   if (!m) return "No messages yet";
   if (m.event) return `${m.event.title}: ${m.event.questions?.[0]?.question ?? m.text}`;
   if (m.author === "user") return `You: ${m.text}`;
+  if (m.author === "automation") return `${m.automation?.name ?? "An automation"}${m.automation?.quiet ? ": nothing new" : ", automation"}`;
   if (m.author === "pass") return `${nameOf?.(m.sprocketId) ?? "A deleted Sprocket"} → ${(m.passTo && nameOf?.(m.passTo)) ?? "a teammate"}${m.text ? `: ${m.text}` : ""}`;
   const text = m.card ? (m.card.title ? `Card: ${m.card.title}` : "A card") : m.approval?.status === "pending" ? `Wants to use ${m.approval.server} ${m.approval.tool}` : plain(m.text);
   return nameOf && m.author === "sprocket" ? `${nameOf(m.sprocketId) ?? "A deleted Sprocket"}: ${text}` : text;

@@ -51,6 +51,8 @@ Status:
   in to), other MCP servers and skills for your Sprockets (each tool allowed, asked first or off; a
   Sprocket asks with an approval card before a call that changes something), and saved prompts for Home's and
   Sprocket chats' composer
+- Automate (ADR 0032): a Sprocket runs a prompt on a schedule ("every weekday at 9") in its chat, with a run
+  list; a run with nothing new posts nothing, and anything it wants to change waits on a card for you
 
 Docs: [architecture](docs/architecture.md) · [glossary](docs/CONTEXT.md) · [decisions](docs/adr) · [provider formats](docs/providers.md) · [roadmap](docs/roadmap.md)
 

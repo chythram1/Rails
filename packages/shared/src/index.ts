@@ -517,7 +517,7 @@ export interface SprocketInput {
  * event Rails woke a Coordinator with.
  */
 /** `pass`: a team member gave a teammate the turn (ADR 0023), shown as a line, not a bubble. */
-export type SprocketAuthor = "user" | "sprocket" | "notice" | "event" | "pass";
+export type SprocketAuthor = "user" | "sprocket" | "notice" | "event" | "pass" | "automation";
 
 /** A question a Sprocket asked the user (ADR 0023, ask_user). */
 export interface SprocketAsk {
@@ -673,6 +673,16 @@ export interface SprocketMessage {
   card?: SprocketCard;
   /** On an approval (ADR 0025): the MCP call the Sprocket wants to make, and what came of it. */
   approval?: SprocketApproval;
+  /** On an automation's line (author `automation`, ADR 0032): which one started this run; `text` is its prompt then. */
+  automation?: AutomationMark;
+}
+
+/** What an automation's line in a chat names. `quiet`: that run found nothing new, so the line isn't shown. */
+export interface AutomationMark {
+  id: string;
+  name: string;
+  trigger: AutomationTrigger;
+  quiet?: boolean;
 }
 
 /**
@@ -904,6 +914,8 @@ export type ServerMsg =
   | { type: "sprockets.changed" }
   /** Agent profiles or saved prompts changed (possibly on another device). */
   | { type: "customize.changed" }
+  /** Automations or their runs changed (ADR 0032). */
+  | { type: "automations.changed" }
   /** A Sprocket's reply so far, while it's being written; null when it's done. */
   | { type: "sprockets.typing"; sprocketId: string; chatId: string; text: string | null }
   /** While a Sprocket replies: the step it's on ("Reading src/api.ts"), and what it has done so far; null when done. */
@@ -916,3 +928,85 @@ export type ServerMsg =
   /** The profile. Sent on connect and when it changes (possibly on another device). */
   | { type: "profile.changed"; profile: Profile }
   | { type: "error"; message: string };
+
+// Automations (ADR 0032): a Sprocket, a prompt and a schedule. Runs post in the Sprocket's direct chat.
+
+/**
+ * When an automation runs, in its timezone. Times are "HH:MM" (24-hour); `once` is a local date and time
+ * ("2026-10-24T09:00"); weekdays count from Sunday (0); `cron` is five fields.
+ */
+export type AutomationSchedule =
+  | { kind: "once"; at: string }
+  | { kind: "hourly"; minute: number }
+  | { kind: "daily"; time: string }
+  | { kind: "weekdays"; time: string }
+  | { kind: "weekly"; days: number[]; time: string }
+  | { kind: "cron"; expr: string };
+export type AutomationTrigger = "schedule" | "manual";
+/**
+ * How a run went: still going, posted a reply (done), found nothing to tell (quiet), left something waiting for the
+ * user (needs_you: a card's actions or a question), failed, or didn't start (skipped: its previous run hadn't finished).
+ */
+export type AutomationOutcome = "running" | "done" | "quiet" | "needs_you" | "failed" | "skipped";
+
+export interface AutomationRun {
+  id: string;
+  automationId: string;
+  trigger: AutomationTrigger;
+  outcome: AutomationOutcome;
+  /** One line: the first of its reply, what it gave as nothing new, or why it failed or was skipped. */
+  summary?: string;
+  createdAt: string;
+  endedAt?: string;
+}
+
+export interface Automation {
+  id: string;
+  name: string;
+  sprocketId: string;
+  prompt: string;
+  schedule: AutomationSchedule;
+  /** An IANA timezone ("Europe/Berlin"). */
+  timezone: string;
+  enabled: boolean;
+  /** Why Rails turned it off (after failing again and again); gone once it's turned on. */
+  pausedReason?: string;
+  /** When it runs next, if it's on and its schedule still fires. */
+  nextRunAt?: string;
+  createdAt: string;
+  lastRun?: AutomationRun;
+}
+
+export type AutomationInput = Partial<Pick<Automation, "name" | "sprocketId" | "prompt" | "schedule" | "timezone" | "enabled">>;
+
+export const AUTOMATION_NAME_MAX = 80;
+export const AUTOMATION_PROMPT_MAX = 4000;
+/** No schedule may run more often than this. */
+export const AUTOMATION_MIN_MINUTES = 15;
+/** Failed runs in a row before Rails turns an automation off. */
+export const AUTOMATION_FAILS_TO_PAUSE = 3;
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** A schedule in words: "Weekdays at 09:00", "Every hour at :15", "Mon, Thu at 18:30", "Once, Oct 24 at 09:00". */
+export function scheduleText(s: AutomationSchedule): string {
+  switch (s.kind) {
+    case "once": {
+      const [date, time] = s.at.split("T");
+      const [y, m, d] = date.split("-").map(Number);
+      const month = new Date(Date.UTC(y, m - 1, d)).toLocaleString("en", { month: "short", timeZone: "UTC" });
+      return `Once, ${month} ${d} at ${time?.slice(0, 5) ?? "00:00"}`;
+    }
+    case "hourly":
+      return `Every hour at :${String(s.minute).padStart(2, "0")}`;
+    case "daily":
+      return `Every day at ${s.time}`;
+    case "weekdays":
+      return `Weekdays at ${s.time}`;
+    case "weekly":
+      return `${[...s.days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => WEEKDAYS[d]).join(", ")} at ${s.time}`;
+    case "cron":
+      return `Cron ${s.expr}`;
+  }
+}
+

@@ -12,7 +12,9 @@ export type TurnEnd =
   /** Nothing more to do: it passed to a teammate whose turn already comes, after posting its part. */
   | { done: true }
   /** A call to an MCP tool that asks first (ADR 0025, mcpTools.ts). */
-  | { approval: { serverId: string; server: string; tool: string; args: Record<string, unknown> } };
+  | { approval: { serverId: string; server: string; tool: string; args: Record<string, unknown> } }
+  /** An automation's run found nothing to tell its user (ADR 0032): what it checked, in a line. */
+  | { quiet: string };
 
 /** A pass's note, shown on its line: what the teammate should do next. */
 export const PASS_NOTE_MAX = 160;
@@ -117,3 +119,28 @@ export function sendMessageCapability(post: (text: string) => void): Capability 
     },
   };
 }
+
+export const QUIET_SUMMARY_MAX = 200;
+
+/**
+ * `nothing_new`, in an automation's run only (ADR 0032): nothing this time is worth a message, so nothing is posted
+ * and the run is listed as Nothing new with its summary. `said` is whether the run has posted anything yet.
+ */
+export function nothingNewCapability(end: (e: TurnEnd) => void, ended: () => boolean, said: () => boolean): Capability {
+  return {
+    name: "nothing_new",
+    description:
+      "In an automation's run: when its instructions leave nothing to tell this time (they ask about changes and nothing changed, or nothing matched), call this instead of writing a message. Not when they ask for something each time. Nothing is posted in the chat; `summary` is one line for the automation's run list saying what you checked (\"No new issues since Monday 09:00\"). Your turn ends when this script ends.",
+    params: Type.Object({ summary: Type.String({ minLength: 1, maxLength: QUIET_SUMMARY_MAX }) }),
+    effect: "act",
+    log: { doing: () => "Finding nothing new", done: () => "found nothing new" },
+    run: async ({ summary }: { summary: string }) => {
+      if (ended()) throw new Error("Your turn already ends.");
+      if (said()) throw new Error("You've already written to your user this run, so it isn't quiet: just end your turn.");
+      if (!summary.trim()) throw new Error("Say in `summary` what you checked.");
+      end({ quiet: summary.trim() });
+      return "Noted: nothing is posted. Your turn ends when this script does: don't write anything more.";
+    },
+  };
+}
+
