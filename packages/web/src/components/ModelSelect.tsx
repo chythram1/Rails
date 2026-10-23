@@ -4,13 +4,29 @@ import { api } from "../api.ts";
 import { socket } from "../ws.ts";
 import { Dropdown, type DropdownOption } from "./Dropdown.tsx";
 
+/**
+ * The model settings last fetched. The server can take a moment to answer (it asks providers which models they
+ * have), so a panel that opens again shows these at once while it checks for changes.
+ */
+let cached: ModelSettings | null = null;
+let fetching: Promise<ModelSettings> | null = null;
+
+/** Fetch the model settings (one request at a time) and keep them for the next panel that opens. */
+export function fetchModelSettings(): Promise<ModelSettings> {
+  fetching ??= api
+    .models()
+    .then((s) => (cached = s))
+    .finally(() => (fetching = null));
+  return fetching;
+}
+
 /** The model settings (providers, models, default), kept fresh across devices. */
 export function useModelSettings() {
-  const [settings, setSettings] = useState<ModelSettings | null>(null);
+  const [settings, setSettings] = useState<ModelSettings | null>(cached);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     try {
-      setSettings(await api.models());
+      setSettings(await fetchModelSettings());
       setError("");
     } catch (e: any) {
       setError(e.message);

@@ -72,15 +72,30 @@ export const refOf = (m: Model<Api>) => `${m.provider}/${m.id}`;
 const PLAN_TTL_MS = 10 * 60_000;
 let planModels: { at: number; ids: Set<string> } | undefined;
 
+let fetchingPlan: Promise<void> | undefined;
+
+/**
+ * Keep the plan's models known. OpenAI takes a few seconds to answer, so only the first look waits for it; a list
+ * past its time is used as it is while a fresh one is fetched, and browsers hear if the fresh one differs (the
+ * Sprocket settings' model menu used to wait on this every ten minutes).
+ */
 async function chatgptPlanModels(): Promise<void> {
   if ((await credentials.read("openai"))?.type !== "oauth") return void (planModels = undefined);
   if (planModels && Date.now() - planModels.at < PLAN_TTL_MS) return;
+  fetchingPlan ??= fetchPlanModels().finally(() => (fetchingPlan = undefined));
+  if (!planModels) await fetchingPlan;
+}
+
+async function fetchPlanModels(): Promise<void> {
   try {
     const token = (await models.getAuth("openai"))?.auth.apiKey;
     const res = await fetch("https://api.openai.com/v1/models", { headers: { authorization: `Bearer ${token}` } });
     if (!res.ok) return; // keep the last known list
     const body = (await res.json()) as { models?: { slug: string; visibility?: string }[] };
-    planModels = { at: Date.now(), ids: new Set((body.models ?? []).filter((m) => m.visibility === "list").map((m) => m.slug)) };
+    const ids = new Set((body.models ?? []).filter((m) => m.visibility === "list").map((m) => m.slug));
+    const before = planModels?.ids;
+    planModels = { at: Date.now(), ids };
+    if (before && (before.size !== ids.size || [...ids].some((id) => !before.has(id)))) changed();
   } catch {
     // offline: keep the last known list
   }

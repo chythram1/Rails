@@ -168,7 +168,7 @@ export function SprocketSettings({ sprocket, all, onProjectChat = false }: { spr
               <DescriptionField sprocket={sprocket} onSave={(description) => save({ description })} />
               <div className="settings-field">
                 <label htmlFor="sp-model">Model</label>
-                {models && (
+                {models ? (
                   <ModelSelect
                     id="sp-model"
                     settings={models}
@@ -176,6 +176,9 @@ export function SprocketSettings({ sprocket, all, onProjectChat = false }: { spr
                     empty={defaultName ? `Default (${defaultName})` : "Default (none set)"}
                     onChange={(ref) => void save({ model: ref })}
                   />
+                ) : (
+                  // Held in place while the models load, so the panel doesn't shift when they arrive.
+                  <Dropdown id="sp-model" value="" options={[]} placeholder="Loading models…" disabled onChange={() => {}} />
                 )}
                 {models && !models.models.length && (
                   <p className="muted small">

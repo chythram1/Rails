@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { IconChevronDown as ChevronDown, IconEdit as Compose, IconFilter as Filter, IconPlus as Plus, IconSearch as Search, IconUsersPlus as UsersPlus } from "@tabler/icons-react";
 import type { Project, Sprocket as SprocketData, SprocketChatInfo, SprocketTeam } from "@rails/shared";
 import { href, navigate, type Route } from "../../router.ts";
 import { useStore } from "../../store.tsx";
 import { timeAgo } from "../../util.ts";
 import { MenuButton } from "../Menu.tsx";
+import { fetchModelSettings } from "../ModelSelect.tsx";
 import { TeamDialog } from "./TeamDialog.tsx";
 import { TeamSettings } from "./TeamSettings.tsx";
 import { TeamFace } from "./TeamFace.tsx";
@@ -30,6 +31,8 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
   const [filter, setFilter] = useState("all");
   /** The New team dialog (from the list's New menu). */
   const [makingTeam, setMakingTeam] = useState(false);
+  // Ready before a settings panel opens: the server can take a moment to list the models.
+  useEffect(() => void fetchModelSettings().catch(() => {}), []);
 
   if (!list) return error ? <p className="error pad" role="alert">{error}</p> : null;
   // A filter for a heading that's gone (its last Sprocket moved or was deleted) shows everything again.

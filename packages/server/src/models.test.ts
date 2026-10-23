@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { checkKey, modelSettings, setApiKey } from "./models.ts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fileCredentialStore } from "./credentials.ts";
+import { checkKey, modelSettings, onModelsChanged, setApiKey } from "./models.ts";
 
 /** A stand-in for the provider's API that answers `status` and records what it was asked. */
 function provider(status: number) {
@@ -39,5 +40,38 @@ describe("checking API keys", () => {
     expect(await setApiKey("mistral", "k", async () => ({ verdict: "unknown", reason: "it didn't answer in time" }))).toEqual({
       note: "Saved, but Rails couldn't check it: it didn't answer in time.",
     });
+  });
+});
+
+describe("the ChatGPT plan's models", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("waits for OpenAI's list only the first time; later it refreshes behind the last one (Sprocket settings waited)", async () => {
+    const store = fileCredentialStore();
+    await store.modify("openai", async () => ({ type: "oauth", access: "acc", refresh: "ref", expires: Date.now() + 86_400_000, clientId: "app" }) as any);
+    const lists: ((slugs: string[]) => void)[] = [];
+    vi.stubGlobal("fetch", (url: string) =>
+      String(url).includes("api.openai.com/v1/models")
+        ? new Promise<Response>((resolve) => lists.push((slugs) => resolve(Response.json({ models: slugs.map((slug) => ({ slug, visibility: "list" })) }))))
+        : Promise.reject(new Error("offline")),
+    );
+    const first = modelSettings();
+    await vi.waitFor(() => expect(lists.length).toBe(1));
+    lists[0](["gpt-a"]);
+    await first;
+
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 11 * 60_000); // past the list's ten minutes
+    let changes = 0;
+    const off = onModelsChanged(() => changes++);
+    await modelSettings(); // answers with the last list, without waiting for OpenAI
+    expect(lists.length).toBe(2);
+    lists[1](["gpt-a", "gpt-b"]);
+    await vi.waitFor(() => expect(changes).toBe(1)); // the fresh list differs: browsers hear of it
+    off();
+    await store.delete("openai");
   });
 });
