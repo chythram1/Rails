@@ -975,6 +975,20 @@ export interface Automation {
   nextRunAt?: string;
   createdAt: string;
   lastRun?: AutomationRun;
+  stats: AutomationStats;
+}
+
+/** How its runs have gone, for its card. */
+export interface AutomationStats {
+  /** Runs that started (skipped ones didn't). */
+  runs: number;
+  /** Of those, the ones that have ended, and how many of them failed. */
+  ended: number;
+  failed: number;
+  /** How long an ended run took on average, in milliseconds. */
+  avgMs?: number;
+  /** The outcomes of its last AUTOMATION_RECENT runs, oldest first. */
+  recent: AutomationOutcome[];
 }
 
 export type AutomationInput = Partial<Pick<Automation, "name" | "sprocketId" | "prompt" | "schedule" | "timezone" | "enabled">>;
@@ -985,6 +999,8 @@ export const AUTOMATION_PROMPT_MAX = 4000;
 export const AUTOMATION_SUMMARY_MAX = 200;
 /** No schedule may run more often than this. */
 export const AUTOMATION_MIN_MINUTES = 15;
+/** How many of an automation's last runs its card shows. */
+export const AUTOMATION_RECENT = 12;
 /** Failed runs in a row before Rails turns an automation off. */
 export const AUTOMATION_FAILS_TO_PAUSE = 3;
 

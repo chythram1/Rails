@@ -61,3 +61,25 @@ export const when = (iso: string) => new Date(iso).toLocaleString(undefined, { w
 
 /** The browser's timezone, for a new automation. */
 export const localTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
+/** When it runs next, short: "Today 9:00 AM", "Tomorrow 9:00 AM", "Mon 9:00 AM", "Oct 30 9:00 AM", in the browser's time. */
+export function soon(iso: string, now = new Date()): string {
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const days = Math.round((new Date(d).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / 86_400_000);
+  if (days <= 0) return `Today ${time}`;
+  if (days === 1) return `Tomorrow ${time}`;
+  if (days < 7) return `${d.toLocaleDateString(undefined, { weekday: "short" })} ${time}`;
+  return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${time}`;
+}
+
+/** How long a run took: "8s", "3m", "1h 5m". */
+export function took(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.round(s / 60);
+  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+/** The share of ended runs that didn't fail, as "92%"; none before a run has ended. */
+export const successRate = (ended: number, failed: number) => (ended ? `${Math.round(((ended - failed) / ended) * 100)}%` : undefined);

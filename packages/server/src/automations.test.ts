@@ -142,7 +142,9 @@ describe("automations", () => {
       await idle();
     }
     expect(getAutomation(a.id).runs.map((r) => r.outcome)).toEqual(["failed", "done", "failed", "failed"]);
-    expect(getAutomation(a.id).automation).toMatchObject({ enabled: true });
+    const { automation } = getAutomation(a.id);
+    expect(automation).toMatchObject({ enabled: true, stats: { runs: 4, ended: 4, failed: 3, recent: ["failed", "failed", "done", "failed"] } });
+    expect(automation.stats.avgMs).toBeGreaterThanOrEqual(0);
   });
 
   it("needs the user when a tool's call waits on a card", async () => {

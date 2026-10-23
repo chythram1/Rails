@@ -1564,6 +1564,19 @@ export const automationRuns = {
   list(automationId: string, limit = 50): StoredAutomationRun[] {
     return (db.prepare("SELECT * FROM automation_runs WHERE automation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?").all(automationId, limit) as AutomationRunRow[]).map(toAutomationRun);
   },
+  /** How its runs went: started, ended and failed counts, and how long an ended one took on average. */
+  stats(automationId: string): { runs: number; ended: number; failed: number; avgMs?: number } {
+    const r = db
+      .prepare(
+        `SELECT COUNT(*) FILTER (WHERE outcome != 'skipped') AS runs,
+                COUNT(*) FILTER (WHERE outcome NOT IN ('skipped', 'running')) AS ended,
+                COUNT(*) FILTER (WHERE outcome = 'failed') AS failed,
+                AVG((julianday(ended_at) - julianday(created_at)) * 86400000) FILTER (WHERE outcome NOT IN ('skipped', 'running') AND ended_at IS NOT NULL) AS avg_ms
+           FROM automation_runs WHERE automation_id = ?`,
+      )
+      .get(automationId) as { runs: number; ended: number; failed: number; avg_ms: number | null };
+    return { runs: r.runs, ended: r.ended, failed: r.failed, ...(r.avg_ms != null ? { avgMs: Math.round(r.avg_ms) } : {}) };
+  },
   /** Runs still going, across automations. */
   running(): StoredAutomationRun[] {
     return (db.prepare("SELECT * FROM automation_runs WHERE outcome = 'running' ORDER BY created_at").all() as AutomationRunRow[]).map(toAutomationRun);

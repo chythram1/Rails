@@ -1,20 +1,39 @@
-import { useState } from "react";
-import { IconPlayerPlay as Play, IconPlus as Plus, IconSearch as Search } from "@tabler/icons-react";
-import { scheduleText, type Automation, type Sprocket as SprocketData } from "@rails/shared";
+import { useState, type ReactNode } from "react";
+import {
+  IconActivity as Activity,
+  IconAlertCircle as AlertCircle,
+  IconCircleCheck as CircleCheck,
+  IconCircleDashed as CircleDashed,
+  IconCircleX as CircleX,
+  IconClock as Clock,
+  IconDots as Dots,
+  IconGauge as Gauge,
+  IconLoader2 as Loader,
+  IconPlayerPause as Pause,
+  IconPlayerPlay as Play,
+  IconPlayerSkipForward as Skip,
+  IconPlus as Plus,
+  IconSearch as Search,
+  IconSparkles as Sparkles,
+} from "@tabler/icons-react";
+import { AUTOMATION_RECENT, scheduleText, type Automation, type AutomationOutcome, type Sprocket as SprocketData } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate, type Route } from "../../router.ts";
 import { timeAgo } from "../../util.ts";
+import { useConfirm } from "../ConfirmDialog.tsx";
+import { MenuButton } from "../Menu.tsx";
+import { useModelSettings } from "../ModelSelect.tsx";
 import { Sprocket } from "../sprockets/Sprocket.tsx";
 import { useSprockets } from "../sprockets/useSprockets.ts";
 import { AutomationEditor } from "./AutomationEditor.tsx";
 import { NewAutomation } from "./NewAutomation.tsx";
-import { OUTCOME, useAutomations } from "./useAutomations.ts";
+import { OUTCOME, soon, successRate, took, useAutomations } from "./useAutomations.ts";
 
 type AutomateRoute = Extract<Route, { name: "automate" }>;
 
 /**
- * Automate (ADR 0032): prompts a Sprocket runs on a schedule, as a page of cards (On, then Off), like Customize's.
- * One opens full width in its place; a new one is a draft until Create.
+ * Automate (ADR 0032): prompts a Sprocket runs on a schedule. The page says how they're doing at a glance (an overview
+ * strip), then a card for each (On, then Off). One opens full width in its place; a new one is a draft until Create.
  */
 export function AutomatePage({ route }: { route: AutomateRoute }) {
   const { list: sprockets } = useSprockets();
@@ -25,45 +44,83 @@ export function AutomatePage({ route }: { route: AutomateRoute }) {
   return <Gallery sprockets={sprockets ?? []} />;
 }
 
+/** Whether its last run, or Rails pausing it, wants the user to look. */
+const needsYou = (a: Automation) => !!a.pausedReason || a.lastRun?.outcome === "needs_you" || a.lastRun?.outcome === "failed";
+
 function Gallery({ sprockets }: { sprockets: SprocketData[] }) {
   const { list, error } = useAutomations();
+  const { settings: models } = useModelSettings();
   const [query, setQuery] = useState("");
-  const [runError, setRunError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [confirmDialog, ask] = useConfirm();
   const q = query.trim().toLowerCase();
-  const nameOf = (id: string) => sprockets.find((s) => s.id === id)?.name ?? "";
-  const shown = (list ?? []).filter((a) => !q || [a.name, a.prompt, nameOf(a.sprocketId)].some((t) => t.toLowerCase().includes(q)));
+  const sprocketOf = (a: Automation) => sprockets.find((s) => s.id === a.sprocketId);
+  const modelOf = (s?: SprocketData) => {
+    const ref = s?.model ?? models?.defaultModel;
+    return ref ? (models?.models.find((m) => m.ref === ref)?.name ?? ref) : undefined;
+  };
+  const shown = (list ?? []).filter((a) => !q || [a.name, a.prompt, sprocketOf(a)?.name ?? ""].some((t) => t.toLowerCase().includes(q)));
   const on = shown.filter((a) => a.enabled);
   const off = shown.filter((a) => !a.enabled);
-  const runNow = async (a: Automation) => {
-    setRunError("");
+
+  const act = (a: Automation, what: () => Promise<unknown>) => async () => {
+    setActionError("");
     try {
-      await api.runAutomation(a.id);
+      await what();
     } catch (e: any) {
-      setRunError(`${a.name}: ${e.message}`);
+      setActionError(`${a.name}: ${e.message}`);
     }
   };
-  const card = (a: Automation) => <Card key={a.id} a={a} sprocket={sprockets.find((s) => s.id === a.sprocketId)} onRun={() => void runNow(a)} />;
+  const remove = (a: Automation) =>
+    ask({
+      title: `Delete ${a.name}?`,
+      text: "It stops running. What its runs posted stays in the Sprocket's chat.",
+      action: "Delete automation",
+      danger: true,
+      onConfirm: async () => {
+        await api.deleteAutomation(a.id);
+      },
+    });
+  const card = (a: Automation) => {
+    const s = sprocketOf(a);
+    return (
+      <Card
+        key={a.id}
+        a={a}
+        sprocket={s}
+        model={modelOf(s)}
+        onRun={act(a, () => api.runAutomation(a.id))}
+        onToggle={act(a, () => api.updateAutomation(a.id, { enabled: !a.enabled }))}
+        onDelete={() => remove(a)}
+      />
+    );
+  };
 
   return (
     <div className="cz-page">
+      {confirmDialog}
       <div className="cz-page-inner">
-        <h1 className="cz-title">Automate</h1>
-        <p className="cz-lead">Prompts your Sprockets run on a schedule, while Rails' server is on. Each run posts in the Sprocket's chat, and anything it wants to change waits there for you.</p>
-        <div className="cz-toolbar">
-          <span className="grow" />
-          <label className="cz-search">
-            <Search size={15} aria-hidden />
-            <input type="search" placeholder="Search" aria-label="Search automations" value={query} onChange={(e) => setQuery(e.target.value)} />
-          </label>
+        <div className="au-head">
+          <div>
+            <h1 className="cz-title">Automate</h1>
+            <p className="cz-lead">Prompts your Sprockets run on a schedule, while Rails' server is on. Each run posts in the Sprocket's chat, and anything it wants to change waits there for you.</p>
+          </div>
           <a className="btn primary cz-add" href={href.newAutomation()}>
             <span className="cz-add-label">
               <Plus size={16} aria-hidden /> New automation
             </span>
           </a>
         </div>
-        {(error || runError) && (
-          <p className="error" role="alert">
-            {error || runError}
+        {!!list?.length && <Overview list={list} />}
+        {!!list?.length && (
+          <label className="cz-search au-search">
+            <Search size={15} aria-hidden />
+            <input type="search" placeholder="Search automations" aria-label="Search automations" value={query} onChange={(e) => setQuery(e.target.value)} />
+          </label>
+        )}
+        {(error || actionError) && (
+          <p className="error au-error" role="alert">
+            {error || actionError}
           </p>
         )}
         {list && !list.length && (
@@ -84,14 +141,64 @@ function Gallery({ sprockets }: { sprockets: SprocketData[] }) {
           </section>
         )}
         {list && !!list.length && !shown.length && <p className="muted cz-none">Nothing matches “{query.trim()}”.</p>}
-        {!!on.length && <Section title="On" count={on.length}>{on.map(card)}</Section>}
-        {!!off.length && <Section title="Off" count={off.length}>{off.map(card)}</Section>}
+        {!!on.length && (
+          <Section title="On" count={on.length}>
+            {on.map(card)}
+          </Section>
+        )}
+        {!!off.length && (
+          <Section title="Off" count={off.length}>
+            {off.map(card)}
+          </Section>
+        )}
       </div>
     </div>
   );
 }
 
-function Section({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
+/** Four numbers across every automation: how many (and on), what needs you, how runs went, and what runs next. */
+function Overview({ list }: { list: Automation[] }) {
+  const on = list.filter((a) => a.enabled);
+  const waiting = list.filter(needsYou);
+  const runs = list.reduce((n, a) => n + a.stats.runs, 0);
+  const rate = successRate(
+    list.reduce((n, a) => n + a.stats.ended, 0),
+    list.reduce((n, a) => n + a.stats.failed, 0),
+  );
+  const next = on.filter((a) => a.nextRunAt).sort((x, y) => Date.parse(x.nextRunAt!) - Date.parse(y.nextRunAt!))[0];
+  const why = (a: Automation) => (a.pausedReason ? `${a.name} is paused` : `${a.name}: ${OUTCOME[a.lastRun!.outcome].label.toLowerCase()}`);
+  return (
+    <ul className="au-overview" aria-label="Overview">
+      <Stat label="Automations" icon={<Gauge size={16} />} value={list.length} note={`${on.length} on`} />
+      <Stat
+        label="Needs you"
+        icon={<AlertCircle size={16} />}
+        value={waiting.length}
+        note={!waiting.length ? "Nothing waits for you" : waiting.length === 1 ? why(waiting[0]) : `${waiting.length} want a look`}
+        tone={waiting.length ? "needed" : undefined}
+      />
+      <Stat label="Runs" icon={<Activity size={16} />} value={runs} note={rate ? `${rate} without failing` : "None yet"} />
+      <Stat label="Next run" icon={<Clock size={16} />} value={next ? soon(next.nextRunAt!) : "None"} note={next ? next.name : "Nothing on is scheduled"} />
+    </ul>
+  );
+}
+
+function Stat({ label, icon, value, note, tone }: { label: string; icon: ReactNode; value: ReactNode; note: string; tone?: "needed" }) {
+  return (
+    <li className="au-stat">
+      <span className="au-stat-label">
+        {label}
+        <span className={`au-stat-icon${tone ? ` ${tone}` : ""}`} aria-hidden>
+          {icon}
+        </span>
+      </span>
+      <span className="au-stat-value">{value}</span>
+      <span className="au-stat-note">{note}</span>
+    </li>
+  );
+}
+
+function Section({ title, count, children }: { title: string; count: number; children: ReactNode }) {
   const id = `au-sec-${title.toLowerCase()}`;
   return (
     <section className="cz-section" aria-labelledby={id}>
@@ -101,41 +208,159 @@ function Section({ title, count, children }: { title: string; count: number; chi
           <span className="cz-count">{count}</span>
         </h2>
       </div>
-      <ul className="cz-cards">{children}</ul>
+      <ul className="cz-cards au-cards">{children}</ul>
     </section>
   );
 }
 
-/** A card: its Sprocket's face, the name (a link over the card), its prompt, then when it runs and how it last went. */
-function Card({ a, sprocket, onRun }: { a: Automation; sprocket?: SprocketData; onRun(): void }) {
+const OUTCOME_ICON: Record<AutomationOutcome, ReactNode> = {
+  running: <Loader size={16} />,
+  done: <CircleCheck size={16} />,
+  quiet: <CircleDashed size={16} />,
+  needs_you: <AlertCircle size={16} />,
+  failed: <CircleX size={16} />,
+  skipped: <Skip size={16} />,
+};
+
+/**
+ * A card: the name (a link over the card) with Run now and a menu, its instructions, what runs it and when with its
+ * last runs as bars, how the last one went, and its numbers.
+ */
+function Card({
+  a,
+  sprocket,
+  model,
+  onRun,
+  onToggle,
+  onDelete,
+}: {
+  a: Automation;
+  sprocket?: SprocketData;
+  model?: string;
+  onRun(): void;
+  onToggle(): void;
+  onDelete(): void;
+}) {
   const last = a.lastRun;
   const running = last?.outcome === "running";
+  const rate = successRate(a.stats.ended, a.stats.failed);
   return (
-    <li className="cz-card">
-      <span className="cz-logo au-face" aria-hidden>
-        {sprocket && <Sprocket look={sprocket.look} size={30} seed={sprocket.id} still />}
-      </span>
-      <div className="cz-card-text">
-        <a className="cz-card-name" href={href.automation(a.id)}>
+    <li className="cz-card au-card">
+      <div className="au-card-head">
+        <a className="cz-card-name au-card-name" href={href.automation(a.id)}>
           {a.name}
         </a>
-        <p className="cz-card-desc">{a.prompt}</p>
-        <p className="cz-card-meta">
-          {a.pausedReason && <span className="cz-card-warn">Paused · </span>}
-          {sprocket?.name ?? "No Sprocket"} · <span className="au-last">{scheduleText(a.schedule)}</span>
-          {last && (
-            <span className="au-last">
-              {" · "}
-              <span className={`cz-dot ${OUTCOME[last.outcome].tone}`} aria-hidden /> {OUTCOME[last.outcome].label} {last.outcome !== "running" && timeAgo(last.createdAt)}
-            </span>
+        <div className="cz-card-action au-card-actions">
+          <button type="button" className="icon-btn" aria-label={`Run ${a.name} now`} title={running ? "It's running now" : "Run now"} disabled={running} onClick={onRun}>
+            <Play size={16} />
+          </button>
+          <MenuButton
+            label={`${a.name} actions`}
+            title="More"
+            icon={<Dots size={16} />}
+            align="right"
+            items={[
+              { label: a.enabled ? "Turn off" : "Turn on", onSelect: onToggle },
+              { label: "Delete automation", danger: true, onSelect: onDelete },
+            ]}
+          />
+        </div>
+      </div>
+      <p className="cz-card-desc">{a.prompt}</p>
+      <div className="au-card-facts">
+        <ul className="au-tags" aria-label="Runs with">
+          <li className="au-tag">
+            {sprocket ? <Sprocket look={sprocket.look} size={16} seed={sprocket.id} still /> : null}
+            {sprocket?.name ?? "No Sprocket"}
+          </li>
+          <li className="au-tag">
+            <Clock size={14} aria-hidden />
+            {scheduleText(a.schedule)}
+          </li>
+          {model && (
+            <li className="au-tag">
+              <Sparkles size={14} aria-hidden />
+              {model}
+            </li>
           )}
-        </p>
+        </ul>
+        <RunBars recent={a.stats.recent} />
       </div>
-      <div className="cz-card-action">
-        <button type="button" className="icon-btn cz-plus" aria-label={`Run ${a.name} now`} title={running ? "It's running now" : "Run now"} disabled={running} onClick={onRun}>
-          <Play size={16} />
-        </button>
-      </div>
+      <LastRun a={a} />
+      <dl className="au-numbers">
+        <div>
+          <dt>Runs</dt>
+          <dd>{a.stats.runs}</dd>
+        </div>
+        <div>
+          <dt>Success</dt>
+          <dd>{rate ?? "–"}</dd>
+        </div>
+        <div>
+          <dt>Avg time</dt>
+          <dd>{a.stats.avgMs != null ? took(a.stats.avgMs) : "–"}</dd>
+        </div>
+        <div>
+          <dt>Next run</dt>
+          <dd>{a.enabled ? (a.nextRunAt ? soon(a.nextRunAt) : "Not again") : "Off"}</dd>
+        </div>
+      </dl>
     </li>
+  );
+}
+
+/** How its last run went (or that Rails paused it), with its one line and when. */
+function LastRun({ a }: { a: Automation }) {
+  const last = a.lastRun;
+  if (a.pausedReason)
+    return (
+      <p className="au-last-run" title={a.pausedReason}>
+        <span className="au-tone needed" aria-hidden>
+          <Pause size={16} />
+        </span>
+        <span className="au-last-run-label">Paused</span>
+        <span className="au-last-run-summary">{a.pausedReason}</span>
+      </p>
+    );
+  if (!last)
+    return (
+      <p className="au-last-run">
+        <span className="au-tone idle" aria-hidden>
+          <Clock size={16} />
+        </span>
+        <span className="au-last-run-summary">No runs yet. Run it now to see what it does.</span>
+      </p>
+    );
+  return (
+    <p className="au-last-run" title={last.summary}>
+      <span className={`au-tone ${OUTCOME[last.outcome].tone}`} aria-hidden>
+        {OUTCOME_ICON[last.outcome]}
+      </span>
+      <span className="au-last-run-label">{OUTCOME[last.outcome].label}</span>
+      {last.summary && <span className="au-last-run-summary">{last.summary}</span>}
+      <time className="au-last-run-time" dateTime={last.createdAt}>
+        {last.outcome === "running" ? "now" : timeAgo(last.createdAt)}
+      </time>
+    </p>
+  );
+}
+
+/** Its last runs as bars, oldest first, each in its outcome's color; empty slots until it has run that often. */
+function RunBars({ recent }: { recent: AutomationOutcome[] }) {
+  const counts = new Map<string, number>();
+  for (const o of recent) counts.set(OUTCOME[o].label, (counts.get(OUTCOME[o].label) ?? 0) + 1);
+  const label = recent.length
+    ? `Last ${recent.length} ${recent.length === 1 ? "run" : "runs"}: ${[...counts].map(([l, n]) => `${n} ${l.toLowerCase()}`).join(", ")}`
+    : "No runs yet";
+  const empty = AUTOMATION_RECENT - recent.length;
+  return (
+    <span className="au-bars" role="img" aria-label={label} title={label}>
+      {Array.from({ length: empty }, (_, i) => (
+        <span key={`e${i}`} className="au-bar" />
+      ))}
+      {recent.map((o, i) => (
+        <span key={i} className={`au-bar ${OUTCOME[o].tone}`} />
+      ))}
+    </span>
   );
 }

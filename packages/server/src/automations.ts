@@ -5,6 +5,7 @@ import {
   AUTOMATION_FAILS_TO_PAUSE,
   AUTOMATION_NAME_MAX,
   AUTOMATION_PROMPT_MAX,
+  AUTOMATION_RECENT,
   AUTOMATION_SUMMARY_MAX,
   actionSettled,
   type Automation,
@@ -30,8 +31,9 @@ const TICK_MS = 30_000;
 const publicRun = ({ sprocketRunId: _r, messageId: _m, ...run }: StoredAutomationRun): AutomationRun => run;
 
 function toAutomation(a: StoredAutomation): Automation {
-  const last = automationRuns.list(a.id, 1)[0];
-  return { ...a, ...(last ? { lastRun: publicRun(last) } : {}) };
+  const recent = automationRuns.list(a.id, AUTOMATION_RECENT);
+  const stats = { ...automationRuns.stats(a.id), recent: recent.map((r) => r.outcome).reverse() };
+  return { ...a, ...(recent[0] ? { lastRun: publicRun(recent[0]) } : {}), stats };
 }
 
 export function listAutomations(): Automation[] {
