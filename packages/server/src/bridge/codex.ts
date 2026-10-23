@@ -3,7 +3,10 @@
 // such client, connected only while Codex panels are open:
 // - every client gets `thread/started` and `thread/status/changed`, which map a new Codex panel to its
 //   thread (Codex picks the id) and say when a thread waits for approval or input;
-// - `thread/resume {excludeTurns}` subscribes Rails to a mapped thread's turns and items.
+// - `thread/resume {excludeTurns}` subscribes Rails to a mapped thread's turns and items;
+// - a panel's Codex can move to another thread (`/new`, `/fork`, `/resume`), and the daemon doesn't say which client
+//   did it, so Rails follows a fork by its `forkedFromId` and a new or resumed thread when only one Codex panel is
+//   open in its folder (`follow`; docs/providers.md).
 // The protocol is JSON-RPC over a WebSocket on the daemon's Unix socket. It's marked experimental, so
 // unknown messages are ignored and a lost connection is retried.
 import { randomUUID } from "node:crypto";
@@ -12,9 +15,9 @@ import { join } from "node:path";
 import WebSocket from "ws";
 import type { Panel } from "@rails/shared";
 import { CODEX_HOME } from "../config.ts";
-import { panels } from "../db.ts";
+import { panels, projects } from "../db.ts";
 import { fromCodex } from "./events.ts";
-import { noteShell, record } from "./index.ts";
+import { cardOf, noteShell, record } from "./index.ts";
 
 const SOCKET = join(CODEX_HOME, "app-server-control", "app-server-control.sock");
 /** A new panel's thread starts within this long, or the panel stays unmapped. */
@@ -48,6 +51,10 @@ export class CodexWatcher {
   /** Panels whose thread hasn't had a turn yet: a newer thread in their folder replaces it (see `started`). */
   private unused = new Map<string, { threadId: string; cwd: string; started: number; at: number }>();
   private subscribed = new Set<string>();
+  /** Threads the daemon reported unloaded: one that loads again was resumed by some client (`/resume`). */
+  private unloaded = new Set<string>();
+  /** Threads a panel moved away from, and that panel: going back to one is that panel's `/resume`. */
+  private left = new Map<string, string>();
   private nextId = 1;
   private replies = new Map<number, (result: any, error?: unknown) => void>();
 
@@ -70,7 +77,7 @@ export class CodexWatcher {
     // Threads that started before Rails connected (the first codex starts the daemon): look them up.
     if (this.pending.length)
       this.request("thread/loaded/list", {}, (r) => {
-        for (const id of r?.data ?? []) if (!panels.bySession(id)) this.request("thread/read", { threadId: id }, (t) => this.started(t?.thread));
+        for (const id of r?.data ?? []) if (!panels.bySession(id)) this.request("thread/read", { threadId: id }, (t) => this.started(t?.thread, false));
       });
   }
 
@@ -86,7 +93,7 @@ export class CodexWatcher {
     const threadId: string | undefined = params.threadId ?? params.thread?.id;
     if (!threadId) return;
     const panel = panels.bySession(threadId);
-    if (!panel || panel.kind !== "codex") return; // the user's own Codex sessions outside Rails
+    if (!panel || panel.kind !== "codex") return this.elsewhere(msg.method, threadId, params.status?.type); // not a panel's (yet)
     const turn = msg.method.startsWith("turn/") || msg.method.startsWith("item/") || params.status?.type === "active";
     if (turn && this.unused.get(panel.id)?.threadId === threadId) this.unused.delete(panel.id);
     if (!this.subscribed.has(threadId)) this.subscribe(threadId);
@@ -94,7 +101,8 @@ export class CodexWatcher {
     record(panel.id, fromCodex(msg.method, params), threadId);
   }
 
-  private started(thread: any) {
+  /** A thread started, or (`live` false) one found loaded when Rails connected. */
+  private started(thread: any, live = true) {
     if (!thread?.id || thread.ephemeral || thread.parentThreadId) return;
     const known = panels.bySession(thread.id);
     if (known) return this.subscribe(thread.id); // a resumed session
@@ -109,6 +117,56 @@ export class CodexWatcher {
     // the trust prompt. A panel whose thread hasn't had a turn moves to a newer one in its folder.
     for (const [panelId, u] of this.unused)
       if (u.cwd === cwd && started > u.started && Date.now() - u.at < MAP_WITHIN_MS && panels.get(panelId)) return this.link(panelId, cwd, thread.id, started);
+    if (!live) return;
+    // `/fork` in a panel: the fork names the thread it came from.
+    const from = typeof thread.forkedFromId === "string" ? panels.bySession(thread.forkedFromId) : undefined;
+    if (from?.kind === "codex") return this.moveTo(from.id, thread.id);
+    // `/new` in a panel: a newer thread in its folder, from the terminal app, while it's idle.
+    this.follow(thread, cwd, (p) => started > threadStarted({ id: p.sessionId }));
+  }
+
+  /** A thread no panel follows reported something: if a client loaded it again, it may be a panel's `/resume`. */
+  private elsewhere(method: string, threadId: string, status: string | undefined) {
+    if (method !== "thread/status/changed" || !status) return;
+    if (status === "notLoaded") return void this.unloaded.add(threadId);
+    if (status !== "idle" && status !== "active") return;
+    // Loaded again after the daemon unloaded it, or a turn in a thread a panel left: a client went (back) to it.
+    const leftBy = this.left.get(threadId);
+    if (!this.unloaded.delete(threadId) && !(leftBy && status === "active")) return;
+    this.request("thread/read", { threadId }, (r) => {
+      const thread = r?.thread;
+      if (!thread?.id || thread.ephemeral || thread.parentThreadId || panels.bySession(thread.id) || typeof thread.cwd !== "string") return;
+      // Back to a thread the panel left is that panel's own `/resume`; otherwise, the one-panel rule.
+      const back = leftBy ? panels.get(leftBy) : undefined;
+      if (back?.kind === "codex" && !busy(back)) return this.moveTo(back.id, thread.id);
+      this.follow(thread, real(thread.cwd));
+    });
+  }
+
+  /**
+   * Move the only Codex panel open in a thread's folder to it, when it's from Codex's terminal app and the panel is
+   * idle (Codex takes `/new` and `/resume` only between turns). With two panels there, or the user's own Codex in the
+   * folder, Rails can't tell whose it is: with two it doesn't guess; the user's own is the known risk (ADR 0007).
+   */
+  private follow(thread: any, cwd: string, also: (p: Panel) => boolean = () => true) {
+    if (thread.source !== "vscode" && thread.source !== "cli") return; // `codex exec`, other apps
+    const here = panels.all().filter((p) => p.kind === "codex" && p.sessionId && real(projects.get(p.projectId)?.path ?? "") === cwd);
+    if (here.length === 1 && !busy(here[0]) && also(here[0])) this.moveTo(here[0].id, thread.id);
+  }
+
+  /** A panel's Codex moved to another thread: follow it there, and say so (its card, drafts and handoffs go by it). */
+  private moveTo(panelId: string, threadId: string) {
+    const old = panels.get(panelId)?.sessionId;
+    if (!old || old === threadId || panels.bySession(threadId)) return;
+    this.unused.delete(panelId);
+    this.assign(panelId, threadId);
+    if (panels.get(panelId)?.sessionId !== threadId) return;
+    this.left.set(old, panelId);
+    this.left.delete(threadId);
+    this.subscribed.delete(old);
+    this.request("thread/unsubscribe", { threadId: old });
+    this.subscribe(threadId);
+    record(panelId, [{ kind: "start", sessionId: threadId, from: old }], threadId);
   }
 
   private link(panelId: string, cwd: string, threadId: string, started: number) {
@@ -170,6 +228,9 @@ export class CodexWatcher {
   /** Whether a new panel still waits for its thread (closed panels and old entries don't count). */
   hasPending = () => this.pending.some((p) => Date.now() - p.since < MAP_WITHIN_MS && panels.get(p.panelId));
 }
+
+/** A panel's session is mid-turn: its Codex can't be switching threads. */
+const busy = (p: Panel) => ["working", "waiting"].includes(cardOf(p).status);
 
 function real(path: string): string {
   try {

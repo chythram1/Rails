@@ -42,3 +42,13 @@ Consequences:
   bridge ignores what it doesn't understand, and the tests pin the payload shapes it relies on.
 - Opening a scratch folder in Codex or Claude Code saves a folder-trust entry in their own config; tests
   that use real agents leave those behind.
+
+*Amended (Codex threads):* a Codex panel can move to another thread (`/new`, `/fork`, `/resume`), and the daemon
+doesn't say which client did it (every TUI thread has `source: "vscode"`, `originator: "codex-tui"`). Rails follows
+a fork by its `forkedFromId`; a new thread, or one loaded again (`/resume`), when it comes from the TUI and exactly
+one idle Codex panel is open in its folder; and a turn in a thread the panel left. The panel then records a `start`
+with `from` (the old thread): its card starts over, its pending drafts expire, waits and wakes for the old thread end,
+and the Coordinator sees "moved on to a new session". The known risk: the user's own Codex in a terminal, in a folder
+with one Rails Codex panel, can move that panel when it starts or resumes a thread. With two panels there, Rails
+doesn't guess. Verified live with 0.163.
+

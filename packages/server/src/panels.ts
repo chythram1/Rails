@@ -64,7 +64,8 @@ export const panelsChanged = changed;
 
 /**
  * Codex picks a new session's id itself; the bridge learns it from Codex's daemon (bridge/codex.ts). It may move a
- * new panel on to another thread, the one Codex really uses (CodexWatcher.started); resumed panels never get here.
+ * new panel on to another thread, the one Codex really uses (CodexWatcher.started), and a panel whose Codex moved
+ * to another thread (`/new`, `/fork`, `/resume`) follows it there.
  */
 export function linkCodexThread(panelId: string, threadId: string): void {
   const panel = panels.get(panelId);

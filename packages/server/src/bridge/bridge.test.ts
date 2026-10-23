@@ -10,6 +10,7 @@ import { fromClaude, fromCodex, fromPi } from "./events.ts";
 import { attentionList, bridgeEnv, cardOf, receive, tokenOk } from "./index.ts";
 import { projectCapabilities } from "../harness/project.ts";
 import { WAIT_MS } from "../agentTools.ts";
+import { admit } from "../watches.ts";
 
 // Payloads as Claude Code 2.1.302, pi 1.3 (through pi/rails.ts) and Codex 0.163 sent them in the
 // experiments (scratch notes; trimmed).
@@ -279,5 +280,93 @@ describe("Codex watcher, new threads", () => {
     w.handle({ id: first[0].id, error: { code: -32600, message: "no rollout found for thread id t-new" } });
     w.handle({ method: "thread/status/changed", params: { threadId: "t-new", status: { type: "active", activeFlags: [] } } });
     expect(sent.filter((m) => m.method === "thread/resume")).toHaveLength(2);
+  });
+});
+
+describe("Codex watcher, a panel's Codex moves to another thread", () => {
+  const v7 = (ms: number) => {
+    const t = ms.toString(16).padStart(12, "0");
+    return `${t.slice(0, 8)}-${t.slice(8)}-7abc-8def-${Math.random().toString(16).slice(2, 14).padEnd(12, "0")}`;
+  };
+  /** A project with one Codex panel already on its thread, and the server's own handler for moving it. */
+  const setup = (more = 0) => {
+    const project = projects.create("app", `/tmp/codex-move-${Math.random()}`);
+    const sent: any[] = [];
+    const w = new CodexWatcher((m) => sent.push(m), (panelId, threadId) => linkCodexThread(panelId, threadId));
+    const make = () => {
+      const p = panels.create({ projectId: project.id, kind: "codex", title: "Codex" });
+      const t = v7(Date.now() - 60_000 + Math.floor(Math.random() * 1000));
+      panels.setSession(p.id, t);
+      w.handle({ method: "turn/completed", params: { threadId: t, turn: { status: "completed", items: [{ type: "agentMessage", text: "done" }] } } });
+      return { p, t };
+    };
+    const { p, t } = make();
+    for (let i = 0; i < more; i++) make();
+    const started = (thread: object) => w.handle({ method: "thread/started", params: { thread: { cwd: project.path, source: "vscode", ...thread } } });
+    const status = (threadId: string, type: string) => w.handle({ method: "thread/status/changed", params: { threadId, status: { type, activeFlags: [] } } });
+    /** Answer Rails' last `thread/read` with this thread. */
+    const read = (thread: object) => w.handle({ id: sent.filter((m) => m.method === "thread/read").at(-1).id, result: { thread: { cwd: project.path, source: "vscode", ...thread } } });
+    const session = () => panels.get(p.id)!.sessionId;
+    return { project, sent, w, p, t, started, status, read, session };
+  };
+
+  it("follows /new to a newer thread in its folder, and leaves the old one", () => {
+    const { sent, p, t, started, session } = setup();
+    const next = v7(Date.now());
+    started({ id: next });
+    expect(session()).toBe(next);
+    expect(sent).toContainEqual(expect.objectContaining({ method: "thread/unsubscribe", params: { threadId: t } }));
+    expect(sent.at(-1)).toMatchObject({ method: "thread/resume", params: { threadId: next } });
+    expect(cardOf(panels.get(p.id)!)).toMatchObject({ sessionId: next, status: "idle", lastOutcome: undefined });
+  });
+
+  it("doesn't guess with two panels in the folder, a busy panel, an older thread or another Codex app", () => {
+    const two = setup(1);
+    two.started({ id: v7(Date.now()) });
+    expect(two.session()).toBe(two.t);
+    const one = setup();
+    one.started({ id: v7(Date.now()), source: "exec" });
+    one.started({ id: v7(Date.now() - 3_600_000) });
+    expect(one.session()).toBe(one.t);
+    one.w.handle({ method: "turn/started", params: { threadId: one.t, turn: { id: "u1" } } });
+    one.w.handle({ method: "item/completed", params: { threadId: one.t, item: { type: "commandExecution", command: "ls", status: "completed" } } });
+    one.started({ id: v7(Date.now()) });
+    expect(one.session()).toBe(one.t);
+  });
+
+  it("follows /fork by the thread it came from, wherever it runs", () => {
+    const { p, t, w, session } = setup(1); // two panels in the folder: the fork still says whose it is
+    const fork = v7(Date.now());
+    w.handle({ method: "thread/started", params: { thread: { id: fork, cwd: "/elsewhere", source: "vscode", forkedFromId: t } } });
+    expect(session()).toBe(fork);
+    expect(panels.get(p.id)!.sessionId).toBe(fork);
+  });
+
+  it("follows /resume: a thread loaded again, and going back to the thread it left", () => {
+    const { t, started, status, read, session } = setup();
+    const other = v7(Date.now() - 600_000);
+    status(other, "notLoaded");
+    status(other, "idle"); // a client loaded it
+    read({ id: other });
+    expect(session()).toBe(other);
+    // Back to the first thread, which Rails left: a turn in it is the panel's.
+    status(t, "active");
+    read({ id: t });
+    expect(session()).toBe(t);
+    // A thread that only goes idle, never unloaded and never the panel's: nothing to follow.
+    const stranger = v7(Date.now());
+    status(stranger, "idle");
+    expect(session()).toBe(t);
+  });
+
+  it("ends what waited on the last session: its wait, and the Coordinator's wake", () => {
+    const { p, t, w } = setup();
+    w.handle({ method: "thread/status/changed", params: { threadId: t, status: { type: "active", activeFlags: ["waitingOnUserInput"] } } });
+    expect(cardOf(panels.get(p.id)!)).toMatchObject({ status: "waiting" });
+    // A waiting panel is busy, so /new can't have come from it: but a fork names it, and moving clears the wait.
+    w.handle({ method: "thread/started", params: { thread: { id: v7(Date.now()), cwd: "/x", source: "vscode", forkedFromId: t } } });
+    expect(cardOf(panels.get(p.id)!)).toMatchObject({ status: "idle", waitingFor: undefined });
+    expect(admit({ kind: "start", sessionId: "n", from: t })).toBe("over");
+    expect(admit({ kind: "start", sessionId: "n" })).toBeNull();
   });
 });

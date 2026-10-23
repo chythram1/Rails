@@ -208,6 +208,13 @@ describe("messages the user asks for", () => {
     expect(listMessages(projectChat(lead.id)).at(-1)!.suggestions![0]).toMatchObject({ id: t.id, status: "expired", error: "The session ended." });
   });
 
+  it("drops what waited for a session when its panel moves on to another (Codex's /new)", async () => {
+    const { lead, panel } = setup();
+    const [t] = (await messageThroughRun(lead.id, panel.id, "Summarize.")).suggestions!;
+    record(panel.id, [{ kind: "start", sessionId: "next", from: panel.sessionId }], "next");
+    expect(suggestions.get(t.id)).toMatchObject({ status: "expired", error: "The panel moved on to another session." });
+  });
+
   it("points the Coordinator to suggest_message when it tries to answer a session that isn't asking", () => {
     const { lead, panel } = setup();
     receive(panel.id, "claude", "UserPromptSubmit", { prompt: "go" });

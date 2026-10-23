@@ -53,6 +53,11 @@ export function foldCard(panel: { id: string; kind: PanelKind; title: string; se
       case "start":
         if (e.sessionId) c.sessionId = e.sessionId;
         if (e.inbox) c.inbox = e.inbox;
+        // Another session in the panel: what the last one was doing, waiting for or said isn't this one's.
+        if (e.from) {
+          c.status = "idle";
+          c.intent = c.lastOutcome = c.lastCommand = c.waitingFor = c.dialog = c.error = undefined;
+        }
         if (c.status === "unknown" || c.status === "ended") c.status = "idle";
         break;
       case "prompt":

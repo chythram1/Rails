@@ -37,7 +37,7 @@ function patch({ text, cut }: { text: string; cut: boolean }, what: string): str
 const describe = (e: SessionEvent): string => {
   switch (e.kind) {
     case "start":
-      return "session started";
+      return e.from ? "moved on to a new session in the same panel (it doesn't remember the last one, unless it's a fork)" : "session started";
     case "prompt":
       return `asked: ${e.text}`;
     case "tool":

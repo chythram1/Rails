@@ -234,6 +234,7 @@ export function startSuggestions(): void {
   onReturned(returned);
   onEvents((panel, events) => {
     if (events.some((e) => e.kind === "ended")) expireFor(panel.id, { all: true, error: "The session ended." });
+    else if (events.some((e) => e.kind === "start" && e.from)) expireFor(panel.id, { all: true, error: "The panel moved on to another session." });
     else if (events.some(movesOnFrom(cardOf(panel)))) expireFor(panel.id);
   });
   onPanelForgotten((panelId) => expireFor(panelId, { all: true, error: "The panel was closed." }));

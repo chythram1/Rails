@@ -6,8 +6,11 @@ import { isAbsolute, join } from "node:path";
 import type { SessionQuestion } from "@rails/shared";
 
 export type SessionEvent =
-  /** The agent started (or resumed) a session. `inbox` is Claude Code's message socket, for step 3. */
-  | { kind: "start"; sessionId?: string; inbox?: string }
+  /**
+   * The agent started (or resumed) a session. `inbox` is Claude Code's message socket, for step 3. `from`: the panel
+   * moved to this session from that one (Codex's `/new`, `/fork`, `/resume`), which is over for it.
+   */
+  | { kind: "start"; sessionId?: string; inbox?: string; from?: string }
   /** The user (or something on their behalf) sent a prompt. */
   | { kind: "prompt"; text: string }
   /** The agent used a tool. `files` are absolute paths it read or changed; `command` a shell command. */

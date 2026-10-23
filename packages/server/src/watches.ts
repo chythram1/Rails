@@ -115,7 +115,7 @@ export function admit(e: SessionEvent): Wake | "over" | null {
     case "turn_end":
       return looksLikeQuestion(e.text) ? { what: "turn_end", text: tail(e.text) } : "over";
     case "start":
-      return null;
+      return e.from ? "over" : null; // another session in the panel: the last one's wait is over for it
     default:
       return "over"; // a prompt, a tool, an answer, a failure, the end: it's moving (or gone)
   }
