@@ -208,6 +208,24 @@ describe("message (ADR 0018)", () => {
     expect(content.endsWith(TEXT)).toBe(true);
   });
 
+  it("tells wait_for the session hasn't got the message while it waits for the user, and waits for the turn it starts once sent", async () => {
+    const { lead, engine, ui } = team();
+    await messageFromAgent(ui.id, "Engine", TEXT);
+    expect(await waitForSession(ui.id, "Engine")).toMatch(/is idle, and your message to it still waits for your user, so nothing has reached it/);
+    const [s] = listMessages(projectChat(lead.id))[0].suggestions!;
+    await sendSuggestion(s.id, undefined);
+    // Sent, not started on yet: "idle" is the old idle, so it waits for the turn the message starts.
+    const waiting = waitForSession(ui.id, "Engine");
+    await new Promise((r) => setTimeout(r, 5));
+    receive(engine.id, "claude", "UserPromptSubmit", { prompt: TEXT });
+    receive(engine.id, "claude", "Stop", { last_assistant_message: "Renamed the call." });
+    const text = await waiting;
+    expect(text).toMatch(/finished its turn after \d+s\. Its last reply: "Renamed the call\."/);
+    expect(text).toMatch(/Your message reached it .* so this waited for the turn it starts/);
+    // Once it has started on it (and finished), idle is the new idle.
+    expect(await waitForSession(ui.id, "Engine")).toMatch(/is idle\. Its last reply: "Renamed the call\."/);
+  });
+
   it("finds the session by id or by its title, and refuses itself, shells, other projects and ended sessions", async () => {
     const { engine, ui, game } = team();
     const elsewhere = panels.create({ projectId: projects.create("other", `/work/other-${Math.random()}`).id, kind: "claude", title: "Elsewhere" });

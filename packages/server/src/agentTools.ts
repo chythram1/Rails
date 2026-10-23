@@ -8,7 +8,7 @@ import { shortTitle } from "@rails/shared";
 import { AGENT, ago, boardText, rel, type SessionCard } from "./bridge/board.ts";
 import type { SessionEvent } from "./bridge/events.ts";
 import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
-import { panels, projects, sprockets, suggestions } from "./db.ts";
+import { panels, projects, sessionEvents, sprockets, suggestions } from "./db.ts";
 import { projectOwners } from "./owners.ts";
 import { postEvent } from "./sprockets.ts";
 import { MAX_PENDING_MESSAGES, suggest } from "./suggestions.ts";
@@ -64,8 +64,8 @@ function draftLines(panelId: string, { to, except }: { to?: string; except?: str
       const what =
         s.status === "sent"
           ? s.edited
-            ? `sent with your user's edits, so see what they changed. It got: ${quote(s.text, 1500)}`
-            : `sent as you wrote it. You wrote: ${quote(s.text)}`
+            ? `sent with your user's edits, so see what they changed${s.unconfirmed ? " (no sign yet that it got there)" : ""}. It got: ${quote(s.text, 1500)}`
+            : `sent as you wrote it${s.unconfirmed ? " (no sign yet that it got there)" : ""}. You wrote: ${quote(s.text)}`
           : s.status === "dismissed"
             ? `dismissed by your user. You wrote: ${quote(s.text)}`
             : s.status === "expired"
@@ -100,6 +100,8 @@ async function otherSession(panelId: string, session: unknown) {
  * the agent gets "still working" and decides itself whether to wait again.
  */
 export const WAIT_MS = 100_000;
+/** How recently the caller's own message must have reached an idle session for wait_for to wait for the turn it starts. */
+const JUST_SENT_MS = 120_000;
 /** The events that end a wait: the session stopped working. */
 const DONE = new Set<SessionEvent["kind"]>(["turn_end", "stopped", "failed", "waiting", "ended"]);
 /** Who waits for whom right now (waiting panel → the panels it waits for), so two sessions can't wait for each other. */
@@ -127,6 +129,20 @@ export async function waitForSession(
   const card = cardOf(to);
   if (card.status === "unknown") return `Rails can't follow ${name}: it hasn't reported anything since it was opened in Rails, so Rails can't tell when it's done.`;
   if (card.status === "ended") return `${who} has ended.`;
+  // Its own message to that session (ADR 0018): "idle" right after one is the old idle, and the reply the old reply
+  // (herdr's prompt waits guard against the same with an activity gate). Still with the user, nothing has reached it;
+  // just sent to an idle session that hasn't started on it, the turn it starts is the one to wait for.
+  const toIt = suggestions.byAgent(me.id, new Date(Date.now() - DRAFTS_SHOWN_MS).toISOString()).filter((s) => s.panelId === to.id);
+  const drafted = toIt.find((s) => s.status === "pending" || s.status === "sending" || s.status === "failed");
+  if (!next && drafted && card.status !== "working")
+    return `${who} is ${card.status === "waiting" ? "waiting for its user" : card.status === "failed" ? "stopped (its last turn failed)" : "idle"}, and your message to it still waits for your user, so nothing has reached it: waiting now would only give you its last turn. Carry on with your work; neighbours shows when your user sends it.`;
+  const sent = toIt.find((s) => s.status === "sent" && Date.now() - Date.parse(s.updatedAt) < JUST_SENT_MS);
+  const tookSince = (at: string) => sessionEvents.list(to.id).some((r) => r.at >= at && r.event?.kind === "prompt");
+  let note = "";
+  if (!next && sent && !sent.queued && card.status === "idle" && !tookSince(sent.updatedAt)) {
+    next = true;
+    note = `\n(Your message reached it ${ago(sent.updatedAt, Date.now())}, so this waited for the turn it starts.)`;
+  } else if (sent?.queued) note = `\nYour message went into its queue while it worked, so it takes it up in its next turn: if this reply doesn't answer it, call wait_for again with next: true.`;
   if (!next && card.status === "idle")
     return `${who} is idle.${reply(card)}\nIf it said it will carry on by itself (after a background command, say), call wait_for with next: true to wait for its next turn.`;
   if (!next && card.status === "waiting") return `${who} is waiting for its user.${reply(card)}`;
@@ -172,7 +188,7 @@ export async function waitForSession(
   const files = changed.length ? `\nFiles it changed while you waited: ${changed.slice(0, 8).join(", ")}${changed.length > 8 ? ` and ${changed.length - 8} more` : ""}` : "\nIt changed no files while you waited.";
   const what =
     end === "turn_end" ? `finished its turn after ${secs}.` : end === "stopped" ? `was stopped after ${secs}.` : end === "waiting" ? `is now waiting for its user (after ${secs}).` : end === "failed" ? `failed its turn after ${secs}.` : `ended after ${secs}.`;
-  return `${who} ${what}${end === "failed" || end === "ended" ? "" : reply(now)}${files}`;
+  return `${who} ${what}${end === "failed" || end === "ended" ? "" : reply(now)}${files}${note}`;
 }
 
 /** Most of one session's drafts that wait for the user at a time. */

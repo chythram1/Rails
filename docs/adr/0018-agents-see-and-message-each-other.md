@@ -73,6 +73,11 @@ Decisions (proposed):
     - otherwise when it next ends a turn, stops, fails or waits for the user, with that status and its last reply;
     - or after 100 seconds with "still working", so the agent can call again.
     Each result also lists the files the session changed while the agent waited.
+    *Amended:* "idle" right after the agent's own message is the old idle. While its message to that session still
+    waits for the user, `wait_for` says so at once (nothing has reached it). When the message reached an idle
+    session in the last 2 minutes and that session hasn't started on it, it waits for the turn the message starts,
+    and says so. A message that went into a busy session's queue is taken up in its next turn, which the result
+    points out (`next: true`).
     As built: both agents limit one MCP call, so Rails sets the limit to 150 s in the config it passes (Claude
     Code's per-server `timeout` in ms; pi's `timeout` in seconds, whose default of 60 would have cut a wait
     short). The wait is 100 s, not 2 minutes: Claude Code moves an MCP call that's still running after 120 s to
