@@ -6,6 +6,7 @@ import { ACT_ASKS, ACT_QUESTION, decisionLog, settled, setDecisionModel, setDeci
 import { models, modelSettings, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
 import { turnEnded } from "./findings.ts";
+import { messageFromAgent } from "./agentTools.ts";
 import { createSprocket, listMessages, projectChat, updateSettings } from "./sprockets.ts";
 import { GRACE_MS, startWatches } from "./watches.ts";
 
@@ -287,9 +288,18 @@ describe("the decision model on findings (ADR 0029)", () => {
     expect(asked.at(-1)!.state.other_sessions).toContain('"UI" (pi)');
   });
 
+  it("doesn't wake for work the session already messaged someone about this turn (test run 9)", async () => {
+    settings.set("decisionModel", "judge/judge-1");
+    answer = finds(0.97);
+    const { panel, ui } = team();
+    receive(panel.id, "claude", "UserPromptSubmit", { prompt: "Add a 3x speed" });
+    await messageFromAgent(panel.id, ui.id.slice(0, 8), "The HUD's speed button needs a 3x label.");
+    expect(await turnEnded(panel, "3x is in. The HUD needs two small edits; I drafted that request to the UI session.")).toBe(false);
+  });
+
   it("leaves it to the rule when it isn't sure, fails, or only shadows; and to the question's wake when it hears one", async () => {
     settings.set("decisionModel", "judge/judge-1");
-    answer = finds(0.6);
+    answer = finds(0.7);
     expect(await turnEnded(team().panel, RUNNER)).toBe(false); // unsure, and the rule sees no file
     answer = () => ({ stopReason: "error", errorMessage: "overloaded" });
     expect(await turnEnded(team().panel, RUNNER)).toBe(false);

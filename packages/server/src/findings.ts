@@ -20,7 +20,7 @@ import type { Panel, SprocketEvent } from "@rails/shared";
 import { OVERLAP_MS, rel } from "./bridge/board.ts";
 import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
 import type { SessionEvent } from "./bridge/events.ts";
-import { handoffs, panels, projects, sprockets, suggestions } from "./db.ts";
+import { handoffs, panels, projects, sessionEvents, sprockets, suggestions } from "./db.ts";
 import { ownedPath, ownerOf, projectOwners } from "./owners.ts";
 import { postEvent } from "./sprockets.ts";
 import { sessionTitle } from "./titles.ts";
@@ -103,6 +103,12 @@ function covered(reporter: Panel, otherId: string, now: number): boolean {
   return handoffs.pendingAt(reporter.id).some((h) => h.from.panelId === reporter.id && h.to.panelId === otherId);
 }
 
+/** Whether the session drafted a message for another one (ADR 0018) since its turn began (or within WROTE_MS). */
+function wroteThisTurn(panel: Panel, now: number): boolean {
+  const began = sessionEvents.list(panel.id).findLast((x) => x.event?.kind === "prompt")?.at ?? new Date(now - WROTE_MS).toISOString();
+  return suggestions.byAgent(panel.id, began).some((s) => s.status !== "dismissed");
+}
+
 /** Which pairs were reported for which file, when: once per OVERLAP_MS. */
 const reported = new Map<string, number>();
 
@@ -116,8 +122,9 @@ export async function noteFinding(panel: Panel, text: string, now = Date.now(), 
   if (!coordinator) return false;
   const found = findingsIn(panel, text, now);
   // The model heard work for another session, and the reply names none of their files: Rails can't tell whose it
-  // is, so the Coordinator reads the reply. Once per turn end; the agent's own messages show in its chat already.
-  if (verdict === "finding" && !found.length) return post(coordinator.id, panel, text, []);
+  // is, so the Coordinator reads the reply. Not when the session wrote to another one during this turn (ADR 0018):
+  // that's most likely what its reply describes (test run 8: "I drafted that request to the UI session").
+  if (verdict === "finding" && !found.length) return wroteThisTurn(panel, now) ? false : post(coordinator.id, panel, text, []);
   const fresh = found
     .filter((f) => !covered(panel, f.panelId, now))
     .map((f) => ({ ...f, files: f.files.filter((file) => now - (reported.get(`${panel.id} ${f.panelId} ${file}`) ?? -Infinity) >= OVERLAP_MS) }))

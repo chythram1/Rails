@@ -23,8 +23,9 @@ Decisions:
   the work there is already done. As with every draft, the user sends it.
 - **The decision model**, when one is set, is asked first: "does it name work another session has to do?", with
   the other sessions and what each owns or changed as context, and in the same call "does it ask the user
-  something?". When it's sure (`FINDING_BAR`, 0.7) its answer decides: a finding wakes the Coordinator even when
-  the reply names no file (the event then names no session, and the Coordinator finds out whose it is), no finding
+  something?". When it's sure (`FINDING_BAR`, 0.75, from runs 8 and 9) its answer decides: a finding wakes the Coordinator even when
+  the reply names no file (the event then names no session, and the Coordinator finds out whose it is; not when
+  the session messaged another one during that turn, which is what its reply most likely describes), no finding
   stops the rule's wake, and a reply it hears asking is left to that wake. When it isn't sure, fails, times out
   (8 s), or there's none, or `RAILS_DECISIONS=shadow`, the rule decides. So Rails works the same without a model;
   with one, a finding's wake waits for its answer, a few seconds at most. Every answer is logged next to the

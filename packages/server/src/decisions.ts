@@ -52,11 +52,11 @@ function bars(): { asks: number; question: number } {
   return { asks, question: Math.min(DECISION_THRESHOLD.max, Math.round((asks + DECISION_THRESHOLD.dialogMargin) * 100) / 100) };
 }
 /**
- * How sure it has to be for its finding answer to decide (ADR 0029), either way. From test run 8's log: it was right
- * on all five turn ends where it or the rule saw a finding, at 0.78 to 0.92. A wrong wake costs a run the
- * Coordinator ends quiet; below the bar, the rule decides.
+ * How sure it has to be for its finding answer to decide (ADR 0029), either way. From the test runs' logs: run 8's
+ * findings it was right on scored 0.78 to 0.92; in run 9 its one wrong wake scored 0.71 and its right ones 0.85 to
+ * 0.97. A wrong wake costs a run the Coordinator ends quiet; below the bar, the rule decides.
  */
-export const FINDING_BAR = 0.7;
+export const FINDING_BAR = 0.75;
 
 /** How much of a message's end an event keeps (as watches.ts). */
 const EVENT_TAIL = 600;
