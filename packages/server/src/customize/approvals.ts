@@ -2,9 +2,9 @@
 // and keeps the result on the card) or denies it; either way the Sprocket gets a new turn to go on. The card is the
 // record, so nothing waits in memory while the user decides.
 import { RESULT_CHARS, callTool, policyOf } from "./mcp.ts";
-import { mcpServers, sprocketMessages, sprocketRuns, sprocketTools } from "./db.ts";
-import { ServiceError } from "./errors.ts";
-import { requestReply, runsChanged } from "./sprockets/runs.ts";
+import { mcpServers, sprocketMessages, sprocketRuns, sprocketTools } from "../db.ts";
+import { ServiceError } from "../errors.ts";
+import { requestReply, runsChanged } from "../sprockets/runs.ts";
 
 /** Decisions under way, so a double tap (or two devices) can't run a call twice. */
 const deciding = new Set<string>();

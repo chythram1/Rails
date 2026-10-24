@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { actOnCard } from "./cardActions.ts";
 import { mcpServers, settings, sprocketRuns } from "../db.ts";
-import { createServer, disconnectAll, testServer, updateServer } from "../mcp.ts";
+import { createServer, disconnectAll, testServer, updateServer } from "../customize/mcp.ts";
 import { models, refOf } from "../models.ts";
 import { idle } from "./runs.ts";
 import { createSprocket, directChat, listMessages, sendMessage, updateSettings } from "./sprockets.ts";

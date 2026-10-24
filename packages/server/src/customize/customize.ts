@@ -1,9 +1,9 @@
 // Customize (ADR 0025): what Sprockets can use. This file holds the saved prompts; MCP servers are mcp.ts, skills
 // skills.ts. Changes are broadcast as customize.changed.
 import { SAVED_PROMPT_NAME_MAX, SAVED_PROMPT_TEXT_MAX, type SavedPrompt, type SavedPromptInput } from "@rails/shared";
-import { savedPrompts } from "./db.ts";
-import { ServiceError } from "./errors.ts";
-import { listeners } from "./util.ts";
+import { savedPrompts } from "../db.ts";
+import { ServiceError } from "../errors.ts";
+import { listeners } from "../util.ts";
 
 // ---- change notifications (the terminal hub forwards these to every browser) ----
 const changes = listeners();

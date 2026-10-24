@@ -12,7 +12,7 @@ import { panels } from "./db.ts";
 import { startDecisions } from "./decisions.ts";
 import { startFindings } from "./findings.ts";
 import { startHandoffs } from "./handoffs.ts";
-import { disconnectAll } from "./mcp.ts";
+import { disconnectAll } from "./customize/mcp.ts";
 import { startOverlaps } from "./overlaps.ts";
 import { startOwners } from "./owners.ts";
 import { resumeRuns } from "./sprockets/runs.ts";

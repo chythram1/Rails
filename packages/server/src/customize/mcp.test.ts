@@ -3,10 +3,10 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { RAILS_HOME } from "./config.ts";
+import { RAILS_HOME } from "../config.ts";
 import { addConnector, callTool, createServer, deleteServer, disconnectAll, listServers, policyOf, testServer, updateServer } from "./mcp.ts";
 
-const FAKE = fileURLToPath(new URL("./test/fake-mcp.mjs", import.meta.url));
+const FAKE = fileURLToPath(new URL("../test/fake-mcp.mjs", import.meta.url));
 /** A server running the fake notes server. */
 export const fakeServer = (name: string, env: Record<string, string> = {}) => createServer({ name, transport: "stdio", command: process.execPath, args: [FAKE], env });
 

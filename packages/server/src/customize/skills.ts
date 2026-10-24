@@ -5,11 +5,11 @@ import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rm
 import { homedir } from "node:os";
 import { basename, join, normalize, relative, sep } from "node:path";
 import { SKILL_BODY_MAX, SKILL_DESCRIPTION_MAX, SKILL_NAME_MAX, type Skill, type SkillInput, type SkillSource } from "@rails/shared";
-import { RAILS_HOME } from "./config.ts";
+import { RAILS_HOME } from "../config.ts";
 import { customizeChanged } from "./customize.ts";
-import { sprocketTools } from "./db.ts";
-import { ServiceError } from "./errors.ts";
-import { pickFolder } from "./workspace/picker.ts";
+import { sprocketTools } from "../db.ts";
+import { ServiceError } from "../errors.ts";
+import { pickFolder } from "../workspace/picker.ts";
 
 const dir = () => join(RAILS_HOME, "skills");
 /** At most this many files are listed (and copied in) per skill, and this much in all. */

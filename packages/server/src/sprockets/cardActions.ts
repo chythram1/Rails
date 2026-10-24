@@ -5,7 +5,7 @@
 import { actionSettled, type SprocketCardAction } from "@rails/shared";
 import { mcpServers, sprocketMessages, sprocketTools } from "../db.ts";
 import { ServiceError } from "../errors.ts";
-import { callTool, policyOf } from "../mcp.ts";
+import { callTool, policyOf } from "../customize/mcp.ts";
 import { requestReply, runsChanged } from "./runs.ts";
 
 /** How much of a call's result a card keeps (it goes to the model with up to four others). */

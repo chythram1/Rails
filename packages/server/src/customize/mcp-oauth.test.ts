@@ -8,9 +8,9 @@ vi.hoisted(() => {
   process.env.RAILS_MCP_OAUTH_PORT = String(20000 + Math.floor(Math.random() * 30000));
 });
 
-const { RAILS_HOME } = await import("./config.ts");
+const { RAILS_HOME } = await import("../config.ts");
 const mcp = await import("./mcp.ts");
-const { fakeOAuthMcp } = await import("./test/fake-oauth-mcp.ts");
+const { fakeOAuthMcp } = await import("../test/fake-oauth-mcp.ts");
 
 afterAll(() => mcp.disconnectAll());
 

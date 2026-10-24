@@ -2,7 +2,7 @@ import type { IPty } from "node-pty";
 import type WebSocket from "ws";
 import type { ClientMsg, ServerMsg } from "@rails/shared";
 import { watchBusy } from "./activity.ts";
-import { onCustomizeChanged } from "../customize.ts";
+import { onCustomizeChanged } from "../customize/customize.ts";
 import { onAutomationsChanged } from "../automate/automations.ts";
 import { panels } from "../db.ts";
 import { onPanelsChanged, panelEnded } from "./panels.ts";

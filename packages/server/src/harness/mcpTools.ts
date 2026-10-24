@@ -3,7 +3,7 @@
 // runs or skips, and the turn goes on (ADR 0031). Only direct and team chats have MCP tools.
 import { Type } from "@earendil-works/pi-ai";
 import { CARD_ACTIONS_MAX } from "@rails/shared";
-import { callTool, policyOf } from "../mcp.ts";
+import { callTool, policyOf } from "../customize/mcp.ts";
 import type { StoredMcpServer } from "../db.ts";
 import type { Capability } from "./capabilities.ts";
 

@@ -4,12 +4,12 @@ import { fauxAssistantMessage, fauxProvider, fauxToolCall, type TranscriptContex
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { decideApproval } from "./approvals.ts";
-import { projects, settings, sprocketMessages, sprocketRuns } from "./db.ts";
+import { projects, settings, sprocketMessages, sprocketRuns } from "../db.ts";
 import { createServer, disconnectAll, testServer, updateServer } from "./mcp.ts";
-import { models, refOf } from "./models.ts";
-import { idle } from "./sprockets/runs.ts";
+import { models, refOf } from "../models.ts";
+import { idle } from "../sprockets/runs.ts";
 import { createSkill, deleteSkill, listSkills, parseSkill } from "./skills.ts";
-import { createSprocket, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets/sprockets.ts";
+import { createSprocket, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "../sprockets/sprockets.ts";
 
 const faux = fauxProvider();
 models.setProvider(faux.provider);
@@ -18,7 +18,7 @@ const look = { character: "bean", color: "teal", accessory: "none" } as const;
 beforeEach(() => settings.set("defaultModel", ref));
 afterAll(() => disconnectAll());
 
-const FAKE = fileURLToPath(new URL("./test/fake-mcp.mjs", import.meta.url));
+const FAKE = fileURLToPath(new URL("../test/fake-mcp.mjs", import.meta.url));
 let n = 0;
 /** A Sprocket with a fresh notes server (its tools listed). */
 async function withNotes() {

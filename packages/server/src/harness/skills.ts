@@ -2,7 +2,7 @@
 // skills it has (skillsPrompt), so it knows when one applies.
 import { Type } from "@earendil-works/pi-ai";
 import type { Skill } from "@rails/shared";
-import { readSkillFile } from "../skills.ts";
+import { readSkillFile } from "../customize/skills.ts";
 import type { Capability } from "./capabilities.ts";
 
 /** The lines its instructions get: each skill's name and description. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createPrompt, updatePrompt } from "./customize.ts";
-import { promptsCapability } from "./harness/prompts.ts";
+import { promptsCapability } from "../harness/prompts.ts";
 
 describe("saved prompts", () => {
   it("creates, edits and checks prompts", () => {

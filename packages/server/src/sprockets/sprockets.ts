@@ -19,8 +19,8 @@ import {
   type SprocketSettings,
 } from "@rails/shared";
 import { handoffs, mcpServers, projects, sprocketChats, sprocketMessages, sprocketTools, sprockets, suggestions, usage, type StoredChat } from "../db.ts";
-import { customizeChanged } from "../customize.ts";
-import { skillExists } from "../skills.ts";
+import { customizeChanged } from "../customize/customize.ts";
+import { skillExists } from "../customize/skills.ts";
 import { ServiceError } from "../errors.ts";
 import { endRound, nameClash, onTeamsChanged, startRound } from "./teams.ts";
 import { settleHandoffs } from "../handoffs.ts";
