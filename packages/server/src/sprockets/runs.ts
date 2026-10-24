@@ -410,7 +410,7 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   const posted = new Map<AssistantMessage, SprocketMessage>();
   const clean = (text: string) => (team ? withoutName(text, s.name) : text);
   /** A team member with nothing to add replies (quiet) (ADR 0033): nothing is posted. */
-  const quiet = (text: string) => !!team && QUIET.test(text.trim());
+  const quiet = (text: string) => !!team && (QUIET.test(text.trim()) || QUIET_SHORT.test(text.trim()));
   /** Messages it posted with send_message and the cards it showed (show_card), as it went. */
   const sent: SprocketMessage[] = [];
   /** Text it already posted this run, said again (models repeat their message after a refused pass): not posted twice. */
@@ -628,6 +628,11 @@ export function textOf(m: Pick<AssistantMessage, "content">): string {
  * (quiet), or an explanation that ends with it (the user isn't told either way).
  */
 const QUIET = /(^\(?quiet\)?|\(quiet\))\.?$/i;
+/**
+ * A team member's whole reply that only says it stays quiet: a short form ("(q)", "quiet"), or a note in brackets
+ * ("(Chandler's answer covers it)"), as some models write instead of (quiet) (mimo-v2.6-flash, live).
+ */
+const QUIET_SHORT = /^(\s*(q|quiet|silent|no reply)\s*\.?|\([^()]*\)\.?|\[[^[\]]*\]\.?)$/i;
 
 /** A tool's name as a button's label: its title as it is, or "add_note" as "Add note". */
 const labelOf = (title: string) => (/[\s]/.test(title) ? title : (title.charAt(0).toUpperCase() + title.slice(1)).replace(/[_-]+/g, " "));

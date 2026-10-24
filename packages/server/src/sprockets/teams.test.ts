@@ -70,6 +70,14 @@ describe("team chats", () => {
     expect(listMessages(team.id).some((m) => m.author === "notice")).toBe(false);
   });
 
+  it("takes a short form of (quiet) as quiet too, as some models write it", async () => {
+    const { team } = crew(["Ada", "Bo"]);
+    scriptMembers(faux, { Ada: [reply("Ada here.")], Bo: [reply("(q)"), reply("(Ada's answer covers it)")] });
+    sendMessage(team.id, "Ada?");
+    await idle();
+    expect(said(team.id)).toEqual(["user: Ada?", "Ada: Ada here."]);
+  });
+
   it("lets every member answer a message for all of them, at once", async () => {
     const { team } = crew();
     const g = gate();
