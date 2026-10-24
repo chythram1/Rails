@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { IconPlus as Plus, IconStarFilled as Star } from "@tabler/icons-react";
+import { IconPlus as Plus } from "@tabler/icons-react";
 import { TEAM_MEMBERS_MAX, TEAM_MEMBERS_MIN, type Project, type Sprocket as SprocketData, type SprocketTeam } from "@rails/shared";
 import { api } from "../../api.ts";
 import { MenuButton } from "../ui/Menu.tsx";
@@ -9,9 +9,9 @@ import { Sprocket } from "./Sprocket.tsx";
 export const TEAM_NAME_MAX = 40;
 
 /**
- * A team's four member slots (ADR 0022), two to a row: the first is the lead's, marked with a star. A filled slot's
- * menu makes its Sprocket the lead or takes it out; the next empty one's adds a Sprocket. `onChange` gets the new
- * members, lead first. Used by the New team dialog and the team's settings panel, which saves each change and so
+ * A team's four member slots (ADR 0022), two to a row, in order (the first stands in front in the team's face). A
+ * filled slot's menu moves its Sprocket to the front or takes it out; the next empty one's adds a Sprocket. `onChange`
+ * gets the new members, in order. Used by the New team dialog and the team's settings panel, which saves each change and so
  * keeps at least `keep` members.
  */
 export function MemberSlots(props: { members: string[]; all: SprocketData[]; projects: Project[]; labelledBy: string; keep?: number; onChange(next: string[]): void }) {
@@ -46,26 +46,21 @@ export function MemberSlots(props: { members: string[]; all: SprocketData[]; pro
               key={s.id}
               plain
               className="sp-slot"
-              label={`${s.name}${i === 0 ? ", the lead" : ""}. Change`}
+              label={`${s.name}. Change`}
               title={s.name}
               icon={
                 <>
                   <span className="sp-slot-face">
                     <Sprocket look={s.look} size={28} seed={s.id} still />
-                    {i === 0 && (
-                      <span className="sp-lead-badge">
-                        <Star size={8} />
-                      </span>
-                    )}
                   </span>
                   <span className="sp-slot-text">
                     <span className="truncate">{s.name}</span>
-                    <span className="muted small truncate">{i === 0 ? "Lead" : where(s)}</span>
+                    <span className="muted small truncate">{where(s)}</span>
                   </span>
                 </>
               }
               items={[
-                { label: "Make lead", disabled: i === 0, onSelect: () => change([s.id, ...members.filter((m) => m !== s.id)], 0) },
+                { label: "Move to front", disabled: i === 0, onSelect: () => change([s.id, ...members.filter((m) => m !== s.id)], 0) },
                 {
                   label: "Remove from team",
                   danger: true,
@@ -82,11 +77,11 @@ export function MemberSlots(props: { members: string[]; all: SprocketData[]; pro
             key={`empty-${i}`}
             plain
             className="sp-slot empty"
-            label={i === 0 ? "Add the lead" : "Add a Sprocket"}
+            label="Add a Sprocket"
             icon={
               <>
                 <Plus size={16} aria-hidden />
-                <span>{i === 0 ? "Add the lead" : "Add a Sprocket"}</span>
+                <span>Add a Sprocket</span>
               </>
             }
             items={
@@ -156,7 +151,7 @@ export function TeamDialog({ all, projects, onSaved, onClose, returnFocus }: Pro
       <form onSubmit={(e) => (e.preventDefault(), void save())}>
         <h2 id="team-title">New team</h2>
         <p id="team-desc" className="small-dialog-desc">
-          Your messages go to whoever you @mention (or @everyone), and the lead takes the rest. Members can pass each other the turn.
+          Everyone reads every message, and whoever has something to add answers. @mention someone to ask only them.
         </p>
         <label className="sp-field-label" htmlFor="team-name">Name</label>
         <input

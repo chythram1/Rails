@@ -23,7 +23,7 @@ export function TeamPanelToggle({ team, open }: { team: SprocketTeam; open: bool
 }
 
 /**
- * A team's panel beside its chat (ADR 0022), in the frame of a Sprocket's: its name, its members (the first leads),
+ * A team's panel beside its chat (ADR 0022), in the frame of a Sprocket's: its name, its members (the first stands in front in its face),
  * and Delete at the end. Everything saves as you go, and a quiet "Saved" in the header confirms it. It has its own
  * URL (`#/sprockets/teams/<id>/settings`); its toggle, Escape or the browser's back button close it.
  */
@@ -73,7 +73,7 @@ export function TeamSettings({ team, all }: { team: SprocketTeam; all: SprocketD
           <div className="settings-field">
             <p id="team-panel-members" className="sp-field-label">Sprockets</p>
             <MemberSlots members={team.members} all={all} projects={projects} labelledBy="team-panel-members" keep={TEAM_MEMBERS_MIN} onChange={(members) => void save({ members })} />
-            <p className="muted small">Two to four. The first leads: it takes messages that aren't for anyone in particular, and goes first when several are asked.</p>
+            <p className="muted small">Two to four. Each reads every message and answers when it has something to add.</p>
           </div>
         </section>
         <div className="sp-danger-zone">

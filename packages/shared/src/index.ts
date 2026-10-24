@@ -391,18 +391,17 @@ export interface SprocketChatInfo {
 }
 
 /**
- * A team chat (ADR 0022): the user and two to four Sprockets. The user's messages go to the members they
- * @mention, else to whoever asked them something, else to the lead; a member gives a teammate the turn with
- * pass_turn (ADR 0023).
+ * A team chat (ADR 0022): the user and two to four Sprockets. Every message wakes every member (or those it
+ * @mentions), and each decides whether to answer (ADR 0033).
  */
 export interface SprocketTeam extends SprocketChatInfo {
   kind: "team";
   name: string;
-  /** Its members' ids, the lead first. */
+  /** Its members' ids, in order. */
   members: string[];
-  /** The member writing a reply there now, if one is. */
-  replying?: string;
-  /** Members whose turns are queued, in order (ADR 0023). */
+  /** Members writing a reply there now (ADR 0033: several at once). */
+  replying: string[];
+  /** Members woken but not started yet, in order. */
   waiting: string[];
   createdAt: string;
 }
@@ -410,14 +409,17 @@ export interface SprocketTeam extends SprocketChatInfo {
 /** A team as the user makes or edits it. */
 export interface SprocketTeamInput {
   name: string;
-  /** Two to four Sprockets with different names, the lead first. */
+  /** Two to four Sprockets with different names, in order. */
   members: string[];
 }
 
 export const TEAM_MEMBERS_MIN = 2;
 export const TEAM_MEMBERS_MAX = 4;
-/** Passes of the turn in a row, after one message from the user, before a team waits for them again (ADR 0023). */
-export const TEAM_TURNS_MAX = 10;
+/**
+ * Levels of members' replies after one message from the user (ADR 0033): a member's reply wakes its teammates only
+ * while fewer came before it, so members stop answering each other until the user writes again.
+ */
+export const TEAM_TURNS_MAX = 4;
 
 /** An @mention of a team member in a message (ADR 0022): where it is, and the member's index in the names given. */
 export interface MentionSpan {
@@ -653,7 +655,7 @@ export interface SprocketEvent {
 /** One message in a Sprocket's chat. */
 export interface SprocketMessage {
   id: string;
-  /** The chat's Sprocket; in a team, the member that wrote it (the lead for the user's messages). */
+  /** The chat's Sprocket; in a team, the member that wrote it. */
   sprocketId: string;
   chatId: string;
   author: SprocketAuthor;
@@ -665,7 +667,7 @@ export interface SprocketMessage {
   event?: SprocketEvent;
   /** On a Coordinator's reply: the replies it suggests sending to sessions. */
   suggestions?: Suggestion[];
-  /** On a pass line (author `pass`): the member given the turn. */
+  /** On a pass line (author `pass`, before ADR 0033): the member given the turn. */
   passTo?: string;
   /** On a Sprocket's question to the user (ADR 0023): its options, and the answer once there is one. */
   ask?: SprocketAsk;

@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projects, settings, sprocketRuns, sprockets } from "../db.ts";
 import { models, refOf } from "../settings/models.ts";
 import { CORE_MEMORY_MAX, editMemory } from "../harness/memory.ts";
-import { askedTeammates } from "./rounds.ts";
 import { idle, isRunning, onActivity, onTyping, readableError, REQUEST_TIMEOUT_MS, resumeRuns, RETRY_MS, textOf } from "./runs.ts";
 import { sprocketMessages } from "../db.ts";
 import { createSprocket, deleteSprocket, detachFromProject, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
@@ -336,21 +335,6 @@ describe("runs", () => {
     await idle();
     // Each message is dated when it's posted: "two" came in while "first" was being written.
     expect(authors(s.id)).toEqual(["user: one", "user: two", "sprocket: first", "sprocket: second"]);
-  });
-});
-
-describe("askedTeammates", () => {
-  const team = [{ name: "Fred" }, { name: "Doc Keeper" }, { name: "Pam" }];
-  it("finds teammates a message asks something or gives something to do, not ones it only mentions", () => {
-    const asks = (t: string) => askedTeammates(t, team);
-    expect(asks("Fred, what do you think?")).toEqual(["Fred"]);
-    expect(asks("Here's my draft. What do you think, Fred?")).toEqual(["Fred"]);
-    expect(asks("Doc Keeper, draft step 2.")).toEqual(["Doc Keeper"]);
-    expect(asks("**Pam:** your take on the colours")).toEqual(["Pam"]);
-    expect(asks("@Pam can you check it?")).toEqual(["Pam"]);
-    expect(asks("Thanks Fred!")).toEqual([]);
-    expect(asks("I agree with Fred. Nice work.")).toEqual([]);
-    expect(asks("Frederick, are you there?")).toEqual([]);
   });
 });
 

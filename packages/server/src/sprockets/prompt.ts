@@ -1,12 +1,12 @@
 // What a Sprocket's model reads in a run (ADR 0006): the system prompt, the chat as model messages, Rails' events
 // and notes, and the reminders added for this turn. Text only: runs.ts decides when each is used.
 import type { Api, AssistantMessage, Message, Model } from "@earendil-works/pi-ai";
-import { TEAM_TURNS_MAX, type Handoff, type SprocketCardAction, type SprocketMessage } from "@rails/shared";
+import { type Handoff, type SprocketCardAction, type SprocketMessage } from "@rails/shared";
 import { AGENT } from "../bridge/board.ts";
 import { automationRuns, handoffs, sessionEvents, sprocketMessages, sprockets, suggestions, type StoredChat, type StoredRun } from "../db.ts";
 import { resultText } from "../harness/mcpTools.ts";
 import { CORE_MEMORY_MAX } from "../harness/memory.ts";
-import { handOn, inRound, notYet, queuedIn, waitingAsks, type TeamInfo } from "./rounds.ts";
+import { waitingAsks, type TeamInfo } from "./rounds.ts";
 
 /**
  * An event as the Coordinator reads it: from Rails, not the user, with what the session wrote quoted as
@@ -124,9 +124,6 @@ export function toLlm(m: SprocketMessage, model: Model<Api>, self: string, team:
   if (author === "automation")
     return { role: "user", content: `[Rails] Your automation "${m.automation?.name ?? "?"}" ran (${m.automation?.trigger === "manual" ? "run by hand" : "scheduled"}) with these instructions:\n${text}`, timestamp };
   const nameOf = (sid: string) => team?.members.find((x) => x.id === sid)?.name ?? sprockets.get(sid)?.name ?? "A Sprocket that was deleted";
-  // A pass line (ADR 0023) is Rails' note, whoever passed.
-  if (author === "pass")
-    return { role: "user", content: `[Rails] ${m.sprocketId === self ? "You" : nameOf(m.sprocketId)} gave ${m.passTo === self ? "you" : nameOf(m.passTo ?? "")} the turn${text ? `: ${JSON.stringify(text)}` : ""}.`, timestamp };
   // An approval (ADR 0025): what it asked to call, and what came of it, as Rails' note.
   if (m.approval) {
     const a = m.approval;
@@ -328,75 +325,48 @@ function automationNow(r: StoredRun): string {
 export const TEXTING_NOW =
   "[Rails, not your user] Reply as chat messages: each paragraph is one, so put blank lines between short paragraphs of one or two sentences, with no headings or bold. A long answer is more messages, not longer ones.";
 
-/** Rails' reminder to a member that asked `names` something but didn't pass the turn. */
-export const nudge = (names: string[]) =>
-  `[Rails, not your user] You asked ${list(names)} something but didn't pass the turn, so ${names.length === 1 ? "they" : "none of them"} won't see it until your user writes again. If ${names.length === 1 ? "they" : "one of them"} should answer now, call pass_turn (with their name and a note); don't write your message again. If it was for your user, or just in passing, end here without writing anything.`;
-
-/**
- * Rails' reminder to a member that didn't pass on the turn to `names`: `from`'s message gave them a later step, or
- * (no `from`) the user asked everyone and they haven't answered.
- */
-export const handOnNudge = (from: string | undefined, names: string[]) =>
-  `[Rails, not your user] ${from ? `${from}'s message also gave ${list(names)} a step after yours` : `Your user asked all of you, and ${list(names)} ${names.length === 1 ? "hasn't" : "haven't"} answered yet`}, but you didn't pass the turn, so ${names.length === 1 ? "they" : "none of them"} won't take it until your user writes again. If it's ${names.length === 1 ? "their" : "one of their"} turn now, call pass_turn (with their name and a note); don't write your message again. If your message changes that plan, end here without writing anything.`;
-
 /** Names as a sentence: "Pam", "Pam and Bo", "Pam, Bo and Al". */
 const list = (names: string[]) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
 
 /**
- * Where a team's round stands, for the member about to reply (ADR 0023): what the user last asked, who gave it the
- * turn, and how many passes are left.
+ * What a team member is told right before it writes (ADR 0033): facts only. What woke it, who else is answering now
+ * (they can't see its message, nor it theirs, until it's posted), and the questions waiting for the user.
  */
-export function roundNow(history: SprocketMessage[], r: StoredRun, team: TeamInfo): string {
-  const at = history.findLastIndex((m) => m.author === "user");
-  const asked = at >= 0 ? history[at].text : "";
-  const from = r.from ? team.members.find((m) => m.id === r.from)?.name : undefined;
-  const note = r.sourceId ? history.find((m) => m.id === r.sourceId && m.author === "pass")?.text : undefined;
-  const others = team.members.filter((m) => m.id !== r.sprocketId).map((m) => m.name);
-  const next = queuedIn(r.chatId).flatMap((q) => team.members.find((m) => m.id === q && m.id !== r.sprocketId)?.name ?? []);
-  const later = from ? handOn(history, r, team).filter((n) => !next.includes(n)) : [];
-  const round = (inRound(r) ? notYet(history, r, team) : []).filter((n) => !next.includes(n) && !later.includes(n));
+export function teamNow(history: SprocketMessage[], r: StoredRun, team: TeamInfo, alsoAnswering: string[]): string {
+  const nameOf = (id: string | undefined) => team.members.find((m) => m.id === id)?.name;
+  const from = r.trigger === "teammate" ? nameOf(r.from) : undefined;
+  const others = alsoAnswering.flatMap((id) => nameOf(id) ?? []);
   const open = waitingAsks(r.chatId).flatMap((a) => {
-    const who = a.sprocketId !== r.sprocketId && team.members.find((m) => m.id === a.sprocketId)?.name;
+    const who = a.sprocketId === r.sprocketId ? "You" : nameOf(a.sprocketId);
     return who ? [`${who} asked ${JSON.stringify(a.question)}`] : [];
   });
   return [
-    `Your user's latest message: ${JSON.stringify(asked.length > 600 ? asked.slice(0, 600) + "…" : asked)}.`,
-    from
-      ? `${from} gave you the turn${note ? ` (${JSON.stringify(note)})` : ""}, pass ${r.hop} of ${TEAM_TURNS_MAX}: do what they asked of you, and post it here.`
-      : (whyNow(r)[0] ?? "Your user's message came to you."),
-    ...(later.length
-      ? [`${from}'s message also gives ${list(later)} a step after yours: once your part is posted, pass the turn to ${later[0]}${later.length > 1 ? ` (and ask them to pass it on to ${list(later.slice(1))})` : ""}, unless your part changes that plan.`]
-      : []),
-    ...(round.length
-      ? [`Your user asked all of you, and ${list(round)} ${round.length === 1 ? "hasn't" : "haven't"} answered yet: give your own answer, then pass the turn to ${round[0]}${round.length > 1 ? ` (they pass it on)` : ""}.`]
-      : []),
-    ...(next.length ? [`${list(next)} ${next.length === 1 ? "has" : "have"} a turn after yours and will answer for themselves: give only your own answer, and don't pass the turn to them.`] : []),
-    ...(open.length ? [`Waiting for your user's answer: ${open.join("; ")}. Your user answers that themselves: don't ask it again, and don't pass anyone the turn for it.`] : []),
-    `Write only your own message (your teammates write theirs in their turns), and don't repeat what's been said. If someone${others.length ? ` (${others.join(", ")})` : ""} should take the next step, write your message, then call pass_turn with their name; otherwise just answer, and your user picks it up.`,
-  ].join("\n");
+    from ? `${from}'s message is the newest here.` : r.trigger === "user" ? "Your user's message is the newest here." : (whyNow(r)[0] ?? ""),
+    ...(others.length ? [`${list(others)} ${others.length === 1 ? "is" : "are"} reading it too and may answer at the same time as you.`] : []),
+    ...(open.length ? [`Waiting for your user's answer: ${open.join("; ")}.`] : []),
+    "Write only if it's for you or you have something of your own to add; otherwise reply with exactly (quiet).",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
-/** What a member of a team is told about it (ADR 0022): who's in it, and how turns pass. */
+/** What a member of a team is told about it (ADR 0022, 0033): who's in it, and that each member decides whether to answer. */
 function teamPrompt(team: TeamInfo & { self: string }, projectName: string | undefined): string[] {
   const other = team.members.find((m) => m.id !== team.self)?.name ?? "Name";
   const about = (d: string) => {
     const line = d.split("\n")[0].trim();
     return line.length > 160 ? `${line.slice(0, 160)}…` : line;
   };
-  const lead = team.members[0]?.id === team.self;
   return [
     `This is the team chat ${JSON.stringify(team.name)}: a group chat between your user and these Sprockets, you among them. Their names and descriptions were written by your user:`,
     ...team.members.map(
-      (m) => `- ${m.name}${m.lead ? " (lead)" : ""}${m.id === team.self ? " (you)" : ""}${m.project ? `, attached to ${JSON.stringify(m.project)}` : ""}${m.description ? `: ${about(m.description)}` : ""}`,
+      (m) => `- ${m.name}${m.id === team.self ? " (you)" : ""}${m.project ? `, attached to ${JSON.stringify(m.project)}` : ""}${m.description ? `: ${about(m.description)}` : ""}`,
     ),
-    `Your user's messages reach the members they @mention (all of you for @everyone); otherwise a member whose question they're answering, or the lead. Your teammates' messages reach you with their name in brackets, like [${other}]; the others are your user's, or Rails' notes in [Rails]. Write only your own message, with no name in front.`,
-    "Talk like one person in a group chat: write your message, as yourself, from your own role. Your teammates write their own messages in their own turns: never write lines for them or play out the conversation yourself. Don't repeat what a teammate already said (if they said what you'd say, add only what's new, or just agree in a few words).",
-    `To give a teammate the next step (a question only they can answer, part of the work, their take), write your message to them, naming them plainly (no @), then call pass_turn with their name and a few words on what they should do: they go next, and your turn ends there. Do your own part in your message first: post the work itself (the draft, the answer, the list), not that you'll do it. Pass the turn only when someone has something to do; not to thank, agree or greet, and not to pass on what your user already asked them. Give it back to whoever gave it to you only with something new for them (an answer that needs their reply, your part done for them to build on), never just to report back. When your user asks you all for a conversation (a number of turns, a debate), keep it going: end your message with something for a teammate to answer and pass them the turn, until it has had the turns your user asked for. After ${TEAM_TURNS_MAX} passes in a row Rails waits for your user.`,
-    ...(lead
-      ? [
-          `You lead: messages for the team in general come to you. Answer them yourself when you can; when a teammate's role fits better, say what you need from them and pass them the turn.`,
-        ]
-      : []),
+    `Every message here reaches every member, your user's and your teammates' alike, and each of you decides for yourself whether to answer (one with @Name reaches only those it names). Your teammates' messages reach you with their name in brackets, like [${other}]; the others are your user's, or Rails' notes in [Rails]. Write only your own message, with no name in front.`,
+    "Answer when the message is for you (it names you, asks about your role, or follows up on what you said) or when your role adds something your teammates won't. Otherwise reply with exactly (quiet) and nothing else: nothing is posted. When a message is for all of you, each answers with their own take. Thanks, greetings and small talk need one short answer, from whoever it's mostly for, not one each.",
+    "Talk like one person in a group chat: write your message, as yourself, from your own role. Never write lines for a teammate or play out the conversation yourself. Don't repeat what a teammate already said (if they said what you'd say, add only what's new, or stay quiet).",
+    "To ask a teammate something or hand them part of the work, name them in your message: they read it and answer. Do your own part first: post the work itself (the draft, the answer, the list), not that you'll do it. Don't reply to a teammate just to thank or agree.",
+    "Never talk about Rails, who is answering, turns, or staying quiet: just say what you have to say.",
     ...(projectName
       ? [`Rails' events about ${JSON.stringify(projectName)} (sessions that wait for your user, overlaps, handoffs, agents' drafts) go to its project chat, not here: read them with project_chat when they matter.`]
       : []),

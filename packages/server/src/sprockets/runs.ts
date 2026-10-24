@@ -1,4 +1,4 @@
-// Sprocket runs (ADR 0006, 0023): when the user writes to a Sprocket, a teammate passes it the turn, or Rails wakes a
+// Sprocket runs (ADR 0006, 0023, 0033): when the user writes to a Sprocket, a teammate's message wakes it, or Rails wakes a
 // Coordinator because a session waits for the user (watches.ts), one bounded agent run takes that turn. Runs are
 // rows (`sprocket_runs`): queued, then running, then done, failed, cancelled or waiting (for the user's answer to
 // a question with options). Nothing runs otherwise: idle Sprockets cost nothing. Runs are capped (steps per run,
@@ -7,7 +7,7 @@
 // once more.
 import { Agent } from "@earendil-works/pi-agent-core";
 import { isRetryableAssistantError, type AssistantMessage, type Message, type Model } from "@earendil-works/pi-ai";
-import { CARD_ACTIONS_MAX, TEAM_TURNS_MAX, actionSettled, cardText, type SprocketCard, type SprocketCardAction, type SprocketMessage } from "@rails/shared";
+import { CARD_ACTIONS_MAX, TEAM_TURNS_MAX, actionSettled, cardText, findMentions, type SprocketCard, type SprocketCardAction, type SprocketMessage } from "@rails/shared";
 import {
   automationRuns,
   handoffs,
@@ -38,20 +38,20 @@ import { mcpCapabilities, type Proposal } from "../harness/mcpTools.ts";
 import { readSkillCapability, skillsPrompt } from "../harness/skills.ts";
 import { listSkills } from "../customize/skills.ts";
 import { serversFor } from "../customize/mcp.ts";
-import { askUserCapability, nothingNewCapability, passTurnCapability, sendMessageCapability, type TurnEnd } from "../harness/turns.ts";
+import { askUserCapability, nothingNewCapability, sendMessageCapability, type TurnEnd } from "../harness/turns.ts";
 import { findModel, models } from "../settings/models.ts";
 import { projectOwners } from "../coordination/owners.ts";
 import { resendWhenSilent } from "./resend.ts";
 import { sessionTitle } from "../workspace/titles.ts";
-import { handOnNudge, nudge, roundNow, severalEvents, systemPrompt, TEXTING_NOW, toLlm, whyNow } from "./prompt.ts";
-import { askedTeammates, handOn, inRound, notYet, queuedIn, teamInfo, waitingAsks, type TeamInfo } from "./rounds.ts";
+import { severalEvents, systemPrompt, teamNow, TEXTING_NOW, toLlm, whyNow } from "./prompt.ts";
+import { teamInfo } from "./rounds.ts";
 import { listeners } from "../util.ts";
 
 /** Model calls in one run (each round of tool calls is one). */
 const MAX_STEPS = 12;
 const MAX_RUNS_PER_HOUR = 30;
-/** Runs at once, across all Sprockets. */
-const MAX_ACTIVE = 2;
+/** Runs at once, across all Sprockets: enough for a team of four to answer together (ADR 0033). */
+const MAX_ACTIVE = 6;
 /** Chat messages sent with each run. */
 const HISTORY = 40;
 /**
@@ -80,12 +80,13 @@ const FIRST_ANSWER_MS = 20_000;
  */
 export const RETRY_MS = 15_000;
 
-/** Runs going now, by id: their Sprocket and chat (the rows say `running`). */
-const going = new Map<string, { sprocketId: string; chatId: string }>();
+/**
+ * Runs going now, by id: their Sprocket and chat (the rows say `running`), and once it has begun answering, when
+ * (ms; a project chat's reply is dated then).
+ */
+const going = new Map<string, { sprocketId: string; chatId: string; start?: number }>();
 /** When each Sprocket ran in the last hour (the limit is per Sprocket, across its chats). */
 const recent = new Map<string, number[]>();
-/** When the run in each chat started (ms). A project chat's reply is dated then. */
-const runStart = new Map<string, number>();
 
 const runChanges = listeners();
 const typingChanges = listeners<[sprocketId: string, chatId: string, text: string | null]>();
@@ -105,11 +106,10 @@ export const isRunning = (sprocketId: string) => [...going.values()].some((g) =>
 /** The chat a Sprocket is replying in, if it is. */
 export const runningChat = (sprocketId: string) => [...going.values()].find((g) => g.sprocketId === sprocketId)?.chatId;
 
-/** Who's on it in a chat: the Sprocket replying, those queued (in order) and those waiting for the user's answer. */
-export function chatTurns(chatId: string): { replying?: string; queued: string[]; waiting: string[] } {
-  const replying = [...going.values()].find((g) => g.chatId === chatId)?.sprocketId;
+/** Who's on it in a chat: the Sprockets replying, those queued (in order) and those waiting for the user's answer. */
+export function chatTurns(chatId: string): { replying: string[]; queued: string[]; waiting: string[] } {
   return {
-    ...(replying ? { replying } : {}),
+    replying: [...going.values()].filter((g) => g.chatId === chatId).map((g) => g.sprocketId),
     queued: sprocketRuns.list(["queued"], chatId).map((r) => r.sprocketId),
     waiting: sprocketRuns.list(["waiting"], chatId).map((r) => r.sprocketId),
   };
@@ -122,7 +122,8 @@ export function chatTurns(chatId: string): { replying?: string; queued: string[]
  */
 export function userMessageTime(chatId: string): string {
   const last = sprocketMessages.last(chatId);
-  return new Date(Math.max(Date.now(), (runStart.get(chatId) ?? 0) + 1, last ? Date.parse(last.createdAt) + 1 : 0)).toISOString();
+  const started = Math.max(0, ...[...going.values()].filter((g) => g.chatId === chatId).map((g) => g.start ?? 0));
+  return new Date(Math.max(Date.now(), started + 1, last ? Date.parse(last.createdAt) + 1 : 0)).toISOString();
 }
 
 /** The date for a message a run posts as it goes: now, after the chat's last message. */
@@ -144,6 +145,18 @@ export function requestReply(
   if (!chat) return;
   const who = sprocketId ?? chat.sprocketId;
   if (!sprocketRuns.list(["queued"], chatId).some((r) => r.sprocketId === who)) sprocketRuns.create({ chatId, sprocketId: who, trigger, sourceId, from, hop });
+  changed();
+  pump();
+}
+
+/**
+ * Wake team member `sprocketId` (ADR 0033). A run already queued for it there is enough (it reads everything new when
+ * it starts), but takes what woke it now when that's nearer the user's message, so a chain isn't cut short.
+ */
+export function wake(chatId: string, sprocketId: string, w: { trigger: RunTrigger; sourceId?: string; from?: string; hop: number }): void {
+  const queued = sprocketRuns.list(["queued"], chatId).find((r) => r.sprocketId === sprocketId);
+  if (!queued) sprocketRuns.create({ chatId, sprocketId, ...w });
+  else if (w.hop < queued.hop) sprocketRuns.rewake(queued.id, w);
   changed();
   pump();
 }
@@ -186,11 +199,10 @@ export function answerWaiting(chatId: string, answer: string, to?: string[]): st
 }
 
 /**
- * Start queued runs, oldest first, while fewer than MAX_ACTIVE go: one at a time per Sprocket and per chat, and in
- * each chat in order (a later run waits for an earlier one that can't start yet).
+ * Start queued runs, oldest first, while fewer than MAX_ACTIVE go: one at a time per Sprocket (ADR 0021). A team's
+ * members run at once (ADR 0033); a direct or project chat has one Sprocket, so its runs go one at a time anyway.
  */
 function pump(): void {
-  const held = new Set<string>();
   for (const r of sprocketRuns.list(["queued"])) {
     if (going.size >= MAX_ACTIVE) return;
     const chat = sprocketChats.get(r.chatId);
@@ -198,11 +210,7 @@ function pump(): void {
       sprocketRuns.setStatus(r.id, "cancelled");
       continue;
     }
-    if (held.has(r.chatId) || isRunning(r.sprocketId) || [...going.values()].some((g) => g.chatId === r.chatId)) {
-      held.add(r.chatId);
-      continue;
-    }
-    void start(r, chat);
+    if (!isRunning(r.sprocketId)) void start(r, chat);
   }
 }
 
@@ -228,23 +236,22 @@ async function start(r: StoredRun, chat: StoredChat) {
   changed();
   let status: RunStatus = "done";
   let error: string | undefined;
-  let end: { passTo: string; sourceId: string } | undefined;
+  let woke: Outcome["woke"];
   try {
     const result = await run(chat, r);
     if (result?.asked) status = "waiting";
-    end = result?.passed;
+    woke = result?.woke;
   } catch (e) {
     status = "failed";
     error = (e as Error).message;
     notice(chatId, `Something went wrong: ${error}`, sprocketId);
   } finally {
     going.delete(r.id);
-    runStart.delete(chatId);
     typing(sprocketId, chatId, null);
     activityChanges.emit(sprocketId, chatId, null, null);
     // Cancelled meanwhile (the chat was cleared): it stays so.
     if (sprocketRuns.get(r.id)?.status === "running") sprocketRuns.setStatus(r.id, status, error);
-    if (end) requestReply(chatId, end.passTo, { trigger: "pass", sourceId: end.sourceId, from: sprocketId, hop: r.hop + 1 });
+    for (const who of woke?.members ?? []) wake(chatId, who, { trigger: "teammate", sourceId: woke!.sourceId, from: sprocketId, hop: r.hop + 1 });
     changed();
     pump();
   }
@@ -255,20 +262,24 @@ function notice(chatId: string, text: string, sprocketId?: string) {
   if (sprocketChats.get(chatId)) sprocketMessages.create(chatId, "notice", text, userMessageTime(chatId), { sprocketId });
 }
 
+/** This Sprocket's runs in the last hour that count toward the limit. */
+const lastHour = (id: string) => (recent.get(id) ?? []).filter((t) => Date.now() - t < 3_600_000);
+
 /** False (and a notice in the chat it would reply in) when this Sprocket has run too often in the last hour. */
 function underRateLimit(id: string, chatId: string, name: string, team: boolean): boolean {
-  const now = Date.now();
-  const times = (recent.get(id) ?? []).filter((t) => now - t < 3_600_000);
-  if (times.length >= MAX_RUNS_PER_HOUR) {
-    notice(chatId, `Paused${team ? ` ${name}` : ""}: more than ${MAX_RUNS_PER_HOUR} replies in the last hour. Try again in a little while.`, id);
-    return false;
-  }
-  recent.set(id, [...times, now]);
-  return true;
+  if (lastHour(id).length < MAX_RUNS_PER_HOUR) return true;
+  notice(chatId, `Paused${team ? ` ${name}` : ""}: more than ${MAX_RUNS_PER_HOUR} replies in the last hour. Try again in a little while.`, id);
+  return false;
 }
 
-/** How a run ended: it asked the user (the run waits), or passed the turn (the pass line's id starts the next). */
-type Outcome = { asked?: boolean; passed?: { passTo: string; sourceId: string } };
+/** Count a run toward its Sprocket's hourly limit. */
+const countRun = (id: string) => recent.set(id, [...lastHour(id), Date.now()]);
+
+/**
+ * How a run ended: it asked the user (the run waits), or in a team posted something, which wakes `members` (ADR
+ * 0033), with its last message as what woke them.
+ */
+type Outcome = { asked?: boolean; woke?: { members: string[]; sourceId: string } };
 
 /** Take run `r`'s turn in a chat. */
 async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined> {
@@ -278,8 +289,8 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   if (!s) return;
   const team = chat.kind === "team" ? teamInfo(chat) : undefined;
   if (team && !team.members.some((m) => m.id === id)) return; // it left the team meanwhile
-  // An automation's run that found nothing new left no trace in the chat (ADR 0032).
-  const history = sprocketMessages.list(chatId).filter((m) => m.author !== "notice" && !m.automation?.quiet);
+  // An automation's run that found nothing new left no trace in the chat (ADR 0032); pass lines are from before ADR 0033.
+  const history = sprocketMessages.list(chatId).filter((m) => m.author !== "notice" && m.author !== "pass" && !m.automation?.quiet);
   const last = history.at(-1);
   // Nothing new to answer since its last run there started: from the user or an event, in a team from a teammate.
   const since = sprocketRuns.lastStart(chatId, id, r.id);
@@ -292,7 +303,8 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   // What this run answers: everything since the last reply.
   const unanswered = history.slice(history.findLastIndex((m) => m.author === "sprocket") + 1);
   const start = Math.max(Date.now(), Date.parse(last.createdAt) + 1);
-  runStart.set(chatId, start);
+  const g = going.get(r.id);
+  if (g) g.start = start;
   const startedAt = new Date(start).toISOString();
   const ref = s.model ?? settings.get("defaultModel");
   const model = findModel(ref);
@@ -302,6 +314,8 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
     return;
   }
   if (!underRateLimit(id, chatId, s.name, !!team)) return;
+  // A quiet team run counts only once it posts (ADR 0033): it wakes nobody, so it can't loop.
+  if (!team) countRun(id);
 
   const project = s.projectId ? projects.get(s.projectId) : undefined;
   // Who owns what in its project (ADR 0016), by the titles the user sees.
@@ -324,14 +338,14 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   const skills = toolbox.skills.length ? listSkills().filter((k) => toolbox.skills.includes(k.id)) : [];
   const unreachable = servers.filter((x) => x.error).map((x) => `[Rails] The MCP server ${x.server.name} can't be reached right now (${x.error}), so its tools aren't here this turn.`);
   if (chat.kind !== "project")
-    context.push({ role: "user", content: [team ? `${TEXTING_NOW}\n${roundNow(history, r, team)}` : [TEXTING_NOW, ...whyNow(r)].join("\n"), ...unreachable].join("\n"), timestamp: Date.now() });
+    context.push({ role: "user", content: [team ? `${TEXTING_NOW}\n${teamNow(history, r, team, alsoAnswering(chatId, id))}` : [TEXTING_NOW, ...whyNow(r)].join("\n"), ...unreachable].join("\n"), timestamp: Date.now() });
   // Events that came in together (one arrived while it answered another): models answered only the latest.
   // (An agent's drafted message doesn't wake it, and needs nothing.)
   const events = unanswered.filter((m) => m.author === "event" && m.event && m.event.what !== "message");
   if (chat.kind === "project" && events.length > 1) context.push({ role: "user", content: severalEvents(events), timestamp: Date.now() });
   // One tool (ADR 0008): the model writes scripts that call the Sprocket's capabilities. A Coordinator can
   // also suggest replies to sessions (ADR 0010), shown under the reply this run saves. Outside the project chat a
-  // run can end its turn on purpose (ADR 0023): ask the user, or in a team pass the turn.
+  // run can end its turn on purpose (ADR 0023): ask the user.
   const made: string[] = [];
   let end: TurnEnd | undefined;
   const endWith = (e: TurnEnd) => (end = e);
@@ -349,7 +363,6 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
     ...mcpCapabilities(servers.filter((x) => !x.error).map((x) => x.server), propose),
     ...(skills.length ? [readSkillCapability(skills)] : []),
     ...(r.trigger === "automation" && chat.kind === "direct" ? [nothingNewCapability(endWith, ended, said)] : []),
-    ...(team ? [passTurnCapability(team.members.filter((m) => m.id !== id), { hop: r.hop, queued: () => queuedIn(chatId), asking: () => waitingAsks(chatId).map((a) => a.sprocketId), said }, endWith, ended)] : []),
   ];
   // The run log: every call's outcome, and the ones going now (scripts can run several at once).
   const done: { name: string; args: unknown; status: CallRecord["status"] }[] = [];
@@ -396,12 +409,14 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   const live = chat.kind !== "project";
   const posted = new Map<AssistantMessage, SprocketMessage>();
   const clean = (text: string) => (team ? withoutName(text, s.name) : text);
+  /** A team member with nothing to add replies (quiet) (ADR 0033): nothing is posted. */
+  const quiet = (text: string) => !!team && QUIET.test(text.trim());
   /** Messages it posted with send_message and the cards it showed (show_card), as it went. */
   const sent: SprocketMessage[] = [];
   /** Text it already posted this run, said again (models repeat their message after a refused pass): not posted twice. */
   const repeats = (text: string) => [...posted.values(), ...sent].some((m) => alike(m.text, clean(text)));
   const post = (text: string) => {
-    if (stale() || repeats(text)) return;
+    if (stale() || repeats(text) || quiet(text)) return;
     sent.push(sprocketMessages.create(chatId, "sprocket", clean(text), postTime(chatId), { sprocketId: id, runId: r.id }));
     changed();
   };
@@ -433,33 +448,6 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
     return `Put on a card for your user to run or skip: ${p.server} ${p.tool} with ${JSON.stringify(p.args)}. Nothing has run yet. Your turn goes on; once your user is done with the card, you get a new turn with what came of each call. Don't say it's done.`;
   }
 
-  /** Asked to pass the turn it forgot: what it writes now isn't posted (its message is in already). */
-  let nudged = false;
-  /**
-   * Whether it ended its turn on its own without passing it, and may still be reminded to: it wasn't stopped, has
-   * passes left, and the user hasn't written since it started.
-   */
-  const mayNudge = (): boolean => {
-    const last = agent.state.messages.at(-1);
-    if (end || stale() || steps > MAX_STEPS || r.hop >= TEAM_TURNS_MAX) return false;
-    if (last?.role !== "assistant" || (last as AssistantMessage).stopReason !== "stop") return false;
-    return !sprocketMessages.list(chatId).some((m) => m.author === "user" && Date.parse(m.createdAt) > start);
-  };
-  /** The teammates its last message asks something, when it ended its turn without passing it to anyone. */
-  const unpassed = (t: TeamInfo): string[] => {
-    if (!mayNudge()) return [];
-    const said = [...posted.values(), ...sent].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).at(-1)?.text ?? "";
-    const queued = queuedIn(chatId);
-    return askedTeammates(said, t.members.filter((m) => m.id !== id && !queued.includes(m.id)));
-  };
-  /** Teammates the message that gave it the turn left a later step for, when it passed to none of them. */
-  const unhanded = (t: TeamInfo): string[] => {
-    if (!mayNudge()) return [];
-    const queued = queuedIn(chatId);
-    const history = sprocketMessages.list(chatId);
-    return [...new Set([...handOn(history, r, t), ...(inRound(r) ? notYet(history, r, t) : [])])].filter((name) => !queued.includes(t.members.find((m) => m.name === name)!.id));
-  };
-
   let steps = 0;
   let lastTyping = 0;
   agent.subscribe((e) => {
@@ -468,10 +456,10 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
       lastTyping = Date.now();
       typing(id, chatId, textOf(e.message as AssistantMessage) || "…");
     }
-    if (live && !nudged && e.type === "message_end" && e.message.role === "assistant") {
+    if (live && e.type === "message_end" && e.message.role === "assistant") {
       const m = e.message as AssistantMessage;
       const text = m.stopReason === "error" || m.stopReason === "aborted" ? "" : clean(textOf(m));
-      if (text && !stale() && !repeats(text)) {
+      if (text && !stale() && !repeats(text) && !quiet(text)) {
         posted.set(m, sprocketMessages.create(chatId, "sprocket", text, postTime(chatId), { sprocketId: id, runId: r.id }));
         changed();
       }
@@ -489,17 +477,6 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
       activityChanges.emit(id, chatId, "Trying the model again", summarize(capabilities, done) ?? null);
       await new Promise((r) => setTimeout(r, RETRY_MS));
       if (!stale()) await agent.continue();
-    }
-    // A member that asked a teammate something without passing the turn: once more, to pass it or leave it (ADR 0023).
-    // Or that was given the turn by a message that left a teammate a later step, and didn't pass it on.
-    const asked = team ? unpassed(team) : [];
-    const after = team && !asked.length ? unhanded(team) : [];
-    if (asked.length || after.length) {
-      nudged = true;
-      const from = team!.members.find((m) => m.id === r.from)?.name ?? "A teammate";
-      const everyone = !handOn(sprocketMessages.list(chatId), r, team!).length;
-      agent.state.messages = [...agent.state.messages, { role: "user", content: asked.length ? nudge(asked) : handOnNudge(everyone ? undefined : from, after), timestamp: Date.now() }];
-      await agent.continue();
     }
     return live ? finish() : save();
   } finally {
@@ -548,15 +525,17 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
       automationRuns.setQuiet(r.id, e.quiet);
       if (r.sourceId) sprocketMessages.setAutomationQuiet(r.sourceId);
     }
-    if (e && "passTo" in e) {
-      // Your message after this run started takes the team elsewhere (teams.ts): its pass doesn't count then.
-      const overtaken = sprocketMessages.list(chatId).some((m) => m.author === "user" && Date.parse(m.createdAt) > start);
-      if (!overtaken) {
-        const line = sprocketMessages.create(chatId, "pass", e.note, postTime(chatId), { sprocketId: id, runId: r.id, passTo: e.passTo });
-        outcome = { passed: { passTo: e.passTo, sourceId: line.id } };
-      }
+    // In a team, what it posted wakes its teammates (those it @mentions, if any), up to TEAM_TURNS_MAX levels after
+    // the user's message; a question for the user wakes nobody (ADR 0033).
+    if (team && lastPosted && !outcome?.asked) {
+      countRun(id);
+      const others = team.members.filter((m) => m.id !== id);
+      const texts = [...posted.values(), ...sent].map((m) => m.text).join("\n");
+      const named = [...new Set(findMentions(texts, others.map((m) => m.name)).map((f) => others[f.member].id))];
+      if (r.hop + 1 < TEAM_TURNS_MAX) outcome = { woke: { members: named.length ? named : others.map((m) => m.id), sourceId: lastPosted.id } };
     }
-    endNotice(added.filter((m): m is AssistantMessage => m.role === "assistant").at(-1), !posted.size && !sent.length && !e);
+    // A team member that wrote nothing stayed quiet on purpose.
+    endNotice(added.filter((m): m is AssistantMessage => m.role === "assistant").at(-1), !team && !posted.size && !sent.length && !e);
     changed();
     return outcome;
   }
@@ -595,6 +574,12 @@ function trimStep(m: Message): Message {
   const text = m.content.map((c) => (c.type === "text" ? c.text : "[image]")).join("");
   const trimmed = text.length > STEP_RESULT_CHARS ? `${text.slice(0, STEP_RESULT_CHARS)}\n[…trimmed from ${text.length} characters when it was saved]` : text;
   return { role: "toolResult", toolCallId: m.toolCallId, toolName: m.toolName, content: [{ type: "text", text: trimmed }], isError: m.isError, timestamp: m.timestamp };
+}
+
+/** The other members answering in a team chat now, or about to (running or queued there). */
+function alsoAnswering(chatId: string, self: string): string[] {
+  const { replying, queued } = chatTurns(chatId);
+  return [...new Set([...replying, ...queued])].filter((m) => m !== self);
 }
 
 /** Provider errors often embed a JSON body; show its message, not the JSON. */
@@ -639,8 +624,8 @@ export function textOf(m: Pick<AssistantMessage, "content">): string {
 }
 
 /**
- * A Coordinator's reply when an event doesn't need the user: (quiet), or an explanation that ends with it (the
- * user isn't told either way).
+ * A Coordinator's reply when an event doesn't need the user, or a team member's with nothing to add (ADR 0033):
+ * (quiet), or an explanation that ends with it (the user isn't told either way).
  */
 const QUIET = /(^\(?quiet\)?|\(quiet\))\.?$/i;
 

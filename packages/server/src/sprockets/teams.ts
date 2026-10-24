@@ -1,11 +1,10 @@
-// Team chats (ADR 0022, 0023): the user and two to four Sprockets, the first the lead. The user's message goes to the
-// members it @mentions (every member for @everyone); else, if it's a tapped option, to whoever asked; else to those
-// whose questions wait for an answer; else the lead. No model guesses who it's for (ADR 0023): the lead passes on. Members pass the turn with pass_turn
-// (harness/turns.ts), which runs.ts carries out. This decides who answers the user.
+// Team chats (ADR 0022, 0033): the user and two to four Sprockets. Every message wakes every member, and each one
+// decides whether to write (runs.ts); nothing here reads what a message says. Only the unambiguous cases pick: an
+// @mention wakes those it names, and a tapped option wakes whoever asked it.
 import { TEAM_MEMBERS_MAX, TEAM_MEMBERS_MIN, findMentions, type SprocketTeam, type SprocketTeamInput } from "@rails/shared";
 import { sprocketChats, sprocketMessages, sprockets, suggestions, type StoredChat } from "../db.ts";
 import { ServiceError } from "../errors.ts";
-import { answerWaiting, cancelRuns, chatTurns, requestReply } from "./runs.ts";
+import { answerWaiting, cancelRuns, chatTurns, wake } from "./runs.ts";
 import { waitingAsks } from "./rounds.ts";
 import { expireInChat } from "../coordination/suggestions.ts";
 import { listeners } from "../util.ts";
@@ -22,17 +21,17 @@ function toTeam(chat: StoredChat): SprocketTeam {
   const members = sprocketChats.members(chat.id);
   const last = sprocketMessages.last(chat.id);
   const turns = chatTurns(chat.id);
-  const replying = turns.replying;
-  const waiting = turns.queued.filter((m) => members.includes(m));
+  const replying = turns.replying.filter((m) => members.includes(m));
+  const waiting = turns.queued.filter((m) => members.includes(m) && !replying.includes(m));
   return {
     id: chat.id,
     kind: "team",
     name: chat.name ?? "",
     members,
-    ...(replying ? { replying } : {}),
+    replying,
     waiting,
     createdAt: chat.createdAt,
-    running: !!replying,
+    running: replying.length > 0,
     pending: suggestions.pendingIn(chat.id),
     ...(last ? { lastMessage: last } : {}),
   };
@@ -75,7 +74,7 @@ export function createTeam(body: Partial<SprocketTeamInput> | undefined): Sprock
   return team;
 }
 
-/** Rename a team or change its members; the first is the lead. Turns waiting for a member who left are dropped. */
+/** Rename a team or change its members (in order). Turns waiting for a member who left are dropped. */
 export function updateTeam(id: string, body: Partial<SprocketTeamInput> | undefined): SprocketTeam {
   getTeam(id);
   const { name, members } = parseTeam(body);
@@ -121,37 +120,33 @@ const membersOf = (chatId: string): Member[] =>
     return s ? [{ id, name: s.name, description: s.description }] : [];
   });
 
-/** `@everyone` asks every member (ADR 0023). */
-const EVERYONE_TAG = /(^|[^\p{L}\p{N}_])@everyone(?![\p{L}\p{N}_])/iu;
-
 /**
- * The user wrote in a team: the members it's for get turns, in order. Turns still queued from before are dropped at
- * once; a turn going now finishes, but doesn't pass the turn on.
+ * The user wrote in a team (ADR 0033): every member wakes and decides whether to answer; an @mention wakes only those
+ * it names, and a tapped option only whoever asked it. Nothing is cancelled: replies being written still post, and
+ * their members wake again to read this.
  */
 export function startRound(chatId: string, text: string, messageId?: string): void {
   const members = membersOf(chatId);
-  const lead = members[0]?.id;
-  cancelRuns(chatId);
   const begin = (picked: string[]) => {
-    for (const who of picked) requestReply(chatId, who, { trigger: "user", sourceId: messageId });
+    for (const who of picked) wake(chatId, who, { trigger: "user", sourceId: messageId, hop: 0 });
     changed();
   };
-  // Those it @mentions, in the order it does (every member for @everyone). It answers their questions too.
-  const picked = EVERYONE_TAG.test(text) ? members.map((m) => m.id) : mentioned(text, members);
-  if (picked.length) {
-    answerWaiting(chatId, text, picked);
-    return begin(picked);
+  const named = mentioned(text, members);
+  if (named.length) {
+    answerWaiting(chatId, text, named);
+    return begin(named);
   }
-  // Questions waiting for an answer: a tapped option goes to whoever asked it, a typed message to everyone who asked.
-  const asks = waitingAsks(chatId).filter((a) => members.some((m) => m.id === a.sprocketId));
+  // A tapped option goes to whoever asked it.
   const said = text.trim().toLowerCase();
+  const asks = waitingAsks(chatId).filter((a) => members.some((m) => m.id === a.sprocketId));
   const tapped = [...new Set(asks.filter((a) => a.options.some((o) => o.trim().toLowerCase() === said)).map((a) => a.sprocketId))];
   if (tapped.length) {
     answerWaiting(chatId, text, tapped);
     return begin(tapped);
   }
-  const askers = answerWaiting(chatId, text).filter((id) => members.some((m) => m.id === id));
-  begin(askers.length ? askers : lead ? [lead] : []);
+  // A typed message answers every waiting question: each asker reads it and decides whether it's their answer.
+  answerWaiting(chatId, text);
+  begin(members.map((m) => m.id));
 }
 
 /** Stop a team's turns (its chat was cleared, or it's deleted): queued ones and questions waiting are dropped. */

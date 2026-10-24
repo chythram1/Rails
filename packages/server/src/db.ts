@@ -839,7 +839,8 @@ export const sprocketMessages = {
 
 export type RunStatus = "queued" | "running" | "waiting" | "done" | "failed" | "cancelled";
 /** `approval`: the user allowed or denied an MCP call the Sprocket asked for (ADR 0025). */
-export type RunTrigger = "user" | "pass" | "event" | "approval" | "actions" | "automation";
+/** `pass` is from before ADR 0033 (a member passed the turn); now a teammate's message wakes a member (`teammate`). */
+export type RunTrigger = "user" | "teammate" | "pass" | "event" | "approval" | "actions" | "automation";
 type RunRow = {
   id: string;
   chat_id: string;
@@ -910,6 +911,10 @@ export const sprocketRuns = {
     if (status === "running") db.prepare("UPDATE sprocket_runs SET status = ?, started_at = ? WHERE id = ?").run(status, now, id);
     else if (status === "queued" || status === "waiting") db.prepare("UPDATE sprocket_runs SET status = ? WHERE id = ?").run(status, id);
     else db.prepare("UPDATE sprocket_runs SET status = ?, error = ?, ended_at = ? WHERE id = ?").run(status, error ?? null, now, id);
+  },
+  /** A queued run woken again by something nearer the user's message (ADR 0033): what woke it now. */
+  rewake(id: string, r: { trigger: RunTrigger; sourceId?: string; from?: string; hop: number }): void {
+    db.prepare("UPDATE sprocket_runs SET trigger = ?, source_id = ?, from_id = ?, hop = ? WHERE id = ? AND status = 'queued'").run(r.trigger, r.sourceId ?? null, r.from ?? null, r.hop, id);
   },
   /** End a chat's runs with one of `statuses` (cancelled). Returns how many. */
   cancel(chatId: string, statuses: RunStatus[]): number {

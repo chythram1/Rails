@@ -10,6 +10,7 @@ import { models, refOf } from "../settings/models.ts";
 import { idle } from "./runs.ts";
 import { createSprocket, directChat, listMessages, sendMessage, updateSettings } from "./sprockets.ts";
 import { createTeam } from "./teams.ts";
+import { scriptMembers } from "../test/members.ts";
 
 const faux = fauxProvider();
 models.setProvider(faux.provider);
@@ -157,36 +158,29 @@ describe("cards that act", () => {
     expect(mcpServers.get(server.id)).toBeDefined();
   });
 
-  it("in a team, the member that showed the card goes on, outside any round", async () => {
+  it("in a team, the member that showed the card goes on, and its teammates stay out of it", async () => {
     const server = await notesServer();
     const ada = sprocketWith("Ada", server.id);
     const bo = sprocketWith("Bo", server.id);
     const cy = sprocketWith("Cy", server.id);
     const team = createTeam({ name: "Crew", members: [ada.id, bo.id, cy.id] });
-    faux.setResponses([
-      fauxAssistantMessage([fauxText("I'll set it up."), fauxToolCall("codemode", { code: `await tools.pass_turn({ to: "Bo", note: "propose the notes" })` })], { stopReason: "toolUse" }),
-      calls([{ tool: `${server.name}_add_note`, args: { text: "Standup" } }]),
-      fauxAssistantMessage("Run it if it looks right."),
-    ]);
-    // A message to the whole team: a go-round must not restart when the card settles.
-    sendMessage(team.id, "What do you all think we should note?");
+    scriptMembers(faux, { Bo: [calls([{ tool: `${server.name}_add_note`, args: { text: "Standup" } }]), fauxAssistantMessage("Run it if it looks right.")] });
+    sendMessage(team.id, "What should we note?");
     await idle();
     const card = cardIn(team.id);
     expect(card.sprocketId).toBe(bo.id);
 
     let told = "";
-    faux.setResponses([(c) => ((told = seen(c)), fauxAssistantMessage("Added the standup note."))]);
+    const woken = scriptMembers(faux, { Bo: [(c) => ((told = seen(c)), fauxAssistantMessage("Added the standup note."))] });
     await actOnCard(card.id, { run: true });
     await idle();
     const last = listMessages(team.id).at(-1)!;
     expect([last.sprocketId, last.text]).toEqual([bo.id, "Added the standup note."]);
     expect(told).toContain("Your user has run or skipped every action on your card");
-    expect(told).not.toContain("Your user's message came to you.");
-    expect(told).not.toContain("haven't answered yet");
-    expect(faux.getPendingResponseCount()).toBe(0); // no reminder, no pass
+    expect(woken.Bo).toBe(1);
 
     // An ask tool called directly by a member @mentioned: its card, and its turn after.
-    faux.setResponses([script(`await tools.${server.name}_add_note({ text: "Snacks" })`), fauxAssistantMessage("It's on the card."), (c) => ((told = seen(c)), fauxAssistantMessage("Snacks noted."))]);
+    scriptMembers(faux, { Cy: [script(`await tools.${server.name}_add_note({ text: "Snacks" })`), fauxAssistantMessage("It's on the card."), fauxAssistantMessage("Snacks noted.")] });
     sendMessage(team.id, "@Cy note the snacks");
     await idle();
     const proposed = listMessages(team.id).filter((m) => m.card?.actions).at(-1)!;

@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { IconArrowDown as ArrowDown, IconArrowRight as ArrowRight, IconChevronLeft as ChevronLeft, IconClock as Clock } from "@tabler/icons-react";
-import { TEAM_TURNS_MAX, findMentions, type Sprocket as SprocketData, type SprocketChatInfo, type SprocketTeam, type SprocketMessage } from "@rails/shared";
+import { IconArrowDown as ArrowDown, IconChevronLeft as ChevronLeft, IconClock as Clock } from "@tabler/icons-react";
+import { type Sprocket as SprocketData, type SprocketChatInfo, type SprocketTeam, type SprocketMessage } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href } from "../../router.ts";
 import { socket } from "../../ws.ts";
@@ -18,6 +18,7 @@ import { MessageActions } from "./MessageActions.tsx";
 import { COLORS } from "./characters.ts";
 import { SPIN_MS, useSprocketMotion } from "./motion.ts";
 import { useThreadScroll } from "./threadScroll.ts";
+import { findNames } from "./mentions.ts";
 import { bubbles, typingTime } from "./bubbles.ts";
 import { blocks, type Block } from "./marks.ts";
 import { Card } from "./Card.tsx";
@@ -49,10 +50,11 @@ function stamp(iso: string): string {
  * another (bubbles.ts). What it looked at (its codemode steps) isn't shown. `embedded` is the project chat in a workspace's side panel (SidePanel.tsx), which has a header
  * of its own.
  *
- * A team chat (ADR 0022) passes `team` (and its lead as `sprocket`): each member's run of replies has its name above
- * (in its colour) and its face at the foot. One face pops up at the bottom left, of the member whose turn it is.
- * @mentions of members (and @everyone) read as chips, and the composer completes them. A member giving a teammate
- * the turn shows as a line, and a question with options as buttons under it until it's answered (ADR 0023).
+ * A team chat (ADR 0022, 0033) passes `team` (and its first member as `sprocket`): each member's run of replies has its
+ * name above (in its colour) and its face at the foot. Every member reads every message, several at once: one face
+ * pops up at the bottom left with a line naming those working ("Bo and Cy are working…"). Members' names read as
+ * chips, with an @ or without, and the composer completes @mentions. A question with options shows as buttons under it
+ * until it's answered (ADR 0023). Pass lines from before ADR 0033 aren't shown.
  */
 export function SprocketChat({
   sprocket,
@@ -93,9 +95,8 @@ export function SprocketChat({
   const [reveal, setReveal] = useState<{ id: string; by: string; parts: string[]; shown: number } | null>(null);
   /** Replies that have come in (or never needed to). */
   const revealed = useRef(new Set<string>());
-  /** Who's on it, at the bottom left: the member replying, then those whose turns are coming; or the Sprocket. */
-  const turns = team ? [...(team.info.replying ? [team.info.replying] : []), ...(team.info.waiting ?? [])] : running || expecting ? [id] : [];
-  // In a team, a face shows only once Rails knows that member answers (not while it works out who).
+  /** Who's on it, at the bottom left: the members replying, then those woken and about to; or the Sprocket. */
+  const turns = team ? [...team.info.replying, ...team.info.waiting] : running || expecting ? [id] : [];
   const watching = [...new Set([...(reveal && reveal.shown < reveal.parts.length ? [reveal.by] : []), ...turns])];
   /** Writing now: the member whose reply has started, or whose reply is still coming in. */
   const writing = reveal && reveal.shown < reveal.parts.length ? reveal.by : typingBy;
@@ -176,7 +177,7 @@ export function SprocketChat({
     }
     await load();
   };
-  /** In a team, @mentions of members read as chips. */
+  /** In a team, members' names read as chips. */
   const text = (t: string) => (team ? withMentions(t, members) : t);
 
   // Who's on it: one face at a time, of the member whose turn it is (the others wait unseen). It shows while the
@@ -216,7 +217,9 @@ export function SprocketChat({
     else if (lastFace.current?.at === Infinity) lastFace.current = { ...lastFace.current, at: Date.now() };
   });
   /** Members still on their turn here: their face waits for the end of it to sit under their last message. */
-  const onTurn = new Set([...(team?.info.replying ? [team.info.replying] : []), ...(writing ? [writing] : []), ...started]);
+  const onTurn = new Set([...(team?.info.replying ?? []), ...(writing ? [writing] : []), ...started]);
+  /** In a team, who's working now, by name: "Bo is working…", "Bo and Cy are working…". */
+  const working = team && onIt.length ? `${names(onIt.map((w) => w.name))} ${onIt.length === 1 ? "is" : "are"} working…` : "";
   /** The messages at the end of the chat from the member writing them now (its current turn): its face waits. */
   const tail = new Set<string>();
   const end = [...(messages ?? [])].reverse();
@@ -281,13 +284,13 @@ export function SprocketChat({
                 {members.map((m, i) => (
                   <li key={m.id}>
                     <Sprocket look={m.look} size={72} seed={m.id} />
-                    <span className="small">{m.name}{i === 0 && <span className="muted"> · lead</span>}</span>
+                    <span className="small">{m.name}</span>
                   </li>
                 ))}
               </ul>
               <p className="sp-intro-title">Say hello to {title}</p>
               <p className="muted small">
-                @mention whoever you're asking, or @everyone; {members[0]?.name} leads and takes the rest. They can pass each other the turn, and after {TEAM_TURNS_MAX} passes in a row they wait for you.
+                Everyone reads every message, and whoever has something to add answers. @mention someone to ask only them.
               </p>
             </div>
           ) : (
@@ -324,22 +327,8 @@ export function SprocketChat({
               // A reply shows a bubble per paragraph; one coming in shows those it has reached.
               const parts = m.author === "sprocket" && !m.card && !m.approval ? (reveal?.id === m.id ? reveal.parts.slice(0, reveal.shown) : bubbles(m.text)) : [m.text];
               const coming = reveal?.id === m.id && reveal.shown < reveal.parts.length;
-              // A member gave a teammate the turn (ADR 0023): a line, not a bubble.
-              if (m.author === "pass") {
-                const from = speaker(m.sprocketId);
-                const to = m.passTo ? speaker(m.passTo) : undefined;
-                return (
-                  <li key={m.id} className={"sp-message pass" + (pop ? " pop" : "")}>
-                    <p className="sp-pass">
-                      <span className="sr-only">{`${from?.name ?? "A deleted Sprocket"} gave the turn to `}</span>
-                      <ArrowRight size={14} aria-hidden />
-                      {to && <Sprocket look={to.look} size={16} seed={to.id} still />}
-                      <span className="sp-pass-to">{to?.name ?? "A deleted Sprocket"}</span>
-                      {m.text && <span className="sp-pass-note">{m.text}</span>}
-                    </p>
-                  </li>
-                );
-              }
+              // A member gave a teammate the turn (before ADR 0033): not shown.
+              if (m.author === "pass") return null;
               // An automation started a run (ADR 0032): a line naming it, as a pass line is.
               if (m.author === "automation") {
                 return (
@@ -421,7 +410,7 @@ export function SprocketChat({
             {one &&
               (() => {
                 return (
-                  <li className="sp-message sprocket sp-watching" aria-hidden>
+                  <li className={"sp-message sprocket sp-watching" + (working ? " team" : "")} aria-hidden>
                     {dots ? (
                       <div key={one.id} className="sp-said">
                         {/* No face while it writes: it comes back under its last message once its turn is over. */}
@@ -437,6 +426,7 @@ export function SprocketChat({
                         <Sprocket look={one.look} size={26} seed={one.id} busy={spinning !== one.id} spin={spinning === one.id} />
                       </span>
                     )}
+                    {working && <span className="sp-working">{working}</span>}
                   </li>
                 );
               })()}
@@ -444,7 +434,7 @@ export function SprocketChat({
         )}
         <div className="sp-spacer" ref={spacer} aria-hidden />
         <div className="sp-fade" aria-hidden />
-        <p className="sr-only" role="status">{writing ? `${speaker(writing)?.name ?? name} is typing` : ""}</p>
+        <p className="sr-only" role="status">{working || (writing ? `${speaker(writing)?.name ?? name} is typing` : "")}</p>
       </div>
       <div className="sp-compose">
         {scroll.hidden && (
@@ -461,8 +451,7 @@ export function SprocketChat({
           fill={fill}
           mentions={
             team && [
-              ...members.map((m, i) => ({ name: m.name, note: i === 0 ? "Lead" : undefined, icon: <Sprocket look={m.look} size={18} seed={m.id} still /> })),
-              { name: "everyone", note: "Every member", icon: <TeamFace looks={members} size={18} /> },
+              ...members.map((m) => ({ name: m.name, note: "Only them", icon: <Sprocket look={m.look} size={18} seed={m.id} still /> })),
             ]
           }
         >
@@ -498,31 +487,23 @@ function Marked({ blocks: read, text }: { blocks: Block[]; text: (t: string) => 
   );
 }
 
-/**
- * A message with its @mentions of team members as chips (ADR 0022): the member's face and its whole name, also for
- * the start of one ("@Doc" is Doc Keeper), as the server reads them (findMentions).
- */
+/** Names as a sentence: "Bo", "Bo and Cy", "Ada, Bo and Cy". */
+const names = (list: string[]) => (list.length < 2 ? list.join("") : `${list.slice(0, -1).join(", ")} and ${list.at(-1)}`);
+
+/** A message with team members' names as chips (ADR 0022, 0033): the member's face and its whole name. */
 function withMentions(text: string, members: SprocketData[]): ReactNode {
-  if (!members.length || !text.includes("@")) return text;
+  if (!members.length) return text;
   const parts: ReactNode[] = [];
   let at = 0;
-  // @everyone (ADR 0023) reads as a chip too, after the members.
-  for (const found of findMentions(text, [...members.map((m) => m.name), "everyone"])) {
+  for (const found of findNames(text, members.map((m) => m.name))) {
     const m = members[found.member];
     parts.push(text.slice(at, found.start));
     parts.push(
-      m ? (
-        <span key={found.start} className="sp-mention" style={{ "--who": COLORS[m.look.color] } as CSSProperties}>
-          <Sprocket look={m.look} size={14} seed={m.id} still />
-          <span className="sr-only">@</span>
-          {m.name}
-        </span>
-      ) : (
-        <span key={found.start} className="sp-mention" style={{ "--who": "var(--text-2)" } as CSSProperties}>
-          <span className="sr-only">@</span>
-          everyone
-        </span>
-      ),
+      <span key={found.start} className="sp-mention" style={{ "--who": COLORS[m.look.color] } as CSSProperties}>
+        <Sprocket look={m.look} size={14} seed={m.id} still />
+        {found.at && <span className="sr-only">@</span>}
+        {m.name}
+      </span>,
     );
     at = found.end;
   }
