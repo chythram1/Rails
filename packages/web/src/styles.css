@@ -922,7 +922,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-message.sprocket { align-items: flex-start; }
 .sp-message.sprocket .sp-bubble { max-width: min(620px, 85%); }
 .sp-said { display: flex; align-items: flex-end; gap: 8px; width: 100%; }
-/* A reply's paragraphs are bubbles of their own (bubbles.ts), 4px apart. */
+/* A message's bubble, then the options to tap under it, 4px apart. */
 .sp-bubbles { display: flex; flex: 1; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
 .sp-message.user .sp-bubbles { align-items: flex-end; }
 .sp-message.notice .sp-bubbles { align-items: center; }

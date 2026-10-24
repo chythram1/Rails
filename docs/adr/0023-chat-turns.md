@@ -110,3 +110,10 @@ Fred, check it after her.") sometimes didn't pass on to the next (1 of 3). Now, 
   what it writes then isn't posted).
 Live (gpt-6-luna, gpt-6-sol, gpt-5.6-terra): the plan's hand-on 3 of 3, "what do you all think?" round all three
 members 3 of 3, "thanks everyone!" only the lead.
+
+Amendment (2026-10-24): one bubble per message. A message's paragraphs no longer show as bubbles of their own, cut
+at blank lines and between sentences and revealed one after another (`bubbles.ts`, removed): a poem's stanzas and a
+team member's one answer came apart, next to everyone else's. A message is one bubble, paragraphs and all, and pops
+in whole. Several messages in a row come only from separate sends (`send_message`, or text before a tool call), and
+the prompt now says so instead of asking for 40-word paragraphs. In the reference group chat app, a 300-word answer
+was one bubble, and a reply that read a page was two: a short heads-up, then the answer.

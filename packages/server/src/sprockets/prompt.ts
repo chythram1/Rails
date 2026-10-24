@@ -246,15 +246,15 @@ export function systemPrompt(
 }
 
 /**
- * How a Sprocket writes outside its project chat: like a person texting. Each paragraph of a reply shows as its own
- * bubble (SprocketChat.tsx), so a long answer comes as several short messages.
+ * How a Sprocket writes outside its project chat: like a person texting. Each message shows as one bubble
+ * (SprocketChat.tsx), so separate messages come only from separate sends.
  */
 const TEXTING = [
   "How you write: like a person texting, not like a document.",
-  "- Everything you write is shown, in order: text you write before a tool call is sent as a message of its own right away, then your reply after it. What a script prints (text()) is for you alone: your user never sees it. Each paragraph shows as its own chat bubble, so a long reply reads as several short messages: separate your thoughts with blank lines, and keep each paragraph to one or two sentences (40 words at most). Don't call a tool just to start a new message, and don't repeat what you already wrote.",
+  "- Everything you write is shown, in order: text you write before a tool call is sent as a message of its own right away, then your reply after it. What a script prints (text()) is for you alone: your user never sees it. Each message shows as one chat bubble, paragraphs and all. To send several messages in a row (your user asks for them, or a quick heads-up such as \"Looking now.\" before slow work), post each but the last with send_message. Don't repeat what you already wrote.",
   "- When you can't go on without something only your user knows (their choice, a fact about their project), ask with ask_user instead of writing the question (with two to four options to tap when a few short answers are likely, none for an open question): their answer comes back to you. When you can give a useful answer already, give it (say what you assumed) rather than asking first.",
-  "- Most replies are one to three bubbles. Something long (a plan, a checklist) is more of them, one step or part per bubble, rather than one big block.",
-  "- No headings, no bold, no Markdown tables. A short list of a few items is fine inside one bubble. Use Markdown only for code.",
+  "- Keep it short: most replies are a few sentences. When your user asks for more (a length, a plan, a checklist), write all of it, in short paragraphs or a list.",
+  "- No headings, no bold, no Markdown tables. A short list is fine. Use Markdown only for code.",
   "- When structure helps (comparing options, figures, a checklist of steps, code or a diff), show a card with show_card instead of writing it out, with a sentence around it if useful. Most replies are plain text.",
 ].join("\n");
 
@@ -323,7 +323,7 @@ function automationNow(r: StoredRun): string {
 
 /** The reminder after the chat (not saved, not from the user). */
 export const TEXTING_NOW =
-  "[Rails, not your user] Reply as chat messages: each paragraph is one, so put blank lines between short paragraphs of one or two sentences, with no headings or bold. A long answer is more messages, not longer ones.";
+  "[Rails, not your user] Reply as a chat message: short, in plain paragraphs, with no headings or bold.";
 
 /** Names as a sentence: "Pam", "Pam and Bo", "Pam, Bo and Al". */
 const list = (names: string[]) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);

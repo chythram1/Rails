@@ -20,7 +20,6 @@ import { SPIN_MS, useSprocketMotion } from "./motion.ts";
 import { useThreadScroll } from "./threadScroll.ts";
 import { TeamThinking } from "./TeamThinking.tsx";
 import { findNames } from "./mentions.ts";
-import { bubbles, typingTime } from "./bubbles.ts";
 import { blocks, type Block } from "./marks.ts";
 import { Card } from "./Card.tsx";
 import { ApprovalCard } from "./ApprovalCard.tsx";
@@ -47,8 +46,8 @@ function stamp(iso: string): string {
  * messages, one quiet line), and time labels break it up where there are gaps. The user's messages sit on the right,
  * replies on the left, both as bubbles, and Rails' own notices (no model yet, errors) in the middle. As in a text
  * app, a reply isn't shown as it's written: the Sprocket's face pops up at the bottom left once it has the message,
- * turns into dots in its colour while it writes, and the reply then pops in, a paragraph to a bubble, one after
- * another (bubbles.ts). What it looked at (its codemode steps) isn't shown. `embedded` is the project chat in a workspace's side panel (SidePanel.tsx), which has a header
+ * turns into dots in its colour while it writes, and the reply then pops in whole, one bubble per message, paragraphs
+ * and all. What it looked at (its codemode steps) isn't shown. `embedded` is the project chat in a workspace's side panel (SidePanel.tsx), which has a header
  * of its own.
  *
  * A team chat (ADR 0022, 0033) passes `team` (and its first member as `sprocket`): each member's run of replies has its
@@ -93,15 +92,11 @@ export function SprocketChat({
   const [expecting, setExpecting] = useState(false);
   /** The messages of the first load: they're there already, so they don't pop in. */
   const initial = useRef<Set<string> | null>(null);
-  /** A new reply coming in a bubble at a time: how many of its bubbles show so far. */
-  const [reveal, setReveal] = useState<{ id: string; by: string; parts: string[]; shown: number } | null>(null);
-  /** Replies that have come in (or never needed to). */
-  const revealed = useRef(new Set<string>());
   /** Who's on it, at the bottom left: the members replying, then those woken and about to; or the Sprocket. */
   const turns = team ? [...team.info.replying, ...team.info.waiting] : running || expecting ? [id] : [];
-  const watching = [...new Set([...(reveal && reveal.shown < reveal.parts.length ? [reveal.by] : []), ...turns])];
-  /** Writing now: the member whose reply has started, or whose reply is still coming in. */
-  const writing = reveal && reveal.shown < reveal.parts.length ? reveal.by : typingBy;
+  const watching = [...new Set(turns)];
+  /** Writing now: the member whose reply has started. */
+  const writing = typingBy;
   /** Re-renders once a minute, so "5 minutes ago" under each message stays true. */
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -112,27 +107,7 @@ export function SprocketChat({
   const [loadError, setLoadError] = useState("");
   const thread = useRef<HTMLDivElement>(null);
   const spacer = useRef<HTMLDivElement>(null);
-  const scroll = useThreadScroll(thread, spacer, running || watching.length > 0, [messages, running, watching.join(), typingBy, reveal?.shown]);
-
-  // A new reply comes in a bubble at a time, as if typed; a newer message (or reduced motion) shows the rest at once.
-  useEffect(() => {
-    if (!messages || !initial.current) return;
-    const fresh = messages.filter((m) => m.author === "sprocket" && !initial.current!.has(m.id) && !revealed.current.has(m.id));
-    for (const m of fresh) revealed.current.add(m.id);
-    const newest = fresh.at(-1);
-    const later = reveal && messages.findIndex((m) => m.id === reveal.id) < messages.length - 1;
-    if (newest) {
-      const parts = newest.card || newest.approval ? [newest.text] : bubbles(newest.text);
-      const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-      setReveal(parts.length > 1 && !still ? { id: newest.id, by: newest.sprocketId, parts, shown: 1 } : null);
-    } else if (later) setReveal(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages]);
-  useEffect(() => {
-    if (!reveal || reveal.shown >= reveal.parts.length) return;
-    const t = setTimeout(() => setReveal((r) => (r && r.id === reveal.id ? { ...r, shown: r.shown + 1 } : r)), typingTime(reveal.parts[reveal.shown]));
-    return () => clearTimeout(t);
-  }, [reveal]);
+  const scroll = useThreadScroll(thread, spacer, running || watching.length > 0, [messages, running, watching.join(), typingBy]);
 
   /** Loads overlap (the first one, every `sprockets.changed`, StrictMode's second run): only the latest applies. */
   const loads = useRef(0);
@@ -339,9 +314,6 @@ export function SprocketChat({
               const first = label || !same(prev);
               const last = !same(next) || newGroup(m.createdAt, next!.createdAt);
               const pop = m.author === "sprocket" && !!initial.current && !initial.current.has(m.id);
-              // A reply shows a bubble per paragraph; one coming in shows those it has reached.
-              const parts = m.author === "sprocket" && !m.card && !m.approval ? (reveal?.id === m.id ? reveal.parts.slice(0, reveal.shown) : bubbles(m.text)) : [m.text];
-              const coming = reveal?.id === m.id && reveal.shown < reveal.parts.length;
               // A member gave a teammate the turn (before ADR 0033): not shown.
               if (m.author === "pass") return null;
               // An automation started a run (ADR 0032): a line naming it, as a pass line is.
@@ -365,7 +337,10 @@ export function SprocketChat({
               }
               // A question with options waiting for an answer: the options to tap, under its last bubble. A message
               // for someone else leaves it waiting, so they stay until it's answered.
-              const options = m.ask && !m.ask.answer && !coming ? m.ask.options : undefined;
+              const options = m.ask && !m.ask.answer ? m.ask.options : undefined;
+              // One bubble per message, paragraphs and all. A code block can't go in a <p>.
+              const read = m.author === "notice" || m.card || m.approval ? undefined : blocks(m.text);
+              const Bubble = read?.some((b) => b.kind === "fence") ? "div" : "p";
               return (
                 <li key={m.id} className={"sp-message " + m.author + (pop ? " pop" : "")} style={by ? ({ "--who": COLORS[by.look.color] } as CSSProperties) : undefined}>
                   {label && <time className="sp-stamp" dateTime={m.createdAt}>{stamp(m.createdAt)}</time>}
@@ -376,7 +351,7 @@ export function SprocketChat({
                     <div className="sp-said">
                       {team && m.author === "sprocket" && (
                         <span className="sp-avatar" aria-hidden>
-                          {last && !coming && by && !tail.has(m.id) && <Sprocket look={by.look} size={26} seed={by.id} still />}
+                          {last && by && !tail.has(m.id) && <Sprocket look={by.look} size={26} seed={by.id} still />}
                         </span>
                       )}
                       <div className="sp-bubbles">
@@ -387,17 +362,12 @@ export function SprocketChat({
                           </>
                         )}
                         {m.approval && <ApprovalCard messageId={m.id} approval={m.approval} name={by?.name ?? "A deleted Sprocket"} />}
-                        {!m.card && !m.approval && parts.map((part, j) => {
-                          const read = m.author === "notice" ? undefined : blocks(part);
-                          // A code block can't go in a <p>.
-                          const Bubble = read?.some((b) => b.kind === "fence") ? "div" : "p";
-                          return (
-                            <Bubble key={j} className="sp-bubble">
-                              {m.author === "sprocket" && j === 0 && <span className="sr-only">{by?.name ?? "A deleted Sprocket"}: </span>}
-                              {read ? <Marked blocks={read} text={text} /> : part}
-                            </Bubble>
-                          );
-                        })}
+                        {!m.card && !m.approval && (
+                          <Bubble className="sp-bubble">
+                            {m.author === "sprocket" && <span className="sr-only">{by?.name ?? "A deleted Sprocket"}: </span>}
+                            {read ? <Marked blocks={read} text={text} /> : m.text}
+                          </Bubble>
+                        )}
                         {!!options?.length && (
                           <div className="sp-ask" role="group" aria-label="Answers to pick">
                             {options.map((o) => (
@@ -410,13 +380,9 @@ export function SprocketChat({
                       </div>
                     </div>
                   )}
-                  {!coming && (
-                    <>
-                      {/* A Coordinator's suggested replies. */}
-                      {m.suggestions?.map((s) => <SuggestionCard key={s.id} suggestion={s} projectId={by?.projectId ?? sprocket.projectId} />)}
-                      {m.author !== "notice" && <MessageActions text={m.text} at={m.createdAt} now={now} reply={m.author !== "user"} />}
-                    </>
-                  )}
+                  {/* A Coordinator's suggested replies. */}
+                  {m.suggestions?.map((s) => <SuggestionCard key={s.id} suggestion={s} projectId={by?.projectId ?? sprocket.projectId} />)}
+                  {m.author !== "notice" && <MessageActions text={m.text} at={m.createdAt} now={now} reply={m.author !== "user"} />}
                 </li>
               );
             })}
