@@ -19,7 +19,7 @@ packages/
 ## Runtime picture
 
 ```
- browser(s) ──HTTP /api/*──▶ Hono (index.ts) ──▶ services: projects.ts, panels.ts, git.ts, customize.ts
+ browser(s) ──HTTP /api/*──▶ Hono (app.ts)   ──▶ services: projects.ts, panels.ts, git.ts, customize.ts
      ▲                                             │          │
      │                                             │          ├─▶ db.ts: projects, panels, layouts (SQLite)
      │                                             │          └─▶ tmux.ts: new-session / kill / running panels

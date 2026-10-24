@@ -90,7 +90,8 @@ for future ideas, which aren't commitments. Reference screenshots for the look a
 | Path | What lives there |
 | --- | --- |
 | `packages/shared/src/index.ts` | All domain and wire types, including the WebSocket protocol (`ClientMsg` / `ServerMsg`). No runtime deps. |
-| `packages/server/src/index.ts` | Hono routes, token auth, WebSocket upgrade, static serving in prod. |
+| `packages/server/src/app.ts` | The Hono app: token auth, origin checks, bridge auth, every route, static serving in prod. `app.test.ts` checks the auth with `app.request()`. |
+| `packages/server/src/index.ts` | Startup: starts the services, serves the app, the WebSocket upgrade, shutdown. |
 | `packages/server/src/config.ts` | Env vars and paths, plus the token in `~/.rails/config.json`. |
 | `packages/server/src/projects.ts` | Project services (`attachProject`, `attachPickedFolder`, `detachProject`, `getProject`, `listProjectSessions`). Expected failures throw `ServiceError` (`errors.ts`), which carries an HTTP status; `app.onError` turns it into a JSON error. |
 | `packages/server/src/picker.ts` | The OS-native folder picker for Add project (macOS osascript, Linux zenity/kdialog, Windows PowerShell). It opens on the server's screen (ADR 0004). |
@@ -137,7 +138,7 @@ for future ideas, which aren't commitments. Reference screenshots for the look a
 
 ## Where to change what
 - **New WebSocket message:** add the type in `shared`, handle it in `TerminalHub.handle`, then handle it in the web listener (usually `TerminalView.tsx`, `useWorkspace.ts` or `store.tsx`).
-- **New REST endpoint:** put the logic in a service module, add a thin route in `server/src/index.ts`, then add the client method in `web/src/api.ts`.
+- **New REST endpoint:** put the logic in a service module, add a thin route in `server/src/app.ts`, then add the client method in `web/src/api.ts`.
 - **How an agent is launched:** `command()` in `panels.ts` (flags for new vs resumed sessions). tmux behaviour (mouse, keys, sizing) lives in the config written by `tmux.ts`.
 - **Transcript parsing:** edit `providers/<id>.ts`, and update `docs/providers.md` with anything you learn about the format.
 - **App settings** go in the Settings modal (`components/settings/`): sections of groups (a heading on a rule, then rows of label, description and control), as in DESIGN.md's Dialogs. Give each row `id="setting-<rowId>"`, `data-settings-row` and `tabIndex={-1}`, and add it to `SETTINGS` in `search.ts` (label plus synonyms) so search finds it. Customize is for what Sprockets use (MCP servers, skills, prompts), not app settings.
