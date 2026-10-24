@@ -29,11 +29,11 @@ import { MenuButton } from "../Menu.tsx";
 import { PageNav } from "../PageNav.tsx";
 import { Segmented } from "../Segmented.tsx";
 import { ConnectorLogo } from "./ConnectorLogo.tsx";
-import { ConnectorPage } from "./ConnectorPage.tsx";
 import { McpEditor, serverSummary } from "./McpEditor.tsx";
 import { AppSetup } from "./AppSetup.tsx";
 import { NewItem } from "./NewItem.tsx";
 import { PromptEditor } from "./PromptEditor.tsx";
+import { ConnectorDialog, CustomServerDialog } from "./ServerDialogs.tsx";
 import { SkillEditor } from "./SkillEditor.tsx";
 
 type CustomizeRoute = Extract<Route, { name: "customize" }>;
@@ -63,17 +63,20 @@ export function CustomizePage({ route }: { route: CustomizeRoute }) {
     const app = mcpApps?.find((a) => a.id === route.app);
     return <div className="cz-detail">{app ? <AppSetup app={app} /> : null}</div>;
   }
-  if (route.view === "new")
+  const toConnectors = () => navigate(href.customize("connectors"));
+  // Adding a server is a dialog over the connectors: a connector of Rails', or a custom one.
+  const connector = route.view === "connector" ? connectorById(route.id) : undefined;
+  const custom = route.view === "new" && (route.draft === "http" || route.draft === "stdio") ? route.draft : undefined;
+  if (route.view === "new" && !custom)
     return (
       <div className="cz-detail">
-        <NewItem key={route.draft} draft={route.draft} />
+        <NewItem key={route.draft} draft={route.draft === "prompt" ? "prompt" : "skill"} />
       </div>
     );
-  if (route.view !== "home") {
+  if (route.view !== "home" && !connector && !custom) {
     const server = route.view === "mcp" ? mcpServers.find((s) => s.id === route.id) : undefined;
     const skill = route.view === "skill" ? skills.find((s) => s.id === route.id) : undefined;
     const prompt = route.view === "prompt" ? savedPrompts.find((p) => p.id === route.id) : undefined;
-    const connector = route.view === "connector" ? connectorById(route.id) : undefined;
     return (
       <div className="cz-detail">
         {server ? (
@@ -82,8 +85,6 @@ export function CustomizePage({ route }: { route: CustomizeRoute }) {
           <SkillEditor key={skill.id} skill={skill} />
         ) : prompt ? (
           <PromptEditor key={prompt.id} prompt={prompt} />
-        ) : connector ? (
-          <ConnectorPage connector={connector} added={mcpServers.filter((s) => s.connector === connector.id)} />
         ) : (
           <div className="cz-gone">
             <p className="muted">This one doesn't exist anymore. It may have been deleted on another device.</p>
@@ -93,7 +94,13 @@ export function CustomizePage({ route }: { route: CustomizeRoute }) {
       </div>
     );
   }
-  return <Gallery tab={route.tab} servers={mcpServers} skills={skills} prompts={savedPrompts} />;
+  return (
+    <>
+      <Gallery tab={route.tab} servers={mcpServers} skills={skills} prompts={savedPrompts} />
+      {connector && <ConnectorDialog key={connector.id} connector={connector} added={mcpServers.filter((s) => s.connector === connector.id)} onClose={toConnectors} />}
+      {custom && <CustomServerDialog key={custom} transport={custom} onClose={toConnectors} />}
+    </>
+  );
 }
 
 function Gallery({ tab, servers, skills, prompts }: { tab: CustomizeTab; servers: McpServer[]; skills: Skill[]; prompts: SavedPrompt[] }) {
@@ -180,7 +187,7 @@ function Gallery({ tab, servers, skills, prompts }: { tab: CustomizeTab; servers
         )}
         {tab === "connectors" &&
           (mode === "discover" ? (
-            <DiscoverConnectors servers={servers} query={q} onError={setError} onCustom={(t) => void newServer(t)} />
+            <DiscoverConnectors servers={servers} query={q} onCustom={(t) => void newServer(t)} />
           ) : (
             <YourConnectors servers={servers} query={q} onBrowse={() => setMode("discover")} onCustom={(t) => void newServer(t)} />
           ))}
@@ -297,22 +304,7 @@ const SETUP_LABEL: Record<Connector["setup"], string> = {
 };
 
 /** Rails' connectors, by group under a banner, then the custom ones. */
-function DiscoverConnectors({ servers, query, onError, onCustom }: { servers: McpServer[]; query: string; onError(e: string): void; onCustom(t: "http" | "stdio"): void }) {
-  const [busy, setBusy] = useState("");
-  const add = async (c: Connector) => {
-    // Those needing something first (a token, a folder, an app) open their page.
-    if (c.setup === "token" || c.setup === "own-app" || c.setup === "folder") return navigate(href.connector(c.id));
-    onError("");
-    setBusy(c.id);
-    try {
-      const made = await api.addConnector(c.id);
-      navigate(href.mcpServer(made.id));
-    } catch (e: any) {
-      onError(e.message);
-    } finally {
-      setBusy("");
-    }
-  };
+function DiscoverConnectors({ servers, query, onCustom }: { servers: McpServer[]; query: string; onCustom(t: "http" | "stdio"): void }) {
   const shown = CONNECTORS.filter((c) => matches(query, c.name, c.description, c.by));
   return (
     <>
@@ -351,8 +343,8 @@ function DiscoverConnectors({ servers, query, onError, onCustom }: { servers: Mc
                         <Check size={16} aria-hidden />
                       </span>
                     ) : (
-                      <button type="button" className="icon-btn cz-plus" aria-label={`Add ${c.name}`} title={`Add ${c.name}`} disabled={!!busy} onClick={() => void add(c)}>
-                        {busy === c.id ? <span className="cz-spinner" aria-hidden /> : <Plus size={16} />}
+                      <button type="button" className="icon-btn cz-plus" aria-label={`Add ${c.name}`} title={`Add ${c.name}`} onClick={() => navigate(href.connector(c.id))}>
+                        <Plus size={16} />
                       </button>
                     )
                   }

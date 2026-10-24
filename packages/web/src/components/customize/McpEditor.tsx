@@ -275,7 +275,6 @@ function Status({ server: s }: { server: McpServer }) {
  */
 function SignIn({ server: s, signIn, onSave }: { server: McpServer; signIn: McpSignIn; onSave(body: McpServerInput): Promise<boolean> }) {
   const [busy, setBusy] = useState(false);
-  const [address, setAddress] = useState("");
   const [secret, setSecret] = useState("");
   const [error, setError] = useState("");
   const run = async (work: () => Promise<unknown>) => {
@@ -288,13 +287,6 @@ function SignIn({ server: s, signIn, onSave }: { server: McpServer; signIn: McpS
     } finally {
       setBusy(false);
     }
-  };
-  const paste = (e: FormEvent) => {
-    e.preventDefault();
-    void run(async () => {
-      await api.pasteMcpSignIn(s.id, address);
-      setAddress("");
-    });
   };
   const waiting = !!signIn.authUrl;
   const state =
@@ -333,35 +325,7 @@ function SignIn({ server: s, signIn, onSave }: { server: McpServer; signIn: McpS
           )
         )}
       </div>
-      {waiting && (
-        <div className="cz-signin-flow">
-          <div className="cz-signin-actions">
-            <a className="btn small primary" href={signIn.authUrl} target="_blank" rel="noreferrer">
-              Open the sign-in page <ExternalLink size={14} aria-hidden />
-            </a>
-            <button type="button" className="btn small" onClick={() => void run(() => api.cancelMcpSignIn(s.id))}>
-              Cancel
-            </button>
-          </div>
-          <form className="cz-signin-paste" onSubmit={paste}>
-            <label htmlFor="cz-signin-address" className="muted small">
-              Signing in on another device? When you're done, the page you land on won't load. Paste its address here.
-            </label>
-            <div className="cz-signin-row">
-              <input
-                id="cz-signin-address"
-                className="input"
-                placeholder={`${signIn.redirectUrl}?code=…`}
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-              />
-              <button className="btn small" disabled={busy || !address.trim()}>
-                Continue
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      {waiting && <SignInWaiting server={s} />}
       {(error || signIn.error) && (
         <p className="error small cz-signin-error" role="alert">
           {error || signIn.error}
@@ -544,5 +508,70 @@ function Tools({ server: s, onSave }: { server: McpServer; onSave(policies: Reco
         );
       })}
     </section>
+  );
+}
+
+/**
+ * A sign-in under way: the service's page to open (in a new tab; browsers block one opened for you after a wait),
+ * Cancel, and for signing in on another device, the address it lands on to paste back. Used by the editor and by the
+ * add dialogs.
+ */
+export function SignInWaiting({ server: s }: { server: McpServer }) {
+  const [busy, setBusy] = useState(false);
+  const [address, setAddress] = useState("");
+  const [error, setError] = useState("");
+  const run = async (work: () => Promise<unknown>) => {
+    setError("");
+    setBusy(true);
+    try {
+      await work();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const paste = (e: FormEvent) => {
+    e.preventDefault();
+    void run(async () => {
+      await api.pasteMcpSignIn(s.id, address);
+      setAddress("");
+    });
+  };
+  return (
+    <>
+      <div className="cz-signin-flow">
+        <div className="cz-signin-actions">
+          <a className="btn small primary" href={s.signIn?.authUrl} target="_blank" rel="noreferrer">
+            Open the sign-in page <ExternalLink size={14} aria-hidden />
+          </a>
+          <button type="button" className="btn small" onClick={() => void run(() => api.cancelMcpSignIn(s.id))}>
+            Cancel
+          </button>
+        </div>
+        <form className="cz-signin-paste" onSubmit={paste}>
+          <label htmlFor="cz-signin-address" className="muted small">
+            Signing in on another device? When you're done, the page you land on won't load. Paste its address here.
+          </label>
+          <div className="cz-signin-row">
+            <input
+              id="cz-signin-address"
+              className="input"
+              placeholder={`${s.signIn?.redirectUrl}?code=…`}
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+            <button className="btn small" disabled={busy || !address.trim()}>
+              Continue
+            </button>
+          </div>
+        </form>
+      </div>
+      {error && (
+        <p className="error small" role="alert">
+          {error}
+        </p>
+      )}
+    </>
   );
 }

@@ -1454,21 +1454,49 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .cz-hero .cz-status { margin-top: 6px; }
 .cz-about { margin: -16px 0 0; color: var(--text-2); line-height: 1.6; text-wrap: pretty; }
 .cz-about-lead { color: var(--text); }
-.cz-already { margin: -16px 0 0; color: var(--muted); font-size: 13px; }
-.cz-connect { display: flex; flex-direction: column; gap: 14px; padding-top: 14px; }
-.cz-connect-how { margin: 0; color: var(--text-2); font-size: 14px; text-wrap: pretty; }
-.cz-connect-token { display: flex; flex-direction: column; gap: 6px; max-width: 560px; }
-/* The token field, and the service's page for making one beside it. */
-.cz-connect-field { display: flex; flex-wrap: wrap; gap: 8px; }
-.cz-connect-field .input { flex: 1 1 260px; min-width: 0; }
-.cz-connect-field .btn { white-space: nowrap; }
-.cz-connect-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
 .cz-guide { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
-.cz-where { font: 12.5px/1.5 var(--mono); color: var(--text-2); overflow-wrap: anywhere; text-align: right; }
 /* A connector's own settings (address, name, headers), folded under its tools. */
 .cz-advanced > summary { width: fit-content; padding: 6px 0; color: var(--text-2); font-size: 13px; cursor: pointer; }
 .cz-advanced > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .cz-advanced-body { display: flex; flex-direction: column; gap: 40px; margin-top: 20px; }
+/* Adding a server (ServerDialogs.tsx): a modal over the connectors, 520px, the Dialogs' frame. Its head (a 40px mark,
+   the title and one muted line, ×) and actions stay put while its body scrolls. */
+.cz-dialog {
+  width: 520px; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); padding: 0; overflow: hidden;
+  border: 1px solid var(--border-strong); border-radius: 0; background: var(--dialog); color: var(--text); box-shadow: var(--shadow-pop);
+}
+.cz-dialog::backdrop { background: rgb(0 0 0 / 0.4); }
+.cz-dialog-frame { display: flex; flex-direction: column; max-height: calc(100dvh - 34px); }
+.cz-dialog-head { display: flex; align-items: flex-start; gap: 14px; padding: 20px 20px 0 24px; }
+.cz-dialog-titles { flex: 1; min-width: 0; padding-top: 1px; }
+.cz-dialog-titles h2 { margin: 0; font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
+.cz-dialog-titles p { margin: 2px 0 0; color: var(--muted); font-size: 13px; text-wrap: pretty; }
+.cz-dialog-close { flex: none; margin-top: -4px; }
+.cz-dialog-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 16px; padding: 18px 24px 4px; }
+.cz-dialog-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 16px 24px 20px; }
+.cz-dialog-text { margin: 0; color: var(--text-2); font-size: 14px; line-height: 1.5; text-wrap: pretty; }
+.cz-dialog-note { margin: 0; color: var(--muted); font-size: 13px; }
+.cz-dialog-state { display: flex; align-items: baseline; gap: 8px; margin: 0; color: var(--text-2); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.cz-dialog-state > .cz-dot { flex: none; translate: 0 -1px; }
+.cz-dialog-code { display: block; padding: 8px 10px; background: var(--surface-2); color: var(--text-2); font: 12.5px/1.5 var(--mono); overflow-wrap: anywhere; }
+.cz-dfield { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cz-dfield > label, .cz-dlabel { display: flex; align-items: baseline; gap: 8px; font-size: 13px; font-weight: 500; }
+.cz-dfield-optional { color: var(--muted); font-size: 12px; font-weight: 400; }
+.cz-dfield-help { margin: 0; color: var(--muted); font-size: 12.5px; text-wrap: pretty; }
+.cz-dfield-help a { display: inline-flex; align-items: center; gap: 4px; }
+.cz-drow { display: flex; align-items: center; gap: 8px; }
+.cz-drow > .input { flex: 1; min-width: 0; }
+.cz-drow > .input:first-child { flex: 0 1 40%; }
+.cz-paste > summary { width: fit-content; padding: 2px 0; color: var(--text-2); font-size: 13px; cursor: pointer; }
+.cz-paste > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.cz-paste[open] > summary { margin-bottom: 8px; }
+.cz-dialog .cz-signin-flow { margin: 0; }
+@media (max-width: 560px) {
+  /* Phones: a sheet the width of the screen, from the top edge's margin. */
+  .cz-dialog { max-width: calc(100vw - 16px); }
+  .cz-dialog-body, .cz-dialog-actions { padding-left: 16px; padding-right: 16px; }
+  .cz-dialog-head { padding-left: 16px; }
+}
 .cz-gone { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px; text-align: center; }
 @container (max-width: 640px) {
   .cz-page-inner { padding: 64px 16px 48px; }
@@ -1607,7 +1635,6 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .cz-signin-app > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .cz-signin-app[open] > summary { margin-bottom: 2px; }
 .cz-secret-add { gap: 8px; }
-.cz-secret-more { padding-top: 10px; }
 .cz-secret-add > .input { flex: 1; min-width: 0; }
 .cz-secret-add > .input:first-child { flex: 0 1 40%; }
 /* Tools in two groups (can change things, read-only), each a small head with its "All" control over ruled rows:
