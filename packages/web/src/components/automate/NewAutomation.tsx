@@ -1,23 +1,25 @@
 import { useState } from "react";
-import { AUTOMATION_NAME_MAX, AUTOMATION_PROMPT_MAX, connectorById, type AutomationSchedule, type McpServer, type Sprocket as SprocketData } from "@rails/shared";
+import { AUTOMATION_NAME_MAX, AUTOMATION_PROMPT_MAX, type AutomationSchedule, type McpServer, type Sprocket as SprocketData } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
 import { Dropdown } from "../Dropdown.tsx";
 import { EditorHead } from "../customize/fields.tsx";
 import { Sprocket } from "../sprockets/Sprocket.tsx";
 import { ScheduleField } from "./ScheduleField.tsx";
-import type { AutomationTemplate } from "./templates.ts";
+import type { AutomationTemplate, TemplateUse } from "./templates.ts";
+import { useName } from "./Templates.tsx";
 import { localTimezone } from "./useAutomations.ts";
 
 /** Its Sprocket, as the Dropdown lists them: the face and the name. */
 export const sprocketOptions = (sprockets: SprocketData[]) =>
   sprockets.map((s) => ({ value: s.id, label: s.name, icon: <Sprocket look={s.look} size={18} seed={s.id} still /> }));
 
-/** Whether a Sprocket can do what a template needs: be attached to a project, or have the connector among its tools. */
-function canDo(s: SprocketData, t: AutomationTemplate, servers: McpServer[]) {
-  if (t.uses === "project") return !!s.projectId;
-  return servers.some((m) => m.connector === t.uses && s.tools.mcp.includes(m.id));
+/** Whether a Sprocket has a template's use: it's attached to a project, or has the connector among its tools. */
+function canUse(s: SprocketData, u: TemplateUse, servers: McpServer[]) {
+  return u === "project" ? !!s.projectId : servers.some((m) => m.connector === u && s.tools.mcp.includes(m.id));
 }
+/** How much of a template a Sprocket can do: how many of its uses it has. */
+const fit = (s: SprocketData, t: AutomationTemplate, servers: McpServer[]) => t.uses.filter((u) => canUse(s, u, servers)).length;
 
 /**
  * A new automation, as a draft in the editor's head and rows: nothing is saved until Create. From a template, it starts
@@ -25,7 +27,10 @@ function canDo(s: SprocketData, t: AutomationTemplate, servers: McpServer[]) {
  */
 export function NewAutomation({ sprockets, servers, template }: { sprockets: SprocketData[]; servers: McpServer[]; template?: AutomationTemplate }) {
   const [name, setName] = useState(template?.name ?? "");
-  const [sprocketId, setSprocketId] = useState((template && sprockets.find((s) => canDo(s, template, servers))?.id) ?? sprockets[0]?.id ?? "");
+  // From a template, the Sprocket that can do most of it (the first, on a tie).
+  const [sprocketId, setSprocketId] = useState(
+    (template && [...sprockets].sort((a, b) => fit(b, template, servers) - fit(a, template, servers))[0]?.id) ?? sprockets[0]?.id ?? "",
+  );
   const [prompt, setPrompt] = useState(template?.prompt ?? "");
   const [schedule, setSchedule] = useState<AutomationSchedule>(template?.schedule ?? { kind: "weekdays", time: "09:00" });
   const [timezone, setTimezone] = useState(localTimezone);
@@ -33,7 +38,7 @@ export function NewAutomation({ sprockets, servers, template }: { sprockets: Spr
   const [busy, setBusy] = useState(false);
   const ready = !!name.trim() && !!prompt.trim() && !!sprocketId && !busy;
   const chosen = sprockets.find((s) => s.id === sprocketId);
-  const lacks = template && chosen && !canDo(chosen, template, servers) ? missing(chosen, template, servers) : null;
+  const lacks = template && chosen && fit(chosen, template, servers) < template.uses.length ? missing(chosen, template, servers) : null;
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,24 +135,35 @@ function missing(s: SprocketData, t: AutomationTemplate, servers: McpServer[]) {
       {s.name}'s settings
     </a>
   );
-  if (t.uses === "project")
-    return (
-      <>
-        {s.name} has no project, so it can't see agent sessions, git or files. Pick one with a project, or attach it in {settings}.
-      </>
-    );
-  const name = connectorById(t.uses)?.name ?? t.uses;
-  if (!servers.some((m) => m.connector === t.uses))
-    return (
-      <>
-        {s.name} can't use {name} yet. <a href={href.connector(t.uses)} target="_blank" rel="noreferrer">
-          Add {name}
-        </a> in Customize, then turn it on under Tools in {settings}.
-      </>
-    );
+  const lacking = t.uses.filter((u) => !canUse(s, u, servers));
+  const toAdd = lacking.filter((u) => u !== "project" && !servers.some((m) => m.connector === u));
+  const toTurnOn = lacking.filter((u) => u !== "project" && !toAdd.includes(u));
+  const names = (list: TemplateUse[], link: boolean) =>
+    list.map((u, i) => (
+      <span key={u}>
+        {i > 0 && (i === list.length - 1 ? " and " : ", ")}
+        {link ? (
+          <a href={href.connector(u)} target="_blank" rel="noreferrer">
+            {useName(u)}
+          </a>
+        ) : (
+          useName(u)
+        )}
+      </span>
+    ));
   return (
     <>
-      {s.name} can't use {name} yet. Turn it on under Tools in {settings}.
+      {lacking.includes("project") && <>{s.name} has no project, so it can't see agent sessions, git or files: attach it to one in {settings}.{" "}</>}
+      {toAdd.length > 0 && (
+        <>
+          Add {names(toAdd, true)} in Customize, then turn {toAdd.length > 1 ? "them" : "it"} on for {s.name} under Tools.{" "}
+        </>
+      )}
+      {toTurnOn.length > 0 && (
+        <>
+          Turn on {names(toTurnOn, false)} for {s.name} under Tools in {settings}.
+        </>
+      )}
     </>
   );
 }
