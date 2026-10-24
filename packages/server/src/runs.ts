@@ -150,13 +150,17 @@ export function requestReply(
 
 /**
  * Queue an automation's run (ADR 0032) in its Sprocket's direct chat, for the line `lineId` it posted there. Unlike
- * requestReply it doesn't fold into a run already queued: the automation tracks this run. Returns its id.
+ * requestReply it doesn't fold into a run already queued: the automation tracks this run. Returns its id. It doesn't
+ * start until `startQueued()`, so the automation can record it in the same transaction first.
  */
 export function queueAutomationRun(chatId: string, sprocketId: string, lineId: string): string {
-  const r = sprocketRuns.create({ chatId, sprocketId, trigger: "automation", sourceId: lineId });
+  return sprocketRuns.create({ chatId, sprocketId, trigger: "automation", sourceId: lineId }).id;
+}
+
+/** Start the runs that are queued, and say runs changed. */
+export function startQueued(): void {
   changed();
   pump();
-  return r.id;
 }
 
 /** Cancel a chat's queued runs, and with `waiting` its questions waiting for an answer too. */

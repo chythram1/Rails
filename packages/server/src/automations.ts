@@ -14,9 +14,9 @@ import {
   type AutomationTrigger,
   type SprocketMessage,
 } from "@rails/shared";
-import { automationRuns, automations, sprocketMessages, sprocketRuns, sprockets, type StoredAutomation, type StoredAutomationRun } from "./db.ts";
+import { automationRuns, automations, sprocketMessages, sprocketRuns, sprockets, tx, type StoredAutomation, type StoredAutomationRun } from "./db.ts";
 import { ServiceError } from "./errors.ts";
-import { onRunsChanged, queueAutomationRun, userMessageTime } from "./runs.ts";
+import { onRunsChanged, queueAutomationRun, startQueued, userMessageTime } from "./runs.ts";
 import { knownTimezone, nextRun, scheduleProblem } from "./schedules.ts";
 import { directChat } from "./sprockets.ts";
 import { listeners } from "./util.ts";
@@ -111,18 +111,24 @@ export function runAutomation(id: string): AutomationRun {
   const a = stored(id);
   if (isRunning(id)) throw new ServiceError("It's running now.", 409);
   const run = fire(a, "manual");
+  startQueued();
   changed();
   return publicRun(run);
 }
 
-/** Post its line in its Sprocket's direct chat and queue the run there; skipped while its last run still goes. */
+/**
+ * Post its line in its Sprocket's direct chat and queue the run there; skipped while its last run still goes. The
+ * line, the queued run and its row are written together or not at all, and the run only starts once the caller
+ * calls `startQueued()`, after they're in.
+ */
 function fire(a: StoredAutomation, trigger: AutomationTrigger): StoredAutomationRun {
   if (isRunning(a.id)) return automationRuns.create({ automationId: a.id, trigger, outcome: "skipped", summary: "Its previous run hadn't finished." });
-  const chatId = directChat(a.sprocketId);
-  const line = sprocketMessages.create(chatId, "automation", a.prompt, userMessageTime(chatId), { automation: { id: a.id, name: a.name, trigger } });
-  // Its row comes after the Sprocket's run is queued: settle() (on every run change) only sees it complete.
-  const sprocketRunId = queueAutomationRun(chatId, a.sprocketId, line.id);
-  return automationRuns.create({ automationId: a.id, trigger, outcome: "running", sprocketRunId, messageId: line.id });
+  return tx(() => {
+    const chatId = directChat(a.sprocketId);
+    const line = sprocketMessages.create(chatId, "automation", a.prompt, userMessageTime(chatId), { automation: { id: a.id, name: a.name, trigger } });
+    const sprocketRunId = queueAutomationRun(chatId, a.sprocketId, line.id);
+    return automationRuns.create({ automationId: a.id, trigger, outcome: "running", sprocketRunId, messageId: line.id });
+  });
 }
 
 /**
@@ -132,11 +138,20 @@ function fire(a: StoredAutomation, trigger: AutomationTrigger): StoredAutomation
 export function tick(now = new Date()): void {
   const ready = automations.list().filter((a) => a.enabled && a.nextRunAt && Date.parse(a.nextRunAt) <= now.getTime());
   for (const a of ready) {
-    fire(a, "schedule");
-    const once = a.schedule.kind === "once";
-    automations.update(a.id, { ...a, enabled: !once, nextRunAt: once ? undefined : due(a, now) });
+    try {
+      // Fired and moved on to its next time together: a failure halfway would fire it again on every tick.
+      tx(() => {
+        fire(a, "schedule");
+        const once = a.schedule.kind === "once";
+        automations.update(a.id, { ...a, enabled: !once, nextRunAt: once ? undefined : due(a, now) });
+      });
+    } catch (e) {
+      console.error(`automation ${a.id}:`, e); // the others still run; this one is tried again next tick
+    }
   }
-  if (ready.length) changed();
+  if (!ready.length) return;
+  startQueued();
+  changed();
 }
 
 /** The first line of a message, cut to a summary's length. */

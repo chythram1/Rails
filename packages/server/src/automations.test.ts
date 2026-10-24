@@ -1,9 +1,9 @@
 // Automations (ADR 0032): a Sprocket runs a prompt on a schedule in its direct chat, and each run gets an outcome.
 import { fauxAssistantMessage, fauxProvider, fauxToolCall, type TranscriptContext } from "@earendil-works/pi-ai";
 import { fileURLToPath } from "node:url";
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAutomation, deleteAutomation, getAutomation, listAutomations, runAutomation, startAutomations, stopAutomations, tick, updateAutomation } from "./automations.ts";
-import { automations, settings } from "./db.ts";
+import { automationRuns, automations, settings, sprocketRuns } from "./db.ts";
 import { createServer, disconnectAll, testServer } from "./mcp.ts";
 import { models, refOf } from "./models.ts";
 import { idle } from "./runs.ts";
@@ -177,5 +177,30 @@ describe("automations", () => {
     const b = createAutomation({ name: "Gone", prompt: "x", sprocketId: sprocket().id, schedule: daily, timezone: "UTC" });
     deleteAutomation(b.id);
     expect(() => getAutomation(b.id)).toThrow("Not found");
+  });
+
+  it("leaves nothing behind when firing fails halfway, and tries again on the next tick", async () => {
+    const s = sprocket();
+    const chat = directChat(s.id);
+    const a = createAutomation({ name: "Flaky", prompt: "Check.", sprocketId: s.id, schedule: daily, timezone: "UTC" });
+    const at = dueAt(a.id);
+    for (const x of automations.list()) if (x.id !== a.id) automations.update(x.id, { ...x, enabled: false }); // earlier tests' are due too
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const original = automationRuns.create.bind(automationRuns);
+    const create = vi.spyOn(automationRuns, "create").mockImplementation((run) => {
+      if (run.automationId === a.id) throw new Error("disk full");
+      return original(run);
+    });
+    tick(at);
+    expect(error).toHaveBeenCalledWith(`automation ${a.id}:`, expect.any(Error));
+    expect(listMessages(chat)).toEqual([]);
+    expect(sprocketRuns.list(["queued", "running"], chat)).toEqual([]);
+    expect(automations.get(a.id)!.nextRunAt).toBe(a.nextRunAt); // still due
+    create.mockRestore();
+    error.mockRestore();
+    faux.setResponses([fauxAssistantMessage("All good.")]);
+    tick(at);
+    await idle();
+    expect(getAutomation(a.id).runs).toMatchObject([{ outcome: "done", summary: "All good." }]);
   });
 });
