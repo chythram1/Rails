@@ -136,7 +136,8 @@ packages/
   and each writes or replies `(quiet)`; a member's reply wakes its teammates, at most 4 levels after the user's message,
   and a new message lets replies being written finish (ADR 0033). Each message shows as one bubble, paragraphs and all (ADR 0023). Runs are rows
   (`sprocket_runs`, ADR 0023): a user message, a teammate's message or (for a Coordinator) an event queues one in that chat (`runs.ts`),
-  one chat at a time per Sprocket, team members at once, and up to 6 runs at once; outside the project chat a run posts each text as its own message,
+  one chat at a time per Sprocket, team members at once, and up to 6 runs at once. A run reads its chat's last 40 messages and the latest of
+  the Sprocket's other chats (ADR 0034); outside the project chat a run posts each text as its own message,
   can `send_message`, `show_card` (a card: table, facts, list, checklist, code or diff, ADR 0024) and `ask_user`, with options to tap or none (its run then waits for the answer). Each run is a
   pi-agent-core loop on the Sprocket's model, streamed to browsers as `sprockets.typing`, capped at 12 model
   calls (a request that hears nothing for 20 s is sent again, `resend.ts`), 30 runs per Sprocket per hour and 2 runs at once. Its one tool is codemode (ADR 0008,

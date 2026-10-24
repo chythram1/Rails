@@ -43,7 +43,7 @@ import { findModel, models } from "../settings/models.ts";
 import { projectOwners } from "../coordination/owners.ts";
 import { resendWhenSilent } from "./resend.ts";
 import { sessionTitle } from "../workspace/titles.ts";
-import { severalEvents, systemPrompt, teamNow, TEXTING_NOW, toLlm, whyNow } from "./prompt.ts";
+import { elsewhere, severalEvents, systemPrompt, teamNow, TEXTING_NOW, toLlm, whyNow } from "./prompt.ts";
 import { teamInfo } from "./members.ts";
 import { listeners } from "../util.ts";
 
@@ -328,7 +328,12 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   // The chat, with the tool work behind the most recent replies put back in front of them.
   const recentMessages = history.slice(-HISTORY);
   const replayed = sprocketMessages.recentSteps(chatId, id, REPLAYED);
-  const context: Message[] = recentMessages.flatMap((m) => [...((replayed.get(m.id) ?? []) as Message[]), toLlm(m, model, id, team)]);
+  const asLlm = (ms: SprocketMessage[]) => ms.flatMap((m) => [...((replayed.get(m.id) ?? []) as Message[]), toLlm(m, model, id, team)]);
+  // Its other chats (ADR 0034), right before what this run answers: what it said and heard there holds here too.
+  const from = unanswered.length ? recentMessages.findIndex((m) => m.id === unanswered[0].id) : -1;
+  const cut = from < 0 ? recentMessages.length : from;
+  const other = elsewhere(id, chatId);
+  const context: Message[] = [...asLlm(recentMessages.slice(0, cut)), ...(other ? [{ role: "user" as const, content: other, timestamp: Date.now() }] : []), ...asLlm(recentMessages.slice(cut))];
   // How to write, once more right before it does: models keep their document habits from the system prompt alone.
   // Its MCP servers (ADR 0025), outside the project chat: those never connected connect now, and one that can't is
   // named in the reminder.

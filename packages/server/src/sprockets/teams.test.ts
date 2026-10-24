@@ -9,7 +9,7 @@ import { createTeam, deleteTeam, listTeams, mentioned, updateTeam } from "./team
 import { models, refOf } from "../settings/models.ts";
 import { waitingAsks } from "./members.ts";
 import { idle } from "./runs.ts";
-import { clearChat, createSprocket, deleteSprocket, listMessages, sendMessage, updateSettings } from "./sprockets.ts";
+import { clearChat, createSprocket, deleteSprocket, directChat, listMessages, sendMessage, updateSettings } from "./sprockets.ts";
 import { scriptMembers, seen } from "../test/members.ts";
 
 const faux = fauxProvider();
@@ -297,5 +297,63 @@ describe("team chats", () => {
     expect(listTeams().some((x) => x.id === team.id)).toBe(false);
     expect(() => listMessages(team.id)).toThrow();
     expect(sprockets.get(members[0].id)).toBeDefined();
+  });
+});
+
+// A Sprocket's other chats (ADR 0034): what it said and heard in its direct chat and its teams shows in each run,
+// and another Sprocket's direct chat never does.
+describe("a Sprocket's other chats", () => {
+  it("shows a member what it was told in its direct chat, and not what a teammate was told in theirs", async () => {
+    const { members, team } = crew(["Ada", "Bo"]);
+    const [ada, bo] = members;
+    faux.setResponses([reply("Noted."), reply("Got it.")]);
+    sendMessage(directChat(ada.id), "the cobalt code is 12");
+    await idle();
+    sendMessage(directChat(bo.id), "the onyx code is 56");
+    await idle();
+    const prompts: Record<string, string> = {};
+    const answer = (name: string, text: string) => (c: TranscriptContext) => {
+      prompts[name] = seen(c);
+      return reply(text);
+    };
+    scriptMembers(faux, { Ada: [answer("Ada", "It's 12.")], Bo: [answer("Bo", "(quiet)")] });
+    sendMessage(team.id, "what's the cobalt code?");
+    await idle();
+    expect(prompts.Ada).toMatch(/In your direct chat with your user:\n\[just now\] your user: the cobalt code is 12\n\[just now\] you: Noted\./);
+    expect(prompts.Ada).not.toContain("onyx");
+    expect(prompts.Bo).toContain("the onyx code is 56");
+    expect(prompts.Bo).not.toMatch(/your user: the cobalt code is 12/);
+  });
+
+  it("shows a member's direct chat what was said in its team, and nothing once that's cleared", async () => {
+    const { members, team } = crew(["Ada", "Bo"]);
+    const [ada] = members;
+    scriptMembers(faux, { Ada: [reply("Got it, jasper is 34.")], Bo: [reply("Noted.")] });
+    sendMessage(team.id, "the jasper code is 34");
+    await idle();
+    let prompt = "";
+    faux.setResponses([
+      (c: TranscriptContext) => {
+        prompt = seen(c);
+        return reply("34.");
+      },
+    ]);
+    sendMessage(directChat(ada.id), "what's the jasper code?");
+    await idle();
+    expect(prompt).toContain('In the team chat "Crew" (your user, you, Bo):');
+    expect(prompt).toMatch(/your user: the jasper code is 34\n\[just now\] (you: Got it, jasper is 34\.|Bo: Noted\.)/);
+    // It comes before the question it answers.
+    expect(prompt.indexOf("Your other chats")).toBeLessThan(prompt.lastIndexOf("what's the jasper code?"));
+
+    clearChat(team.id);
+    faux.setResponses([
+      (c: TranscriptContext) => {
+        prompt = seen(c);
+        return reply("I don't know it.");
+      },
+    ]);
+    sendMessage(directChat(ada.id), "and now?");
+    await idle();
+    expect(prompt).not.toContain("Your other chats");
   });
 });

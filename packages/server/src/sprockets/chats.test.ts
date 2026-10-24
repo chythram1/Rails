@@ -53,7 +53,7 @@ describe("chats", () => {
     expect(listSprockets().find((x) => x.id === s.id)!.direct.lastMessage?.text).toBe("Noted.");
   });
 
-  it("runs each chat on its own history", async () => {
+  it("runs each chat on its own history, with only the other chat's messages beside it (ADR 0034)", async () => {
     const { s, panel } = coordinator();
     const contexts: string[] = [];
     const reply = (text: string) => (c: TranscriptContext) => (contexts.push(seen(c)), fauxAssistantMessage(text));
@@ -63,8 +63,9 @@ describe("chats", () => {
     sendMessage(directChat(s.id), "what's new?");
     await idle();
     expect(contexts[1]).toContain("what's new?");
+    // The project chat's events never reach the direct chat; what the Sprocket said there shows, as another chat.
     expect(contexts[1]).not.toContain("Shall I merge?");
-    expect(contexts[1]).not.toContain("Seen it.");
+    expect(contexts[1]).toMatch(/In your project chat \(.*\):\n\[just now\] you: Seen it\./);
   });
 
   it("answers one chat at a time, then the other", async () => {

@@ -3,7 +3,7 @@
 import type { Api, AssistantMessage, Message, Model } from "@earendil-works/pi-ai";
 import { type Handoff, type SprocketCardAction, type SprocketMessage } from "@rails/shared";
 import { AGENT } from "../bridge/board.ts";
-import { automationRuns, handoffs, sessionEvents, sprocketMessages, sprockets, suggestions, type StoredChat, type StoredRun } from "../db.ts";
+import { automationRuns, handoffs, projects, sessionEvents, sprocketChats, sprocketMessages, sprockets, suggestions, type StoredChat, type StoredRun } from "../db.ts";
 import { resultText } from "../harness/mcpTools.ts";
 import { CORE_MEMORY_MAX } from "../harness/memory.ts";
 import { waitingAsks, type TeamInfo } from "./members.ts";
@@ -240,7 +240,7 @@ export function systemPrompt(
     "<core_memory>",
     coreMemory || "(empty)",
     "</core_memory>",
-    "Use the remember tool to keep durable facts about your user: preferences and how they like to work. Your description already holds their instructions, so don't copy it. Never store secrets, code or details of one project there. Your user doesn't see this sheet; it's yours to keep tidy. This copy is from the start of the conversation; the tool's result shows the current sheet.",
+    "Use the remember tool to keep what should last beyond this conversation: anything your user asks you to remember (a number, a code, a name, a date, a fact), and what you learn about their preferences and how they like to work. Save it as soon as they ask, in any chat: the sheet is the same in all your chats. Your description already holds their instructions, so don't copy it. Don't store passwords, API keys or tokens, nor source code. Your user doesn't see this sheet; it's yours to keep tidy. This copy is from the start of the conversation; the tool's result shows the current sheet.",
     ...(chat === "project" ? [] : ["", TEXTING]),
   ].join("\n");
 }
@@ -257,6 +257,57 @@ const TEXTING = [
   "- No headings, no bold, no Markdown tables. A short list is fine. Use Markdown only for code.",
   "- When structure helps (comparing options, figures, a checklist of steps, code or a diff), show a card with show_card instead of writing it out, with a sentence around it if useful. Most replies are plain text.",
 ].join("\n");
+
+/** How many of a Sprocket's other chats a run is shown (ADR 0034), the most recently active first. */
+const ELSEWHERE_CHATS = 4;
+/** The latest messages shown from each. */
+const ELSEWHERE_MESSAGES = 20;
+/** Characters of each message shown. */
+const ELSEWHERE_CLIP = 300;
+
+/** "just now", "5 min ago", "3 h ago", "2 days ago". */
+function ago(iso: string): string {
+  const min = Math.round((Date.now() - Date.parse(iso)) / 60_000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  const h = Math.round(min / 60);
+  return h < 24 ? `${h} h ago` : `${Math.round(h / 24)} day${h < 36 ? "" : "s"} ago`;
+}
+
+/**
+ * What a Sprocket said and heard lately in its other chats (ADR 0034): its direct chat, its project's chat and its
+ * teams, without Rails' events, notices and cards. Only its own chats: another Sprocket's direct chat never shows.
+ * Undefined when they're empty.
+ */
+export function elsewhere(self: string, chatId: string): string | undefined {
+  const s = sprockets.get(self);
+  const chats = [
+    sprocketChats.of(self, "direct"),
+    s?.projectId ? sprocketChats.of(self, "project") : undefined,
+    ...sprocketChats.teams().filter((t) => sprocketChats.members(t.id).includes(self)),
+  ].filter((c): c is StoredChat => !!c && c.id !== chatId);
+  const shown = chats
+    .map((c) => ({ c, messages: sprocketMessages.list(c.id).filter((m) => m.author === "user" || (m.author === "sprocket" && !m.card && !m.approval)).slice(-ELSEWHERE_MESSAGES) }))
+    .filter((x) => x.messages.length)
+    .sort((a, b) => b.messages.at(-1)!.createdAt.localeCompare(a.messages.at(-1)!.createdAt))
+    .slice(0, ELSEWHERE_CHATS);
+  if (!shown.length) return;
+  const nameOf = (id: string) => (id === self ? "you" : (sprockets.get(id)?.name ?? "a Sprocket that was deleted"));
+  const title = (c: StoredChat) => {
+    if (c.kind === "direct") return "your direct chat with your user";
+    if (c.kind === "project") return `your project chat${s?.projectId ? ` (${projects.get(s.projectId)?.name ?? "its project"})` : ""}`;
+    const others = sprocketChats.members(c.id).filter((m) => m !== self).map(nameOf);
+    return `the team chat "${c.name ?? ""}" (your user, you${others.length ? `, ${others.join(", ")}` : ""})`;
+  };
+  const line = (m: SprocketMessage) => {
+    const text = m.text.length > ELSEWHERE_CLIP ? `${m.text.slice(0, ELSEWHERE_CLIP)}…` : m.text;
+    return `[${ago(m.createdAt)}] ${m.author === "user" ? "your user" : nameOf(m.sprocketId)}: ${text}`;
+  };
+  return [
+    "[Rails, not your user] Your other chats, for context: the latest of what was said there, oldest first. They aren't this chat, and others here may not have seen them. What your user told you there holds here too, unless they've said otherwise since. Answer in this chat.",
+    ...shown.map(({ c, messages }) => `In ${title(c)}:\n${messages.map(line).join("\n")}`),
+  ].join("\n\n");
+}
 
 /** The reminder when several events wait for one reply (not saved, not from the user). */
 export function severalEvents(events: SprocketMessage[]): string {
