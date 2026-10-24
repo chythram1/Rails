@@ -132,12 +132,11 @@ packages/
   description, whether it's its project's Coordinator; core memory stays internal) in SQLite and broadcasts `sprockets.changed`.
   Each has its direct chat, and an attached one its project's chat, where events land (ADR 0021, `sprocket_chats`;
   `GET`/`POST /api/chats/:id/messages`, `DELETE` to clear). Team chats (ADR 0022, `teams.ts`, `/api/teams`) hold two to four
-  Sprockets: the user's message goes to the members it @mentions (`@everyone` for all), else (a tapped option) to
-  whoever asked, else to members whose questions wait, else the lead (no model guesses, ADR 0023); members pass the
-  turn with `pass_turn` (ADR 0023, `harness/turns.ts`), back and forth too, at most 10 in a row, and one that asks a teammate
-  without passing is reminded once. Replies show a bubble per paragraph, one after another (`bubbles.ts`). Runs are rows
-  (`sprocket_runs`, ADR 0023): a user message, a pass or (for a Coordinator) an event queues one in that chat (`runs.ts`), one
-  chat at a time per Sprocket and one run at a time per chat; outside the project chat a run posts each text as its own message,
+  Sprockets: every message wakes every member at once (only those it @mentions, or for a tapped option whoever asked),
+  and each writes or replies `(quiet)`; a member's reply wakes its teammates, at most 4 levels after the user's message,
+  and a new message lets replies being written finish (ADR 0033). Replies show a bubble per paragraph, one after another (`bubbles.ts`). Runs are rows
+  (`sprocket_runs`, ADR 0023): a user message, a teammate's message or (for a Coordinator) an event queues one in that chat (`runs.ts`),
+  one chat at a time per Sprocket, team members at once, and up to 6 runs at once; outside the project chat a run posts each text as its own message,
   can `send_message`, `show_card` (a card: table, facts, list, checklist, code or diff, ADR 0024) and `ask_user`, with options to tap or none (its run then waits for the answer). Each run is a
   pi-agent-core loop on the Sprocket's model, streamed to browsers as `sprockets.typing`, capped at 12 model
   calls (a request that hears nothing for 20 s is sent again, `resend.ts`), 30 runs per Sprocket per hour and 2 runs at once. Its one tool is codemode (ADR 0008,
