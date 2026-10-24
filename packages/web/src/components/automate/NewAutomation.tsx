@@ -41,8 +41,8 @@ export function NewAutomation({ sprockets, servers, template }: { sprockets: Spr
     setBusy(true);
     setError("");
     try {
-      const made = await api.createAutomation({ name, sprocketId, prompt, schedule, timezone });
-      navigate(href.automation(made.id));
+      await api.createAutomation({ name, sprocketId, prompt, schedule, timezone });
+      navigate(href.automate());
     } catch (e: any) {
       setError(e.message);
       setBusy(false);
