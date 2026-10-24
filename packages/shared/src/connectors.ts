@@ -48,11 +48,11 @@ export interface Connector {
   scopes?: string[];
 }
 
-export const CONNECTOR_GROUPS: { id: ConnectorGroup; title: string; blurb: string }[] = [
-  { id: "accounts", title: "Your accounts", blurb: "Sign in, or paste a token. Rails keeps it on this computer." },
-  { id: "docs", title: "Docs and knowledge", blurb: "No account needed." },
-  { id: "google", title: "Google Workspace", blurb: "In preview at Google. Set up your Google app once, then each is one sign-in." },
-  { id: "local", title: "On this computer", blurb: "Programs Rails runs here, with your access." },
+export const CONNECTOR_GROUPS: { id: ConnectorGroup; title: string }[] = [
+  { id: "accounts", title: "Your accounts" },
+  { id: "docs", title: "Docs and knowledge" },
+  { id: "google", title: "Google Workspace" },
+  { id: "local", title: "On this computer" },
 ];
 
 const GOOGLE_GUIDE = "https://developers.google.com/workspace/guides/configure-mcp-servers";
@@ -245,13 +245,6 @@ export const CONNECTORS: Connector[] = [
     command: "npx",
     args: ["-y", "@modelcontextprotocol/server-filesystem"],
   },
-];
-
-/** Collections for the banner at the top of Customize's connectors. */
-export const CONNECTOR_COLLECTIONS: { eyebrow: string; title: string; text: string; ids: string[] }[] = [
-  { eyebrow: "For building", title: "Your code, issues and errors", text: "Give Sprockets the tools your projects already use.", ids: ["github", "linear", "sentry", "vercel", "supabase"] },
-  { eyebrow: "No account needed", title: "Docs on hand", text: "Current library docs and answers about any public repository.", ids: ["context7", "deepwiki"] },
-  { eyebrow: "Google Workspace", title: "Drive, Sheets, Calendar and Gmail", text: "Google's own servers, with an app you register.", ids: ["google-drive", "google-sheets", "google-calendar", "gmail"] },
 ];
 
 export const connectorById = (id: string | undefined) => CONNECTORS.find((c) => c.id === id);

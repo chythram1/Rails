@@ -45,6 +45,8 @@ type AutomateRoute = Extract<Route, { name: "automate" }>;
 export function AutomatePage({ route }: { route: AutomateRoute }) {
   const { list: sprockets } = useSprockets();
   const { mcpServers } = useStore();
+  // Here, not in the tab: switching tabs keeps what's loaded instead of fetching it again (which drew an empty frame).
+  const automations = useAutomations();
   if (route.view === "new")
     return (
       <div className="cz-detail">
@@ -53,7 +55,7 @@ export function AutomatePage({ route }: { route: AutomateRoute }) {
     );
   if (route.view === "item")
     return <div className="cz-detail">{sprockets && <AutomationEditor key={route.id} id={route.id} sprockets={sprockets} />}</div>;
-  return <Gallery key={route.view} tab={route.view} sprockets={sprockets ?? []} servers={mcpServers ?? []} />;
+  return <Gallery key={route.view} tab={route.view} automations={automations} sprockets={sprockets ?? []} servers={mcpServers ?? []} />;
 }
 
 const TABS = [
@@ -70,8 +72,18 @@ const TABS = [
 /** Whether its last run, or Rails pausing it, wants the user to look. */
 const needsYou = (a: Automation) => !!a.pausedReason || a.lastRun?.outcome === "needs_you" || a.lastRun?.outcome === "failed";
 
-function Gallery({ tab, sprockets, servers }: { tab: "list" | "templates"; sprockets: SprocketData[]; servers: McpServer[] }) {
-  const { list, error } = useAutomations();
+function Gallery({
+  tab,
+  automations,
+  sprockets,
+  servers,
+}: {
+  tab: "list" | "templates";
+  automations: ReturnType<typeof useAutomations>;
+  sprockets: SprocketData[];
+  servers: McpServer[];
+}) {
+  const { list, error } = automations;
   const { settings: models } = useModelSettings();
   const [query, setQuery] = useState("");
   const [actionError, setActionError] = useState("");

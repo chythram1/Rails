@@ -12,7 +12,6 @@ import {
   IconTerminal2 as Terminal,
 } from "@tabler/icons-react";
 import {
-  CONNECTOR_COLLECTIONS,
   CONNECTOR_GROUPS,
   CONNECTORS,
   connectorById,
@@ -96,7 +95,8 @@ export function CustomizePage({ route }: { route: CustomizeRoute }) {
   }
   return (
     <>
-      <Gallery tab={route.tab} servers={mcpServers} skills={skills} prompts={savedPrompts} />
+      {/* A tab of its own (key), so its first frame already shows its own Yours or Discover, search and error. */}
+      <Gallery key={route.tab} tab={route.tab} servers={mcpServers} skills={skills} prompts={savedPrompts} />
       {connector && <ConnectorDialog key={connector.id} connector={connector} added={mcpServers.filter((s) => s.connector === connector.id)} onClose={toConnectors} />}
       {custom && <CustomServerDialog key={custom} transport={custom} onClose={toConnectors} />}
     </>
@@ -108,12 +108,6 @@ function Gallery({ tab, servers, skills, prompts }: { tab: CustomizeTab; servers
   const [mode, setModeState] = useState<Mode>(modes[tab] ?? (has ? "yours" : "discover"));
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
-  useEffect(() => {
-    setModeState(modes[tab] ?? (has ? "yours" : "discover"));
-    setQuery("");
-    setError("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the tab changes
-  }, [tab]);
   const setMode = (m: Mode) => {
     modes[tab] = m;
     setModeState(m);
@@ -189,7 +183,7 @@ function Gallery({ tab, servers, skills, prompts }: { tab: CustomizeTab; servers
           (mode === "discover" ? (
             <DiscoverConnectors servers={servers} query={q} onCustom={(t) => void newServer(t)} />
           ) : (
-            <YourConnectors servers={servers} query={q} onBrowse={() => setMode("discover")} onCustom={(t) => void newServer(t)} />
+            <YourConnectors servers={servers} query={q} onBrowse={() => setMode("discover")} />
           ))}
         {tab === "skills" &&
           (mode === "discover" ? (
@@ -303,12 +297,11 @@ const SETUP_LABEL: Record<Connector["setup"], string> = {
   folder: "Pick a folder",
 };
 
-/** Rails' connectors, by group under a banner, then the custom ones. */
+/** Rails' connectors, by group, then the custom ones. */
 function DiscoverConnectors({ servers, query, onCustom }: { servers: McpServer[]; query: string; onCustom(t: "http" | "stdio"): void }) {
   const shown = CONNECTORS.filter((c) => matches(query, c.name, c.description, c.by));
   return (
     <>
-      {!query && <Banner servers={servers} />}
       {CONNECTOR_GROUPS.map((g) => {
         const list = shown.filter((c) => c.group === g.id);
         if (!list.length) return null;
@@ -317,7 +310,6 @@ function DiscoverConnectors({ servers, query, onCustom }: { servers: McpServer[]
             key={g.id}
             title={g.title}
             count={list.length}
-            blurb={g.blurb}
             action={
               g.id === "google" ? (
                 <a className="cz-section-link" href={href.mcpApp("google")}>
@@ -334,9 +326,8 @@ function DiscoverConnectors({ servers, query, onCustom }: { servers: McpServer[]
                   href={added ? href.mcpServer(added.id) : href.connector(c.id)}
                   mark={<ConnectorLogo id={c.id} />}
                   name={c.name}
-                  kind={`by ${c.by}`}
+                  kind={SETUP_LABEL[c.setup]}
                   text={c.description}
-                  meta={SETUP_LABEL[c.setup]}
                   action={
                     added ? (
                       <span className="cz-added" title="Added" aria-label={`${c.name} is added`}>
@@ -362,78 +353,10 @@ function DiscoverConnectors({ servers, query, onCustom }: { servers: McpServer[]
 
 function CustomSection({ onCustom }: { onCustom(t: "http" | "stdio"): void }) {
   return (
-    <Section title="Custom" blurb="Any other MCP server: one on the web by its URL, or a program Rails runs on this computer.">
+    <Section title="Custom">
       <AddCard icon={<Plug size={20} />} title="A server on the web" text="Paste its URL (Streamable HTTP). Sign in or add a token after." onClick={() => onCustom("http")} />
       <AddCard icon={<Terminal size={20} />} title="A program on this computer" text="A command such as npx or uvx, with its arguments and keys." onClick={() => onCustom("stdio")} />
     </Section>
-  );
-}
-
-/** A collection of connectors at the top of Discover: what it's for, and their marks to open. Arrows go through them. */
-function Banner({ servers }: { servers: McpServer[] }) {
-  // Every collection is drawn, stacked in one cell, so the banner keeps the tallest one's size; only the shown one
-  // is visible. `dir` is which way it went, for the slide; `from` the one going out.
-  const [{ at, from, dir }, setState] = useState({ at: 0, from: -1, dir: 1 });
-  const n = CONNECTOR_COLLECTIONS.length;
-  const go = (d: number) => setState((s) => ({ at: (s.at + d + n) % n, from: s.at, dir: d }));
-  const slide = (i: number) => ({
-    className: "cz-slide" + (i === at ? " on" : i === from ? " out" : ""),
-    "aria-hidden": i !== at,
-    inert: i !== at,
-  });
-  return (
-    <section className="cz-banner" aria-roledescription="carousel" aria-label="Collections" style={{ "--dir": dir } as React.CSSProperties}>
-      <div className="cz-banner-text cz-stack">
-        {CONNECTOR_COLLECTIONS.map((c, i) => (
-          <div key={c.title} {...slide(i)}>
-            <p className="cz-banner-eyebrow">{c.eyebrow}</p>
-            <h2 className="cz-banner-title">{c.title}</h2>
-            <p className="cz-banner-lead">{c.text}</p>
-          </div>
-        ))}
-      </div>
-      <div className="cz-banner-marks cz-stack">
-        {CONNECTOR_COLLECTIONS.map((c, i) => (
-          <ul key={c.title} {...slide(i)}>
-            {c.ids.map((id, j) => {
-              const conn = connectorById(id)!;
-              const added = servers.find((s) => s.connector === id);
-              return (
-                <li key={id} style={{ "--i": j } as React.CSSProperties}>
-                  <a href={added ? href.mcpServer(added.id) : href.connector(id)} title={conn.name} aria-label={`${conn.name}${added ? " (added)" : ""}`}>
-                    <ConnectorLogo id={id} size={j % 2 ? 52 : 60} />
-                    {added && (
-                      <span className="cz-banner-added" aria-hidden>
-                        <Check size={12} />
-                      </span>
-                    )}
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
-        ))}
-      </div>
-      <span className="sr-only" aria-live="polite">
-        {CONNECTOR_COLLECTIONS[at].title}
-      </span>
-      <div className="cz-banner-nav">
-        <button type="button" className="icon-btn" aria-label="Previous collection" onClick={() => go(-1)}>
-          <ChevronLeft size={18} />
-        </button>
-        <span className="cz-banner-dots" aria-hidden>
-          {CONNECTOR_COLLECTIONS.map((_, i) => (
-            <span key={i} className={i === at ? "on" : ""} />
-          ))}
-        </span>
-        <span className="sr-only">
-          {at + 1} of {CONNECTOR_COLLECTIONS.length}
-        </span>
-        <button type="button" className="icon-btn" aria-label="Next collection" onClick={() => go(1)}>
-          <ChevronRight size={18} />
-        </button>
-      </div>
-    </section>
   );
 }
 
@@ -447,10 +370,10 @@ function serverState(s: McpServer): { text: string; warn?: string } {
   if (s.signIn?.state !== "signed-in" && (setup === "sign-in" || setup === "own-app")) return { text: "", warn: "Sign in" };
   if (s.status.state === "error") return { text: "", warn: "Can't connect" };
   if (s.status.state === "unknown" && !s.toolsAt) return { text: "Not connected yet" };
-  return { text: serverSummary(s) };
+  return { text: s.toolsAt ? `${s.tools.length} tool${s.tools.length === 1 ? "" : "s"}` : serverSummary(s) };
 }
 
-function YourConnectors({ servers, query, onBrowse, onCustom }: { servers: McpServer[]; query: string; onBrowse(): void; onCustom(t: "http" | "stdio"): void }) {
+function YourConnectors({ servers, query, onBrowse }: { servers: McpServer[]; query: string; onBrowse(): void }) {
   const shown = servers.filter((s) => {
     const c = connectorById(s.connector);
     return matches(query, s.name, s.description, c?.name, c?.by, s.url, s.command);
@@ -461,18 +384,16 @@ function YourConnectors({ servers, query, onBrowse, onCustom }: { servers: McpSe
         {shown.map((s) => {
           const c = connectorById(s.connector);
           const state = serverState(s);
-          const users = s.usedBy.length;
           return (
             <Card
               key={s.id}
               href={href.mcpServer(s.id)}
               mark={<ConnectorLogo server={s} />}
               name={c && s.name === c.id ? c.name : s.name}
-              kind={c ? `by ${c.by}` : s.transport === "http" ? "On the web" : "On this computer"}
+              kind={state.text || undefined}
               text={s.description || c?.description}
-              detail={(s.transport === "http" ? s.url : [s.command, ...s.args].join(" ")) || "Not set up yet"}
+              detail={c ? undefined : (s.transport === "http" ? s.url : [s.command, ...s.args].join(" ")) || "Not set up yet"}
               warn={state.warn}
-              meta={[state.text, users ? `${users} Sprocket${users === 1 ? "" : "s"}` : "No Sprocket yet"].filter(Boolean).join(" · ")}
               action={
                 s.status.state === "ok" && s.signIn?.state !== "needed" ? (
                   <span className="cz-added" title="Connected" aria-label="Connected">
@@ -486,7 +407,6 @@ function YourConnectors({ servers, query, onBrowse, onCustom }: { servers: McpSe
         {!query && <AddCard icon={<Plus size={20} />} title="Browse connectors" text="Linear, Notion, GitHub, Google Drive and more." onClick={onBrowse} />}
       </Section>
       {query && !shown.length && <p className="muted cz-none">None of yours match.</p>}
-      {!query && <CustomSection onCustom={onCustom} />}
     </>
   );
 }
@@ -501,7 +421,7 @@ function YourSkills({ skills, query, onNew, onBrowse }: { skills: Skill[]; query
             key={s.id}
             href={href.skill(s.id)}
             mark={
-              <span className="cz-logo" aria-hidden>
+              <span className="cz-logo cz-logo-soft" aria-hidden>
                 <Book size={20} stroke={1.6} />
               </span>
             }
@@ -555,7 +475,7 @@ function DiscoverSkills({ skills, query, onError }: { skills: Skill[]; query: st
                   key={s.path}
                   href={copied ? href.skill(copied.id) : undefined}
                   mark={
-                    <span className="cz-logo" aria-hidden>
+                    <span className="cz-logo cz-logo-soft" aria-hidden>
                       <Book size={20} stroke={1.6} />
                     </span>
                   }
@@ -603,7 +523,7 @@ function YourPrompts({ prompts, query, onNew }: { prompts: SavedPrompt[]; query:
             key={p.id}
             href={href.prompt(p.id)}
             mark={
-              <span className="cz-logo" aria-hidden>
+              <span className="cz-logo cz-logo-soft" aria-hidden>
                 <Message size={20} stroke={1.6} />
               </span>
             }

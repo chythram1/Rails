@@ -21,7 +21,7 @@ function UseGlyph({ use, size }: { use: TemplateUse; size: number }) {
 function TemplateMark({ uses }: { uses: TemplateUse[] }) {
   const tile = (u: TemplateUse, size: number) =>
     u === "project" ? (
-      <span className="cz-logo" style={{ "--size": `${size}px` } as React.CSSProperties} aria-hidden>
+      <span className="cz-logo cz-logo-soft" style={{ "--size": `${size}px` } as React.CSSProperties} aria-hidden>
         <Folder size={Math.round(size * 0.5)} stroke={1.6} />
       </span>
     ) : (
