@@ -164,7 +164,7 @@ for future ideas, which aren't commitments. Reference screenshots for the look a
 - If it's unclear whether something counts as experimental, ask before starting.
 
 ## Invariants
-- Provider transcripts are the source of truth for sessions. Rails reads them and **never writes** them (the agents do, inside panels). The DB only stores projects, panels and layouts.
+- Provider transcripts are the source of truth for sessions. Rails reads them and **never writes** them (the agents do, inside panels). The DB holds Rails' own state (projects, panels, layouts, Sprockets and their chats, Customize, automations), never a session's transcript.
 - Panel processes live in tmux, not in the server. A browser disconnecting or the server restarting must never kill an agent; only closing the panel does.
 - The server's panel list is the source of truth; the saved layout is only an arrangement. Reconcile layout against the list, never the other way round.
 - The access token must never reach panel processes: keep the env cleaning in `tmux.ts`. Panels get only their own bridge token (ADR 0007).
