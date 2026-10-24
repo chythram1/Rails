@@ -860,7 +860,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 
 .sp-chat { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 /* position: relative makes the thread the offsetParent its messages are measured against (SprocketChat). */
-.sp-thread { position: relative; flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 24px 20px; display: flex; flex-direction: column; }
+.sp-thread { position: relative; flex: 1; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 24px 20px; display: flex; flex-direction: column; }
 .sp-spacer { flex-shrink: 0; }
 /* The thread's bottom edge: the messages nearest the composer fade and blur into the page (a scroll-fade strip with
    a light blur). Both ramp evenly over the whole 48px, so it reads as one
@@ -903,7 +903,9 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-intro p { margin: 0; }
 /* A Sprocket's name where it introduces itself, and on its gallery card: Space Grotesk, the characters' voice. */
 .sp-intro-title { margin-top: 10px; font: 600 24px/1.2 var(--grotesk); letter-spacing: -0.01em; }
-.sp-messages { list-style: none; margin: 0 auto; padding: 0; width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: 8px; }
+.sp-messages { list-style: none; margin: 0 auto; padding: 0; width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: 20px; }
+/* The same author again: 4px under the one before. */
+.sp-message.cont { margin-top: -16px; }
 .sp-message { display: flex; flex-direction: column; align-items: flex-end; }
 /* Day stamps: Space Mono capitals between rules' worth of space. */
 .sp-stamp { align-self: center; margin: 12px 0 8px; color: var(--muted); font: 11px/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
@@ -925,6 +927,22 @@ textarea.input { resize: vertical; line-height: 1.5; }
 /* A message's bubble, then the options to tap under it, 4px apart. */
 .sp-bubbles { display: flex; flex: 1; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
 .sp-message.user .sp-bubbles { align-items: flex-end; }
+/* A bubble and its details (time, copy). With a pointer they sit beside it, on its inner side (right of a reply,
+   left of the user's), taking no room; on a touch screen a tapped message shows them under it. */
+.sp-line { position: relative; display: flex; flex-direction: column; align-items: flex-start; max-width: min(560px, 85%); }
+.sp-message.sprocket .sp-line { max-width: min(620px, 85%); }
+.sp-message.user .sp-line { align-items: flex-end; }
+.sp-message.notice .sp-line { align-items: center; max-width: 100%; }
+.sp-message .sp-line .sp-bubble { max-width: 100%; } /* the line holds the width cap */
+.sp-line .sp-msg-actions { margin: 0; }
+@media (hover: hover) {
+  .sp-line .sp-msg-actions { position: absolute; bottom: 6px; left: calc(100% + 2px); }
+  .sp-message.user .sp-line .sp-msg-actions { left: auto; right: calc(100% + 2px); }
+}
+@media (hover: none) {
+  .sp-line .sp-msg-actions { display: none; }
+  .sp-message:focus-within .sp-line .sp-msg-actions { display: flex; }
+}
 .sp-message.notice .sp-bubbles { align-items: center; }
 /* A new reply pops in whole (no text streaming), like a message arriving in a text app. */
 .sp-message.pop .sp-bubble { animation: sp-pop 260ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both; transform-origin: 0 100%; }
@@ -1197,11 +1215,11 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 @container (max-width: 720px) {
   .sp-panel { position: absolute; inset: 0 0 0 auto; width: min(340px, 100%); z-index: 2; box-shadow: var(--shadow-pop); }
 }
-/* The details row under a message (MessageActions.tsx): always takes its space, so messages sit apart and
-   nothing shifts; shows for the one message under the pointer, or the one whose button has focus unless the
-   pointer is on another. Touch screens can't hover, so there it always shows. */
+/* A message's details (MessageActions.tsx): beside a bubble (.sp-line), under a card or event. They always take
+   their space, so nothing shifts; they show for the one message under the pointer, or the one whose button has
+   focus unless the pointer is on another. Touch screens can't hover, so there they always show. */
 .sp-msg-actions { display: flex; align-items: center; gap: 2px; height: 28px; margin-top: 4px; color: var(--muted); font-size: 12px; }
-.sp-message.sprocket .sp-msg-actions { margin-left: 8px; } /* the copy icon's glyph lines up with the bubble's text */
+.sp-message.sprocket > .sp-msg-actions { margin-left: 8px; } /* the copy icon's glyph lines up with the bubble's text */
 .sp-time { padding: 0 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .sp-msg-actions .icon-btn { width: 28px; height: 28px; }
 @media (hover: hover) {

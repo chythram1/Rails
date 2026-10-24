@@ -3,10 +3,10 @@ import { IconCheck as Check, IconCopy as Copy } from "@tabler/icons-react";
 import { copyText, timeAgoLong } from "../../util.ts";
 
 /**
- * The row under a chat message (ref/sprockets/stage2/message.png): when it was sent and a copy button. The
- * row always takes its space (so messages sit apart and nothing shifts), and shows while the pointer is on
- * its message or a button in it has focus (styles.css). Under the user's messages it reads time, copy;
- * under a reply, copy, time, each starting from the message's own edge.
+ * A chat message's details: when it was sent and a copy button, beside its bubble (under a card or event). They
+ * always take their space (so nothing shifts), and show while the pointer is on the message or a button in them
+ * has focus (styles.css). Left of the user's messages they read time, copy; right of a reply, copy, time: the
+ * copy button always next to the bubble.
  */
 export function MessageActions({ text, at, now, reply }: { text: string; at: string; now: number; reply: boolean }) {
   const [copied, setCopied] = useState(false);

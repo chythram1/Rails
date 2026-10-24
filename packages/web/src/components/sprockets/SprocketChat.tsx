@@ -313,6 +313,8 @@ export function SprocketChat({
               const same = (a?: SprocketMessage) => a?.author === "sprocket" && a.sprocketId === m.sprocketId;
               const first = label || !same(prev);
               const last = !same(next) || newGroup(m.createdAt, next!.createdAt);
+              // The same author again, soon after: it sits close under the one before, as in a text app.
+              const cont = !label && prev?.author === m.author && (m.author !== "sprocket" || same(prev)) && (m.author === "user" || m.author === "sprocket");
               const pop = m.author === "sprocket" && !!initial.current && !initial.current.has(m.id);
               // A member gave a teammate the turn (before ADR 0033): not shown.
               if (m.author === "pass") return null;
@@ -342,7 +344,7 @@ export function SprocketChat({
               const read = m.author === "notice" || m.card || m.approval ? undefined : blocks(m.text);
               const Bubble = read?.some((b) => b.kind === "fence") ? "div" : "p";
               return (
-                <li key={m.id} className={"sp-message " + m.author + (pop ? " pop" : "")} style={by ? ({ "--who": COLORS[by.look.color] } as CSSProperties) : undefined}>
+                <li key={m.id} className={"sp-message " + m.author + (cont ? " cont" : "") + (pop ? " pop" : "")} style={by ? ({ "--who": COLORS[by.look.color] } as CSSProperties) : undefined}>
                   {label && <time className="sp-stamp" dateTime={m.createdAt}>{stamp(m.createdAt)}</time>}
                   {team && m.author === "sprocket" && first && <p className="sp-author" aria-hidden>{by?.name ?? "A deleted Sprocket"}</p>}
                   {m.event ? (
@@ -363,10 +365,15 @@ export function SprocketChat({
                         )}
                         {m.approval && <ApprovalCard messageId={m.id} approval={m.approval} name={by?.name ?? "A deleted Sprocket"} />}
                         {!m.card && !m.approval && (
-                          <Bubble className="sp-bubble">
-                            {m.author === "sprocket" && <span className="sr-only">{by?.name ?? "A deleted Sprocket"}: </span>}
-                            {read ? <Marked blocks={read} text={text} /> : m.text}
-                          </Bubble>
+                          // The time and copy sit beside the bubble, on its inner side, so a run of messages stays close.
+                          <div className="sp-line">
+                            {/* Focusable by a tap (not by Tab), so a touch screen can show its details. */}
+                            <Bubble className="sp-bubble" tabIndex={m.author === "notice" ? undefined : -1}>
+                              {m.author === "sprocket" && <span className="sr-only">{by?.name ?? "A deleted Sprocket"}: </span>}
+                              {read ? <Marked blocks={read} text={text} /> : m.text}
+                            </Bubble>
+                            {m.author !== "notice" && <MessageActions text={m.text} at={m.createdAt} now={now} reply={m.author !== "user"} />}
+                          </div>
                         )}
                         {!!options?.length && (
                           <div className="sp-ask" role="group" aria-label="Answers to pick">
@@ -382,7 +389,8 @@ export function SprocketChat({
                   )}
                   {/* A Coordinator's suggested replies. */}
                   {m.suggestions?.map((s) => <SuggestionCard key={s.id} suggestion={s} projectId={by?.projectId ?? sprocket.projectId} />)}
-                  {m.author !== "notice" && <MessageActions text={m.text} at={m.createdAt} now={now} reply={m.author !== "user"} />}
+                  {/* Cards and session events are wide: their details go under them. */}
+                  {(m.card || m.approval || m.event) && <MessageActions text={m.text} at={m.createdAt} now={now} reply={m.author !== "user"} />}
                 </li>
               );
             })}
