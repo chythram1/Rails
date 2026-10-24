@@ -172,7 +172,14 @@ export function McpEditor({ server: s }: { server: McpServer }) {
         <button type="button" className="btn small" disabled={testing} onClick={() => void test()}>
           {testing ? "Connecting…" : "Test"}
         </button>
-        <MenuButton label={`${s.name} actions`} title="More" icon={<Dots size={18} />} align="right" items={[{ label: verb, danger: true, onSelect: () => void remove() }]} />
+        {isConnector ? (
+          // A connector's one way out: Disconnect removes it (it's back in Discover). No in-between "signed out" state.
+          <button type="button" className="btn small" onClick={() => void remove(false)}>
+            Disconnect
+          </button>
+        ) : (
+          <MenuButton label={`${s.name} actions`} title="More" icon={<Dots size={18} />} align="right" items={[{ label: verb, danger: true, onSelect: () => void remove() }]} />
+        )}
       </EditorHead>
       <div className="cz-body">
         <header className="cz-hero">
@@ -185,13 +192,13 @@ export function McpEditor({ server: s }: { server: McpServer }) {
         </header>
         {connector ? (
           <>
-            {showSignIn && <SignIn server={s} signIn={s.signIn!} onSave={save} onDisconnect={isConnector ? () => remove(false) : undefined} />}
+            {showSignIn && <SignIn server={s} signIn={s.signIn!} onSave={save} signOut={!isConnector} />}
             {tools}
           </>
         ) : (
           <>
             {settings}
-            {showSignIn && <SignIn server={s} signIn={s.signIn!} onSave={save} onDisconnect={isConnector ? () => remove(false) : undefined} />}
+            {showSignIn && <SignIn server={s} signIn={s.signIn!} onSave={save} signOut={!isConnector} />}
             {tools}
           </>
         )}
@@ -288,18 +295,11 @@ function Status({ server: s }: { server: McpServer }) {
  * that page won't load). Under "Your own app", the client ID and secret for services that don't let apps
  * register themselves, and the redirect address to give them.
  */
-/** `onDisconnect`: a connector's account is its connection, so leaving it disconnects (removes) the connector. */
-function SignIn({
-  server: s,
-  signIn,
-  onSave,
-  onDisconnect,
-}: {
-  server: McpServer;
-  signIn: McpSignIn;
-  onSave(body: McpServerInput): Promise<boolean>;
-  onDisconnect?(): void;
-}) {
+/**
+ * `signOut`: a custom server can sign out and stay. A connector can't: its account is its connection, so it has only
+ * Disconnect (in the head), and here only Sign in, for when its sign-in expired.
+ */
+function SignIn({ server: s, signIn, onSave, signOut }: { server: McpServer; signIn: McpSignIn; onSave(body: McpServerInput): Promise<boolean>; signOut: boolean }) {
   const [busy, setBusy] = useState(false);
   const [secret, setSecret] = useState("");
   const [error, setError] = useState("");
@@ -340,9 +340,11 @@ function SignIn({
           </p>
         </div>
         {signIn.state === "signed-in" && !waiting ? (
-          <button type="button" className="btn small" disabled={busy} onClick={() => (onDisconnect ? onDisconnect() : void run(() => api.signOutMcpServer(s.id)))}>
-            {onDisconnect ? "Disconnect" : "Sign out"}
-          </button>
+          signOut && (
+            <button type="button" className="btn small" disabled={busy} onClick={() => void run(() => api.signOutMcpServer(s.id))}>
+              Sign out
+            </button>
+          )
         ) : (
           !waiting && (
             <button type="button" className="btn small primary" disabled={busy || !s.url} onClick={() => void run(() => api.signInMcpServer(s.id))}>
@@ -539,10 +541,10 @@ function Tools({ server: s, onSave }: { server: McpServer; onSave(policies: Reco
 
 /**
  * A sign-in under way: the service's page to open (in a new tab; browsers block one opened for you after a wait),
- * Cancel, and for signing in on another device, the address it lands on to paste back. Used by the editor and by the
- * add dialogs.
+ * Cancel (unless the dialog's own Cancel does it), and for signing in on another device, the address it lands on to
+ * paste back. Used by the editor and by the add dialogs.
  */
-export function SignInWaiting({ server: s }: { server: McpServer }) {
+export function SignInWaiting({ server: s, cancel = true }: { server: McpServer; cancel?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [address, setAddress] = useState("");
   const [error, setError] = useState("");
@@ -571,9 +573,11 @@ export function SignInWaiting({ server: s }: { server: McpServer }) {
           <a className="btn small primary" href={s.signIn?.authUrl} target="_blank" rel="noreferrer">
             Open the sign-in page <ExternalLink size={14} aria-hidden />
           </a>
-          <button type="button" className="btn small" onClick={() => void run(() => api.cancelMcpSignIn(s.id))}>
-            Cancel
-          </button>
+          {cancel && (
+            <button type="button" className="btn small" onClick={() => void run(() => api.cancelMcpSignIn(s.id))}>
+              Cancel
+            </button>
+          )}
         </div>
         <form className="cz-signin-paste" onSubmit={paste}>
           <label htmlFor="cz-signin-address" className="muted small">

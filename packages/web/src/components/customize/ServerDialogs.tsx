@@ -71,9 +71,10 @@ function Field({ id, label, optional, help, children }: { id: string; label: str
 /**
  * Once it's added, the dialog stays to say how it went: signing in (the page to open), that it needs a sign-in, that
  * it's connected with its tools, or why it can't connect. The server is read from the store, so it follows a sign-in
- * finished in another tab.
+ * finished in another tab. A connector (`setup`) is only kept once it's connected: closing the dialog before that
+ * (Cancel, ×, Escape) removes it, so nothing is left half added.
  */
-function Result({ server: s, setup, onClose }: { server: McpServer; setup?: Connector["setup"]; onClose(): void }) {
+function Result({ server: s, setup, onClose: close }: { server: McpServer; setup?: Connector["setup"]; onClose(): void }) {
   const { mcpApps } = useStore();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -94,13 +95,18 @@ function Result({ server: s, setup, onClose }: { server: McpServer; setup?: Conn
   const needsApp = setup === "own-app" && !s.signIn?.clientId && !(s.signIn?.app && mcpApps?.find((a) => a.id === s.signIn!.app)?.clientId);
   const wantsSignIn = !ok && !signedIn && (s.signIn?.state === "needed" || setup === "sign-in" || (setup === "own-app" && !needsApp));
   const tools = s.tools.length;
+  const unfinished = !!setup && !isConnected(s);
+  const onClose = () => {
+    if (unfinished) void api.deleteMcpServer(s.id).catch(() => {});
+    close();
+  };
 
   let body: ReactNode;
   if (waiting)
     body = (
       <>
         <p className="cz-dialog-text">Open the sign-in page and allow Rails. This updates once you're back.</p>
-        <SignInWaiting server={s} />
+        <SignInWaiting server={s} cancel={!unfinished} />
       </>
     );
   else if (ok)
@@ -119,13 +125,13 @@ function Result({ server: s, setup, onClose }: { server: McpServer; setup?: Conn
   else if (wantsSignIn)
     body = (
       <p className="cz-dialog-state" role="status">
-        <span className="cz-dot needed" aria-hidden /> It's added. Sign in to use its tools.
+        <span className="cz-dot needed" aria-hidden /> {unfinished ? "Sign in to connect it." : "It's added. Sign in to use its tools."}
       </p>
     );
   else if (s.status.state === "error")
     body = (
       <p className="cz-dialog-state" role="status">
-        <span className="cz-dot needed" aria-hidden /> It's added, but it can't connect: {s.status.error}
+        <span className="cz-dot needed" aria-hidden /> {unfinished ? "It can't connect" : "It's added, but it can't connect"}: {s.status.error}
       </p>
     );
   else body = <p className="cz-dialog-text" role="status">Connecting…</p>;
@@ -139,9 +145,11 @@ function Result({ server: s, setup, onClose }: { server: McpServer; setup?: Conn
       onClose={onClose}
       actions={
         <>
-          <a className="btn" href={href.mcpServer(s.id)}>
-            Open its settings
-          </a>
+          {!unfinished && (
+            <a className="btn" href={href.mcpServer(s.id)}>
+              Open its settings
+            </a>
+          )}
           <span className="grow" />
           {wantsSignIn && !waiting ? (
             <button type="button" className="btn primary" disabled={busy || !s.url} onClick={() => void run(() => api.signInMcpServer(s.id))}>
@@ -153,7 +161,7 @@ function Result({ server: s, setup, onClose }: { server: McpServer; setup?: Conn
             </button>
           ) : null}
           <button type="button" className={ok ? "btn primary" : "btn"} onClick={onClose}>
-            Done
+            {unfinished ? "Cancel" : "Done"}
           </button>
         </>
       }

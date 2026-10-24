@@ -358,10 +358,11 @@ function CustomSection({ onCustom }: { onCustom(t: "http" | "stdio"): void }) {
 function serverState(s: McpServer): string {
   const setup = connectorById(s.connector)?.setup;
   if (s.signIn?.authUrl) return "Signing in…";
-  if (s.signIn?.state === "needed") return "Not signed in";
+  if (s.signIn?.state === "needed") return "Sign in again";
   // A connector that signs in, and hasn't yet: say what it needs instead of "not connected".
   if (s.signIn?.state !== "signed-in" && setup === "own-app" && !s.signIn?.clientId) return "Set up your app to sign in";
-  if (s.signIn?.state !== "signed-in" && (setup === "sign-in" || setup === "own-app")) return "Not signed in";
+  // A connector is only kept once it's connected, so one not signed in now lost its sign-in.
+  if (s.signIn?.state !== "signed-in" && (setup === "sign-in" || setup === "own-app")) return "Sign in again";
   if (s.status.state === "error") return "Can't connect";
   if (s.status.state === "unknown" && !s.toolsAt) return "Not connected yet";
   return s.toolsAt ? `${s.tools.length} tool${s.tools.length === 1 ? "" : "s"}` : serverSummary(s);
