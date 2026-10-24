@@ -51,9 +51,15 @@ Decisions:
   reminders and the English-pattern rules are gone. Pass lines from before stay in the database and are hidden.
 - **Limits.** The hourly limit per Sprocket (ADR 0006) counts runs that posted; a quiet run doesn't count, because
   it wakes nobody and so can't loop. Its tokens still count as usage.
-- **What shows.** One line at the bottom of the chat names the members working ("Becky and Chandler are working…"),
-  with the first one's face; a quiet member drops out of it when its run ends. Members' names in messages read as
-  chips, with or without an @; a chip is a reference and wakes nobody.
+- **What shows.** One icon at the bottom of the chat turns from one member into the next, round everyone thinking since
+  the message (the outline morphs, flubber, and the colour fades across), and a line beside it names those still
+  thinking, in the team's order ("Becky and Chandler are thinking…"). A member that finishes drops out of the line, not
+  the icon, so nothing flickers; a member stays named for 800ms after it stops. A team has no typing dots or spin;
+  direct chats keep them. Members' names in messages read as chips, with or without an @; a chip is a reference and
+  wakes nobody.
+
+Amendment (2026-10-24): greetings and thanks to everyone get an answer from each member who wants to give one. The
+first instructions asked for one answer to small talk, and "Hello everyone" got only one.
 
 Consequences:
 - Each message costs one run per member (four in a team of four), and each posted reply up to one more per

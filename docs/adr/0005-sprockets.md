@@ -1,6 +1,6 @@
 # ADR 0005: Sprockets, always-on agents with characters
 
-Status: accepted (stage 1: look and chat UI only).
+Status: accepted (stage 1: look and chat UI only). Accessories are gone (amendment below).
 
 Sprockets are a lightweight collection of always-on agents native to Rails. Each one is a small character
 the user makes: one of 8 shapes (Block, Bean, Lune, Bell, Starry, Cog, Roo, Momo), one of 10 colours,
@@ -39,3 +39,8 @@ Consequences:
 - Sprockets aren't providers and don't widen ADR 0002's scope: they're Rails' own agents (see the "Home
   agent" idea in the roadmap), and they don't run in panels.
 - The app's no-animation rule has one exception: Sprocket characters.
+
+Amendment (2026-10-24): no accessories. A team's thinking icon (ADR 0033) turns one member's body into the next, and a
+hat can't melt with a body, so a Sprocket is a shape and a colour. The creator has two rows; looks stored with an
+accessory still load (it's dropped), and a client that sends one isn't refused. The hat anchors, the accessory
+drawings and their pop-in and wobble motion went with them.
