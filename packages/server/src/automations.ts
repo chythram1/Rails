@@ -199,7 +199,13 @@ export function startAutomations(): void {
   unsubscribe = onRunsChanged(settle);
   settle();
   tick();
-  timer = setInterval(() => tick(), TICK_MS);
+  timer = setInterval(() => {
+    try {
+      tick();
+    } catch (e) {
+      console.error("automations:", e); // the next tick tries again
+    }
+  }, TICK_MS);
   timer.unref?.();
 }
 

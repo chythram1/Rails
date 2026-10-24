@@ -380,6 +380,9 @@ if (existsSync(webDist)) {
 }
 
 // ---- server + websocket ----
+// A promise nobody waits on that fails (a Sprocket run, a watch, a sign-in) is logged, not fatal: Node would
+// otherwise stop the whole server, and with it every run, watch and automation.
+process.on("unhandledRejection", (e) => console.error("unhandled rejection:", e));
 loadAttention(panels.all());
 startWatches(); // Coordinators hear about sessions that wait for the user
 startOverlaps(); // and about sessions changing the same files; their tabs show it

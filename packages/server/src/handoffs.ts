@@ -129,7 +129,13 @@ export function expireHandoffs(): void {
 export function startHandoffs(): void {
   settleHandoffs(); // Sprockets the move to one per project detached (ADR 0016)
   expireHandoffs();
-  setInterval(expireHandoffs, 60_000).unref?.();
+  setInterval(() => {
+    try {
+      expireHandoffs();
+    } catch (e) {
+      console.error("handoffs:", e); // the next minute tries again
+    }
+  }, 60_000).unref?.();
   onEvents((panel, events) => {
     try {
       followSessions(panel);
