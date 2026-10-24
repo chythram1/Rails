@@ -1018,9 +1018,8 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .approval-result { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 var(--mono); max-height: 16em; overflow-y: auto; color: var(--text-2); }
 /* Who's on it, at the bottom left: faces pop up when they get the message; the one writing is dots in its colour. */
 .sp-watching { min-height: 36px; justify-content: flex-end; }
-/* In a team, who's working, beside the face or the dots: "Bo and Cy are working…". */
+/* In a team, the icon turning through the members thinking, and who: "Bo and Cy are thinking…". */
 .sp-watching.team { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; }
-.sp-watching.team .sp-said { width: auto; }
 .sp-working { flex: none; white-space: nowrap; color: var(--muted); font-size: 13px; line-height: 18px; animation: sp-face-in 240ms ease-out both; }
 .sp-watcher { line-height: 0; animation: sp-face-in 320ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both; transform-origin: 50% 100%; }
 @keyframes sp-face-in { from { opacity: 0; transform: translateY(8px) scale(0.4); } }

@@ -18,6 +18,7 @@ import { MessageActions } from "./MessageActions.tsx";
 import { COLORS } from "./characters.ts";
 import { SPIN_MS, useSprocketMotion } from "./motion.ts";
 import { useThreadScroll } from "./threadScroll.ts";
+import { TeamThinking } from "./TeamThinking.tsx";
 import { findNames } from "./mentions.ts";
 import { bubbles, typingTime } from "./bubbles.ts";
 import { blocks, type Block } from "./marks.ts";
@@ -51,8 +52,9 @@ function stamp(iso: string): string {
  * of its own.
  *
  * A team chat (ADR 0022, 0033) passes `team` (and its first member as `sprocket`): each member's run of replies has its
- * name above (in its colour) and its face at the foot. Every member reads every message, several at once: one face
- * pops up at the bottom left with a line naming those working ("Bo and Cy are working…"). Members' names read as
+ * name above (in its colour) and its face at the foot. Every member reads every message, several at once: an icon at
+ * the bottom left turns from one member into the next, with a line naming those thinking ("Bo and Cy are
+ * thinking…"); no typing dots. Members' names read as
  * chips, with an @ or without, and the composer completes @mentions. A question with options shows as buttons under it
  * until it's answered (ADR 0023). Pass lines from before ADR 0033 aren't shown.
  */
@@ -180,15 +182,17 @@ export function SprocketChat({
   /** In a team, members' names read as chips. */
   const text = (t: string) => (team ? withMentions(t, members) : t);
 
-  // Who's on it: one face at a time, of the member whose turn it is (the others wait unseen). It shows while the
-  // member reads and thinks; when it starts writing, it spins round (SPIN_MS) and turns into the typing dots, which
-  // stay, with no face, through every message of its turn (a reply can be several), until its turn is over.
+  // Who's on it, in a direct or project chat: the Sprocket's face. It shows while it reads and thinks; when it starts
+  // writing, it spins round (SPIN_MS) and turns into the typing dots, which stay, with no face, through every message
+  // of its turn (a reply can be several), until its turn is over. A team has no dots or spin (ADR 0033): one icon
+  // turns from one member into the next, round those thinking since the message (TeamThinking), with a line naming
+  // those still at it.
   const motion = useSprocketMotion();
   const [spinning, setSpinning] = useState<string | null>(null);
   /** Members who have started writing in their current turn: dots until it ends. */
   const [started, setStarted] = useState<string[]>([]);
   const onIt = watching.flatMap((w) => speaker(w) ?? []);
-  const one = onIt.find((w) => w.id === writing) ?? onIt[0];
+  const one = team ? undefined : onIt[0];
   const dots = !!one && (one.id === writing || started.includes(one.id)) && spinning !== one.id;
   const face = one && !dots ? one.id : null;
   // The face last shown, and when it went (Infinity while it shows): between thinking and writing there can be a
@@ -197,7 +201,7 @@ export function SprocketChat({
   // Before paint, so neither the dots nor the face flash. A turn's first writing starts it (and the spin, if its
   // face was showing); a member whose turn is over (no longer on it) starts afresh next time.
   useLayoutEffect(() => {
-    if (!writing || started.includes(writing)) return;
+    if (team || !writing || started.includes(writing)) return;
     setStarted((s) => [...s, writing]);
     const last = lastFace.current;
     if (!motion || last?.id !== writing || Date.now() - last.at > 1500) return;
@@ -216,14 +220,20 @@ export function SprocketChat({
     if (face) lastFace.current = { id: face, at: Infinity };
     else if (lastFace.current?.at === Infinity) lastFace.current = { ...lastFace.current, at: Date.now() };
   });
-  /** Members still on their turn here: their face waits for the end of it to sit under their last message. */
-  const onTurn = new Set([...(team?.info.replying ?? []), ...(writing ? [writing] : []), ...started]);
-  /** In a team, who's working now, by name: "Bo is working…", "Bo and Cy are working…". */
-  const working = team && onIt.length ? `${names(onIt.map((w) => w.name))} ${onIt.length === 1 ? "is" : "are"} working…` : "";
-  /** The messages at the end of the chat from the member writing them now (its current turn): its face waits. */
+  /** In a team, the members the icon turns through: all those thinking since it started, until none is. */
+  const [cycle, setCycle] = useState<string[]>([]);
+  useLayoutEffect(() => {
+    if (!team) return;
+    setCycle((c) => (onIt.length ? [...c, ...onIt.map((w) => w.id).filter((w) => !c.includes(w))] : []));
+  }, [onIt.map((w) => w.id).join()]);
+  const cycling = team ? cycle.flatMap((c) => speaker(c) ?? []) : [];
+  /** In a team, who's thinking now, by name: "Bo is thinking…", "Bo and Cy are thinking…". */
+  const thinking = team && onIt.length ? `${names(onIt.map((w) => w.name))} ${onIt.length === 1 ? "is" : "are"} thinking…` : "";
+  /** The messages at the end of the chat from the Sprocket writing them now (its current turn): its face waits. */
   const tail = new Set<string>();
   const end = [...(messages ?? [])].reverse();
-  const writer = end[0]?.author === "sprocket" && onTurn.has(end[0].sprocketId) ? end[0].sprocketId : undefined;
+  const onTurn = new Set([...(writing ? [writing] : []), ...started]);
+  const writer = !team && end[0]?.author === "sprocket" && onTurn.has(end[0].sprocketId) ? end[0].sprocketId : undefined;
   for (const m of end) {
     if (m.author !== "sprocket" || m.sprocketId !== writer) break;
     tail.add(m.id);
@@ -406,15 +416,21 @@ export function SprocketChat({
               );
             })}
             {/* Who's on it (above): it pops up when it gets the message, spins as it starts writing, then writes as
-                dots in its colour, beside its face in a team as its reply will be. */}
+                dots in its colour. In a team, the icon that turns through the members thinking. */}
+            {team && thinking && cycling.length > 0 && (
+              <li className="sp-message sprocket sp-watching team" aria-hidden>
+                <span className="sp-watcher">
+                  <TeamThinking looks={cycling.map((m) => ({ id: m.id, look: m.look }))} size={26} />
+                </span>
+                <span className="sp-working">{thinking}</span>
+              </li>
+            )}
             {one &&
               (() => {
                 return (
-                  <li className={"sp-message sprocket sp-watching" + (working ? " team" : "")} aria-hidden>
+                  <li className="sp-message sprocket sp-watching" aria-hidden>
                     {dots ? (
                       <div key={one.id} className="sp-said">
-                        {/* No face while it writes: it comes back under its last message once its turn is over. */}
-                        {team && <span className="sp-avatar" />}
                         <span className="sp-dots" style={{ "--who": COLORS[one.look.color] } as CSSProperties}>
                           <i />
                           <i />
@@ -426,7 +442,6 @@ export function SprocketChat({
                         <Sprocket look={one.look} size={26} seed={one.id} busy={spinning !== one.id} spin={spinning === one.id} />
                       </span>
                     )}
-                    {working && <span className="sp-working">{working}</span>}
                   </li>
                 );
               })()}
@@ -434,7 +449,7 @@ export function SprocketChat({
         )}
         <div className="sp-spacer" ref={spacer} aria-hidden />
         <div className="sp-fade" aria-hidden />
-        <p className="sr-only" role="status">{working || (writing ? `${speaker(writing)?.name ?? name} is typing` : "")}</p>
+        <p className="sr-only" role="status">{thinking || (writing ? `${speaker(writing)?.name ?? name} is typing` : "")}</p>
       </div>
       <div className="sp-compose">
         {scroll.hidden && (
