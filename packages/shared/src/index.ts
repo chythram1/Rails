@@ -322,15 +322,10 @@ export type SprocketCharacter = (typeof SPROCKET_CHARACTERS)[number];
 export const SPROCKET_COLORS = ["brown", "red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "grey"] as const;
 export type SprocketColor = (typeof SPROCKET_COLORS)[number];
 
-/** Head accessories; a Sprocket wears one or none. */
-export const SPROCKET_ACCESSORIES = ["party", "beanie", "cap", "bow", "flower", "crown", "bucket"] as const;
-export type SprocketAccessory = (typeof SPROCKET_ACCESSORIES)[number];
-
 /** What a Sprocket looks like. */
 export interface SprocketLook {
   character: SprocketCharacter;
   color: SprocketColor;
-  accessory: SprocketAccessory | "none";
 }
 
 export interface Sprocket {

@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import type { SprocketLook } from "@rails/shared";
 import { CHARACTERS, COLORS, type Primitive } from "./characters.ts";
-import { popIn, squash, twirl, useBlink, useLook, useSprocketMotion } from "./motion.ts";
-import { Eyes, Hat } from "./parts.tsx";
+import { squash, twirl, useBlink, useLook, useSprocketMotion } from "./motion.ts";
+import { Eyes } from "./parts.tsx";
 
 /** Seconds per half bob (up, or down) at tempo 1. Sway takes longer, so the two never line up. */
 const PERIOD = 1.7;
@@ -16,7 +16,7 @@ function idleFor(size: number) {
   if (size <= 110) return { bob: 7, sway: 4.5, speed: 0.9 };
   return { bob: 6, sway: 3.5, speed: 1 };
 }
-/** The drawn area of the shared 200×215 coordinate system (hats, ear cups and the shadow included). */
+/** The drawn area of the shared 200×215 coordinate system (ear cups and the shadow included). */
 export const VIEW = { x: 14, y: 24, w: 172, h: 190 };
 
 interface Props {
@@ -48,7 +48,7 @@ function phaseOf(seed: string) {
  * A Sprocket character (see ref characters.md §5.2 for the layers). Each nested group owns one kind of
  * motion: s-rig bobs, s-sway sways, s-pop squashes on change and spins (s-fx, the streak round it, behind and in
  * front), s-face/s-eyes look (at the pointer, around, up while thinking), s-lid blinks, each s-eye changes size and
- * shape, and the accessory (and its wobbly bits) trails the bob a little later.
+ * shape.
  */
 export function Sprocket({ look, size, still, follow, busy = false, spin = false, label, seed = look.character }: Props) {
   const def = CHARACTERS[look.character];
@@ -72,7 +72,7 @@ export function Sprocket({ look, size, still, follow, busy = false, spin = false
   useEffect(() => {
     if (mounted.current && live) squash(pop.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [look.character, look.color, look.accessory]);
+  }, [look.character, look.color]);
   useEffect(() => {
     mounted.current = true;
   }, []);
@@ -88,12 +88,6 @@ export function Sprocket({ look, size, still, follow, busy = false, spin = false
     "--period": `${period.toFixed(2)}s`,
     "--phase": `${(-phaseOf(seed) * period).toFixed(2)}s`,
   } as CSSProperties;
-
-  const part = (key: string, children: ReactNode) => (
-    <PopIn key={key} animate={live} mounted={mounted}>
-      {children}
-    </PopIn>
-  );
 
   return (
     <svg
@@ -124,11 +118,6 @@ export function Sprocket({ look, size, still, follow, busy = false, spin = false
                 </g>
               </g>
             </g>
-            {look.accessory !== "none" && (
-              <g transform={`translate(${def.hat.x} ${def.hat.y}) rotate(${def.hat.rot})`}>
-                <g className="s-hat">{part(look.accessory, <Hat id={look.accessory} />)}</g>
-              </g>
-            )}
           </g>
           {live && <Streak def={def} half="front" />}
         </g>
@@ -158,18 +147,4 @@ function Streak({ def, half }: { def: (typeof CHARACTERS)[keyof typeof CHARACTER
 function Shape({ p }: { p: Primitive }) {
   if ("d" in p) return <path d={p.d} />;
   return <ellipse cx={p.cx} cy={p.cy} rx={p.rx} ry={p.ry} transform={p.rot ? `rotate(${p.rot} ${p.cx} ${p.cy})` : undefined} />;
-}
-
-/** An accessory that grows in when it's put on after the Sprocket first rendered. */
-function PopIn({ animate, mounted, children }: { animate: boolean; mounted: RefObject<boolean>; children: ReactNode }) {
-  const g = useRef<SVGGElement>(null);
-  useLayoutEffect(() => {
-    if (animate && mounted.current) popIn(g.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  return (
-    <g className="s-in" ref={g}>
-      {children}
-    </g>
-  );
 }

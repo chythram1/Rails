@@ -15,7 +15,7 @@ import { scriptMembers, seen } from "../test/members.ts";
 const faux = fauxProvider();
 models.setProvider(faux.provider);
 const ref = refOf(faux.getModel());
-const look = { character: "cog", color: "green", accessory: "none" } as const;
+const look = { character: "cog", color: "green" } as const;
 beforeEach(() => settings.set("defaultModel", ref));
 
 const sprocket = (name: string) => createSprocket({ name, look });

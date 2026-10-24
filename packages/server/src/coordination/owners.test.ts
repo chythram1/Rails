@@ -8,7 +8,7 @@ import { ownedPath, ownerOf, projectOwners, setOwner, startOwners } from "./owne
 import { idle } from "../sprockets/runs.ts";
 import { createSprocket, listMessages, projectChat, listSprockets, sendMessage, updateSettings } from "../sprockets/sprockets.ts";
 
-const look = { character: "cog", color: "green", accessory: "none" } as const;
+const look = { character: "cog", color: "green" } as const;
 const faux = fauxProvider();
 models.setProvider(faux.provider);
 beforeEach(() => settings.set("defaultModel", refOf(faux.getModel())));

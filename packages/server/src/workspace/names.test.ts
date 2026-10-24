@@ -87,7 +87,7 @@ describe("naming a session", () => {
 
   it("is how agents see and reach the session (ADR 0018)", async () => {
     const { project, engine, ui, keys } = setup();
-    updateSettings(createSprocket({ name: "Lead", look: { character: "cog", color: "pink", accessory: "none" } }).id, { projectId: project.id });
+    updateSettings(createSprocket({ name: "Lead", look: { character: "cog", color: "pink" } }).id, { projectId: project.id });
     await nameSession(project.id, keys.open, "engine");
     await nameSession(project.id, keys.fresh, "ui");
     expect(await neighboursText(ui.id)).toContain('You are "ui"');

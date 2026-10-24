@@ -8,7 +8,7 @@ import { idle } from "../sprockets/runs.ts";
 import { createSprocket, directChat, listMessages, projectChat, listSprockets, updateSettings } from "../sprockets/sprockets.ts";
 import { admit, COOLDOWN_MS, GRACE_MS, looksLikeQuestion, startWatches, Watches, type Wake } from "./watches.ts";
 
-const look = { character: "cog", color: "green", accessory: "none" } as const;
+const look = { character: "cog", color: "green" } as const;
 
 describe("looksLikeQuestion", () => {
   it("hears questions at the end of a reply", () => {

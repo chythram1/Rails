@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { IconBan as Ban, IconChevronLeft as ChevronLeft } from "@tabler/icons-react";
+import { IconChevronLeft as ChevronLeft } from "@tabler/icons-react";
 import {
-  SPROCKET_ACCESSORIES,
   SPROCKET_CHARACTERS,
   SPROCKET_COLORS,
   type Sprocket as SprocketData,
@@ -10,11 +9,10 @@ import {
 import { api } from "../../api.ts";
 import { href } from "../../router.ts";
 import { CHARACTERS, COLORS } from "./characters.ts";
-import { ACCESSORY_NAMES, COLOR_NAMES } from "./names.ts";
-import { AccessoryIcon } from "./parts.tsx";
+import { COLOR_NAMES } from "./names.ts";
 import { Sprocket } from "./Sprocket.tsx";
 
-const NEW_LOOK: SprocketLook = { character: "block", color: "blue", accessory: "none" };
+const NEW_LOOK: SprocketLook = { character: "block", color: "blue" };
 
 /** Name ideas, shown one after another in the empty name field; an empty name takes the one showing. */
 const NAME_IDEAS = ["PR Pal", "Changelog", "Dep Doctor", "Flake Hunter", "Doc Keeper", "Todo Sweeper"];
@@ -44,8 +42,7 @@ interface Props {
 }
 
 /**
- * Make a Sprocket (ref/sprockets/stage1/create-bot.jpg): the preview on top, then rows for colour, accessory
- * (drawn on its own) and shape, then the name. Its look is chosen once, here: it can't be changed later.
+ * Make a Sprocket (ref/sprockets/stage1/create-bot.jpg): the preview on top, then rows for colour and shape, then the name. Its look is chosen once, here: it can't be changed later.
  */
 export function SprocketCreator({ taken, onSaved, onCancel }: Props) {
   const [look, setLook] = useState<SprocketLook>(NEW_LOOK);
@@ -85,14 +82,8 @@ export function SprocketCreator({ taken, onSaved, onCancel }: Props) {
         <Row legend="Colour" name="sp-color" value={look.color} onChange={set("color")}
           options={SPROCKET_COLORS.map((c) => ({ value: c, label: COLOR_NAMES[c], view: <span className="sp-swatch" style={{ background: COLORS[c] }} /> }))}
           variant="swatch" narrowColumns={5} />
-        <Row legend="Accessory" name="sp-accessory" value={look.accessory} onChange={set("accessory")}
-          options={(["none", ...SPROCKET_ACCESSORIES] as const).map((a) => ({
-            value: a,
-            label: a === "none" ? "No accessory" : ACCESSORY_NAMES[a],
-            view: a === "none" ? <Ban size={20} className="sp-none" /> : <AccessoryIcon id={a} size={32} />,
-          }))} narrowColumns={4} />
         <Row legend="Shape" name="sp-shape" value={look.character} onChange={set("character")}
-          options={SPROCKET_CHARACTERS.map((c) => ({ value: c, label: CHARACTERS[c].name, view: <Sprocket look={{ ...look, character: c, accessory: "none" }} size={38} still /> }))} narrowColumns={4} />
+          options={SPROCKET_CHARACTERS.map((c) => ({ value: c, label: CHARACTERS[c].name, view: <Sprocket look={{ ...look, character: c }} size={38} still /> }))} narrowColumns={4} />
 
         <label className="field sp-name">
           <span>Name</span>

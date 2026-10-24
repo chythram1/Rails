@@ -1,14 +1,4 @@
-import type { SprocketAccessory, SprocketColor } from "@rails/shared";
-
-export const ACCESSORY_NAMES: Record<SprocketAccessory, string> = {
-  party: "Party hat",
-  beanie: "Beanie",
-  cap: "Cap",
-  bow: "Bow",
-  flower: "Flower clip",
-  crown: "Crown",
-  bucket: "Bucket hat",
-};
+import type { SprocketColor } from "@rails/shared";
 
 export const COLOR_NAMES: Record<SprocketColor, string> = {
   brown: "Brown",

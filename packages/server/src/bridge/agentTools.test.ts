@@ -168,7 +168,7 @@ describe("the agent tools' MCP endpoint", () => {
   });
 });
 
-const look = { character: "cog", color: "pink", accessory: "none" } as const;
+const look = { character: "cog", color: "pink" } as const;
 
 describe("message (ADR 0018)", () => {
   /** A project with its Coordinator, a Claude Code session Rails can deliver to, pi, Codex and a shell. */

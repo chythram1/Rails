@@ -9,7 +9,7 @@ import { BATCH_MS, OverlapWakes, overlapList, startOverlaps } from "./overlaps.t
 import { idle } from "../sprockets/runs.ts";
 import { createSprocket, directChat, listMessages, projectChat, updateSettings } from "../sprockets/sprockets.ts";
 
-const look = { character: "cog", color: "green", accessory: "none" } as const;
+const look = { character: "cog", color: "green" } as const;
 
 describe("overlap wakes", () => {
   beforeEach(() => vi.useFakeTimers());

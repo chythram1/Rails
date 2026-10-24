@@ -134,11 +134,6 @@ function express(svg: SVGSVGElement | null, kind?: Expression) {
   eyes[1].animate(r, { duration, easing: "ease-out" });
 }
 
-/** Grow in from nothing, for a newly added accessory. */
-export function popIn(el: Element | null) {
-  el?.animate([{ transform: "scale(0)" }, { transform: "scale(1)" }], { duration: DURATION.standard, easing: EASE_BACK });
-}
-
 // ---- where the eyes look ----
 // One requestAnimationFrame loop for every looking Sprocket. Each has two damped springs: fast eyes
 // and a slower face, so the eyes lead and the face follows. They aim at the pointer (the creator's

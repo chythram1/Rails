@@ -10,7 +10,7 @@ import { messageFromAgent } from "../bridge/agentTools.ts";
 import { createSprocket, listMessages, projectChat, updateSettings } from "../sprockets/sprockets.ts";
 import { GRACE_MS, startWatches } from "./watches.ts";
 
-const look = { character: "lune", color: "teal", accessory: "none" } as const;
+const look = { character: "lune", color: "teal" } as const;
 
 // A chat model for the Coordinator, and a stand-in decision service that answers what each test says.
 const faux = fauxProvider();

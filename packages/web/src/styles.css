@@ -769,10 +769,10 @@ textarea.input { resize: vertical; line-height: 1.5; }
 /* ---- Sprocket characters (components/sprockets) ----
    Each nested SVG group owns one motion. Idle loops run on --period (set per character, so a group of
    Sprockets never bobs in sync) from --phase (a negative delay: each starts at a different point).
-   Loops are sine-like (ease-in-out each way); the accessory and its wobbly bits use the same period, later. */
+   Loops are sine-like (ease-in-out each way). */
 .sprocket { display: block; overflow: visible; flex-shrink: 0; }
-.sprocket :is(.s-rig, .s-sway, .s-pop, .s-hat, .s-in, .s-wobble, .s-lid, .s-shadow) { transform-box: fill-box; }
-.sprocket :is(.s-sway, .s-pop, .s-hat, .s-in, .s-wobble) { transform-origin: 50% 100%; }
+.sprocket :is(.s-rig, .s-sway, .s-pop, .s-lid, .s-shadow) { transform-box: fill-box; }
+.sprocket :is(.s-sway, .s-pop) { transform-origin: 50% 100%; }
 .sprocket .s-lid, .sprocket .s-shadow { transform-origin: 50% 50%; }
 /* Each eye changes size and shape about its own centre (motion.ts express). */
 .sprocket .s-eye { transform-box: fill-box; transform-origin: 50% 50%; }
@@ -789,8 +789,6 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sprocket .s-rig { animation: sp-bob var(--period, 1.7s) ease-in-out var(--phase, 0s) infinite alternate; }
 .sprocket .s-sway { animation: sp-sway calc(var(--period, 1.7s) * 1.4) ease-in-out var(--phase, 0s) infinite alternate; }
 .sprocket .s-shadow { animation: sp-shadow var(--period, 1.7s) ease-in-out var(--phase, 0s) infinite alternate; }
-.sprocket .s-hat { animation: sp-tilt var(--period, 1.7s) ease-in-out calc(var(--phase, 0s) + 110ms) infinite alternate; }
-.sprocket .s-wobble { animation: sp-swing var(--period, 1.7s) ease-in-out calc(var(--phase, 0s) + 260ms) infinite alternate; }
 /* Eyes lead, the face follows (motion.ts writes --ex/--ey/--fx/--fy in viewBox units). */
 .sprocket .s-face { transform: translate(calc(var(--fx, 0) * 1px), calc(var(--fy, 0) * 1px)); }
 .sprocket .s-eyes { transform: translate(calc(var(--ex, 0) * 1px), calc(var(--ey, 0) * 1px)); }
@@ -800,8 +798,6 @@ textarea.input { resize: vertical; line-height: 1.5; }
 @keyframes sp-bob { from { transform: translateY(0); } to { transform: translateY(calc(-1 * var(--bob, 6px))); } }
 @keyframes sp-sway { from { transform: rotate(calc(-1 * var(--sway, 3.5deg))); } to { transform: rotate(var(--sway, 3.5deg)); } }
 @keyframes sp-shadow { from { transform: scaleX(1); opacity: var(--sprocket-shadow); } to { transform: scaleX(0.84); opacity: calc(0.64 * var(--sprocket-shadow)); } }
-@keyframes sp-tilt { from { transform: rotate(calc(-1.2 * var(--sway, 3.5deg))); } to { transform: rotate(calc(1.2 * var(--sway, 3.5deg))); } }
-@keyframes sp-swing { from { transform: rotate(calc(-2.5 * var(--sway, 3.5deg))); } to { transform: rotate(calc(2.5 * var(--sway, 3.5deg))); } }
 
 /* ---- Sprockets page: list column + chat or creator (components/sprockets) ---- */
 .sprockets { display: flex; height: 100%; min-height: 0; }
@@ -1237,7 +1233,7 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 }
 
 .sp-creator { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-/* One centred column: preview, colour / accessory / shape rows, name, button. */
+/* One centred column: preview, colour / shape rows, name, button. */
 .sp-creator-body {
   flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 28px 20px 32px;
   display: flex; flex-direction: column; align-items: center; gap: 16px;
@@ -1251,10 +1247,9 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .swatch .sp-pick { width: 36px; height: 36px; border-radius: 50%; }
 .sp-swatch { width: 26px; height: 26px; border-radius: 50%; }
 .swatch .sp-pick:has(input:checked) { box-shadow: 0 0 0 2px var(--text); }
-/* Accessories and shapes: square thumbnails; the chosen one gets the blue segment fill and an edge. */
+/* Shapes: square thumbnails; the chosen one gets the blue segment fill and an edge. */
 .thumb .sp-pick { width: 50px; height: 50px; border: 1px solid transparent; }
 .thumb .sp-pick:has(input:checked) { border-color: var(--tint-ink); background: var(--tint); }
-.sp-none { color: var(--muted); }
 .sp-name { width: 100%; max-width: 360px; margin-top: 12px; }
 /* Name ideas slide up through the empty field, one every 2.6s (IDEA_MS in SprocketCreator.tsx). */
 .sp-name-input { position: relative; display: block; overflow: hidden; }

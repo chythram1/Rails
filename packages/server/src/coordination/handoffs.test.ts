@@ -13,7 +13,7 @@ import { deliveredText } from "./suggestions.ts";
 import { messageFromAgent } from "../bridge/agentTools.ts";
 import { startWatches } from "./watches.ts";
 
-const look = { character: "cog", color: "green", accessory: "none" } as const;
+const look = { character: "cog", color: "green" } as const;
 const faux = fauxProvider();
 models.setProvider(faux.provider);
 beforeEach(() => settings.set("defaultModel", refOf(faux.getModel())));

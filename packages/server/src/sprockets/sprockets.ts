@@ -4,7 +4,6 @@
 // description and core memory stay. Replies are written by runs.ts. Core memory is the
 // Sprocket's own (it edits it with the remember tool) and never leaves the server.
 import {
-  SPROCKET_ACCESSORIES,
   SPROCKET_CHARACTERS,
   SPROCKET_COLORS,
   SPROCKET_DESCRIPTION_MAX,
@@ -43,23 +42,23 @@ onTeamsChanged(changed);
 
 const isOneOf = <T extends string>(list: readonly T[], v: unknown): v is T => list.includes(v as T);
 
-/** A look from a request. Unknown ids are refused, so a stale client can't store junk. */
+/** A look from a request. Unknown ids are refused, so a stale client can't store junk; anything else is dropped. */
 function parseLook(raw: unknown): SprocketLook {
   const look = (raw ?? {}) as Record<string, unknown>;
-  const accessory = look.accessory ?? "none";
   if (!isOneOf(SPROCKET_CHARACTERS, look.character)) throw new ServiceError("Unknown character", 400);
   if (!isOneOf(SPROCKET_COLORS, look.color)) throw new ServiceError("Unknown colour", 400);
-  if (accessory !== "none" && !isOneOf(SPROCKET_ACCESSORIES, accessory)) throw new ServiceError("Unknown accessory", 400);
-  return { character: look.character, color: look.color, accessory: accessory as SprocketLook["accessory"] };
+  return { character: look.character, color: look.color };
 }
 
-/** A stored look, with ids that no longer exist replaced by defaults instead of breaking the page. */
+/**
+ * A stored look, with ids that no longer exist replaced by defaults instead of breaking the page. Looks saved before
+ * accessories went (ADR 0005's amendment) still have one; it's dropped.
+ */
 function repairLook(raw: unknown): SprocketLook {
   const look = (raw ?? {}) as Record<string, unknown>;
   return {
     character: isOneOf(SPROCKET_CHARACTERS, look.character) ? look.character : "block",
     color: isOneOf(SPROCKET_COLORS, look.color) ? look.color : "yellow",
-    accessory: isOneOf(SPROCKET_ACCESSORIES, look.accessory) ? look.accessory : "none",
   };
 }
 

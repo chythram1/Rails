@@ -1,5 +1,5 @@
 // The cast (see docs/CONTEXT.md "Sprocket"). Every character shares one coordinate system, a 200×215
-// viewBox with the ground at y = 200, so accessories drawn at an anchor fit any character.
+// viewBox with the ground at y = 200.
 import type { SprocketCharacter, SprocketColor } from "@rails/shared";
 
 /** Body colours, in picker order. Dark enough eyes stay readable on every one. */
@@ -28,8 +28,6 @@ interface CharacterDef {
   round?: number;
   /** Centre of the face, and how much the eyes lean (degrees). */
   face: { x: number; y: number; tilt: number };
-  /** Where a hat sits: its bottom centre, and its tilt (side clips sit to its right). */
-  hat: { x: number; y: number; rot: number };
   /** Ground shadow: centre and half-width. */
   shadow: { x: number; half: number };
   /** Idle speed multiplier, so characters shown together don't bob in sync. */
@@ -101,7 +99,6 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
     name: "Block",
     body: [{ d: roundedPoly([[46, 86], [154, 86], [154, 196], [46, 196]], 30) }],
     face: { x: 100, y: 138, tilt: 6 },
-    hat: { x: 100, y: 94, rot: 0 },
     shadow: { x: 100, half: 52 },
     tempo: 1,
   },
@@ -109,7 +106,6 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
     name: "Bean",
     body: [{ d: "M 64 84 C 92 68 122 78 128 104 C 132 122 150 126 164 140 C 182 160 172 196 132 196 L 96 196 C 56 196 36 168 38 134 C 40 108 48 92 64 84 Z" }],
     face: { x: 110, y: 150, tilt: 10 },
-    hat: { x: 80, y: 90, rot: -22 },
     shadow: { x: 104, half: 56 },
     tempo: 0.92,
   },
@@ -118,7 +114,6 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
     body: [{ d: crescent(98, 138, 58, 142, 102, 42) }],
     round: 12,
     face: { x: 80, y: 150, tilt: 8 },
-    hat: { x: 74, y: 92, rot: -24 },
     shadow: { x: 100, half: 54 },
     tempo: 1.12,
   },
@@ -126,7 +121,6 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
     name: "Bell",
     body: [{ d: "M 100 80 C 132 80 146 102 148 134 C 150 160 158 172 170 182 C 178 190 172 197 160 197 L 40 197 C 28 197 22 190 30 182 C 42 172 50 160 52 134 C 54 102 68 80 100 80 Z" }],
     face: { x: 100, y: 146, tilt: 6 },
-    hat: { x: 100, y: 88, rot: 0 },
     shadow: { x: 100, half: 62 },
     tempo: 0.96,
   },
@@ -134,7 +128,6 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
     name: "Starry",
     body: [{ d: roundedPoly(star(100, 140, 68, 38, 5), (i) => (i % 2 ? 12 : 26)) }],
     face: { x: 100, y: 146, tilt: 6 },
-    hat: { x: 100, y: 94, rot: 0 },
     shadow: { x: 100, half: 54 },
     tempo: 1.06,
   },
@@ -142,7 +135,6 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
     name: "Cog",
     body: [{ d: roundedPoly(gear(100, 138, 60, 47, 8), 6) }],
     face: { x: 100, y: 140, tilt: 6 },
-    hat: { x: 84, y: 92, rot: -18 },
     shadow: { x: 100, half: 50 },
     tempo: 0.9,
   },
@@ -150,7 +142,6 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
     name: "Roo",
     body: [{ d: roundedPoly([[100, 74], [162, 136], [100, 198], [38, 136]], 22) }],
     face: { x: 100, y: 138, tilt: 6 },
-    hat: { x: 100, y: 92, rot: 0 },
     shadow: { x: 100, half: 44 },
     tempo: 1.04,
   },
@@ -161,7 +152,6 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
       { cx: 123, cy: 140, rx: 43, ry: 56, rot: 6 },
     ],
     face: { x: 100, y: 150, tilt: 6 },
-    hat: { x: 100, y: 96, rot: 0 },
     shadow: { x: 100, half: 62 },
     tempo: 0.98,
   },

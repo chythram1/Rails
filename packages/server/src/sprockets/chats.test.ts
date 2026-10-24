@@ -12,7 +12,7 @@ import { clearChat, createSprocket, deleteSprocket, directChat, listMessages, li
 const faux = fauxProvider();
 models.setProvider(faux.provider);
 const ref = refOf(faux.getModel());
-const look = { character: "cog", color: "green", accessory: "none" } as const;
+const look = { character: "cog", color: "green" } as const;
 beforeEach(() => settings.set("defaultModel", ref));
 
 let n = 0;

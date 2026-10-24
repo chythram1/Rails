@@ -15,7 +15,7 @@ import { scriptMembers } from "../test/members.ts";
 const faux = fauxProvider();
 models.setProvider(faux.provider);
 const ref = refOf(faux.getModel());
-const look = { character: "bean", color: "teal", accessory: "none" } as const;
+const look = { character: "bean", color: "teal" } as const;
 beforeEach(() => settings.set("defaultModel", ref));
 afterAll(() => disconnectAll());
 

@@ -14,7 +14,7 @@ import { idle } from "../sprockets/runs.ts";
 import { createSprocket, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "../sprockets/sprockets.ts";
 import { dialogAnswer, dismissSuggestion, pickup, sendSuggestion, startSuggestions, suggest } from "./suggestions.ts";
 
-const look = { character: "bell", color: "purple", accessory: "none" } as const;
+const look = { character: "bell", color: "purple" } as const;
 const faux = fauxProvider();
 models.setProvider(faux.provider);
 beforeEach(() => settings.set("defaultModel", refOf(faux.getModel())));

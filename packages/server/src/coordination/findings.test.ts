@@ -14,7 +14,7 @@ import { createSprocket, listMessages, projectChat, updateSettings } from "../sp
 const faux = fauxProvider();
 models.setProvider(faux.provider);
 beforeEach(() => settings.set("defaultModel", refOf(faux.getModel())));
-const look = { character: "cog", color: "pink", accessory: "none" } as const;
+const look = { character: "cog", color: "pink" } as const;
 
 /** Engine (Claude Code) and UI (pi), UI having changed src/ui/audio.js; with a Coordinator unless `alone`. */
 function setup({ alone = false } = {}) {
