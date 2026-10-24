@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -27,7 +27,10 @@ export const CLAUDE_HOME = process.env.CLAUDE_HOME ?? join(home, ".claude");
 export const PI_HOME = process.env.PI_HOME ?? join(home, ".pi", "agent");
 export const CODEX_HOME = process.env.CODEX_HOME ?? join(home, ".codex");
 
-mkdirSync(RAILS_HOME, { recursive: true });
+// Only the user may look inside: rails.db holds every chat and the panels' bridge tokens, and the folder also
+// keeps credentials and the tmux socket. A home made before this (with the default umask) is closed up too.
+mkdirSync(RAILS_HOME, { recursive: true, mode: 0o700 });
+chmodSync(RAILS_HOME, 0o700);
 
 interface ConfigFile {
   token: string;

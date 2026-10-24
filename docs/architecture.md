@@ -242,7 +242,7 @@ Transcript format notes are in [providers.md](./providers.md).
 
 | Var | Default | Meaning |
 | --- | --- | --- |
-| `RAILS_HOME` | `~/.rails` | DB, config, `tmux.sock` and `tmux.conf` |
+| `RAILS_HOME` | `~/.rails` | DB, config, `tmux.sock` and `tmux.conf`; Rails keeps the folder open to its user only (0700) |
 | `RAILS_HOST` | `127.0.0.1` | bind address |
 | `RAILS_PORT` | `4317` | server port (Vite dev runs on 5173 and proxies to it) |
 | `RAILS_TOKEN` | generated | access token override |
