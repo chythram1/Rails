@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { panels, projects, sessionEvents } from "../db.ts";
-import { linkCodexThread } from "../panels.ts";
+import { linkCodexThread } from "../workspace/panels.ts";
 import { boardText, foldCard, sharedFiles } from "./board.ts";
 import { CodexWatcher, setCodexTools } from "./codex.ts";
 import { bridgeFlags } from "./wiring.ts";

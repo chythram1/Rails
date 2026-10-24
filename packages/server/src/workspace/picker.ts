@@ -1,7 +1,7 @@
 // Opens the operating system's own folder picker on the machine running the server (ADR 0004).
 import { execFile } from "node:child_process";
 import { hostname } from "node:os";
-import { ServiceError } from "./errors.ts";
+import { ServiceError } from "../errors.ts";
 
 // macOS: the standard "choose folder" dialog, run through JavaScript for Automation. The window is brought
 // to the front with NSApplication (~0.1s); AppleScript's `activate` does the same but takes ~2s.

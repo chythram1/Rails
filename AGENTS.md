@@ -93,16 +93,16 @@ for future ideas, which aren't commitments. Reference screenshots for the look a
 | `packages/server/src/app.ts` | The Hono app: token auth, origin checks, bridge auth, every route, static serving in prod. `app.test.ts` checks the auth with `app.request()`. |
 | `packages/server/src/index.ts` | Startup: starts the services, serves the app, the WebSocket upgrade, shutdown. |
 | `packages/server/src/config.ts` | Env vars and paths, plus the token in `~/.rails/config.json`. |
-| `packages/server/src/projects.ts` | Project services (`attachProject`, `attachPickedFolder`, `detachProject`, `getProject`, `listProjectSessions`). Expected failures throw `ServiceError` (`errors.ts`), which carries an HTTP status; `app.onError` turns it into a JSON error. |
-| `packages/server/src/picker.ts` | The OS-native folder picker for Add project (macOS osascript, Linux zenity/kdialog, Windows PowerShell). It opens on the server's screen (ADR 0004). |
-| `packages/server/src/panels.ts` | Panel services (`getWorkspace`, `openPanel`, `closePanel`, `saveLayout`) and the CLI command line for each panel kind. Emits `onPanelsChanged`. |
-| `packages/server/src/tmux.ts` | Everything tmux: private socket and config in `RAILS_HOME`, start/kill sessions, which panels are still running, `attach()` in a node-pty PTY, the cleaned environment. |
-| `packages/server/src/terminals.ts` | `TerminalHub`: one tmux client per (browser, panel), streams `term.*` messages, removes panels whose process exited (`panelEnded`), broadcasts `panels.changed`. |
+| `packages/server/src/workspace/projects.ts` | Project services (`attachProject`, `attachPickedFolder`, `detachProject`, `getProject`, `listProjectSessions`). Expected failures throw `ServiceError` (`errors.ts`), which carries an HTTP status; `app.onError` turns it into a JSON error. |
+| `packages/server/src/workspace/picker.ts` | The OS-native folder picker for Add project (macOS osascript, Linux zenity/kdialog, Windows PowerShell). It opens on the server's screen (ADR 0004). |
+| `packages/server/src/workspace/panels.ts` | Panel services (`getWorkspace`, `openPanel`, `closePanel`, `saveLayout`) and the CLI command line for each panel kind. Emits `onPanelsChanged`. |
+| `packages/server/src/workspace/tmux.ts` | Everything tmux: private socket and config in `RAILS_HOME`, start/kill sessions, which panels are still running, `attach()` in a node-pty PTY, the cleaned environment. |
+| `packages/server/src/workspace/terminals.ts` | `TerminalHub`: one tmux client per (browser, panel), streams `term.*` messages, removes panels whose process exited (`panelEnded`), broadcasts `panels.changed`. |
 | `packages/server/src/db.ts` | SQLite via `node:sqlite` (write-ahead logging): projects, panels, layouts, Sprockets and their state. |
-| `packages/server/src/names.ts` | Session names (ADR 0019): the name the user gives a session in Rails (`nameSession`; `session_names` in the DB), shown instead of the agent's title. The web side is `RenameSession.tsx`, opened from a sidebar row's menu or a tab's double-click. |
-| `packages/server/src/titles.ts` | `sessionTitle(panel)`: a session's title as the user sees it (its Rails name first). Depends only on the database and discovery, so any service can use it without an import cycle. |
-| `packages/server/src/git.ts` | Read-only git status and diff through the git CLI. |
-| `packages/server/src/tree.ts` | The file tree (side panel's Files tab): one folder at a time with each entry's git state, and read-only previews (the secret policy of `files.ts`). |
+| `packages/server/src/workspace/names.ts` | Session names (ADR 0019): the name the user gives a session in Rails (`nameSession`; `session_names` in the DB), shown instead of the agent's title. The web side is `RenameSession.tsx`, opened from a sidebar row's menu or a tab's double-click. |
+| `packages/server/src/workspace/titles.ts` | `sessionTitle(panel)`: a session's title as the user sees it (its Rails name first). Depends only on the database and discovery, so any service can use it without an import cycle. |
+| `packages/server/src/workspace/git.ts` | Read-only git status and diff through the git CLI. |
+| `packages/server/src/workspace/tree.ts` | The file tree (side panel's Files tab): one folder at a time with each entry's git state, and read-only previews (the secret policy of `files.ts`). |
 | `packages/server/src/providers/` | One discovery adapter per provider (`scan`: cwd, title, dates from the head/tail of each transcript). `index.ts` holds the registry and `installed()`. |
 | `packages/web/src/components/workspace/Workspace.tsx` | The workspace: dockview layout (`Dock`), tabs, `+` menu, the side panel's toggles, and the one-panel-at-a-time mobile view. Data comes from `useWorkspace.ts`. |
 | `packages/web/src/components/workspace/SidePanel.tsx` | The panel beside a workspace, behind one toggle: tabs for the project's Sprockets' chats (where suggested replies wait), Files (`FilesPanel.tsx`) and Git (`GitPanel.tsx`). Rows of tabs take arrow keys through `tabKeys.ts`. |

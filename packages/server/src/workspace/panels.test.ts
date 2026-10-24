@@ -8,7 +8,7 @@ vi.mock("./tmux.ts", () => ({
   killSession: vi.fn(async (id: string) => void running.delete(id)),
   runningPanels: vi.fn(async () => new Set(running)),
 }));
-vi.mock("./providers/index.ts", () => ({
+vi.mock("../providers/index.ts", () => ({
   discovery: { pi: { name: "pi" }, claude: { name: "Claude Code" }, codex: { name: "Codex" } },
   installed: () => true,
   findSession: vi.fn(async (provider: string, id: string) => {
@@ -18,7 +18,7 @@ vi.mock("./providers/index.ts", () => ({
 }));
 
 const { getWorkspace, openPanel, panelEnded } = await import("./panels.ts");
-const { panels, projects } = await import("./db.ts");
+const { panels, projects } = await import("../db.ts");
 
 describe("openPanel", () => {
   let projectId: string;

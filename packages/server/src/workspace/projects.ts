@@ -1,11 +1,11 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { sessionKey, type Project, type RecentFolder, type SessionSummary } from "@rails/shared";
-import { layouts, panels, projects, sessionNames } from "./db.ts";
-import { ServiceError } from "./errors.ts";
-import { detachFromProject } from "./sprockets.ts";
+import { layouts, panels, projects, sessionNames } from "../db.ts";
+import { ServiceError } from "../errors.ts";
+import { detachFromProject } from "../sprockets.ts";
 import { pickFolder } from "./picker.ts";
-import { scanAll, sessionsFor } from "./providers/index.ts";
+import { scanAll, sessionsFor } from "../providers/index.ts";
 
 export function getProject(id: string): Project {
   const project = projects.get(id);

@@ -23,7 +23,7 @@ import type { SessionEvent } from "./bridge/events.ts";
 import { handoffs, panels, projects, sessionEvents, sprockets, suggestions } from "./db.ts";
 import { ownedPath, ownerOf, projectOwners } from "./owners.ts";
 import { postEvent } from "./sprockets.ts";
-import { sessionTitle } from "./titles.ts";
+import { sessionTitle } from "./workspace/titles.ts";
 import { looksLikeQuestion } from "./watches.ts";
 
 /** How much of the reply's end the event keeps. */

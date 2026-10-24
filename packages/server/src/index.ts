@@ -18,8 +18,8 @@ import { startOwners } from "./owners.ts";
 import { resumeRuns } from "./runs.ts";
 import { startShellEdits } from "./shellEdits.ts";
 import { startSuggestions } from "./suggestions.ts";
-import { TerminalHub } from "./terminals.ts";
-import { version as tmuxVersion } from "./tmux.ts";
+import { TerminalHub } from "./workspace/terminals.ts";
+import { version as tmuxVersion } from "./workspace/tmux.ts";
 import { startWatches } from "./watches.ts";
 
 const hub = new TerminalHub();

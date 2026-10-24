@@ -13,7 +13,7 @@ import { planHandoff } from "../../packages/server/src/handoffs.ts";
 import { suggest } from "../../packages/server/src/suggestions.ts";
 import { setOwner } from "../../packages/server/src/owners.ts";
 import { createSprocket, listMessages, postEvent, projectChat, sendMessage, updateSettings } from "../../packages/server/src/sprockets.ts";
-import { sessionTitle } from "../../packages/server/src/titles.ts";
+import { sessionTitle } from "../../packages/server/src/workspace/titles.ts";
 
 type Kind = "claude" | "pi" | "codex";
 

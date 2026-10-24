@@ -1,7 +1,7 @@
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import type { GitStatus } from "@rails/shared";
-import { ServiceError } from "./errors.ts";
+import { ServiceError } from "../errors.ts";
 
 const run = promisify(execFile);
 const git = (cwd: string, ...args: string[]) => run("git", ["-C", cwd, ...args], { maxBuffer: 16 * 1024 * 1024 });

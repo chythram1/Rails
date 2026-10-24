@@ -12,7 +12,7 @@ import { HANDOFF_NOTE_MAX, type Panel } from "@rails/shared";
 import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
 import { handoffs, panels, sessionEvents, sprocketChats, sprocketMessages, sprockets, type StoredHandoff } from "./db.ts";
 import { ServiceError } from "./errors.ts";
-import { sessionTitle } from "./titles.ts";
+import { sessionTitle } from "./workspace/titles.ts";
 import { listeners } from "./util.ts";
 
 /** How long a handoff waits for its session to finish. */

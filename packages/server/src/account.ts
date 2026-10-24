@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import type { ServerInfo } from "@rails/shared";
 import { HOST, PORT, rotateToken, TOKEN_FROM_ENV } from "./config.ts";
 import { ServiceError } from "./errors.ts";
-import * as tmux from "./tmux.ts";
+import * as tmux from "./workspace/tmux.ts";
 import { listeners } from "./util.ts";
 
 const signedOut = listeners();

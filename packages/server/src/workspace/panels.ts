@@ -1,16 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { userInfo } from "node:os";
 import type { OpenPanel, Panel, PanelKind, ProviderId, Workspace } from "@rails/shared";
-import { layouts, panels } from "./db.ts";
-import { bridgeEnv, forgetPanel, onSessionMoved } from "./bridge/index.ts";
-import { onCodexSession, startCodexThread, unwatchCodexIfIdle, watchCodex } from "./bridge/codex.ts";
-import { bridgeFlags } from "./bridge/wiring.ts";
-import { ServiceError } from "./errors.ts";
+import { layouts, panels } from "../db.ts";
+import { bridgeEnv, forgetPanel, onSessionMoved } from "../bridge/index.ts";
+import { onCodexSession, startCodexThread, unwatchCodexIfIdle, watchCodex } from "../bridge/codex.ts";
+import { bridgeFlags } from "../bridge/wiring.ts";
+import { ServiceError } from "../errors.ts";
 import { getProject } from "./projects.ts";
-import { discovery, findSession, installed } from "./providers/index.ts";
+import { discovery, findSession, installed } from "../providers/index.ts";
 import { sessionName } from "./titles.ts";
 import * as tmux from "./tmux.ts";
-import { listeners } from "./util.ts";
+import { listeners } from "../util.ts";
 
 /**
  * The user's login shell from their account. Not $SHELL: shells like `nix develop` set it to their own

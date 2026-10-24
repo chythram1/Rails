@@ -6,7 +6,7 @@ import { open, opendir, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, relative } from "node:path";
 import { promisify } from "node:util";
 import type { FileEntry, FolderListing, GitState } from "@rails/shared";
-import { ServiceError } from "./errors.ts";
+import { ServiceError } from "../errors.ts";
 import { ignoredAmong, isSecretPath } from "./files.ts";
 
 const run = promisify(execFile);

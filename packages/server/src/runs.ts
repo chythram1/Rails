@@ -42,7 +42,7 @@ import { askUserCapability, nothingNewCapability, passTurnCapability, sendMessag
 import { findModel, models } from "./models.ts";
 import { projectOwners } from "./owners.ts";
 import { resendWhenSilent } from "./resend.ts";
-import { sessionTitle } from "./titles.ts";
+import { sessionTitle } from "./workspace/titles.ts";
 import { handOnNudge, nudge, roundNow, severalEvents, systemPrompt, TEXTING_NOW, toLlm, whyNow } from "./prompt.ts";
 import { askedTeammates, handOn, inRound, notYet, queuedIn, teamInfo, waitingAsks, type TeamInfo } from "./rounds.ts";
 import { listeners } from "./util.ts";

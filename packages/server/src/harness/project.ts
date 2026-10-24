@@ -7,10 +7,10 @@ import { AGENT, boardText } from "../bridge/board.ts";
 import type { SessionEvent } from "../bridge/events.ts";
 import { cardOf } from "../bridge/index.ts";
 import { panels, sessionEvents } from "../db.ts";
-import { isSecretPath, readProjectFile, READ_MAX_LINES, SEARCH_MAX_MATCHES, searchProject, withoutSecrets } from "../files.ts";
-import { gitDiff, gitDiffAll, gitLog, gitShow, gitStatus } from "../git.ts";
+import { isSecretPath, readProjectFile, READ_MAX_LINES, SEARCH_MAX_MATCHES, searchProject, withoutSecrets } from "../workspace/files.ts";
+import { gitDiff, gitDiffAll, gitLog, gitShow, gitStatus } from "../workspace/git.ts";
 import { conversation, findSession, sessionsFor } from "../providers/index.ts";
-import { sessionName } from "../titles.ts";
+import { sessionName } from "../workspace/titles.ts";
 import { listOf, type Capability, type RunContext } from "./capabilities.ts";
 
 const ACTIVITY = 25;

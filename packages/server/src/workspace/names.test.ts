@@ -2,13 +2,13 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { sessionKey } from "@rails/shared";
 import { describe, expect, it } from "vitest";
-import { messageFromAgent, neighboursText } from "./agentTools.ts";
-import { panels, projects } from "./db.ts";
-import { projectCapabilities } from "./harness/project.ts";
+import { messageFromAgent, neighboursText } from "../agentTools.ts";
+import { panels, projects } from "../db.ts";
+import { projectCapabilities } from "../harness/project.ts";
 import { nameSession } from "./names.ts";
 import { onPanelsChanged } from "./panels.ts";
 import { listProjectSessions } from "./projects.ts";
-import { createSprocket, updateSettings } from "./sprockets.ts";
+import { createSprocket, updateSettings } from "../sprockets.ts";
 import { sessionTitle } from "./titles.ts";
 
 /** A Claude Code transcript discovery finds in `cwd`, titled by its first prompt. */

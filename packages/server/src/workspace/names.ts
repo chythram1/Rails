@@ -2,8 +2,8 @@
 // Rails shows one (tabs, the sidebar, the Coordinator, agent tools), because agents title sessions with long or
 // changing text. Rails keeps it in its database, by session, and never writes it into the agent's transcript.
 import { parseSessionKey, SESSION_NAME_MAX, type SessionKey } from "@rails/shared";
-import { panels, sessionNames } from "./db.ts";
-import { ServiceError } from "./errors.ts";
+import { panels, sessionNames } from "../db.ts";
+import { ServiceError } from "../errors.ts";
 import { panelsChanged } from "./panels.ts";
 import { listProjectSessions } from "./projects.ts";
 import { sessionTitle } from "./titles.ts";

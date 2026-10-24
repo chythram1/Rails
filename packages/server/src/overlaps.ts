@@ -14,7 +14,7 @@ import { panels, projects, sprockets } from "./db.ts";
 import { postEvent } from "./sprockets.ts";
 import { ownerOf } from "./owners.ts";
 import { listeners } from "./util.ts";
-import { sessionTitle } from "./titles.ts";
+import { sessionTitle } from "./workspace/titles.ts";
 
 /** How long a session's burst of edits is gathered into one wake. */
 export const BATCH_MS = 15_000;

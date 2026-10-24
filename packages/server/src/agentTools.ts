@@ -14,7 +14,7 @@ import { panels, projects, sessionEvents, sprockets, suggestions } from "./db.ts
 import { projectOwners } from "./owners.ts";
 import { postEvent } from "./sprockets.ts";
 import { MAX_PENDING_MESSAGES, suggest } from "./suggestions.ts";
-import { sessionTitle } from "./titles.ts";
+import { sessionTitle } from "./workspace/titles.ts";
 
 /** Titles are often a session's whole first prompt: agents get them cut short. */
 const TITLE_MAX = 60;

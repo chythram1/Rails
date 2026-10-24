@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readProjectFile, searchProject } from "./files.ts";
 import { gitShow } from "./git.ts";
-import { projectCapabilities } from "./harness/project.ts";
+import { projectCapabilities } from "../harness/project.ts";
 
 // A throwaway repository: code, a secret, an ignored build folder, a binary and a link out of the project.
 const root = realpathSync(mkdtempSync(join(tmpdir(), "rails-files-")));
