@@ -191,7 +191,8 @@ export function SprocketChat({
   const [spinning, setSpinning] = useState<string | null>(null);
   /** Members who have started writing in their current turn: dots until it ends. */
   const [started, setStarted] = useState<string[]>([]);
-  const onIt = watching.flatMap((w) => speaker(w) ?? []);
+  // In a team, in the team's order, so the line naming them doesn't reorder as runs start and end.
+  const onIt = team ? members.filter((m) => watching.includes(m.id)) : watching.flatMap((w) => speaker(w) ?? []);
   const one = team ? undefined : onIt[0];
   const dots = !!one && (one.id === writing || started.includes(one.id)) && spinning !== one.id;
   const face = one && !dots ? one.id : null;
@@ -220,15 +221,19 @@ export function SprocketChat({
     if (face) lastFace.current = { id: face, at: Infinity };
     else if (lastFace.current?.at === Infinity) lastFace.current = { ...lastFace.current, at: Date.now() };
   });
+  /**
+   * In a team, who's thinking now, by name: "Bo is thinking…", "Bo and Cy are thinking…". A member stays named a
+   * moment after it stops, so one that rereads quietly for a moment (a teammate's reply woke it) doesn't flicker in and out.
+   */
+  const named = useLinger(onIt.map((w) => w.id), LINGER_MS);
+  const namedNow = members.filter((m) => named.includes(m.id));
+  const thinking = team && namedNow.length ? `${names(namedNow.map((w) => w.name))} ${namedNow.length === 1 ? "is" : "are"} thinking…` : "";
   /** In a team, the members the icon turns through: all those thinking since it started, until none is. */
   const [cycle, setCycle] = useState<string[]>([]);
   useLayoutEffect(() => {
-    if (!team) return;
-    setCycle((c) => (onIt.length ? [...c, ...onIt.map((w) => w.id).filter((w) => !c.includes(w))] : []));
-  }, [onIt.map((w) => w.id).join()]);
+    if (team) setCycle((c) => (named.length ? [...c, ...named.filter((w) => !c.includes(w))] : []));
+  }, [named.join()]);
   const cycling = team ? cycle.flatMap((c) => speaker(c) ?? []) : [];
-  /** In a team, who's thinking now, by name: "Bo is thinking…", "Bo and Cy are thinking…". */
-  const thinking = team && onIt.length ? `${names(onIt.map((w) => w.name))} ${onIt.length === 1 ? "is" : "are"} thinking…` : "";
   /** The messages at the end of the chat from the Sprocket writing them now (its current turn): its face waits. */
   const tail = new Set<string>();
   const end = [...(messages ?? [])].reverse();
@@ -500,6 +505,23 @@ function Marked({ blocks: read, text }: { blocks: Block[]; text: (t: string) => 
       </Fragment>
     ),
   );
+}
+
+/** How long a team member stays named in the thinking line after it stops (ms). */
+const LINGER_MS = 800;
+
+/** `ids`, with each one that leaves kept for `ms` more (it's back at once if it returns meanwhile). */
+function useLinger(ids: string[], ms: number): string[] {
+  const [kept, setKept] = useState<string[]>([]);
+  const key = ids.join();
+  useLayoutEffect(() => {
+    setKept((k) => [...ids, ...k.filter((x) => !ids.includes(x))]);
+    if (!ids.length && !kept.length) return;
+    const t = setTimeout(() => setKept(ids), ms);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return kept;
 }
 
 /** Names as a sentence: "Bo", "Bo and Cy", "Ada, Bo and Cy". */
