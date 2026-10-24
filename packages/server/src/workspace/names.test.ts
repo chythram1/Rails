@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { sessionKey } from "@rails/shared";
 import { describe, expect, it } from "vitest";
-import { messageFromAgent, neighboursText } from "../agentTools.ts";
+import { messageFromAgent, neighboursText } from "../bridge/agentTools.ts";
 import { panels, projects } from "../db.ts";
 import { projectCapabilities } from "../harness/project.ts";
 import { nameSession } from "./names.ts";

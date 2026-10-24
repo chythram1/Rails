@@ -9,7 +9,7 @@ import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { serverInfo, signOutEverywhere } from "./settings/account.ts";
-import { mcpRequest } from "./agentTools.ts";
+import { mcpRequest } from "./bridge/agentTools.ts";
 import { accessToken } from "./config.ts";
 import { claudeInbox, piInbox } from "./bridge/deliver.ts";
 import { receive, tokenOk as bridgeTokenOk } from "./bridge/index.ts";

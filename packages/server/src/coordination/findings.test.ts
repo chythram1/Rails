@@ -2,7 +2,7 @@
 // (no decision model needed); the decision model only judges the same in shadow.
 import { fauxProvider } from "@earendil-works/pi-ai";
 import { beforeEach, describe, expect, it } from "vitest";
-import { messageFromAgent } from "../agentTools.ts";
+import { messageFromAgent } from "../bridge/agentTools.ts";
 import { receive } from "../bridge/index.ts";
 import { panels, projects, settings } from "../db.ts";
 import { findingToJudge } from "./decisions.ts";

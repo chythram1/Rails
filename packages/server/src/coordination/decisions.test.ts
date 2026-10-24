@@ -6,7 +6,7 @@ import { ACT_ASKS, ACT_QUESTION, decisionLog, settled, setDecisionModel, setDeci
 import { models, modelSettings, refOf } from "../settings/models.ts";
 import { idle } from "../sprockets/runs.ts";
 import { turnEnded } from "./findings.ts";
-import { messageFromAgent } from "../agentTools.ts";
+import { messageFromAgent } from "../bridge/agentTools.ts";
 import { createSprocket, listMessages, projectChat, updateSettings } from "../sprockets/sprockets.ts";
 import { GRACE_MS, startWatches } from "./watches.ts";
 
