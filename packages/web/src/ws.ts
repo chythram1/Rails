@@ -7,7 +7,6 @@ class Socket {
   private ws?: WebSocket;
   private listeners = new Set<Listener>();
   private connListeners = new Set<(up: boolean) => void>();
-  private queue: ClientMsg[] = [];
   private retry = 0;
   /** Signed out: don't reconnect until connect() is called again (after signing in). */
   private stopped = false;
@@ -22,7 +21,6 @@ class Socket {
     ws.onopen = () => {
       this.retry = 0;
       this.setConnected(true);
-      for (const m of this.queue.splice(0)) this.raw(m);
     };
     ws.onmessage = (e) => {
       const m = JSON.parse(e.data) as ServerMsg;
@@ -38,7 +36,6 @@ class Socket {
   /** Close the connection for good (signing out): the server keeps an open socket authorized otherwise. */
   disconnect() {
     this.stopped = true;
-    this.queue = [];
     this.ws?.close();
   }
 
@@ -47,13 +44,13 @@ class Socket {
     for (const l of this.connListeners) l(up);
   }
 
-  private raw(m: ClientMsg) {
-    this.ws?.send(JSON.stringify(m));
-  }
-
+  /**
+   * Sent now, or not at all: nothing is kept for later. Keys typed into a dead connection would reach the agent
+   * minutes later, in whatever state it's in by then (a "y" at a prompt that changed meanwhile). The server drops a
+   * socket's terminals when it closes, and terminals attach again, at their current size, on reconnect.
+   */
   send(m: ClientMsg) {
-    if (this.connected) this.raw(m);
-    else this.queue.push(m);
+    if (this.connected) this.ws?.send(JSON.stringify(m));
   }
 
   on(l: Listener) {
