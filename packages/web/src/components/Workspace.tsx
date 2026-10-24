@@ -179,7 +179,8 @@ function Dock({ projectId, targetGroup, focusId, onFocused }: DockProps) {
     const save = dock.onDidLayoutChange(() => {
       if (!restored.current) return;
       clearTimeout(timer);
-      timer = setTimeout(() => void api.saveLayout(projectId, dock.toJSON()).catch(() => {}), 400);
+      // A failed save only means other devices keep the last arrangement; the next change saves it again.
+      timer = setTimeout(() => void api.saveLayout(projectId, dock.toJSON()).catch((e) => console.warn("layout not saved:", e)), 400);
     });
     const active = dock.onDidActivePanelChange((e) => setActivePanelId(e.panel?.id));
     return () => {

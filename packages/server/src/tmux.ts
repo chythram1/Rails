@@ -77,8 +77,14 @@ export async function startSession(panelId: string, cwd: string, argv: string[],
   await tmux("source-file", CONF); // apply config changes to an already-running tmux server
 }
 
+/** Stop a panel's process. Already gone is fine; any other failure throws, so the panel isn't dropped while it runs. */
 export async function killSession(panelId: string): Promise<void> {
-  await tmux("kill-session", "-t", sessionName(panelId)).catch(() => {}); // already gone is fine
+  try {
+    await tmux("kill-session", "-t", sessionName(panelId));
+  } catch (e) {
+    if (noServer(e) || /^can't find session/m.test(stderrOf(e))) return;
+    throw e;
+  }
 }
 
 /**
@@ -105,9 +111,10 @@ export async function panelActivity(): Promise<Map<string, number>> {
 
 /** Whether tmux failed because no server runs on the socket yet (no socket file, or a stale one). */
 function noServer(e: unknown): boolean {
-  const stderr = String((e as { stderr?: unknown })?.stderr ?? "");
-  return /^no server running on |^error connecting to .*\((No such file or directory|Connection refused)\)/m.test(stderr);
+  return /^no server running on |^error connecting to .*\((No such file or directory|Connection refused)\)/m.test(stderrOf(e));
 }
+
+const stderrOf = (e: unknown) => String((e as { stderr?: unknown })?.stderr ?? "");
 
 /** Ids of the panels whose process is still running. */
 export async function runningPanels(): Promise<Set<string>> {

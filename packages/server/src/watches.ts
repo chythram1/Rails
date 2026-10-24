@@ -242,7 +242,7 @@ function wakeCoordinator(panelId: string, wake: Wake): boolean {
     // Still this project's Coordinator (the lookup took a moment)?
     const now = sprockets.get(coordinator.id);
     if (now?.coordinator && now.projectId === panel.projectId) woke.emit(panelId, postEvent(coordinator.id, event, wake.text).id, wake);
-  });
+  }).catch((err) => console.error("watches:", err));
   return true;
 }
 

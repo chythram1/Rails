@@ -7,7 +7,7 @@ vi.mock("node:child_process", () => ({
     answer.error ? cb(answer.error) : cb(null, { stdout: answer.stdout, stderr: "" }),
 }));
 
-const { panelActivity } = await import("./tmux.ts");
+const { killSession, panelActivity } = await import("./tmux.ts");
 
 const failure = (stderr: string, code?: string) => Object.assign(new Error("Command failed"), { stderr, code });
 
@@ -39,5 +39,19 @@ describe("panelActivity", () => {
     await expect(panelActivity()).rejects.toThrow();
     answer.error = failure("", "ENOENT"); // tmux isn't installed
     await expect(panelActivity()).rejects.toThrow(/tmux/i);
+  });
+});
+
+describe("killSession", () => {
+  it("is fine when the session or the server is already gone", async () => {
+    for (const stderr of ["can't find session: p-a\n", "no server running on /home/x/.rails/tmux.sock\n"]) {
+      answer.error = failure(stderr);
+      await expect(killSession("a")).resolves.toBeUndefined();
+    }
+  });
+
+  it("fails otherwise, so a panel isn't dropped while its process runs", async () => {
+    answer.error = failure("", "EAGAIN");
+    await expect(killSession("a")).rejects.toThrow();
   });
 });

@@ -1,6 +1,7 @@
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import type { GitStatus } from "@rails/shared";
+import { ServiceError } from "./errors.ts";
 
 const run = promisify(execFile);
 const git = (cwd: string, ...args: string[]) => run("git", ["-C", cwd, ...args], { maxBuffer: 16 * 1024 * 1024 });
@@ -9,8 +10,13 @@ export async function gitStatus(cwd: string): Promise<GitStatus> {
   let stdout: string;
   try {
     ({ stdout } = await git(cwd, "status", "--porcelain=v1", "--branch", "-z"));
-  } catch {
-    return { isRepo: false, ahead: 0, behind: 0, files: [] };
+  } catch (e: any) {
+    if (e?.code === "ENOENT") throw new ServiceError("git isn't installed, so Rails can't show changes.", 503);
+    const stderr = String(e?.stderr ?? "");
+    // Not a repository (or its folder is gone): nothing to show. Anything else (say, git refusing a folder another
+    // user owns) is git's to explain, not a folder without git.
+    if (/not a git repository|cannot change to/.test(stderr)) return { isRepo: false, ahead: 0, behind: 0, files: [] };
+    throw new ServiceError(stderr.trim().split("\n")[0]?.replace(/^fatal: /, "git: ") || "git failed.", 503);
   }
   const status: GitStatus = { isRepo: true, ahead: 0, behind: 0, files: [] };
   const parts = stdout.split("\0");
