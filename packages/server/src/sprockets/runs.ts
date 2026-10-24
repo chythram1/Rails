@@ -44,7 +44,7 @@ import { projectOwners } from "../coordination/owners.ts";
 import { resendWhenSilent } from "./resend.ts";
 import { sessionTitle } from "../workspace/titles.ts";
 import { severalEvents, systemPrompt, teamNow, TEXTING_NOW, toLlm, whyNow } from "./prompt.ts";
-import { teamInfo } from "./rounds.ts";
+import { teamInfo } from "./members.ts";
 import { listeners } from "../util.ts";
 
 /** Model calls in one run (each round of tool calls is one). */
@@ -251,7 +251,7 @@ async function start(r: StoredRun, chat: StoredChat) {
     activityChanges.emit(sprocketId, chatId, null, null);
     // Cancelled meanwhile (the chat was cleared): it stays so.
     if (sprocketRuns.get(r.id)?.status === "running") sprocketRuns.setStatus(r.id, status, error);
-    for (const who of woke?.members ?? []) wake(chatId, who, { trigger: "teammate", sourceId: woke!.sourceId, from: sprocketId, hop: r.hop + 1 });
+    for (const who of woke?.members ?? []) wake(chatId, who, { trigger: "teammate", sourceId: woke?.sourceId, from: sprocketId, hop: r.hop + 1 });
     changed();
     pump();
   }
@@ -338,7 +338,7 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   const skills = toolbox.skills.length ? listSkills().filter((k) => toolbox.skills.includes(k.id)) : [];
   const unreachable = servers.filter((x) => x.error).map((x) => `[Rails] The MCP server ${x.server.name} can't be reached right now (${x.error}), so its tools aren't here this turn.`);
   if (chat.kind !== "project")
-    context.push({ role: "user", content: [team ? `${TEXTING_NOW}\n${teamNow(history, r, team, alsoAnswering(chatId, id))}` : [TEXTING_NOW, ...whyNow(r)].join("\n"), ...unreachable].join("\n"), timestamp: Date.now() });
+    context.push({ role: "user", content: [team ? `${TEXTING_NOW}\n${teamNow(r, team, alsoAnswering(chatId, id))}` : [TEXTING_NOW, ...whyNow(r)].join("\n"), ...unreachable].join("\n"), timestamp: Date.now() });
   // Events that came in together (one arrived while it answered another): models answered only the latest.
   // (An agent's drafted message doesn't wake it, and needs nothing.)
   const events = unanswered.filter((m) => m.author === "event" && m.event && m.event.what !== "message");
@@ -629,10 +629,11 @@ export function textOf(m: Pick<AssistantMessage, "content">): string {
  */
 const QUIET = /(^\(?quiet\)?|\(quiet\))\.?$/i;
 /**
- * A team member's whole reply that only says it stays quiet: a short form ("(q)", "quiet"), or a note in brackets
- * ("(Chandler's answer covers it)"), as some models write instead of (quiet) (mimo-v2.6-flash, live).
+ * A team member's whole reply that only says it stays quiet: a short form ("(q)", "quiet"), or a short note in
+ * brackets on one line ("(Chandler's answer covers it)"), as some models write instead of (quiet) (mimo-v2.6-flash,
+ * live). A longer bracketed message is a real one.
  */
-const QUIET_SHORT = /^(\s*(q|quiet|silent|no reply)\s*\.?|\([^()]*\)\.?|\[[^[\]]*\]\.?)$/i;
+const QUIET_SHORT = /^(\s*(q|quiet|silent|no reply)\s*\.?|\([^()\n]{0,60}\)\.?|\[[^[\]\n]{0,60}\]\.?)$/i;
 
 /** A tool's name as a button's label: its title as it is, or "add_note" as "Add note". */
 const labelOf = (title: string) => (/[\s]/.test(title) ? title : (title.charAt(0).toUpperCase() + title.slice(1)).replace(/[_-]+/g, " "));

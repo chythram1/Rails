@@ -5,7 +5,7 @@ import { TEAM_MEMBERS_MAX, TEAM_MEMBERS_MIN, findMentions, type SprocketTeam, ty
 import { sprocketChats, sprocketMessages, sprockets, suggestions, type StoredChat } from "../db.ts";
 import { ServiceError } from "../errors.ts";
 import { answerWaiting, cancelRuns, chatTurns, wake } from "./runs.ts";
-import { waitingAsks } from "./rounds.ts";
+import { waitingAsks } from "./members.ts";
 import { expireInChat } from "../coordination/suggestions.ts";
 import { listeners } from "../util.ts";
 
@@ -86,7 +86,7 @@ export function updateTeam(id: string, body: Partial<SprocketTeamInput> | undefi
 /** Delete a team and its chat; its members stay. Suggestions still waiting there expire, as when it's cleared. */
 export function deleteTeam(id: string): void {
   getTeam(id);
-  endRound(id);
+  stopTeam(id);
   expireInChat(id);
   sprocketChats.removeTeam(id);
   changed();
@@ -125,7 +125,7 @@ const membersOf = (chatId: string): Member[] =>
  * it names, and a tapped option only whoever asked it. Nothing is cancelled: replies being written still post, and
  * their members wake again to read this.
  */
-export function startRound(chatId: string, text: string, messageId?: string): void {
+export function wakeTeam(chatId: string, text: string, messageId?: string): void {
   const members = membersOf(chatId);
   const begin = (picked: string[]) => {
     for (const who of picked) wake(chatId, who, { trigger: "user", sourceId: messageId, hop: 0 });
@@ -150,6 +150,6 @@ export function startRound(chatId: string, text: string, messageId?: string): vo
 }
 
 /** Stop a team's turns (its chat was cleared, or it's deleted): queued ones and questions waiting are dropped. */
-export function endRound(chatId: string): void {
+export function stopTeam(chatId: string): void {
   cancelRuns(chatId, { waiting: true });
 }

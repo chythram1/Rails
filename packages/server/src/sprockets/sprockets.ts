@@ -22,7 +22,7 @@ import { handoffs, mcpServers, projects, sprocketChats, sprocketMessages, sprock
 import { customizeChanged } from "../customize/customize.ts";
 import { skillExists } from "../customize/skills.ts";
 import { ServiceError } from "../errors.ts";
-import { endRound, nameClash, onTeamsChanged, startRound } from "./teams.ts";
+import { nameClash, onTeamsChanged, stopTeam, wakeTeam } from "./teams.ts";
 import { settleHandoffs } from "../coordination/handoffs.ts";
 import { projectOwners } from "../coordination/owners.ts";
 import { findModel } from "../settings/models.ts";
@@ -159,7 +159,7 @@ export function sendMessage(chatId: string, rawText: unknown): SprocketMessage {
   if (text.length > MAX_MESSAGE) throw new ServiceError(`Messages can be at most ${MAX_MESSAGE} characters.`, 400);
   const message = sprocketMessages.create(chatId, "user", text, userMessageTime(chatId));
   changed();
-  if (chat.kind === "team") startRound(chatId, text, message.id);
+  if (chat.kind === "team") wakeTeam(chatId, text, message.id);
   else {
     answerWaiting(chatId, text); // a question with options it asked here (ADR 0023)
     requestReply(chatId, undefined, { trigger: "user", sourceId: message.id });
@@ -173,7 +173,7 @@ export function sendMessage(chatId: string, rawText: unknown): SprocketMessage {
  */
 export function clearChat(chatId: string): void {
   getChat(chatId);
-  endRound(chatId);
+  stopTeam(chatId);
   expireInChat(chatId);
   sprocketChats.clear(chatId);
   changed();

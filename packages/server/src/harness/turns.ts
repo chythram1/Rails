@@ -5,7 +5,7 @@ import { Type } from "@earendil-works/pi-ai";
 import { ASK_OPTIONS_MAX, ASK_OPTIONS_MIN, AUTOMATION_SUMMARY_MAX, type SprocketAsk } from "@rails/shared";
 import type { Capability } from "./capabilities.ts";
 
-/** How a run ended on purpose: the question it asked. */
+/** How a run ended on purpose: the question it asked, or an automation's run with nothing new. */
 export type TurnEnd =
   | { ask: SprocketAsk }
   /** An automation's run found nothing to tell its user (ADR 0032): what it checked, in a line. */

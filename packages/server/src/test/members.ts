@@ -9,7 +9,7 @@ type Step = AssistantMessage | ((c: TranscriptContext) => AssistantMessage | Pro
 export const seen = (c: TranscriptContext) =>
   c.messages.map((m) => (typeof m.content === "string" ? m.content : m.content.map((b) => ("text" in b ? b.text : "")).join(""))).join("\n");
 
-export const QUIET = () => fauxAssistantMessage("(quiet)");
+const QUIET = () => fauxAssistantMessage("(quiet)");
 
 /**
  * Set `faux`'s replies: each member's steps in order, quiet once they run out. Returns how many model calls each

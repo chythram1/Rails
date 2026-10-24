@@ -1,4 +1,4 @@
-// Team chats (ADR 0022, 0033): who is in a team, and the questions waiting for the user. Read from the database;
+// A team's members (ADR 0022, 0033): who is in a team, and the questions waiting for the user. Read from the database;
 // what members are told about them is prompt.ts.
 import { projects, sprocketChats, sprocketMessages, sprocketRuns, sprockets, type StoredChat } from "../db.ts";
 

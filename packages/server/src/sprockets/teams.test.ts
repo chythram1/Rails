@@ -7,7 +7,7 @@ import { TEAM_TURNS_MAX } from "@rails/shared";
 import { projects, settings, sprocketRuns, sprockets } from "../db.ts";
 import { createTeam, deleteTeam, listTeams, mentioned, updateTeam } from "./teams.ts";
 import { models, refOf } from "../settings/models.ts";
-import { waitingAsks } from "./rounds.ts";
+import { waitingAsks } from "./members.ts";
 import { idle } from "./runs.ts";
 import { clearChat, createSprocket, deleteSprocket, listMessages, sendMessage, updateSettings } from "./sprockets.ts";
 import { scriptMembers, seen } from "../test/members.ts";
@@ -71,11 +71,11 @@ describe("team chats", () => {
   });
 
   it("takes a short form of (quiet) as quiet too, as some models write it", async () => {
-    const { team } = crew(["Ada", "Bo"]);
-    scriptMembers(faux, { Ada: [reply("Ada here.")], Bo: [reply("(q)"), reply("(Ada's answer covers it)")] });
+    const { team } = crew();
+    scriptMembers(faux, { Ada: [reply("Ada here.")], Bo: [reply("(q)"), reply("(Ada's answer covers it)")], Cy: [reply("(Long aside: this whole message is in brackets but it says something real to the team.)")] });
     sendMessage(team.id, "Ada?");
     await idle();
-    expect(said(team.id)).toEqual(["user: Ada?", "Ada: Ada here."]);
+    expect(said(team.id)).toEqual(["user: Ada?", "Ada: Ada here.", "Cy: (Long aside: this whole message is in brackets but it says something real to the team.)"]);
   });
 
   it("lets every member answer a message for all of them, at once", async () => {

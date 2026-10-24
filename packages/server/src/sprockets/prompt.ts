@@ -6,7 +6,7 @@ import { AGENT } from "../bridge/board.ts";
 import { automationRuns, handoffs, sessionEvents, sprocketMessages, sprockets, suggestions, type StoredChat, type StoredRun } from "../db.ts";
 import { resultText } from "../harness/mcpTools.ts";
 import { CORE_MEMORY_MAX } from "../harness/memory.ts";
-import { waitingAsks, type TeamInfo } from "./rounds.ts";
+import { waitingAsks, type TeamInfo } from "./members.ts";
 
 /**
  * An event as the Coordinator reads it: from Rails, not the user, with what the session wrote quoted as
@@ -332,7 +332,7 @@ const list = (names: string[]) => (names.length < 2 ? names.join("") : `${names.
  * What a team member is told right before it writes (ADR 0033): facts only. What woke it, who else is answering now
  * (they can't see its message, nor it theirs, until it's posted), and the questions waiting for the user.
  */
-export function teamNow(history: SprocketMessage[], r: StoredRun, team: TeamInfo, alsoAnswering: string[]): string {
+export function teamNow(r: StoredRun, team: TeamInfo, alsoAnswering: string[]): string {
   const nameOf = (id: string | undefined) => team.members.find((m) => m.id === id)?.name;
   const from = r.trigger === "teammate" ? nameOf(r.from) : undefined;
   const others = alsoAnswering.flatMap((id) => nameOf(id) ?? []);
