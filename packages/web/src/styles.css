@@ -1360,6 +1360,8 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .cz-add { height: 32px; }
 .cz-add-label { display: inline-flex; align-items: center; gap: 6px; }
 .cz-none { margin: 32px 0 0; }
+.cz-none a { color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; }
+.cz-none a:hover { color: var(--text); }
 /* The banner: a collection of connectors on --surface-2, its words on the left, its marks on the right in a loose
    staggered row (every other one smaller and lower), arrows and dots under the words. */
 .cz-banner {

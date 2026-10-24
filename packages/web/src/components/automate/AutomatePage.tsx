@@ -20,7 +20,7 @@ import {
 } from "@tabler/icons-react";
 import { AUTOMATION_RECENT, scheduleText, type Automation, type AutomationOutcome, type McpServer, type Sprocket as SprocketData } from "@rails/shared";
 import { api } from "../../api.ts";
-import { href, navigate, type Route } from "../../router.ts";
+import { href, type Route } from "../../router.ts";
 import { timeAgo } from "../../util.ts";
 import { useConfirm } from "../ConfirmDialog.tsx";
 import { MenuButton } from "../Menu.tsx";
@@ -135,7 +135,7 @@ function Gallery({ tab, sprockets, servers }: { tab: "list" | "templates"; sproc
             </span>
           </a>
         </div>
-        {tab === "list" && !!list?.length && <Overview list={list} />}
+        {tab === "list" && list && <Overview list={list} />}
         {(tab === "templates" || !!list?.length) && (
           <label className="cz-search au-search">
             <Search size={16} aria-hidden />
@@ -157,32 +157,9 @@ function Gallery({ tab, sprockets, servers }: { tab: "list" | "templates"; sproc
               </p>
             )}
             {list && !list.length && (
-              <section className="cz-section" aria-label="No automations yet">
-                <ul className="cz-cards">
-                  <li className="cz-card cz-card-add">
-                    <button type="button" className="cz-card-add-btn" onClick={() => navigate(href.newAutomation())}>
-                      <span className="cz-logo cz-logo-add" aria-hidden>
-                        <Plus size={18} />
-                      </span>
-                      <span className="cz-card-text">
-                        <span className="cz-card-name">New automation</span>
-                        <span className="cz-card-desc">Pick a Sprocket, say what it should do, and when. For example, every weekday at 9: “Tell me what changed in Linear since yesterday.”</span>
-                      </span>
-                    </button>
-                  </li>
-                  <li className="cz-card cz-card-add">
-                    <button type="button" className="cz-card-add-btn" onClick={() => navigate(href.automateTemplates())}>
-                      <span className="cz-logo cz-logo-add" aria-hidden>
-                        <Template size={18} />
-                      </span>
-                      <span className="cz-card-text">
-                        <span className="cz-card-name">Start from a template</span>
-                        <span className="cz-card-desc">A morning brief of your agent sessions, Linear triage, new Sentry errors and more.</span>
-                      </span>
-                    </button>
-                  </li>
-                </ul>
-              </section>
+              <p className="muted cz-none">
+                No automations yet. Make one with New automation, or start from one of the <a href={href.automateTemplates()}>templates</a>.
+              </p>
             )}
             {list && !!list.length && !shown.length && <p className="muted cz-none">Nothing matches “{query.trim()}”.</p>}
             {!!on.length && (
