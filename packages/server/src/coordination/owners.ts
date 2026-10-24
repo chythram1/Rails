@@ -4,9 +4,9 @@
 // (Kept free of sprockets.ts, which imports the runs, so the capabilities can use it without a cycle.)
 import { isAbsolute, normalize, relative } from "node:path";
 import type { Panel, Project, ProjectOwner } from "@rails/shared";
-import { onPanelForgotten } from "./bridge/index.ts";
-import { owners, panels } from "./db.ts";
-import { listeners } from "./util.ts";
+import { onPanelForgotten } from "../bridge/index.ts";
+import { owners, panels } from "../db.ts";
+import { listeners } from "../util.ts";
 
 /** Most paths one session can own. */
 export const MAX_OWNED = 10;

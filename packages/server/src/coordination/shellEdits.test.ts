@@ -3,9 +3,9 @@ import { mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { shellCall } from "./bridge/events.ts";
-import { cardOf, receive } from "./bridge/index.ts";
-import { panels, projects } from "./db.ts";
+import { shellCall } from "../bridge/events.ts";
+import { cardOf, receive } from "../bridge/index.ts";
+import { panels, projects } from "../db.ts";
 import { changedFiles, porcelainPaths, readsOnly, snapshot, startShellEdits } from "./shellEdits.ts";
 
 startShellEdits();

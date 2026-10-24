@@ -10,7 +10,7 @@ import { fromClaude, fromCodex, fromPi } from "./events.ts";
 import { attentionList, bridgeEnv, cardOf, onSessionMoved, receive, tokenOk } from "./index.ts";
 import { projectCapabilities } from "../harness/project.ts";
 import { WAIT_MS } from "../agentTools.ts";
-import { admit } from "../watches.ts";
+import { admit } from "../coordination/watches.ts";
 
 // Payloads as Claude Code 2.1.302, pi 1.3 (through pi/rails.ts) and Codex 0.163 sent them in the
 // experiments (scratch notes; trimmed).

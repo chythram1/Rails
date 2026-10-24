@@ -32,10 +32,10 @@ import { getProfile, updateProfile } from "./settings/profile.ts";
 import { cancelSignIn, modelSettings, removeCredential, setApiKey, setDefaultModel, startSignIn, submitSignInCode } from "./settings/models.ts";
 import { createTeam, deleteTeam, listTeams, updateTeam } from "./sprockets/teams.ts";
 import { clearChat, createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets/sprockets.ts";
-import { cancelHandoff } from "./handoffs.ts";
-import { clearOwner } from "./owners.ts";
-import { dismissSuggestion, sendSuggestion } from "./suggestions.ts";
-import { decisionLog, setDecisionModel, setDecisionThreshold } from "./decisions.ts";
+import { cancelHandoff } from "./coordination/handoffs.ts";
+import { clearOwner } from "./coordination/owners.ts";
+import { dismissSuggestion, sendSuggestion } from "./coordination/suggestions.ts";
+import { decisionLog, setDecisionModel, setDecisionThreshold } from "./coordination/decisions.ts";
 import { sameSecret } from "./util.ts";
 
 const COOKIE = "rails_token";

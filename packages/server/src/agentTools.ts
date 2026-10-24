@@ -11,9 +11,9 @@ import type { SessionEvent } from "./bridge/events.ts";
 import { setCodexTools } from "./bridge/codex.ts";
 import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
 import { panels, projects, sessionEvents, sprockets, suggestions } from "./db.ts";
-import { projectOwners } from "./owners.ts";
+import { projectOwners } from "./coordination/owners.ts";
 import { postEvent } from "./sprockets/sprockets.ts";
-import { MAX_PENDING_MESSAGES, suggest } from "./suggestions.ts";
+import { MAX_PENDING_MESSAGES, suggest } from "./coordination/suggestions.ts";
 import { sessionTitle } from "./workspace/titles.ts";
 
 /** Titles are often a session's whole first prompt: agents get them cut short. */

@@ -9,18 +9,18 @@ import { loadAttention } from "./bridge/index.ts";
 import { prepareClaudeMod } from "./bridge/wiring.ts";
 import { accessToken, HOST, PORT } from "./config.ts";
 import { panels } from "./db.ts";
-import { startDecisions } from "./decisions.ts";
-import { startFindings } from "./findings.ts";
-import { startHandoffs } from "./handoffs.ts";
+import { startDecisions } from "./coordination/decisions.ts";
+import { startFindings } from "./coordination/findings.ts";
+import { startHandoffs } from "./coordination/handoffs.ts";
 import { disconnectAll } from "./customize/mcp.ts";
-import { startOverlaps } from "./overlaps.ts";
-import { startOwners } from "./owners.ts";
+import { startOverlaps } from "./coordination/overlaps.ts";
+import { startOwners } from "./coordination/owners.ts";
 import { resumeRuns } from "./sprockets/runs.ts";
-import { startShellEdits } from "./shellEdits.ts";
-import { startSuggestions } from "./suggestions.ts";
+import { startShellEdits } from "./coordination/shellEdits.ts";
+import { startSuggestions } from "./coordination/suggestions.ts";
 import { TerminalHub } from "./workspace/terminals.ts";
 import { version as tmuxVersion } from "./workspace/tmux.ts";
-import { startWatches } from "./watches.ts";
+import { startWatches } from "./coordination/watches.ts";
 
 const hub = new TerminalHub();
 // After "sign out everywhere", close every connection; browsers with the new token reconnect. The delay

@@ -14,13 +14,13 @@
 // A turn that ends without a question also wakes the Coordinator for each handoff waiting on that session
 // (ADR 0015, handoffs.ts).
 import type { Panel, SessionQuestion, SprocketEvent } from "@rails/shared";
-import { ASKING, type SessionEvent } from "./bridge/events.ts";
-import { onEvents, onPanelForgotten } from "./bridge/index.ts";
-import { handoffs, panels, sprockets, type StoredHandoff } from "./db.ts";
+import { ASKING, type SessionEvent } from "../bridge/events.ts";
+import { onEvents, onPanelForgotten } from "../bridge/index.ts";
+import { handoffs, panels, sprockets, type StoredHandoff } from "../db.ts";
 import { end as endHandoff, followSessions } from "./handoffs.ts";
-import { postEvent } from "./sprockets/sprockets.ts";
-import { sessionTitle } from "./workspace/titles.ts";
-import { listeners } from "./util.ts";
+import { postEvent } from "../sprockets/sprockets.ts";
+import { sessionTitle } from "../workspace/titles.ts";
+import { listeners } from "../util.ts";
 
 /** How long the user has to answer a session themselves before its Coordinator wakes. */
 export const GRACE_MS = 20_000;

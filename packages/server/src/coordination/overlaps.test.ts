@@ -1,13 +1,13 @@
 import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { OVERLAP_MS } from "./bridge/board.ts";
-import { forgetPanel, receive } from "./bridge/index.ts";
-import { panels, projects, settings } from "./db.ts";
-import { models, refOf } from "./settings/models.ts";
+import { OVERLAP_MS } from "../bridge/board.ts";
+import { forgetPanel, receive } from "../bridge/index.ts";
+import { panels, projects, settings } from "../db.ts";
+import { models, refOf } from "../settings/models.ts";
 import { setOwner } from "./owners.ts";
 import { BATCH_MS, OverlapWakes, overlapList, startOverlaps } from "./overlaps.ts";
-import { idle } from "./sprockets/runs.ts";
-import { createSprocket, directChat, listMessages, projectChat, updateSettings } from "./sprockets/sprockets.ts";
+import { idle } from "../sprockets/runs.ts";
+import { createSprocket, directChat, listMessages, projectChat, updateSettings } from "../sprockets/sprockets.ts";
 
 const look = { character: "cog", color: "green", accessory: "none" } as const;
 

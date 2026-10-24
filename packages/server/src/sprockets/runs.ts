@@ -40,7 +40,7 @@ import { listSkills } from "../customize/skills.ts";
 import { serversFor } from "../customize/mcp.ts";
 import { askUserCapability, nothingNewCapability, passTurnCapability, sendMessageCapability, type TurnEnd } from "../harness/turns.ts";
 import { findModel, models } from "../settings/models.ts";
-import { projectOwners } from "../owners.ts";
+import { projectOwners } from "../coordination/owners.ts";
 import { resendWhenSilent } from "./resend.ts";
 import { sessionTitle } from "../workspace/titles.ts";
 import { handOnNudge, nudge, roundNow, severalEvents, systemPrompt, TEXTING_NOW, toLlm, whyNow } from "./prompt.ts";

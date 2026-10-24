@@ -1,12 +1,12 @@
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { forgetPanel, receive } from "./bridge/index.ts";
-import { panels, projects, settings } from "./db.ts";
-import { models, refOf } from "./settings/models.ts";
+import { forgetPanel, receive } from "../bridge/index.ts";
+import { panels, projects, settings } from "../db.ts";
+import { models, refOf } from "../settings/models.ts";
 import { BATCH_MS, startOverlaps } from "./overlaps.ts";
 import { ownedPath, ownerOf, projectOwners, setOwner, startOwners } from "./owners.ts";
-import { idle } from "./sprockets/runs.ts";
-import { createSprocket, listMessages, projectChat, listSprockets, sendMessage, updateSettings } from "./sprockets/sprockets.ts";
+import { idle } from "../sprockets/runs.ts";
+import { createSprocket, listMessages, projectChat, listSprockets, sendMessage, updateSettings } from "../sprockets/sprockets.ts";
 
 const look = { character: "cog", color: "green", accessory: "none" } as const;
 const faux = fauxProvider();

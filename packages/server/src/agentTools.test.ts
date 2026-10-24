@@ -8,10 +8,10 @@ import { mcpRequest, messageFromAgent, neighboursText, waitForSession } from "./
 import { forgetPanel, receive } from "./bridge/index.ts";
 import { panels, projects, settings, suggestions } from "./db.ts";
 import { models, refOf } from "./settings/models.ts";
-import { setOwner } from "./owners.ts";
+import { setOwner } from "./coordination/owners.ts";
 import { idle } from "./sprockets/runs.ts";
 import { createSprocket, listMessages, projectChat, sendMessage, updateSettings } from "./sprockets/sprockets.ts";
-import { dismissSuggestion, sendSuggestion, suggest, SUGGESTION_MAX } from "./suggestions.ts";
+import { dismissSuggestion, sendSuggestion, suggest, SUGGESTION_MAX } from "./coordination/suggestions.ts";
 
 const faux = fauxProvider();
 models.setProvider(faux.provider);

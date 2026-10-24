@@ -9,9 +9,9 @@ import type { Panel, Project, SessionQuestion, Sprocket, SprocketEvent } from "@
 import { receive, record } from "../../packages/server/src/bridge/index.ts";
 import { fromCodex } from "../../packages/server/src/bridge/events.ts";
 import { panels, projects, sprocketMessages, suggestions, usage } from "../../packages/server/src/db.ts";
-import { planHandoff } from "../../packages/server/src/handoffs.ts";
-import { suggest } from "../../packages/server/src/suggestions.ts";
-import { setOwner } from "../../packages/server/src/owners.ts";
+import { planHandoff } from "../../packages/server/src/coordination/handoffs.ts";
+import { suggest } from "../../packages/server/src/coordination/suggestions.ts";
+import { setOwner } from "../../packages/server/src/coordination/owners.ts";
 import { createSprocket, listMessages, postEvent, projectChat, sendMessage, updateSettings } from "../../packages/server/src/sprockets/sprockets.ts";
 import { sessionTitle } from "../../packages/server/src/workspace/titles.ts";
 

@@ -2,14 +2,14 @@
 // (no decision model needed); the decision model only judges the same in shadow.
 import { fauxProvider } from "@earendil-works/pi-ai";
 import { beforeEach, describe, expect, it } from "vitest";
-import { messageFromAgent } from "./agentTools.ts";
-import { receive } from "./bridge/index.ts";
-import { panels, projects, settings } from "./db.ts";
+import { messageFromAgent } from "../agentTools.ts";
+import { receive } from "../bridge/index.ts";
+import { panels, projects, settings } from "../db.ts";
 import { findingToJudge } from "./decisions.ts";
 import { findingsIn, noteFinding } from "./findings.ts";
-import { models, refOf } from "./settings/models.ts";
+import { models, refOf } from "../settings/models.ts";
 import { setOwner } from "./owners.ts";
-import { createSprocket, listMessages, projectChat, updateSettings } from "./sprockets/sprockets.ts";
+import { createSprocket, listMessages, projectChat, updateSettings } from "../sprockets/sprockets.ts";
 
 const faux = fauxProvider();
 models.setProvider(faux.provider);

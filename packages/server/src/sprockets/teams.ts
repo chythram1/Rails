@@ -7,7 +7,7 @@ import { sprocketChats, sprocketMessages, sprockets, suggestions, type StoredCha
 import { ServiceError } from "../errors.ts";
 import { answerWaiting, cancelRuns, chatTurns, requestReply } from "./runs.ts";
 import { waitingAsks } from "./rounds.ts";
-import { expireInChat } from "../suggestions.ts";
+import { expireInChat } from "../coordination/suggestions.ts";
 import { listeners } from "../util.ts";
 
 const MAX_NAME = 40;

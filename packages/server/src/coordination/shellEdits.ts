@@ -13,9 +13,9 @@ import { execFile } from "node:child_process";
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { Panel } from "@rails/shared";
-import { MAX_FILES } from "./bridge/events.ts";
-import { cardOf, onPanelForgotten, onShellCall, record } from "./bridge/index.ts";
-import { panels, projects } from "./db.ts";
+import { MAX_FILES } from "../bridge/events.ts";
+import { cardOf, onPanelForgotten, onShellCall, record } from "../bridge/index.ts";
+import { panels, projects } from "../db.ts";
 
 /** Longest command whose changes count: longer ones would collect other sessions' edits too. */
 const MAX_WINDOW_MS = 60_000;

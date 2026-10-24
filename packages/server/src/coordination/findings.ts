@@ -17,13 +17,13 @@
 // RAILS_DECISIONS=shadow), the rule decides: at worst a wake comes a few seconds later.
 import { basename } from "node:path";
 import type { Panel, SprocketEvent } from "@rails/shared";
-import { OVERLAP_MS, rel } from "./bridge/board.ts";
-import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
-import type { SessionEvent } from "./bridge/events.ts";
-import { handoffs, panels, projects, sessionEvents, sprockets, suggestions } from "./db.ts";
+import { OVERLAP_MS, rel } from "../bridge/board.ts";
+import { cardOf, onEvents, onPanelForgotten } from "../bridge/index.ts";
+import type { SessionEvent } from "../bridge/events.ts";
+import { handoffs, panels, projects, sessionEvents, sprockets, suggestions } from "../db.ts";
 import { ownedPath, ownerOf, projectOwners } from "./owners.ts";
-import { postEvent } from "./sprockets/sprockets.ts";
-import { sessionTitle } from "./workspace/titles.ts";
+import { postEvent } from "../sprockets/sprockets.ts";
+import { sessionTitle } from "../workspace/titles.ts";
 import { looksLikeQuestion } from "./watches.ts";
 
 /** How much of the reply's end the event keeps. */

@@ -7,9 +7,9 @@ import { HANDOFF_NOTE_MAX } from "@rails/shared";
 import { Type } from "@earendil-works/pi-ai";
 import { cardOf } from "../bridge/index.ts";
 import { handoffs, panels, sprockets, suggestions, type StoredHandoff } from "../db.ts";
-import { completeHandoff, dropHandoff, findHandoff, HANDOFF_TTL_MS, planHandoff } from "../handoffs.ts";
-import { MAX_OWNED, setOwner } from "../owners.ts";
-import { MAX_PENDING_MESSAGES, suggest, SUGGESTION_MAX, type Purpose } from "../suggestions.ts";
+import { completeHandoff, dropHandoff, findHandoff, HANDOFF_TTL_MS, planHandoff } from "../coordination/handoffs.ts";
+import { MAX_OWNED, setOwner } from "../coordination/owners.ts";
+import { MAX_PENDING_MESSAGES, suggest, SUGGESTION_MAX, type Purpose } from "../coordination/suggestions.ts";
 import type { Capability, RunContext } from "./capabilities.ts";
 import { findOpen, session } from "./project.ts";
 

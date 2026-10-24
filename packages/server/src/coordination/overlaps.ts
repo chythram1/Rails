@@ -8,13 +8,13 @@
 // change. An edit to files another live session owns (owners.ts, ADR 0016) wakes the Coordinator the same way,
 // marked as theirs, whether or not the owner changed them lately; tabs are marked only for real overlaps.
 import type { PanelOverlap, SprocketEvent } from "@rails/shared";
-import { OVERLAP_MS, rel, sharedFiles } from "./bridge/board.ts";
-import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
-import { panels, projects, sprockets } from "./db.ts";
-import { postEvent } from "./sprockets/sprockets.ts";
+import { OVERLAP_MS, rel, sharedFiles } from "../bridge/board.ts";
+import { cardOf, onEvents, onPanelForgotten } from "../bridge/index.ts";
+import { panels, projects, sprockets } from "../db.ts";
+import { postEvent } from "../sprockets/sprockets.ts";
 import { ownerOf } from "./owners.ts";
-import { listeners } from "./util.ts";
-import { sessionTitle } from "./workspace/titles.ts";
+import { listeners } from "../util.ts";
+import { sessionTitle } from "../workspace/titles.ts";
 
 /** How long a session's burst of edits is gathered into one wake. */
 export const BATCH_MS = 15_000;

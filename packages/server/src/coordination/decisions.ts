@@ -16,17 +16,17 @@
 //   one, and not if the session moved on while it was asked. `RAILS_DECISIONS=shadow` keeps it to judging.
 import type { ClassifierAnswer, ClassifierContext, ClassifierQuestion } from "@earendil-works/pi-ai";
 import { DECISION_THRESHOLD, type DecisionEntry, type DecisionLog, type Panel } from "@rails/shared";
-import { AGENT, OVERLAP_MS, rel } from "./bridge/board.ts";
-import { ASKING, type SessionEvent } from "./bridge/events.ts";
-import { cardOf, onEvents } from "./bridge/index.ts";
-import { decisions, panels, projects, settings, sprockets } from "./db.ts";
+import { AGENT, OVERLAP_MS, rel } from "../bridge/board.ts";
+import { ASKING, type SessionEvent } from "../bridge/events.ts";
+import { cardOf, onEvents } from "../bridge/index.ts";
+import { decisions, panels, projects, settings, sprockets } from "../db.ts";
 import { findingsIn, setFindingJudge, type FindingVerdict } from "./findings.ts";
 import { projectOwners } from "./owners.ts";
-import { ServiceError } from "./errors.ts";
-import { decisionsInShadow } from "./config.ts";
-import { classifierChoices, decisionThreshold, findClassifier, models, modelsChanged } from "./settings/models.ts";
-import { listeners } from "./util.ts";
-import { sessionTitle } from "./workspace/titles.ts";
+import { ServiceError } from "../errors.ts";
+import { decisionsInShadow } from "../config.ts";
+import { classifierChoices, decisionThreshold, findClassifier, models, modelsChanged } from "../settings/models.ts";
+import { listeners } from "../util.ts";
+import { sessionTitle } from "../workspace/titles.ts";
 import { eventPosition, looksLikeQuestion, onWake, wakeFromModel, type Wake } from "./watches.ts";
 
 /** How much of a message's end the model sees. */

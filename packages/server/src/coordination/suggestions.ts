@@ -5,14 +5,14 @@
 // again when the user sends. An answer expires as soon as its session moves on (a new prompt, a tool, the
 // dialog answered); a message doesn't, and a busy session gets it in its own queue, after its current turn.
 import { shortTitle, type Panel, type Suggestion } from "@rails/shared";
-import { AGENT, type SessionCard } from "./bridge/board.ts";
-import { claudeInbox, deliver, piInbox } from "./bridge/deliver.ts";
-import { steerCodex } from "./bridge/codex.ts";
-import { ASKING, type SessionEvent } from "./bridge/events.ts";
-import { cardOf, onEvents, onPanelForgotten, onReturned } from "./bridge/index.ts";
-import { panels, sessionEvents, sprockets, suggestions } from "./db.ts";
-import { ServiceError } from "./errors.ts";
-import { listeners } from "./util.ts";
+import { AGENT, type SessionCard } from "../bridge/board.ts";
+import { claudeInbox, deliver, piInbox } from "../bridge/deliver.ts";
+import { steerCodex } from "../bridge/codex.ts";
+import { ASKING, type SessionEvent } from "../bridge/events.ts";
+import { cardOf, onEvents, onPanelForgotten, onReturned } from "../bridge/index.ts";
+import { panels, sessionEvents, sprockets, suggestions } from "../db.ts";
+import { ServiceError } from "../errors.ts";
+import { listeners } from "../util.ts";
 
 /** Longest reply a Coordinator may suggest. */
 export const SUGGESTION_MAX = 2000;

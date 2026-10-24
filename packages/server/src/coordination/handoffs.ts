@@ -9,11 +9,11 @@
 // Its sessions' titles are kept current: a handoff is often planned before a session has a title of its own.
 // (The capabilities use this module, so it doesn't import sprockets.ts, which imports the runs.)
 import { HANDOFF_NOTE_MAX, type Panel } from "@rails/shared";
-import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
-import { handoffs, panels, sessionEvents, sprocketChats, sprocketMessages, sprockets, type StoredHandoff } from "./db.ts";
-import { ServiceError } from "./errors.ts";
-import { sessionTitle } from "./workspace/titles.ts";
-import { listeners } from "./util.ts";
+import { cardOf, onEvents, onPanelForgotten } from "../bridge/index.ts";
+import { handoffs, panels, sessionEvents, sprocketChats, sprocketMessages, sprockets, type StoredHandoff } from "../db.ts";
+import { ServiceError } from "../errors.ts";
+import { sessionTitle } from "../workspace/titles.ts";
+import { listeners } from "../util.ts";
 
 /** How long a handoff waits for its session to finish. */
 export const HANDOFF_TTL_MS = 24 * 3600_000;
