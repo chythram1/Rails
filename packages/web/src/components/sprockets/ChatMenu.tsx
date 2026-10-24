@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { IconRotate as StartOver } from "@tabler/icons-react";
 import { api } from "../../api.ts";
-import { ConfirmDialog } from "../ConfirmDialog.tsx";
+import { ConfirmDialog } from "../ui/ConfirmDialog.tsx";
 
 /**
  * A chat's Clear chat button (ADR 0021), an arrow going round (it starts the chat over), confirmed. Clearing deletes its messages for every device; the Sprocket

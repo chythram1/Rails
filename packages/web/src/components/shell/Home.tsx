@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { IconFolderPlus as FolderPlus } from "@tabler/icons-react";
 import type { ProviderId } from "@rails/shared";
-import { api } from "../api.ts";
-import { href, navigate } from "../router.ts";
-import { useStore } from "../store.tsx";
-import { providerLabel } from "../util.ts";
-import { Composer } from "./Composer.tsx";
-import { Dropdown } from "./Dropdown.tsx";
+import { api } from "../../api.ts";
+import { href, navigate } from "../../router.ts";
+import { useStore } from "../../store.tsx";
+import { providerLabel } from "../../util.ts";
+import { Composer } from "../ui/Composer.tsx";
+import { Dropdown } from "../ui/Dropdown.tsx";
 import { FolderMenu } from "./FolderMenu.tsx";
-import { SavedPromptsMenu } from "./customize/SavedPromptsMenu.tsx";
-import { ProviderIcon } from "./ProviderIcon.tsx";
+import { SavedPromptsMenu } from "../customize/SavedPromptsMenu.tsx";
+import { ProviderIcon } from "../ui/ProviderIcon.tsx";
 
 export function Home({ promptId }: { promptId?: string }) {
   const { projects, providers, picking, savedPrompts } = useStore();

@@ -1,7 +1,7 @@
 import { sessionKey, type SprocketMessage } from "@rails/shared";
 import { href } from "../../router.ts";
 import { shortTitle } from "../../util.ts";
-import { PanelIcon } from "../PanelMenu.tsx";
+import { PanelIcon } from "../workspace/PanelMenu.tsx";
 
 /**
  * A session waiting for the user, as Rails puts it in its Coordinator's chat (server watches.ts): which

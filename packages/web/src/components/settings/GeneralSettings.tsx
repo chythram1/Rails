@@ -3,7 +3,7 @@ import { IconDeviceDesktop as Desktop, IconMoon as Moon, IconSun as Sun } from "
 import type { ServerInfo } from "@rails/shared";
 import { api } from "../../api.ts";
 import { useAppearance, type Appearance } from "../../theme.ts";
-import { Segmented } from "../Segmented.tsx";
+import { Segmented } from "../ui/Segmented.tsx";
 
 const THEMES: { value: Appearance; label: string; icon: React.ReactNode }[] = [
   { value: "light", label: "Light", icon: <Sun size={15} aria-hidden /> },

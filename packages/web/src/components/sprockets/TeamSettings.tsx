@@ -4,7 +4,7 @@ import { TEAM_MEMBERS_MIN, type Sprocket as SprocketData, type SprocketTeam } fr
 import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
 import { useStore } from "../../store.tsx";
-import { ConfirmDialog } from "../ConfirmDialog.tsx";
+import { ConfirmDialog } from "../ui/ConfirmDialog.tsx";
 import { MemberSlots, TEAM_NAME_MAX } from "./TeamDialog.tsx";
 
 /** The button that opens and closes a team's settings panel, as a Sprocket's PanelToggle does. */

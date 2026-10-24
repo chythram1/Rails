@@ -4,8 +4,8 @@ import type { Project, Sprocket as SprocketData, SprocketChatInfo, SprocketTeam 
 import { href, navigate, type Route } from "../../router.ts";
 import { useStore } from "../../store.tsx";
 import { timeAgo } from "../../util.ts";
-import { MenuButton } from "../Menu.tsx";
-import { fetchModelSettings } from "../ModelSelect.tsx";
+import { MenuButton } from "../ui/Menu.tsx";
+import { fetchModelSettings } from "../ui/ModelSelect.tsx";
 import { TeamDialog } from "./TeamDialog.tsx";
 import { TeamSettings } from "./TeamSettings.tsx";
 import { TeamFace } from "./TeamFace.tsx";

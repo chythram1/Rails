@@ -1,8 +1,8 @@
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import type { RecentFolder } from "@rails/shared";
-import { api } from "../api.ts";
-import { useStore } from "../store.tsx";
-import { usePopover } from "./Menu.tsx";
+import { api } from "../../api.ts";
+import { useStore } from "../../store.tsx";
+import { usePopover } from "../ui/Menu.tsx";
 
 // Last list from the server, so the menu shows folders instantly while it refreshes. Prefetched when the
 // pointer reaches the trigger, so even the first open isn't empty.

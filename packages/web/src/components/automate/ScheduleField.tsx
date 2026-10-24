@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { AUTOMATION_MIN_MINUTES, scheduleText, type AutomationSchedule } from "@rails/shared";
-import { Dropdown } from "../Dropdown.tsx";
-import { Segmented } from "../Segmented.tsx";
+import { Dropdown } from "../ui/Dropdown.tsx";
+import { Segmented } from "../ui/Segmented.tsx";
 
 type Kind = AutomationSchedule["kind"];
 const KINDS: { value: Kind; label: string }[] = [

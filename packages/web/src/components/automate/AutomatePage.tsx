@@ -22,10 +22,10 @@ import { AUTOMATION_RECENT, scheduleText, type Automation, type AutomationOutcom
 import { api } from "../../api.ts";
 import { href, type Route } from "../../router.ts";
 import { timeAgo } from "../../util.ts";
-import { useConfirm } from "../ConfirmDialog.tsx";
-import { MenuButton } from "../Menu.tsx";
-import { useModelSettings } from "../ModelSelect.tsx";
-import { PageNav } from "../PageNav.tsx";
+import { useConfirm } from "../ui/ConfirmDialog.tsx";
+import { MenuButton } from "../ui/Menu.tsx";
+import { useModelSettings } from "../ui/ModelSelect.tsx";
+import { PageNav } from "../ui/PageNav.tsx";
 import { useStore } from "../../store.tsx";
 import { Sprocket } from "../sprockets/Sprocket.tsx";
 import { useSprockets } from "../sprockets/useSprockets.ts";

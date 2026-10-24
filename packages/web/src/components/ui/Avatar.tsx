@@ -1,12 +1,12 @@
 import type { ProfileAvatar } from "@rails/shared";
-import burst from "../assets/avatars/six-ray-burst.svg";
-import crown from "../assets/avatars/crown.svg";
-import paths from "../assets/avatars/interlocking-paths.svg";
-import petals from "../assets/avatars/four-petals.svg";
-import shield from "../assets/avatars/split-shield.svg";
-import sparkle from "../assets/avatars/sparkle.svg";
-import spiral from "../assets/avatars/interlocking-spiral.svg";
-import squares from "../assets/avatars/linked-squares.svg";
+import burst from "../../assets/avatars/six-ray-burst.svg";
+import crown from "../../assets/avatars/crown.svg";
+import paths from "../../assets/avatars/interlocking-paths.svg";
+import petals from "../../assets/avatars/four-petals.svg";
+import shield from "../../assets/avatars/split-shield.svg";
+import sparkle from "../../assets/avatars/sparkle.svg";
+import spiral from "../../assets/avatars/interlocking-spiral.svg";
+import squares from "../../assets/avatars/linked-squares.svg";
 
 const IMAGES: Record<ProfileAvatar, string> = {
   "interlocking-spiral": spiral,

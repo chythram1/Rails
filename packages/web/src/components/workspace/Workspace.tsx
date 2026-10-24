@@ -12,15 +12,15 @@ import {
 import "dockview-react/dist/styles/dockview.css";
 import { IconAlertTriangle as Warning, IconLayoutSidebarRight as PanelRight, IconX as X } from "@tabler/icons-react";
 import { parseSessionKey, sessionKey, type Panel, type PanelKind } from "@rails/shared";
-import { api } from "../api.ts";
-import { href, navigate } from "../router.ts";
-import { useStore } from "../store.tsx";
-import { shortTitle } from "../util.ts";
+import { api } from "../../api.ts";
+import { href, navigate } from "../../router.ts";
+import { useStore } from "../../store.tsx";
+import { shortTitle } from "../../util.ts";
 import { SidePanel, type SideView } from "./SidePanel.tsx";
-import { useSprockets } from "./sprockets/useSprockets.ts";
+import { useSprockets } from "../sprockets/useSprockets.ts";
 import { PanelIcon, PanelMenu } from "./PanelMenu.tsx";
 import { RenameSession, type Renaming } from "./RenameSession.tsx";
-import { onTabKeys } from "./tabKeys.ts";
+import { onTabKeys } from "../ui/tabKeys.ts";
 import { TerminalView } from "./TerminalView.tsx";
 import { useWorkspace, type WorkspaceState } from "./useWorkspace.ts";
 

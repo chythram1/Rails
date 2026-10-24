@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Panel, PanelKind, Workspace } from "@rails/shared";
-import { api } from "../api.ts";
-import { useStore } from "../store.tsx";
-import { socket } from "../ws.ts";
+import { api } from "../../api.ts";
+import { useStore } from "../../store.tsx";
+import { socket } from "../../ws.ts";
 
 /**
  * A project's panels, as the server reports them. The server list is the source of truth; the

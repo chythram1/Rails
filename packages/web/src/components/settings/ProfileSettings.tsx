@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from
 import { IconCheck as Check, IconPencil as Pencil } from "@tabler/icons-react";
 import { PROFILE_AVATARS, PROFILE_NAME_MAX, type ProfileAvatar } from "@rails/shared";
 import { useStore } from "../../store.tsx";
-import { Avatar, AVATAR_LABELS } from "../Avatar.tsx";
+import { Avatar, AVATAR_LABELS } from "../ui/Avatar.tsx";
 
 /**
  * Settings → Account → Profile (Claude's Profile rows): the avatar and name at the foot of the sidebar,

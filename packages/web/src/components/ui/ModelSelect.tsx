@@ -1,6 +1,6 @@
 import { useLive } from "./useLive.ts";
 import type { ModelSettings } from "@rails/shared";
-import { api } from "../api.ts";
+import { api } from "../../api.ts";
 import { Dropdown, type DropdownOption } from "./Dropdown.tsx";
 
 /**

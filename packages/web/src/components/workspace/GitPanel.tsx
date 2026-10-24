@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { IconRefresh as RefreshCw } from "@tabler/icons-react";
 import type { GitStatus } from "@rails/shared";
-import { api } from "../api.ts";
+import { api } from "../../api.ts";
 
 /** The side panel's Git tab (SidePanel.tsx): the branch, changed files and a file's diff. */
 export function GitPanel({ projectId, refreshKey }: { projectId: string; refreshKey: string }) {

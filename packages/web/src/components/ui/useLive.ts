@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ServerMsg } from "@rails/shared";
-import { socket } from "../ws.ts";
+import { socket } from "../../ws.ts";
 
 /**
  * Something from the server, kept current: loaded now, again whenever `changes` says a server message changed it

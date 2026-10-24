@@ -3,9 +3,9 @@ import { IconDots as Dots } from "@tabler/icons-react";
 import { SAVED_PROMPT_NAME_MAX, SAVED_PROMPT_TEXT_MAX, type SavedPrompt, type SavedPromptInput } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
-import { MenuButton } from "../Menu.tsx";
+import { MenuButton } from "../ui/Menu.tsx";
 import { EditorHead, LongText, TextInput } from "./fields.tsx";
-import { useConfirm } from "../ConfirmDialog.tsx";
+import { useConfirm } from "../ui/ConfirmDialog.tsx";
 
 /** One saved prompt: its name and its text. Home's composer lists them to fill in. */
 export function PromptEditor({ prompt }: { prompt: SavedPrompt }) {

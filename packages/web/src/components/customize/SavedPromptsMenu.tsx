@@ -1,7 +1,7 @@
 import { IconMessage as Message } from "@tabler/icons-react";
 import { href, navigate } from "../../router.ts";
 import { useStore } from "../../store.tsx";
-import { MenuButton, type MenuItem } from "../Menu.tsx";
+import { MenuButton, type MenuItem } from "../ui/Menu.tsx";
 
 /**
  * The saved prompts (Customize, ADR 0020) as a menu inside a composer: picking one hands its text to `onPick`

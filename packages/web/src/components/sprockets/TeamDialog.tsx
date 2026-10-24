@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { IconPlus as Plus, IconStarFilled as Star } from "@tabler/icons-react";
 import { TEAM_MEMBERS_MAX, TEAM_MEMBERS_MIN, type Project, type Sprocket as SprocketData, type SprocketTeam } from "@rails/shared";
 import { api } from "../../api.ts";
-import { MenuButton } from "../Menu.tsx";
+import { MenuButton } from "../ui/Menu.tsx";
 import { Sprocket } from "./Sprocket.tsx";
 
 export const TEAM_NAME_MAX = 40;

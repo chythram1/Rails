@@ -1,8 +1,8 @@
 import type { ProviderId } from "@rails/shared";
-import claude from "../assets/providers/claude.svg";
-import codex from "../assets/providers/codex.svg";
-import pi from "../assets/providers/pi.svg";
-import { providerLabel } from "../util.ts";
+import claude from "../../assets/providers/claude.svg";
+import codex from "../../assets/providers/codex.svg";
+import pi from "../../assets/providers/pi.svg";
+import { providerLabel } from "../../util.ts";
 
 // Sources and licenses: assets/providers/README.md
 const icons: Record<ProviderId, string> = { claude, codex, pi };

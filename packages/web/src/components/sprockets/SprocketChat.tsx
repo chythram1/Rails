@@ -4,7 +4,7 @@ import { TEAM_TURNS_MAX, findMentions, type Sprocket as SprocketData, type Sproc
 import { api } from "../../api.ts";
 import { href } from "../../router.ts";
 import { socket } from "../../ws.ts";
-import { Composer } from "../Composer.tsx";
+import { Composer } from "../ui/Composer.tsx";
 import { SavedPromptsMenu } from "../customize/SavedPromptsMenu.tsx";
 import { useStore } from "../../store.tsx";
 import { ChatMenu } from "./ChatMenu.tsx";

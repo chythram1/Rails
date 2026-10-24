@@ -13,15 +13,15 @@ import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
 import { useStore } from "../../store.tsx";
 import { shortTitle } from "../../util.ts";
-import { Dropdown } from "../Dropdown.tsx";
-import { Switch } from "../Switch.tsx";
-import { PanelIcon } from "../PanelMenu.tsx";
-import { ModelSelect, useModelSettings } from "../ModelSelect.tsx";
+import { Dropdown } from "../ui/Dropdown.tsx";
+import { Switch } from "../ui/Switch.tsx";
+import { PanelIcon } from "../workspace/PanelMenu.tsx";
+import { ModelSelect, useModelSettings } from "../ui/ModelSelect.tsx";
 import { useOpenSettings } from "../settings/context.ts";
-import { useAutoGrow } from "../useAutoGrow.ts";
+import { useAutoGrow } from "../ui/useAutoGrow.ts";
 import { ConnectorLogo } from "../customize/ConnectorLogo.tsx";
-import { useConfirm } from "../ConfirmDialog.tsx";
-import { onTabKeys } from "../tabKeys.ts";
+import { useConfirm } from "../ui/ConfirmDialog.tsx";
+import { onTabKeys } from "../ui/tabKeys.ts";
 
 /**
  * The button that opens and closes a Sprocket's settings panel. It sits at the right end of the chat header,

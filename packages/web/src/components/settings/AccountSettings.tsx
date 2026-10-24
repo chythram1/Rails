@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ServerInfo } from "@rails/shared";
 import { api } from "../../api.ts";
 import { ProfileSettings } from "./ProfileSettings.tsx";
-import { useConfirm } from "../ConfirmDialog.tsx";
+import { useConfirm } from "../ui/ConfirmDialog.tsx";
 
 /**
  * Settings → Account: the profile (ProfileSettings.tsx), then access. Rails has one user and one access

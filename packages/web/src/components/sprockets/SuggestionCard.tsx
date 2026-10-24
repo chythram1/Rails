@@ -4,8 +4,8 @@ import { sessionKey, type Suggestion } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href } from "../../router.ts";
 import { shortTitle } from "../../util.ts";
-import { PanelIcon } from "../PanelMenu.tsx";
-import { useAutoGrow } from "../useAutoGrow.ts";
+import { PanelIcon } from "../workspace/PanelMenu.tsx";
+import { useAutoGrow } from "../ui/useAutoGrow.ts";
 
 /**
  * What a Coordinator drafts for a session, under its message (server suggestions.ts, ADR 0010): an answer to

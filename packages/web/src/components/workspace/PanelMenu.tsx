@@ -1,9 +1,9 @@
 import { IconPlus as Plus, IconTerminal2 as SquareTerminal } from "@tabler/icons-react";
 import type { PanelKind, ProviderId } from "@rails/shared";
-import { useStore } from "../store.tsx";
-import { providerLabel } from "../util.ts";
-import { MenuButton, type MenuItem } from "./Menu.tsx";
-import { ProviderIcon } from "./ProviderIcon.tsx";
+import { useStore } from "../../store.tsx";
+import { providerLabel } from "../../util.ts";
+import { MenuButton, type MenuItem } from "../ui/Menu.tsx";
+import { ProviderIcon } from "../ui/ProviderIcon.tsx";
 
 const AGENTS: { id: ProviderId; key: string }[] = [
   { id: "claude", key: "c" },

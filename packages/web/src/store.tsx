@@ -3,7 +3,7 @@ import type { AttentionReason, McpApp, McpServer, PanelOverlap, Profile, Profile
 import { api } from "./api.ts";
 import { href, navigate } from "./router.ts";
 import { socket } from "./ws.ts";
-import { showNotice } from "./components/ConfirmDialog.tsx";
+import { showNotice } from "./components/ui/ConfirmDialog.tsx";
 
 interface Store {
   projects: Project[];

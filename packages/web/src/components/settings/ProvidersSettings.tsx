@@ -3,8 +3,8 @@ import { IconCheck as Check } from "@tabler/icons-react";
 import type { ModelProvider, SignIn } from "@rails/shared";
 import { api } from "../../api.ts";
 import { socket } from "../../ws.ts";
-import { useModelSettings } from "../ModelSelect.tsx";
-import { useConfirm } from "../ConfirmDialog.tsx";
+import { useModelSettings } from "../ui/ModelSelect.tsx";
+import { useConfirm } from "../ui/ConfirmDialog.tsx";
 
 /**
  * Settings → Providers (ADR 0006): the services Sprockets and the decision model run on, each connected with an

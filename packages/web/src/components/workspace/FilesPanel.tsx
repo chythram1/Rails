@@ -8,7 +8,7 @@ import {
   IconRefresh as RefreshCw,
 } from "@tabler/icons-react";
 import type { FileEntry, FolderListing, GitState } from "@rails/shared";
-import { api } from "../api.ts";
+import { api } from "../../api.ts";
 import { diffLineClass } from "./GitPanel.tsx";
 
 /** How often the tree looks again while it's shown, so agents' edits show up. */

@@ -4,10 +4,10 @@ import { AUTOMATION_NAME_MAX, AUTOMATION_PROMPT_MAX, type Automation, type Autom
 import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
 import { timeAgo } from "../../util.ts";
-import { useConfirm } from "../ConfirmDialog.tsx";
-import { Dropdown } from "../Dropdown.tsx";
-import { MenuButton } from "../Menu.tsx";
-import { Switch } from "../Switch.tsx";
+import { useConfirm } from "../ui/ConfirmDialog.tsx";
+import { Dropdown } from "../ui/Dropdown.tsx";
+import { MenuButton } from "../ui/Menu.tsx";
+import { Switch } from "../ui/Switch.tsx";
 import { EditorHead, LongText, TextInput } from "../customize/fields.tsx";
 import { sprocketOptions } from "./NewAutomation.tsx";
 import { ScheduleField } from "./ScheduleField.tsx";

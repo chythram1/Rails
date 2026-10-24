@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../../api.ts";
-import { ModelSelect, useModelSettings } from "../ModelSelect.tsx";
+import { ModelSelect, useModelSettings } from "../ui/ModelSelect.tsx";
 import { useOpenSettings } from "./context.ts";
 import { DecisionsSettings } from "./DecisionsSettings.tsx";
 

@@ -1,6 +1,6 @@
 import { IconCircle as Todo, IconCircleCheckFilled as Done, IconProgress as Doing } from "@tabler/icons-react";
 import type { CardBlock, CheckState, SprocketCard } from "@rails/shared";
-import { diffLineClass } from "../GitPanel.tsx";
+import { diffLineClass } from "../workspace/GitPanel.tsx";
 import { CardActions } from "./CardActions.tsx";
 
 /**

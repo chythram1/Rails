@@ -3,9 +3,9 @@ import { IconChevronRight as ChevronRight } from "@tabler/icons-react";
 import { DECISION_THRESHOLD, type DecisionEntry, type DecisionLog, type ModelSettings } from "@rails/shared";
 import { api } from "../../api.ts";
 import { timeAgo } from "../../util.ts";
-import { Dropdown } from "../Dropdown.tsx";
-import { useLive } from "../useLive.ts";
-import { PanelIcon } from "../PanelMenu.tsx";
+import { Dropdown } from "../ui/Dropdown.tsx";
+import { useLive } from "../ui/useLive.ts";
+import { PanelIcon } from "../workspace/PanelMenu.tsx";
 import { useOpenSettings } from "./context.ts";
 
 /**

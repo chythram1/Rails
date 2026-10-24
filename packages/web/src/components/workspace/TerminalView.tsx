@@ -3,7 +3,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
-import { socket } from "../ws.ts";
+import { socket } from "../../ws.ts";
 
 /** While a terminal is being resized (e.g. a divider drag), it refits at most this often (see below). */
 const RESIZE_THROTTLE_MS = 100;

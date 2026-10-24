@@ -7,7 +7,7 @@ import {
   IconUserCircle as UserCircle,
   IconX as X,
 } from "@tabler/icons-react";
-import { useModelSettings } from "../ModelSelect.tsx";
+import { useModelSettings } from "../ui/ModelSelect.tsx";
 import { AccountSettings } from "./AccountSettings.tsx";
 import { GeneralSettings } from "./GeneralSettings.tsx";
 import { ModelsSettings } from "./ModelsSettings.tsx";

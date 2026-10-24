@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AUTOMATION_NAME_MAX, AUTOMATION_PROMPT_MAX, type AutomationSchedule, type McpServer, type Sprocket as SprocketData } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
-import { Dropdown } from "../Dropdown.tsx";
+import { Dropdown } from "../ui/Dropdown.tsx";
 import { EditorHead } from "../customize/fields.tsx";
 import { Sprocket } from "../sprockets/Sprocket.tsx";
 import { ScheduleField } from "./ScheduleField.tsx";

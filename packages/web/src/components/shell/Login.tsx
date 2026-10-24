@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "../api.ts";
+import { api } from "../../api.ts";
 
 export function Login({ onDone }: { onDone: () => void }) {
   const [token, setToken] = useState("");

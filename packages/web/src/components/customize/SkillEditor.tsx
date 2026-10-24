@@ -3,10 +3,10 @@ import { IconDots as Dots } from "@tabler/icons-react";
 import { SKILL_BODY_MAX, SKILL_DESCRIPTION_MAX, SKILL_NAME_MAX, type Skill, type SkillInput } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
-import { MenuButton } from "../Menu.tsx";
+import { MenuButton } from "../ui/Menu.tsx";
 import { useSprockets } from "../sprockets/useSprockets.ts";
 import { EditorHead, LongText, TextInput } from "./fields.tsx";
-import { useConfirm } from "../ConfirmDialog.tsx";
+import { useConfirm } from "../ui/ConfirmDialog.tsx";
 
 /**
  * One skill (ADR 0025): its name and description (what a Sprocket sees to know when it applies), its instructions

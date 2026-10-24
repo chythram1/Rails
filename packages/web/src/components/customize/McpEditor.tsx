@@ -5,12 +5,12 @@ import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
 import { useStore } from "../../store.tsx";
 import { timeAgo } from "../../util.ts";
-import { MenuButton } from "../Menu.tsx";
-import { Segmented } from "../Segmented.tsx";
+import { MenuButton } from "../ui/Menu.tsx";
+import { Segmented } from "../ui/Segmented.tsx";
 import { useSprockets } from "../sprockets/useSprockets.ts";
 import { ConnectorLogo } from "./ConnectorLogo.tsx";
 import { EditorHead, LongText, TextInput } from "./fields.tsx";
-import { useConfirm } from "../ConfirmDialog.tsx";
+import { useConfirm } from "../ui/ConfirmDialog.tsx";
 
 /** A server in a line, for the list: its tools, or why it can't connect. */
 export function serverSummary(s: McpServer): string {

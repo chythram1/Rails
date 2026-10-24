@@ -4,7 +4,7 @@ import { connectorById, MCP_NAME_MAX, type Connector, type McpServer } from "@ra
 import { api } from "../../api.ts";
 import { href } from "../../router.ts";
 import { useStore } from "../../store.tsx";
-import { Dropdown } from "../Dropdown.tsx";
+import { Dropdown } from "../ui/Dropdown.tsx";
 import { ConnectorLogo } from "./ConnectorLogo.tsx";
 import { isConnected, SignInWaiting } from "./McpEditor.tsx";
 import { readPastedConfig, shellWords, type PastedServer } from "./pasteConfig.ts";

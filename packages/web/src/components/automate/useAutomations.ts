@@ -1,6 +1,6 @@
 import type { Automation, AutomationOutcome, AutomationRun } from "@rails/shared";
 import { api } from "../../api.ts";
-import { useLive } from "../useLive.ts";
+import { useLive } from "../ui/useLive.ts";
 
 /** Every automation (ADR 0032), kept current: the server says when they or their runs change. */
 export function useAutomations(): { list: Automation[] | null; error: string } {

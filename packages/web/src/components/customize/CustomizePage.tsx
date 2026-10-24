@@ -24,9 +24,9 @@ import {
 import { api } from "../../api.ts";
 import { href, navigate, type CustomizeTab, type Route } from "../../router.ts";
 import { useStore } from "../../store.tsx";
-import { MenuButton } from "../Menu.tsx";
-import { PageNav } from "../PageNav.tsx";
-import { Segmented } from "../Segmented.tsx";
+import { MenuButton } from "../ui/Menu.tsx";
+import { PageNav } from "../ui/PageNav.tsx";
+import { Segmented } from "../ui/Segmented.tsx";
 import { ConnectorLogo } from "./ConnectorLogo.tsx";
 import { isConnected, McpEditor, serverSummary } from "./McpEditor.tsx";
 import { AppSetup } from "./AppSetup.tsx";

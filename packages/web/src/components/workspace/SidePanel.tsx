@@ -1,13 +1,13 @@
 import { IconArrowUpRight as ArrowUpRight, IconFolder as Folder, IconGitBranch as GitBranch, IconRobotFace as RobotFace, IconX as X } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import type { Sprocket as SprocketData } from "@rails/shared";
-import { href } from "../router.ts";
+import { href } from "../../router.ts";
 import { FilesPanel } from "./FilesPanel.tsx";
 import { GitPanel } from "./GitPanel.tsx";
-import { Sprocket } from "./sprockets/Sprocket.tsx";
-import { ChatMenu } from "./sprockets/ChatMenu.tsx";
-import { SprocketChat } from "./sprockets/SprocketChat.tsx";
-import { onTabKeys } from "./tabKeys.ts";
+import { Sprocket } from "../sprockets/Sprocket.tsx";
+import { ChatMenu } from "../sprockets/ChatMenu.tsx";
+import { SprocketChat } from "../sprockets/SprocketChat.tsx";
+import { onTabKeys } from "../ui/tabKeys.ts";
 
 export type SideView = "sprockets" | "files" | "git";
 

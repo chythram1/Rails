@@ -1,8 +1,8 @@
 import { SESSION_NAME_MAX, type SessionKey } from "@rails/shared";
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { api } from "../api.ts";
-import { useStore } from "../store.tsx";
+import { api } from "../../api.ts";
+import { useStore } from "../../store.tsx";
 
 export interface Renaming {
   projectId: string;
