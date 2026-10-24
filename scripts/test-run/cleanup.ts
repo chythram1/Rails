@@ -23,7 +23,7 @@ const safeId = (id: string) => /^[\w-]+$/.test(id);
  * transcripts) and pi's `*_<id>.jsonl`. Other sessions' transcripts in the same folders stay. A folder the run
  * created goes too, once no other session's transcript is in it.
  */
-export function deleteTranscripts(project: string, sessions: Record<string, string>, newDirs: string[]): string[] {
+function deleteTranscripts(project: string, sessions: Record<string, string>, newDirs: string[]): string[] {
   const [claudeDir, piDir] = transcriptDirs(project);
   const done: string[] = [];
   let files = 0;
@@ -54,7 +54,7 @@ export function deleteTranscripts(project: string, sessions: Record<string, stri
  * Codex threads started in the project during the run that the run didn't record (Codex can start a new one after
  * its trust prompt, which Rails may not map to the panel). Only listed, never deleted: one could be the user's.
  */
-export function otherCodexThreads(project: string, since: string, known: Set<string>): string[] {
+function otherCodexThreads(project: string, since: string, known: Set<string>): string[] {
   const ids: string[] = [];
   const walk = (dir: string) => {
     for (const name of existsSync(dir) ? readdirSync(dir) : []) {

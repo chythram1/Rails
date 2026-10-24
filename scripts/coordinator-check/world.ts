@@ -27,7 +27,7 @@ export interface Turn {
 /** Run 2's Coordinator, as the user set it up (`.test-runs/gearworks-2.json`). */
 const DESCRIPTION =
   "You coordinate three coding agents building a browser tower-defense game (BRIEF.md): Claude Code owns the engine and wiring, Codex owns gameplay (src/game), pi owns the UI and audio (src/ui). Keep module ownership clean, keep answers short, and tell me plainly when something needs my decision.";
-export const RULES = [
+const RULES = [
   "If a session asks whether to go ahead with its plan or the next step, say yes.",
   "If it asks me to choose between approaches, pick the simpler one that keeps plain JavaScript modules with no build step.",
   "If it asks about game numbers or balance, pick a sensible value and say we'll tune it after playtesting.",

@@ -511,7 +511,6 @@ textarea.input { resize: vertical; line-height: 1.5; }
 /* ---- pages ---- */
 .page { width: 100%; max-width: 1080px; margin: 0 auto; padding: 72px 32px 48px; overflow-y: auto; }
 .page.center { text-align: center; padding-top: 120px; }
-.page-title { font-size: 36px; line-height: 1.1; letter-spacing: -0.03em; margin-bottom: 10px; }
 /* Home: one column on the left edge, a Space Mono label over a display headline. */
 .home { max-width: 880px; padding-top: 88px; }
 .home .eyebrow { margin-bottom: 14px; }

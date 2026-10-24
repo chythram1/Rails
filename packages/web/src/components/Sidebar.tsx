@@ -231,7 +231,7 @@ function AccountMenu({ connected }: { connected: boolean }) {
   const { profile } = useStore();
   const openSettings = useOpenSettings();
   const name = profile?.name ?? "Rails";
-  const signOut = () => void api.logout().catch((e: Error) => alert(e.message)); // the app switches to sign-in
+  const signOut = () => void api.logout().catch((e: Error) => showNotice("Couldn't sign out", e.message)); // the app switches to sign-in
   return (
     <MenuButton
       plain

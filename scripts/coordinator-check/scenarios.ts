@@ -6,7 +6,7 @@ import { handoffs } from "../../packages/server/src/db.ts";
 import { idle } from "../../packages/server/src/runs.ts";
 import type { Draft, Outcome, Turn, World } from "./world.ts";
 
-export interface Check {
+interface Check {
   what: string;
   ok: boolean;
 }

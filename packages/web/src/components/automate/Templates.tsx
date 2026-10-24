@@ -9,7 +9,7 @@ import { TEMPLATE_GROUPS, TEMPLATES, type AutomationTemplate, type TemplateUse }
 export const useName = (u: TemplateUse) => (u === "project" ? "Project" : (connectorById(u)?.name ?? u));
 
 /** Whether a use is here: a Sprocket with a project, or the connector added in Customize. */
-export function hasUse(u: TemplateUse, servers: McpServer[], sprockets: SprocketData[]) {
+function hasUse(u: TemplateUse, servers: McpServer[], sprockets: SprocketData[]) {
   return u === "project" ? sprockets.some((s) => s.projectId) : servers.some((s) => s.connector === u);
 }
 

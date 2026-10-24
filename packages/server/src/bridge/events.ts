@@ -37,7 +37,7 @@ export type SessionEvent =
  * option of the questions Rails read from the tool's input, or text). In Codex, `steer`: a question it asked while
  * its turn goes on, answered by steering that turn (the id is the turn's) with the text.
  */
-export interface DialogRef {
+interface DialogRef {
   id: string;
   /** `claude`: Claude Code's question dialog, answered through Rails' mod by the tool call's id (ADR 0028). */
   kind: "select" | "input" | "questionnaire" | "steer" | "claude";

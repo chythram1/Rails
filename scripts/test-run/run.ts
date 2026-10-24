@@ -6,9 +6,9 @@ import { fileURLToPath } from "node:url";
 
 export const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 /** Where runs keep their state, logs and reports (gitignored). */
-export const RUNS = join(REPO, ".test-runs");
+const RUNS = join(REPO, ".test-runs");
 
-export type AgentKind = "claude" | "codex" | "pi";
+type AgentKind = "claude" | "codex" | "pi";
 
 export interface AgentConfig {
   /** What the run calls it ("engine"), for `prompt <name>`. */

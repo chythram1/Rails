@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { IconLayoutSidebar as PanelLeft } from "@tabler/icons-react";
 import { api, onSignedOut, Unauthorized } from "./api.ts";
 import { CustomizePage } from "./components/customize/CustomizePage.tsx";
 import { Notices } from "./components/ConfirmDialog.tsx";
@@ -105,7 +106,7 @@ function Shell() {
         <div className="scrim" onClick={() => setNavOpen(false)} />
         <main className="main">
           <button className="icon-btn nav-toggle" aria-label="Open sidebar" onClick={() => setNavOpen(true)}>
-            <span aria-hidden>☰</span>
+            <PanelLeft size={16} />
           </button>
           {route.name === "home" && <Home promptId={route.promptId} />}
           {route.name === "workspace" && <Workspace key={route.projectId} projectId={route.projectId} openKey={route.openKey} />}
