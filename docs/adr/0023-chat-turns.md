@@ -1,6 +1,7 @@
 # ADR 0023: Chat turns: runs as rows, passing the turn, asking the user
 
-Status: accepted. It replaces how turns pass in team chats (ADR 0022) and the rule that one run saves one reply
+Status: accepted. ADR 0033 replaces who answers in a team, `pass_turn`, the reminders and both amendments (every
+member hears every message and decides), and runs no longer go one at a time per chat. It replaces how turns pass in team chats (ADR 0022) and the rule that one run saves one reply
 (ADR 0006, 0021). Everything else in those ADRs stands.
 
 Team chats passed the turn by reading replies: an `@Name`, a question that starts or ends with a name, and for a
