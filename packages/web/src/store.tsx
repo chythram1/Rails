@@ -94,6 +94,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const offConn = socket.onConnection((up) => {
       setConnected(up);
       if (!up) setBusy(new Set()); // unknown until the server sends it again
+      // What changed while the socket was down (a server restart, a phone waking up) sent no message here.
+      else void Promise.all([refreshProjects(), refreshCustomize()]);
     });
     const off = socket.on((m) => {
       // Opening or closing a panel changes which sessions are open.
