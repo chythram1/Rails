@@ -28,7 +28,7 @@ import { MenuButton } from "../Menu.tsx";
 import { PageNav } from "../PageNav.tsx";
 import { Segmented } from "../Segmented.tsx";
 import { ConnectorLogo } from "./ConnectorLogo.tsx";
-import { McpEditor, serverSummary } from "./McpEditor.tsx";
+import { isConnected, McpEditor, serverSummary } from "./McpEditor.tsx";
 import { AppSetup } from "./AppSetup.tsx";
 import { NewItem } from "./NewItem.tsx";
 import { PromptEditor } from "./PromptEditor.tsx";
@@ -217,8 +217,7 @@ function Section({ title, count, blurb, children, action }: { title: string; cou
 }
 
 /**
- * A card: a mark, the name (a link that covers the card) over one muted line of what it is and its facts (what needs
- * doing first, in red), two lines on what it does, its command or address (`detail`, in mono), and at the top right
+ * A card: a mark, the name (a link that covers the card) over one muted line of what it is and its facts, two lines on what it does, its command or address (`detail`, in mono), and at the top right
  * one action (a "+" or a check) that sits above the link.
  */
 function Card(props: {
@@ -230,7 +229,6 @@ function Card(props: {
   detail?: string;
   meta?: React.ReactNode;
   action?: React.ReactNode;
-  warn?: string;
 }) {
   return (
     <li className="cz-card">
@@ -244,15 +242,10 @@ function Card(props: {
           ) : (
             <span className="cz-card-name">{props.name}</span>
           )}
-          {(props.kind || props.warn || props.meta) && (
+          {(props.kind || props.meta) && (
             <span className="cz-card-kind">
               {[
                 props.kind,
-                props.warn && (
-                  <span key="warn" className="cz-card-warn">
-                    {props.warn}
-                  </span>
-                ),
                 props.meta,
               ]
                 .filter(Boolean)
@@ -319,7 +312,8 @@ function DiscoverConnectors({ servers, query, onCustom }: { servers: McpServer[]
             }
           >
             {list.map((c) => {
-              const added = servers.find((s) => s.connector === c.id);
+              // Added counts once it's connected: one still waiting on its sign-in offers "+" to finish connecting it.
+              const added = servers.find((s) => s.connector === c.id && isConnected(s));
               return (
                 <Card
                   key={c.id}
@@ -360,17 +354,17 @@ function CustomSection({ onCustom }: { onCustom(t: "http" | "stdio"): void }) {
   );
 }
 
-/** What a server is like now, in a few words, and whether that wants attention. */
-function serverState(s: McpServer): { text: string; warn?: string } {
+/** What a server is like now, in a few words (in the muted line, like any other fact: no red on cards). */
+function serverState(s: McpServer): string {
   const setup = connectorById(s.connector)?.setup;
-  if (s.signIn?.authUrl) return { text: "", warn: "Signing in" };
-  if (s.signIn?.state === "needed") return { text: "", warn: "Sign in" };
+  if (s.signIn?.authUrl) return "Signing in…";
+  if (s.signIn?.state === "needed") return "Not signed in";
   // A connector that signs in, and hasn't yet: say what it needs instead of "not connected".
-  if (s.signIn?.state !== "signed-in" && setup === "own-app" && !s.signIn?.clientId) return { text: "", warn: "Set up your app" };
-  if (s.signIn?.state !== "signed-in" && (setup === "sign-in" || setup === "own-app")) return { text: "", warn: "Sign in" };
-  if (s.status.state === "error") return { text: "", warn: "Can't connect" };
-  if (s.status.state === "unknown" && !s.toolsAt) return { text: "Not connected yet" };
-  return { text: s.toolsAt ? `${s.tools.length} tool${s.tools.length === 1 ? "" : "s"}` : serverSummary(s) };
+  if (s.signIn?.state !== "signed-in" && setup === "own-app" && !s.signIn?.clientId) return "Set up your app to sign in";
+  if (s.signIn?.state !== "signed-in" && (setup === "sign-in" || setup === "own-app")) return "Not signed in";
+  if (s.status.state === "error") return "Can't connect";
+  if (s.status.state === "unknown" && !s.toolsAt) return "Not connected yet";
+  return s.toolsAt ? `${s.tools.length} tool${s.tools.length === 1 ? "" : "s"}` : serverSummary(s);
 }
 
 function YourConnectors({ servers, query, onBrowse }: { servers: McpServer[]; query: string; onBrowse(): void }) {
@@ -390,12 +384,11 @@ function YourConnectors({ servers, query, onBrowse }: { servers: McpServer[]; qu
               href={href.mcpServer(s.id)}
               mark={<ConnectorLogo server={s} />}
               name={c && s.name === c.id ? c.name : s.name}
-              kind={state.text || undefined}
+              kind={state}
               text={s.description || c?.description}
               detail={c ? undefined : (s.transport === "http" ? s.url : [s.command, ...s.args].join(" ")) || "Not set up yet"}
-              warn={state.warn}
               action={
-                s.status.state === "ok" && s.signIn?.state !== "needed" ? (
+                isConnected(s) ? (
                   <span className="cz-added" title="Connected" aria-label="Connected">
                     <Check size={16} aria-hidden />
                   </span>

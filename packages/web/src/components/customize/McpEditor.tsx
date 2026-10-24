@@ -20,6 +20,16 @@ export function serverSummary(s: McpServer): string {
   return `${s.tools.length} tool${s.tools.length === 1 ? "" : "s"}${s.usedBy.length ? ` · ${s.usedBy.length} Sprocket${s.usedBy.length === 1 ? "" : "s"}` : ""}`;
 }
 
+/**
+ * Whether a server is connected: it doesn't wait on a sign-in (one it needs, or a connector's that signs in and
+ * hasn't), it isn't failing, and it has listed its tools at least once. Only a connected connector shows as added.
+ */
+export function isConnected(s: McpServer): boolean {
+  const setup = connectorById(s.connector)?.setup;
+  const signInWanted = s.signIn?.state === "needed" || ((setup === "sign-in" || setup === "own-app") && s.signIn?.state !== "signed-in");
+  return !signInWanted && s.status.state !== "error" && !!s.toolsAt;
+}
+
 const POLICIES: { value: McpToolPolicy; label: string }[] = [
   { value: "allow", label: "Allow" },
   { value: "ask", label: "Ask" },
@@ -57,14 +67,19 @@ export function McpEditor({ server: s }: { server: McpServer }) {
     }
   };
   const [confirmDialog, ask] = useConfirm();
-  const remove = () =>
+  // A connector is disconnected (it goes back to Discover); a custom server, which you set up yourself, is removed.
+  const isConnector = !!connectorById(s.connector);
+  const verb = isConnector ? "Disconnect" : "Remove";
+  const remove = (fromMenu = true) =>
     ask({
-      title: `Remove ${s.name}?`,
-      text: "Sprockets that have it lose its tools.",
-      action: "Remove",
+      title: `${verb} ${connectorById(s.connector)?.name ?? s.name}?`,
+      text: isConnector
+        ? "Rails signs out and forgets its tool settings, and Sprockets that have it lose its tools. You can connect it again from Discover."
+        : "Sprockets that have it lose its tools.",
+      action: verb,
       danger: true,
-      // It opened from the `…` menu, whose item is gone: back to the menu's button.
-      returnFocus: () => document.querySelector<HTMLElement>(`[aria-label="${CSS.escape(`${s.name} actions`)}"]`),
+      // From the `…` menu, whose item is gone: back to the menu's button.
+      returnFocus: fromMenu ? () => document.querySelector<HTMLElement>(`[aria-label="${CSS.escape(`${s.name} actions`)}"]`) : undefined,
       onConfirm: async () => {
         await api.deleteMcpServer(s.id);
         navigate(href.customize("connectors"));
@@ -157,7 +172,7 @@ export function McpEditor({ server: s }: { server: McpServer }) {
         <button type="button" className="btn small" disabled={testing} onClick={() => void test()}>
           {testing ? "Connecting…" : "Test"}
         </button>
-        <MenuButton label={`${s.name} actions`} title="More" icon={<Dots size={18} />} align="right" items={[{ label: "Remove", danger: true, onSelect: () => void remove() }]} />
+        <MenuButton label={`${s.name} actions`} title="More" icon={<Dots size={18} />} align="right" items={[{ label: verb, danger: true, onSelect: () => void remove() }]} />
       </EditorHead>
       <div className="cz-body">
         <header className="cz-hero">
@@ -170,13 +185,13 @@ export function McpEditor({ server: s }: { server: McpServer }) {
         </header>
         {connector ? (
           <>
-            {showSignIn && <SignIn server={s} signIn={s.signIn!} onSave={save} />}
+            {showSignIn && <SignIn server={s} signIn={s.signIn!} onSave={save} onDisconnect={isConnector ? () => remove(false) : undefined} />}
             {tools}
           </>
         ) : (
           <>
             {settings}
-            {showSignIn && <SignIn server={s} signIn={s.signIn!} onSave={save} />}
+            {showSignIn && <SignIn server={s} signIn={s.signIn!} onSave={save} onDisconnect={isConnector ? () => remove(false) : undefined} />}
             {tools}
           </>
         )}
@@ -273,7 +288,18 @@ function Status({ server: s }: { server: McpServer }) {
  * that page won't load). Under "Your own app", the client ID and secret for services that don't let apps
  * register themselves, and the redirect address to give them.
  */
-function SignIn({ server: s, signIn, onSave }: { server: McpServer; signIn: McpSignIn; onSave(body: McpServerInput): Promise<boolean> }) {
+/** `onDisconnect`: a connector's account is its connection, so leaving it disconnects (removes) the connector. */
+function SignIn({
+  server: s,
+  signIn,
+  onSave,
+  onDisconnect,
+}: {
+  server: McpServer;
+  signIn: McpSignIn;
+  onSave(body: McpServerInput): Promise<boolean>;
+  onDisconnect?(): void;
+}) {
   const [busy, setBusy] = useState(false);
   const [secret, setSecret] = useState("");
   const [error, setError] = useState("");
@@ -314,8 +340,8 @@ function SignIn({ server: s, signIn, onSave }: { server: McpServer; signIn: McpS
           </p>
         </div>
         {signIn.state === "signed-in" && !waiting ? (
-          <button type="button" className="btn small" disabled={busy} onClick={() => void run(() => api.signOutMcpServer(s.id))}>
-            Sign out
+          <button type="button" className="btn small" disabled={busy} onClick={() => (onDisconnect ? onDisconnect() : void run(() => api.signOutMcpServer(s.id)))}>
+            {onDisconnect ? "Disconnect" : "Sign out"}
           </button>
         ) : (
           !waiting && (

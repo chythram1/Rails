@@ -6,7 +6,7 @@ import { href } from "../../router.ts";
 import { useStore } from "../../store.tsx";
 import { Dropdown } from "../Dropdown.tsx";
 import { ConnectorLogo } from "./ConnectorLogo.tsx";
-import { SignInWaiting } from "./McpEditor.tsx";
+import { isConnected, SignInWaiting } from "./McpEditor.tsx";
 import { readPastedConfig, shellWords, type PastedServer } from "./pasteConfig.ts";
 
 /**
@@ -170,7 +170,8 @@ function Result({ server: s, setup, onClose }: { server: McpServer; setup?: Conn
 
 /**
  * A connector (shared CONNECTORS), as a dialog over Customize: what it does, how it connects, the one thing it needs
- * (a token, a folder, the Google app), and Connect. Then the dialog says how it went (Result).
+ * (a token, a folder, the Google app), and Connect. Then the dialog says how it went (Result). One added before that
+ * never finished connecting (a sign-in left halfway) is picked up again, not added twice.
  */
 export function ConnectorDialog({ connector: c, added, onClose }: { connector: Connector; added: McpServer[]; onClose(): void }) {
   const { profile, mcpApps, mcpServers } = useStore();
@@ -181,12 +182,17 @@ export function ConnectorDialog({ connector: c, added, onClose }: { connector: C
   const [error, setError] = useState("");
   const [made, setMade] = useState<McpServer | null>(null);
   if (made) return <Result server={mcpServers?.find((s) => s.id === made.id) ?? made} setup={c.setup} onClose={onClose} />;
+  const connected = added.filter(isConnected);
+  const halfway = added.find((s) => !isConnected(s));
 
   const add = async () => {
     if (needsApp || busy || (c.setup === "token" && !token.trim())) return;
     setError("");
     setBusy(true);
     try {
+      // A sign-in left halfway: sign in to that one. Anything else unfinished is set up again from the start.
+      if (halfway && (c.setup === "sign-in" || c.setup === "own-app")) return setMade(await api.signInMcpServer(halfway.id));
+      if (halfway) await api.deleteMcpServer(halfway.id);
       setMade(await api.addConnector(c.id, c.setup === "token" ? { token } : {}));
     } catch (err: any) {
       setError(err.message);
@@ -241,10 +247,10 @@ export function ConnectorDialog({ connector: c, added, onClose }: { connector: C
     >
       {c.about && <p className="cz-dialog-text">{c.about}</p>}
       <p className="cz-dialog-text">{how[c.setup]}</p>
-      {added.length > 0 && (
+      {connected.length > 0 && (
         <p className="cz-dialog-note" role="status">
-          Already added:{" "}
-          {added.map((s, i) => (
+          Already connected:{" "}
+          {connected.map((s, i) => (
             <span key={s.id}>
               {i > 0 && ", "}
               <a href={href.mcpServer(s.id)}>{s.name}</a>
