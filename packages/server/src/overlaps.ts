@@ -11,7 +11,7 @@ import type { PanelOverlap, SprocketEvent } from "@rails/shared";
 import { OVERLAP_MS, rel, sharedFiles } from "./bridge/board.ts";
 import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
 import { panels, projects, sprockets } from "./db.ts";
-import { postEvent } from "./sprockets.ts";
+import { postEvent } from "./sprockets/sprockets.ts";
 import { ownerOf } from "./owners.ts";
 import { listeners } from "./util.ts";
 import { sessionTitle } from "./workspace/titles.ts";

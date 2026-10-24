@@ -15,7 +15,7 @@ import { startHandoffs } from "./handoffs.ts";
 import { disconnectAll } from "./mcp.ts";
 import { startOverlaps } from "./overlaps.ts";
 import { startOwners } from "./owners.ts";
-import { resumeRuns } from "./runs.ts";
+import { resumeRuns } from "./sprockets/runs.ts";
 import { startShellEdits } from "./shellEdits.ts";
 import { startSuggestions } from "./suggestions.ts";
 import { TerminalHub } from "./workspace/terminals.ts";

@@ -22,7 +22,7 @@ import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
 import type { SessionEvent } from "./bridge/events.ts";
 import { handoffs, panels, projects, sessionEvents, sprockets, suggestions } from "./db.ts";
 import { ownedPath, ownerOf, projectOwners } from "./owners.ts";
-import { postEvent } from "./sprockets.ts";
+import { postEvent } from "./sprockets/sprockets.ts";
 import { sessionTitle } from "./workspace/titles.ts";
 import { looksLikeQuestion } from "./watches.ts";
 

@@ -13,8 +13,8 @@ import { onOwnersChanged } from "../owners.ts";
 import { onDecisionsChanged } from "../decisions.ts";
 import { onModelsChanged, onSignIn } from "../models.ts";
 import { getProfile, onProfileChanged } from "../profile.ts";
-import { onActivity, onTyping } from "../runs.ts";
-import { onSprocketsChanged } from "../sprockets.ts";
+import { onActivity, onTyping } from "../sprockets/runs.ts";
+import { onSprocketsChanged } from "../sprockets/sprockets.ts";
 import * as tmux from "./tmux.ts";
 
 /**

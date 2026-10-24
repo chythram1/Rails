@@ -7,9 +7,9 @@ import { decideApproval } from "./approvals.ts";
 import { projects, settings, sprocketMessages, sprocketRuns } from "./db.ts";
 import { createServer, disconnectAll, testServer, updateServer } from "./mcp.ts";
 import { models, refOf } from "./models.ts";
-import { idle } from "./runs.ts";
+import { idle } from "./sprockets/runs.ts";
 import { createSkill, deleteSkill, listSkills, parseSkill } from "./skills.ts";
-import { createSprocket, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
+import { createSprocket, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets/sprockets.ts";
 
 const faux = fauxProvider();
 models.setProvider(faux.provider);

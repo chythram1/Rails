@@ -59,7 +59,7 @@ for (const d of ["CLAUDE_HOME", "PI_HOME", "CODEX_HOME", "CHECK_PROJECTS"]) mkdi
 // The server reads its paths when it's imported, so only now.
 const { FILES, SCENARIOS } = await import("./scenarios.ts");
 const { World } = await import("./world.ts");
-const { idle } = await import("../../packages/server/src/runs.ts");
+const { idle } = await import("../../packages/server/src/sprockets/runs.ts");
 const { findModel } = await import("../../packages/server/src/models.ts");
 
 if (!findModel(opts.model)) {

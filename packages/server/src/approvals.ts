@@ -4,7 +4,7 @@
 import { RESULT_CHARS, callTool, policyOf } from "./mcp.ts";
 import { mcpServers, sprocketMessages, sprocketRuns, sprocketTools } from "./db.ts";
 import { ServiceError } from "./errors.ts";
-import { requestReply, runsChanged } from "./runs.ts";
+import { requestReply, runsChanged } from "./sprockets/runs.ts";
 
 /** Decisions under way, so a double tap (or two devices) can't run a call twice. */
 const deciding = new Set<string>();

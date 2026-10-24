@@ -23,15 +23,15 @@ import { createAutomation, deleteAutomation, getAutomation, listAutomations, run
 import { addConnector, cancelSignIn as cancelMcpSignIn, createServer, deleteServer, listApps, listServers, pasteSignIn, setApp, signOut, startSignIn as startMcpSignIn, testServer, updateServer } from "./mcp.ts";
 import { createSkill, deleteSkill, importSkill, listSkills, skillSources, updateSkill } from "./skills.ts";
 import { decideApproval } from "./approvals.ts";
-import { actOnCard } from "./cardActions.ts";
+import { actOnCard } from "./sprockets/cardActions.ts";
 import { closePanel, getWorkspace, openPanel, saveLayout } from "./workspace/panels.ts";
 import { ServiceError } from "./errors.ts";
 import { attachPickedFolder, attachProject, detachProject, getProject, listProjectSessions, recentFolders } from "./workspace/projects.ts";
 import { providerInfo } from "./providers/index.ts";
 import { getProfile, updateProfile } from "./profile.ts";
 import { cancelSignIn, modelSettings, removeCredential, setApiKey, setDefaultModel, startSignIn, submitSignInCode } from "./models.ts";
-import { createTeam, deleteTeam, listTeams, updateTeam } from "./teams.ts";
-import { clearChat, createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets.ts";
+import { createTeam, deleteTeam, listTeams, updateTeam } from "./sprockets/teams.ts";
+import { clearChat, createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets/sprockets.ts";
 import { cancelHandoff } from "./handoffs.ts";
 import { clearOwner } from "./owners.ts";
 import { dismissSuggestion, sendSuggestion } from "./suggestions.ts";

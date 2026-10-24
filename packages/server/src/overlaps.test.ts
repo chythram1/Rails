@@ -6,8 +6,8 @@ import { panels, projects, settings } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { setOwner } from "./owners.ts";
 import { BATCH_MS, OverlapWakes, overlapList, startOverlaps } from "./overlaps.ts";
-import { idle } from "./runs.ts";
-import { createSprocket, directChat, listMessages, projectChat, updateSettings } from "./sprockets.ts";
+import { idle } from "./sprockets/runs.ts";
+import { createSprocket, directChat, listMessages, projectChat, updateSettings } from "./sprockets/sprockets.ts";
 
 const look = { character: "cog", color: "green", accessory: "none" } as const;
 

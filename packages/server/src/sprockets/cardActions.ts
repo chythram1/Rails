@@ -3,9 +3,9 @@
 // it. Once every action has run or been skipped, the Sprocket that showed the card goes on, once, in direct and team
 // chats alike (in a team, that member).
 import { actionSettled, type SprocketCardAction } from "@rails/shared";
-import { mcpServers, sprocketMessages, sprocketTools } from "./db.ts";
-import { ServiceError } from "./errors.ts";
-import { callTool, policyOf } from "./mcp.ts";
+import { mcpServers, sprocketMessages, sprocketTools } from "../db.ts";
+import { ServiceError } from "../errors.ts";
+import { callTool, policyOf } from "../mcp.ts";
 import { requestReply, runsChanged } from "./runs.ts";
 
 /** How much of a call's result a card keeps (it goes to the model with up to four others). */

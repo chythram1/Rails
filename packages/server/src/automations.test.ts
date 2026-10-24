@@ -6,8 +6,8 @@ import { createAutomation, deleteAutomation, getAutomation, listAutomations, run
 import { automationRuns, automations, settings, sprocketRuns } from "./db.ts";
 import { createServer, disconnectAll, testServer } from "./mcp.ts";
 import { models, refOf } from "./models.ts";
-import { idle } from "./runs.ts";
-import { createSprocket, deleteSprocket, directChat, listMessages, updateSettings } from "./sprockets.ts";
+import { idle } from "./sprockets/runs.ts";
+import { createSprocket, deleteSprocket, directChat, listMessages, updateSettings } from "./sprockets/sprockets.ts";
 
 const faux = fauxProvider();
 models.setProvider(faux.provider);

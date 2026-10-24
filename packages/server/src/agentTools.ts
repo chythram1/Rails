@@ -12,7 +12,7 @@ import { setCodexTools } from "./bridge/codex.ts";
 import { cardOf, onEvents, onPanelForgotten } from "./bridge/index.ts";
 import { panels, projects, sessionEvents, sprockets, suggestions } from "./db.ts";
 import { projectOwners } from "./owners.ts";
-import { postEvent } from "./sprockets.ts";
+import { postEvent } from "./sprockets/sprockets.ts";
 import { MAX_PENDING_MESSAGES, suggest } from "./suggestions.ts";
 import { sessionTitle } from "./workspace/titles.ts";
 

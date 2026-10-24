@@ -3,7 +3,7 @@
 // World, wakes the Coordinator the way Rails would, and returns the checks for what it did.
 import type { Panel } from "@rails/shared";
 import { handoffs } from "../../packages/server/src/db.ts";
-import { idle } from "../../packages/server/src/runs.ts";
+import { idle } from "../../packages/server/src/sprockets/runs.ts";
 import type { Draft, Outcome, Turn, World } from "./world.ts";
 
 interface Check {

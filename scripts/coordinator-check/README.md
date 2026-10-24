@@ -2,7 +2,7 @@
 
 Replays situations from test runs 2, 6 and 7 against the real Coordinator on a real model, a few times each, and checks
 what it drafted. Use it after changing the Coordinator's instructions (`systemPrompt` and `eventText` in
-`packages/server/src/prompt.ts`, the tool descriptions in `harness/reply.ts`), or to compare models.
+`packages/server/src/sprockets/prompt.ts`, the tool descriptions in `harness/reply.ts`), or to compare models.
 
 ```sh
 npm run coordinator-check -- [--model openai/gpt-6-luna] [--repeat 3] [--only name,name] [--label after]

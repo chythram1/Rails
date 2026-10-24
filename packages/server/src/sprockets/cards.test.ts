@@ -2,8 +2,8 @@
 import { fauxAssistantMessage, fauxProvider, fauxToolCall, type TranscriptContext } from "@earendil-works/pi-ai";
 import { cardText, type SprocketCard } from "@rails/shared";
 import { beforeEach, describe, expect, it } from "vitest";
-import { projects, settings } from "./db.ts";
-import { models, refOf } from "./models.ts";
+import { projects, settings } from "../db.ts";
+import { models, refOf } from "../models.ts";
 import { idle } from "./runs.ts";
 import { createSprocket, directChat, listMessages, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
 

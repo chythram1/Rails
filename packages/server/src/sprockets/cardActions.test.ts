@@ -4,9 +4,9 @@ import { fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall, type Transc
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { actOnCard } from "./cardActions.ts";
-import { mcpServers, settings, sprocketRuns } from "./db.ts";
-import { createServer, disconnectAll, testServer, updateServer } from "./mcp.ts";
-import { models, refOf } from "./models.ts";
+import { mcpServers, settings, sprocketRuns } from "../db.ts";
+import { createServer, disconnectAll, testServer, updateServer } from "../mcp.ts";
+import { models, refOf } from "../models.ts";
 import { idle } from "./runs.ts";
 import { createSprocket, directChat, listMessages, sendMessage, updateSettings } from "./sprockets.ts";
 import { createTeam } from "./teams.ts";
@@ -18,7 +18,7 @@ const look = { character: "bean", color: "teal", accessory: "none" } as const;
 beforeEach(() => settings.set("defaultModel", ref));
 afterAll(() => disconnectAll());
 
-const FAKE = fileURLToPath(new URL("./test/fake-mcp.mjs", import.meta.url));
+const FAKE = fileURLToPath(new URL("../test/fake-mcp.mjs", import.meta.url));
 let n = 0;
 async function notesServer() {
   const server = createServer({ name: `notes${++n}`, transport: "stdio", command: process.execPath, args: [FAKE] });

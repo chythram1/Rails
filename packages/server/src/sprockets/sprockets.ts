@@ -18,17 +18,17 @@ import {
   type SprocketMessage,
   type SprocketSettings,
 } from "@rails/shared";
-import { handoffs, mcpServers, projects, sprocketChats, sprocketMessages, sprocketTools, sprockets, suggestions, usage, type StoredChat } from "./db.ts";
-import { customizeChanged } from "./customize.ts";
-import { skillExists } from "./skills.ts";
-import { ServiceError } from "./errors.ts";
+import { handoffs, mcpServers, projects, sprocketChats, sprocketMessages, sprocketTools, sprockets, suggestions, usage, type StoredChat } from "../db.ts";
+import { customizeChanged } from "../customize.ts";
+import { skillExists } from "../skills.ts";
+import { ServiceError } from "../errors.ts";
 import { endRound, nameClash, onTeamsChanged, startRound } from "./teams.ts";
-import { settleHandoffs } from "./handoffs.ts";
-import { projectOwners } from "./owners.ts";
-import { findModel } from "./models.ts";
+import { settleHandoffs } from "../handoffs.ts";
+import { projectOwners } from "../owners.ts";
+import { findModel } from "../models.ts";
 import { answerWaiting, isRunning, onRunsChanged, requestReply, runningChat, userMessageTime } from "./runs.ts";
-import { expireInChat, onSuggestionsChanged } from "./suggestions.ts";
-import { listeners } from "./util.ts";
+import { expireInChat, onSuggestionsChanged } from "../suggestions.ts";
+import { listeners } from "../util.ts";
 
 const MAX_NAME = 40;
 const MAX_MESSAGE = 4000;

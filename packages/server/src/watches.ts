@@ -18,7 +18,7 @@ import { ASKING, type SessionEvent } from "./bridge/events.ts";
 import { onEvents, onPanelForgotten } from "./bridge/index.ts";
 import { handoffs, panels, sprockets, type StoredHandoff } from "./db.ts";
 import { end as endHandoff, followSessions } from "./handoffs.ts";
-import { postEvent } from "./sprockets.ts";
+import { postEvent } from "./sprockets/sprockets.ts";
 import { sessionTitle } from "./workspace/titles.ts";
 import { listeners } from "./util.ts";
 

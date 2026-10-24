@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { idle } from "./runs.ts";
-import { sprockets } from "./db.ts";
+import { sprockets } from "../db.ts";
 import { createSprocket, deleteSprocket, directChat, listMessages, listSprockets, onSprocketsChanged, sendMessage, updateSprocket } from "./sprockets.ts";
 
 const look = { character: "roo", color: "blue", accessory: "cap" } as const;

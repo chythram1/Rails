@@ -9,8 +9,8 @@ import { forgetPanel, receive } from "./bridge/index.ts";
 import { panels, projects, settings, suggestions } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { setOwner } from "./owners.ts";
-import { idle } from "./runs.ts";
-import { createSprocket, listMessages, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
+import { idle } from "./sprockets/runs.ts";
+import { createSprocket, listMessages, projectChat, sendMessage, updateSettings } from "./sprockets/sprockets.ts";
 import { dismissSuggestion, sendSuggestion, suggest, SUGGESTION_MAX } from "./suggestions.ts";
 
 const faux = fauxProvider();

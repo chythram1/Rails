@@ -3,7 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { RAILS_HOME } from "./config.ts";
 import { panels, projects, sessionEvents, settings, sprocketChats, sprockets, tx } from "./db.ts";
-import { createSprocket } from "./sprockets.ts";
+import { createSprocket } from "./sprockets/sprockets.ts";
 
 describe("the database file", () => {
   it("takes writes while someone else is reading it (sqlite3 in a terminal, a backup)", () => {

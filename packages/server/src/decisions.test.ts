@@ -4,10 +4,10 @@ import { receive } from "./bridge/index.ts";
 import { panels, projects, settings, sprockets } from "./db.ts";
 import { ACT_ASKS, ACT_QUESTION, decisionLog, settled, setDecisionModel, setDecisionThreshold, startDecisions, toJudge, wakeFor } from "./decisions.ts";
 import { models, modelSettings, refOf } from "./models.ts";
-import { idle } from "./runs.ts";
+import { idle } from "./sprockets/runs.ts";
 import { turnEnded } from "./findings.ts";
 import { messageFromAgent } from "./agentTools.ts";
-import { createSprocket, listMessages, projectChat, updateSettings } from "./sprockets.ts";
+import { createSprocket, listMessages, projectChat, updateSettings } from "./sprockets/sprockets.ts";
 import { GRACE_MS, startWatches } from "./watches.ts";
 
 const look = { character: "lune", color: "teal", accessory: "none" } as const;

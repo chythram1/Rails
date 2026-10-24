@@ -2,10 +2,10 @@
 // and notes, and the reminders added for this turn. Text only: runs.ts decides when each is used.
 import type { Api, AssistantMessage, Message, Model } from "@earendil-works/pi-ai";
 import { TEAM_TURNS_MAX, type Handoff, type SprocketCardAction, type SprocketMessage } from "@rails/shared";
-import { AGENT } from "./bridge/board.ts";
-import { automationRuns, handoffs, sessionEvents, sprocketMessages, sprockets, suggestions, type StoredChat, type StoredRun } from "./db.ts";
-import { resultText } from "./harness/mcpTools.ts";
-import { CORE_MEMORY_MAX } from "./harness/memory.ts";
+import { AGENT } from "../bridge/board.ts";
+import { automationRuns, handoffs, sessionEvents, sprocketMessages, sprockets, suggestions, type StoredChat, type StoredRun } from "../db.ts";
+import { resultText } from "../harness/mcpTools.ts";
+import { CORE_MEMORY_MAX } from "../harness/memory.ts";
 import { handOn, inRound, notYet, queuedIn, waitingAsks, type TeamInfo } from "./rounds.ts";
 
 /**

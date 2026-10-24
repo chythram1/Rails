@@ -25,27 +25,27 @@ import {
   type RunTrigger,
   type StoredChat,
   type StoredRun,
-} from "./db.ts";
-import { stepText, summarize, type Capability } from "./harness/capabilities.ts";
-import { projectChatCapability } from "./harness/chats.ts";
-import { codemodeTool, type CallRecord } from "./harness/codemode.ts";
-import { memoryCapability } from "./harness/memory.ts";
-import { projectCapabilities } from "./harness/project.ts";
-import { promptsCapability } from "./harness/prompts.ts";
-import { replyCapabilities } from "./harness/reply.ts";
-import { showCardCapability } from "./harness/cards.ts";
-import { mcpCapabilities, type Proposal } from "./harness/mcpTools.ts";
-import { readSkillCapability, skillsPrompt } from "./harness/skills.ts";
-import { listSkills } from "./skills.ts";
-import { serversFor } from "./mcp.ts";
-import { askUserCapability, nothingNewCapability, passTurnCapability, sendMessageCapability, type TurnEnd } from "./harness/turns.ts";
-import { findModel, models } from "./models.ts";
-import { projectOwners } from "./owners.ts";
+} from "../db.ts";
+import { stepText, summarize, type Capability } from "../harness/capabilities.ts";
+import { projectChatCapability } from "../harness/chats.ts";
+import { codemodeTool, type CallRecord } from "../harness/codemode.ts";
+import { memoryCapability } from "../harness/memory.ts";
+import { projectCapabilities } from "../harness/project.ts";
+import { promptsCapability } from "../harness/prompts.ts";
+import { replyCapabilities } from "../harness/reply.ts";
+import { showCardCapability } from "../harness/cards.ts";
+import { mcpCapabilities, type Proposal } from "../harness/mcpTools.ts";
+import { readSkillCapability, skillsPrompt } from "../harness/skills.ts";
+import { listSkills } from "../skills.ts";
+import { serversFor } from "../mcp.ts";
+import { askUserCapability, nothingNewCapability, passTurnCapability, sendMessageCapability, type TurnEnd } from "../harness/turns.ts";
+import { findModel, models } from "../models.ts";
+import { projectOwners } from "../owners.ts";
 import { resendWhenSilent } from "./resend.ts";
-import { sessionTitle } from "./workspace/titles.ts";
+import { sessionTitle } from "../workspace/titles.ts";
 import { handOnNudge, nudge, roundNow, severalEvents, systemPrompt, TEXTING_NOW, toLlm, whyNow } from "./prompt.ts";
 import { askedTeammates, handOn, inRound, notYet, queuedIn, teamInfo, waitingAsks, type TeamInfo } from "./rounds.ts";
-import { listeners } from "./util.ts";
+import { listeners } from "../util.ts";
 
 /** Model calls in one run (each round of tool calls is one). */
 const MAX_STEPS = 12;

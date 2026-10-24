@@ -1,7 +1,7 @@
 // Team chats' rounds (ADR 0022, 0023): who is in a team, who a message asks something or gives a step, and who still
 // has a turn coming. Rules only, read from the database; what members are told about them is prompt.ts.
 import type { SprocketMessage } from "@rails/shared";
-import { projects, sprocketChats, sprocketMessages, sprocketRuns, sprockets, type StoredChat, type StoredRun } from "./db.ts";
+import { projects, sprocketChats, sprocketMessages, sprocketRuns, sprockets, type StoredChat, type StoredRun } from "../db.ts";
 
 /** The questions in a chat that wait for the user's answer: who asked, and what (with its options). */
 export function waitingAsks(chatId: string): { sprocketId: string; question: string; options: string[] }[] {

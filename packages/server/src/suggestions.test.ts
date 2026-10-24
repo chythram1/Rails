@@ -10,8 +10,8 @@ import { receive, record } from "./bridge/index.ts";
 import { fromCodex } from "./bridge/events.ts";
 import { panels, projects, settings, sprocketMessages, suggestions } from "./db.ts";
 import { models, refOf } from "./models.ts";
-import { idle } from "./runs.ts";
-import { createSprocket, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
+import { idle } from "./sprockets/runs.ts";
+import { createSprocket, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets/sprockets.ts";
 import { dialogAnswer, dismissSuggestion, pickup, sendSuggestion, startSuggestions, suggest } from "./suggestions.ts";
 
 const look = { character: "bell", color: "purple", accessory: "none" } as const;

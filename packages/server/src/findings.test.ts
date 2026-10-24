@@ -9,7 +9,7 @@ import { findingToJudge } from "./decisions.ts";
 import { findingsIn, noteFinding } from "./findings.ts";
 import { models, refOf } from "./models.ts";
 import { setOwner } from "./owners.ts";
-import { createSprocket, listMessages, projectChat, updateSettings } from "./sprockets.ts";
+import { createSprocket, listMessages, projectChat, updateSettings } from "./sprockets/sprockets.ts";
 
 const faux = fauxProvider();
 models.setProvider(faux.provider);
