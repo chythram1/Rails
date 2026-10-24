@@ -81,9 +81,11 @@ onCodexSession(linkCodexThread);
 // Claude Code's and pi's panels follow their session to another (`/clear`, `/new`, `/resume`; bridge/index.ts).
 onSessionMoved((panel) => changed(panel.projectId));
 
-/** Stop a panel's tmux session (if still there), drop the panel and tell every browser. */
-async function removePanel(panel: Panel): Promise<void> {
-  await tmux.killSession(panel.id); // stops the process; already gone is fine
+/**
+ * Drop a panel whose process ended and tell every browser. It never stops a process: only closing a panel does
+ * (`closePanel`), so a wrong guess that it ended can't kill an agent.
+ */
+function dropPanel(panel: Panel): void {
   panels.remove(panel.id);
   forgetPanel(panel.id);
   if (panel.kind === "codex") unwatchCodexIfIdle();
@@ -100,7 +102,7 @@ const starting = new Set<string>();
 /** Called when a browser's tmux client exits on its own: if the panel's process ended, remove the panel. */
 export async function panelEnded(id: string): Promise<void> {
   const panel = panels.get(id);
-  if (panel && !starting.has(id) && !(await tmux.runningPanels()).has(id)) await removePanel(panel);
+  if (panel && !starting.has(id) && !(await tmux.runningPanels()).has(id)) dropPanel(panel);
 }
 
 /** A project's panels and saved layout. Panels whose process ended while nobody was watching are dropped. */
@@ -114,7 +116,7 @@ export async function getWorkspace(projectId: string): Promise<Workspace> {
       const name = sessionName(p);
       list.push(name ? { ...p, name } : p);
     }
-    else await removePanel(p);
+    else dropPanel(p);
   }
   return { panels: list, layout: layouts.get(projectId) };
 }
@@ -152,7 +154,7 @@ async function openSession(projectId: string, kind: ProviderId, sessionId: strin
   const existing = panels.bySession(sessionId);
   if (existing) {
     if ((await tmux.runningPanels()).has(existing.id)) return existing;
-    await removePanel(existing); // its process ended but nobody noticed yet; start a fresh panel
+    dropPanel(existing); // its process ended but nobody noticed yet; start a fresh panel
   }
   const found = await findSession(kind, sessionId);
   if (!found) throw new ServiceError("Session transcript not found", 404);
@@ -182,7 +184,8 @@ async function start(projectId: string, kind: PanelKind, sessionId: string | und
 export async function closePanel(id: string): Promise<void> {
   const panel = panels.get(id);
   if (!panel) throw new ServiceError("Not found", 404);
-  await removePanel(panel);
+  await tmux.killSession(panel.id); // stops the process; already gone is fine
+  dropPanel(panel);
 }
 
 export function saveLayout(projectId: string, layout: unknown): void {

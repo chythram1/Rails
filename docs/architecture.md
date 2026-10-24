@@ -57,7 +57,8 @@ packages/
 - **Exits:** a panel closes itself when its process exits (`exit`, `/exit`, a crash). tmux has
   `remain-on-exit off`, so the session ends with the process; the attached browsers' tmux clients then
   exit, and `panelEnded` deletes the panel and broadcasts `panels.changed` so every device drops the tab.
-  Panels that ended while no browser was attached are dropped on the next workspace read.
+  Panels that ended while no browser was attached are dropped on the next workspace read. Dropping one never stops
+  a process, and a tmux listing that fails (other than "no server yet") fails the read instead of reading as no panels.
 - **Busy:** while any browser is connected, `activity.ts` reads each panel's last-output time from tmux
   (`window_activity`, whole seconds, kept even with no client attached) once a second. A panel turns busy
   after printing in two polls in a row (idle agents print the odd one-off update) and idle after 2s

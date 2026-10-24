@@ -91,14 +91,22 @@ export async function panelActivity(): Promise<Map<string, number>> {
   try {
     ({ stdout } = await tmux("list-windows", "-a", "-F", "#{session_name} #{window_activity}"));
   } catch (e) {
-    if (e instanceof ServiceError) throw e; // tmux missing: don't mistake that for "no panels"
-    return out; // no tmux server running yet
+    if (noServer(e)) return out;
+    // Anything else (tmux missing, too many open files, a busy socket) isn't "no panels": callers drop the panels
+    // they think ended, so a failed listing must never read as an empty one.
+    throw e;
   }
   for (const line of stdout.split("\n")) {
     const [name, time] = line.split(" ");
     if (name?.startsWith("p-")) out.set(name.slice(2), Number(time));
   }
   return out;
+}
+
+/** Whether tmux failed because no server runs on the socket yet (no socket file, or a stale one). */
+function noServer(e: unknown): boolean {
+  const stderr = String((e as { stderr?: unknown })?.stderr ?? "");
+  return /^no server running on |^error connecting to .*\((No such file or directory|Connection refused)\)/m.test(stderr);
 }
 
 /** Ids of the panels whose process is still running. */

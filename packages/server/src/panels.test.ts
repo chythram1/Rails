@@ -68,5 +68,31 @@ describe("openPanel", () => {
     expect(panels.get(panel.id)).toBeDefined();
     expect((await getWorkspace(projectId)).panels.map((p) => p.id)).toEqual([panel.id]);
   });
+});
 
+describe("getWorkspace", () => {
+  let projectId: string;
+  beforeEach(() => {
+    projectId = projects.create("app", `/work/app-${Math.random()}`).id;
+  });
+
+  it("drops a panel whose process ended without stopping anything", async () => {
+    const { killSession } = await import("./tmux.ts");
+    const panel = await openPanel(projectId, { kind: "pi", sessionId: "s-ended" });
+    running.delete(panel.id);
+    vi.mocked(killSession).mockClear();
+    expect((await getWorkspace(projectId)).panels).toEqual([]);
+    expect(panels.get(panel.id)).toBeUndefined();
+    expect(killSession).not.toHaveBeenCalled();
+  });
+
+  it("keeps every panel when tmux can't list them", async () => {
+    const { killSession, runningPanels } = await import("./tmux.ts");
+    const panel = await openPanel(projectId, { kind: "pi", sessionId: "s-unlisted" });
+    vi.mocked(killSession).mockClear();
+    vi.mocked(runningPanels).mockRejectedValueOnce(new Error("spawn tmux EAGAIN"));
+    await expect(getWorkspace(projectId)).rejects.toThrow("EAGAIN");
+    expect(panels.get(panel.id)).toBeDefined();
+    expect(killSession).not.toHaveBeenCalled();
+  });
 });
