@@ -3,7 +3,7 @@ import type WebSocket from "ws";
 import type { ClientMsg, ServerMsg } from "@rails/shared";
 import { watchBusy } from "./activity.ts";
 import { onCustomizeChanged } from "../customize.ts";
-import { onAutomationsChanged } from "../automations.ts";
+import { onAutomationsChanged } from "../automate/automations.ts";
 import { panels } from "../db.ts";
 import { onPanelsChanged, panelEnded } from "./panels.ts";
 import { attentionList, onAttention } from "../bridge/index.ts";

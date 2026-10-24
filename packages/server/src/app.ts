@@ -19,7 +19,7 @@ import { listFolder, previewFile } from "./workspace/tree.ts";
 import { nameSession } from "./workspace/names.ts";
 import type { AutomationInput, ConnectorInput, McpAppInput, McpServerInput, OpenPanel, SavedPromptInput, SkillInput, SprocketTeamInput, SprocketInput, SprocketSettings } from "@rails/shared";
 import { createPrompt, deletePrompt, listPrompts, updatePrompt } from "./customize.ts";
-import { createAutomation, deleteAutomation, getAutomation, listAutomations, runAutomation, updateAutomation } from "./automations.ts";
+import { createAutomation, deleteAutomation, getAutomation, listAutomations, runAutomation, updateAutomation } from "./automate/automations.ts";
 import { addConnector, cancelSignIn as cancelMcpSignIn, createServer, deleteServer, listApps, listServers, pasteSignIn, setApp, signOut, startSignIn as startMcpSignIn, testServer, updateServer } from "./mcp.ts";
 import { createSkill, deleteSkill, importSkill, listSkills, skillSources, updateSkill } from "./skills.ts";
 import { decideApproval } from "./approvals.ts";

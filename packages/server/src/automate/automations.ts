@@ -14,12 +14,12 @@ import {
   type AutomationTrigger,
   type SprocketMessage,
 } from "@rails/shared";
-import { automationRuns, automations, sprocketMessages, sprocketRuns, sprockets, tx, type StoredAutomation, type StoredAutomationRun } from "./db.ts";
-import { ServiceError } from "./errors.ts";
-import { onRunsChanged, queueAutomationRun, startQueued, userMessageTime } from "./sprockets/runs.ts";
+import { automationRuns, automations, sprocketMessages, sprocketRuns, sprockets, tx, type StoredAutomation, type StoredAutomationRun } from "../db.ts";
+import { ServiceError } from "../errors.ts";
+import { onRunsChanged, queueAutomationRun, startQueued, userMessageTime } from "../sprockets/runs.ts";
 import { knownTimezone, nextRun, scheduleProblem } from "./schedules.ts";
-import { directChat } from "./sprockets/sprockets.ts";
-import { listeners } from "./util.ts";
+import { directChat } from "../sprockets/sprockets.ts";
+import { listeners } from "../util.ts";
 
 const changes = listeners<[]>();
 export const onAutomationsChanged = changes.on;

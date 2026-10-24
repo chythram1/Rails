@@ -3,11 +3,11 @@ import { fauxAssistantMessage, fauxProvider, fauxToolCall, type TranscriptContex
 import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAutomation, deleteAutomation, getAutomation, listAutomations, runAutomation, startAutomations, stopAutomations, tick, updateAutomation } from "./automations.ts";
-import { automationRuns, automations, settings, sprocketRuns } from "./db.ts";
-import { createServer, disconnectAll, testServer } from "./mcp.ts";
-import { models, refOf } from "./models.ts";
-import { idle } from "./sprockets/runs.ts";
-import { createSprocket, deleteSprocket, directChat, listMessages, updateSettings } from "./sprockets/sprockets.ts";
+import { automationRuns, automations, settings, sprocketRuns } from "../db.ts";
+import { createServer, disconnectAll, testServer } from "../mcp.ts";
+import { models, refOf } from "../models.ts";
+import { idle } from "../sprockets/runs.ts";
+import { createSprocket, deleteSprocket, directChat, listMessages, updateSettings } from "../sprockets/sprockets.ts";
 
 const faux = fauxProvider();
 models.setProvider(faux.provider);
@@ -148,7 +148,7 @@ describe("automations", () => {
   });
 
   it("needs the user when a tool's call waits on a card", async () => {
-    const server = createServer({ name: "autonotes", transport: "stdio", command: process.execPath, args: [fileURLToPath(new URL("./test/fake-mcp.mjs", import.meta.url))] });
+    const server = createServer({ name: "autonotes", transport: "stdio", command: process.execPath, args: [fileURLToPath(new URL("../test/fake-mcp.mjs", import.meta.url))] });
     await testServer(server.id);
     const s = sprocket();
     updateSettings(s.id, { tools: { mcp: [server.id] } });

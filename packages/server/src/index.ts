@@ -3,7 +3,7 @@ import { serve } from "@hono/node-server";
 import { WebSocketServer } from "ws";
 import { onSignedOutEverywhere } from "./account.ts";
 import { app, upgradeAuthorized } from "./app.ts";
-import { startAutomations, stopAutomations } from "./automations.ts";
+import { startAutomations, stopAutomations } from "./automate/automations.ts";
 import { watchCodex } from "./bridge/codex.ts";
 import { loadAttention } from "./bridge/index.ts";
 import { prepareClaudeMod } from "./bridge/wiring.ts";
