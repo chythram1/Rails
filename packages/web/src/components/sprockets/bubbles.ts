@@ -1,4 +1,4 @@
-// A Sprocket's reply as chat bubbles: it writes like a person texting (runs.ts), one thought per paragraph, and
+// A Sprocket's reply as chat bubbles: it writes like a person texting (prompt.ts), one thought per paragraph, and
 // each paragraph shows as its own bubble, appearing one after another.
 
 const LIST_ITEM = /^\s*([-*•]|\d+[.)])\s/;

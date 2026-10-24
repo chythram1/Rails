@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projects, settings, sprocketRuns, sprockets } from "./db.ts";
 import { models, refOf } from "./models.ts";
 import { CORE_MEMORY_MAX, editMemory } from "./harness/memory.ts";
-import { askedTeammates, idle, isRunning, onActivity, onTyping, readableError, REQUEST_TIMEOUT_MS, resumeRuns, RETRY_MS, textOf } from "./runs.ts";
+import { askedTeammates } from "./rounds.ts";
+import { idle, isRunning, onActivity, onTyping, readableError, REQUEST_TIMEOUT_MS, resumeRuns, RETRY_MS, textOf } from "./runs.ts";
 import { sprocketMessages } from "./db.ts";
 import { createSprocket, deleteSprocket, detachFromProject, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
 
