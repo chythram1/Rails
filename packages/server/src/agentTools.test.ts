@@ -7,7 +7,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { mcpRequest, messageFromAgent, neighboursText, waitForSession } from "./agentTools.ts";
 import { forgetPanel, receive } from "./bridge/index.ts";
 import { panels, projects, settings, suggestions } from "./db.ts";
-import { models, refOf } from "./models.ts";
+import { models, refOf } from "./settings/models.ts";
 import { setOwner } from "./owners.ts";
 import { idle } from "./sprockets/runs.ts";
 import { createSprocket, listMessages, projectChat, sendMessage, updateSettings } from "./sprockets/sprockets.ts";

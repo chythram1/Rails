@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 import { createAutomation, deleteAutomation, getAutomation, listAutomations, runAutomation, startAutomations, stopAutomations, tick, updateAutomation } from "./automations.ts";
 import { automationRuns, automations, settings, sprocketRuns } from "../db.ts";
 import { createServer, disconnectAll, testServer } from "../customize/mcp.ts";
-import { models, refOf } from "../models.ts";
+import { models, refOf } from "../settings/models.ts";
 import { idle } from "../sprockets/runs.ts";
 import { createSprocket, deleteSprocket, directChat, listMessages, updateSettings } from "../sprockets/sprockets.ts";
 

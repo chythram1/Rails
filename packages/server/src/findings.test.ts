@@ -7,7 +7,7 @@ import { receive } from "./bridge/index.ts";
 import { panels, projects, settings } from "./db.ts";
 import { findingToJudge } from "./decisions.ts";
 import { findingsIn, noteFinding } from "./findings.ts";
-import { models, refOf } from "./models.ts";
+import { models, refOf } from "./settings/models.ts";
 import { setOwner } from "./owners.ts";
 import { createSprocket, listMessages, projectChat, updateSettings } from "./sprockets/sprockets.ts";
 

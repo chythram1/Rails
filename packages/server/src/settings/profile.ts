@@ -4,9 +4,9 @@
 import { execFileSync } from "node:child_process";
 import { hostname } from "node:os";
 import { PROFILE_AVATARS, PROFILE_NAME_MAX, type Profile, type ProfileAvatar } from "@rails/shared";
-import { settings } from "./db.ts";
-import { ServiceError } from "./errors.ts";
-import { listeners } from "./util.ts";
+import { settings } from "../db.ts";
+import { ServiceError } from "../errors.ts";
+import { listeners } from "../util.ts";
 
 /** "Michael’s MacBook Pro" on macOS (its hostname is "Michaels-MacBook-Pro.local"), else the hostname. */
 function computerName(): string {

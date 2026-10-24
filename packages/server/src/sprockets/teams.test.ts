@@ -8,7 +8,7 @@ import { TEAM_TURNS_MAX } from "@rails/shared";
 import { passTurnCapability } from "../harness/turns.ts";
 import { projects, settings, sprockets } from "../db.ts";
 import { createTeam, deleteTeam, listTeams, mentioned, updateTeam } from "./teams.ts";
-import { models, refOf } from "../models.ts";
+import { models, refOf } from "../settings/models.ts";
 import { waitingAsks } from "./rounds.ts";
 import { idle } from "./runs.ts";
 import { clearChat, createSprocket, deleteSprocket, listMessages, sendMessage, updateSettings } from "./sprockets.ts";

@@ -1,7 +1,7 @@
 // Starts Rails: its services, the HTTP server (the routes are in app.ts) and the terminals' WebSocket.
 import { serve } from "@hono/node-server";
 import { WebSocketServer } from "ws";
-import { onSignedOutEverywhere } from "./account.ts";
+import { onSignedOutEverywhere } from "./settings/account.ts";
 import { app, upgradeAuthorized } from "./app.ts";
 import { startAutomations, stopAutomations } from "./automate/automations.ts";
 import { watchCodex } from "./bridge/codex.ts";

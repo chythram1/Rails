@@ -251,7 +251,7 @@ export function signInWithOpenRouter(): Promise<PendingSignIn> {
 
 const logo = (() => {
   try {
-    const svg = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../../web/src/assets/logo.svg"), "utf8");
+    const svg = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../../../web/src/assets/logo.svg"), "utf8");
     return svg.replace("<svg ", '<svg aria-hidden="true" ');
   } catch {
     return "";

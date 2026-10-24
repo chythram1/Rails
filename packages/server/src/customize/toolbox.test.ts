@@ -6,7 +6,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { decideApproval } from "./approvals.ts";
 import { projects, settings, sprocketMessages, sprocketRuns } from "../db.ts";
 import { createServer, disconnectAll, testServer, updateServer } from "./mcp.ts";
-import { models, refOf } from "../models.ts";
+import { models, refOf } from "../settings/models.ts";
 import { idle } from "../sprockets/runs.ts";
 import { createSkill, deleteSkill, listSkills, parseSkill } from "./skills.ts";
 import { createSprocket, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "../sprockets/sprockets.ts";

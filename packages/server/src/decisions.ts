@@ -24,7 +24,7 @@ import { findingsIn, setFindingJudge, type FindingVerdict } from "./findings.ts"
 import { projectOwners } from "./owners.ts";
 import { ServiceError } from "./errors.ts";
 import { decisionsInShadow } from "./config.ts";
-import { classifierChoices, decisionThreshold, findClassifier, models, modelsChanged } from "./models.ts";
+import { classifierChoices, decisionThreshold, findClassifier, models, modelsChanged } from "./settings/models.ts";
 import { listeners } from "./util.ts";
 import { sessionTitle } from "./workspace/titles.ts";
 import { eventPosition, looksLikeQuestion, onWake, wakeFromModel, type Wake } from "./watches.ts";

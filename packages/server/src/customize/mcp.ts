@@ -36,7 +36,7 @@ import { customizeChanged } from "./customize.ts";
 import { mcpServers, sprocketTools, type StoredMcpServer, type StoredTool } from "../db.ts";
 import { ServiceError } from "../errors.ts";
 import { pickFolder } from "../workspace/picker.ts";
-import { awaitRedirect, type PendingSignIn } from "../signin.ts";
+import { awaitRedirect, type PendingSignIn } from "../settings/signin.ts";
 import { cleanEnv } from "../workspace/tmux.ts";
 
 /** A connection unused this long closes. */

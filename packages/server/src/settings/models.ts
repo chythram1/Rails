@@ -14,11 +14,11 @@ import { typesafeProvider } from "@earendil-works/pi-ai/providers/typesafe";
 import { xaiProvider } from "@earendil-works/pi-ai/providers/xai";
 import { DECISION_THRESHOLD, type ModelChoice, type ModelProvider, type ModelSettings, type SignIn } from "@rails/shared";
 import { fileCredentialStore } from "./credentials.ts";
-import { settings } from "./db.ts";
-import { decisionsInShadow } from "./config.ts";
-import { ServiceError } from "./errors.ts";
+import { settings } from "../db.ts";
+import { decisionsInShadow } from "../config.ts";
+import { ServiceError } from "../errors.ts";
 import { signInWithChatGPT, signInWithOpenRouter, type PendingSignIn } from "./signin.ts";
-import { listeners } from "./util.ts";
+import { listeners } from "../util.ts";
 
 /**
  * The providers offered, in display order, and the ones users may sign in to. Anthropic's own sign-in

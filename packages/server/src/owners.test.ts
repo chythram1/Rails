@@ -2,7 +2,7 @@ import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-work
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { forgetPanel, receive } from "./bridge/index.ts";
 import { panels, projects, settings } from "./db.ts";
-import { models, refOf } from "./models.ts";
+import { models, refOf } from "./settings/models.ts";
 import { BATCH_MS, startOverlaps } from "./overlaps.ts";
 import { ownedPath, ownerOf, projectOwners, setOwner, startOwners } from "./owners.ts";
 import { idle } from "./sprockets/runs.ts";

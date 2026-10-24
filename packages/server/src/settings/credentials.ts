@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Credential, CredentialInfo, CredentialStore } from "@earendil-works/pi-ai";
-import { RAILS_HOME } from "./config.ts";
+import { RAILS_HOME } from "../config.ts";
 
 type Stored = Record<string, Credential>;
 

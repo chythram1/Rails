@@ -60,7 +60,7 @@ for (const d of ["CLAUDE_HOME", "PI_HOME", "CODEX_HOME", "CHECK_PROJECTS"]) mkdi
 const { FILES, SCENARIOS } = await import("./scenarios.ts");
 const { World } = await import("./world.ts");
 const { idle } = await import("../../packages/server/src/sprockets/runs.ts");
-const { findModel } = await import("../../packages/server/src/models.ts");
+const { findModel } = await import("../../packages/server/src/settings/models.ts");
 
 if (!findModel(opts.model)) {
   console.error(`The model ${opts.model} isn't available in ${home}.`);

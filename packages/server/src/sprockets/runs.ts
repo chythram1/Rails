@@ -39,7 +39,7 @@ import { readSkillCapability, skillsPrompt } from "../harness/skills.ts";
 import { listSkills } from "../customize/skills.ts";
 import { serversFor } from "../customize/mcp.ts";
 import { askUserCapability, nothingNewCapability, passTurnCapability, sendMessageCapability, type TurnEnd } from "../harness/turns.ts";
-import { findModel, models } from "../models.ts";
+import { findModel, models } from "../settings/models.ts";
 import { projectOwners } from "../owners.ts";
 import { resendWhenSilent } from "./resend.ts";
 import { sessionTitle } from "../workspace/titles.ts";

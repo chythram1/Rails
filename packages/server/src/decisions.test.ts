@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { receive } from "./bridge/index.ts";
 import { panels, projects, settings, sprockets } from "./db.ts";
 import { ACT_ASKS, ACT_QUESTION, decisionLog, settled, setDecisionModel, setDecisionThreshold, startDecisions, toJudge, wakeFor } from "./decisions.ts";
-import { models, modelSettings, refOf } from "./models.ts";
+import { models, modelSettings, refOf } from "./settings/models.ts";
 import { idle } from "./sprockets/runs.ts";
 import { turnEnded } from "./findings.ts";
 import { messageFromAgent } from "./agentTools.ts";

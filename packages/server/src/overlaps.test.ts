@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OVERLAP_MS } from "./bridge/board.ts";
 import { forgetPanel, receive } from "./bridge/index.ts";
 import { panels, projects, settings } from "./db.ts";
-import { models, refOf } from "./models.ts";
+import { models, refOf } from "./settings/models.ts";
 import { setOwner } from "./owners.ts";
 import { BATCH_MS, OverlapWakes, overlapList, startOverlaps } from "./overlaps.ts";
 import { idle } from "./sprockets/runs.ts";

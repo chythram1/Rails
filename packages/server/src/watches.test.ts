@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fromClaude, fromCodex, fromPi, type SessionEvent } from "./bridge/events.ts";
 import { receive } from "./bridge/index.ts";
 import { panels, projects, settings } from "./db.ts";
-import { models, refOf } from "./models.ts";
+import { models, refOf } from "./settings/models.ts";
 import { idle } from "./sprockets/runs.ts";
 import { createSprocket, directChat, listMessages, projectChat, listSprockets, updateSettings } from "./sprockets/sprockets.ts";
 import { admit, COOLDOWN_MS, GRACE_MS, looksLikeQuestion, startWatches, Watches, type Wake } from "./watches.ts";

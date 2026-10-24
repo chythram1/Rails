@@ -25,7 +25,7 @@ import { ServiceError } from "../errors.ts";
 import { endRound, nameClash, onTeamsChanged, startRound } from "./teams.ts";
 import { settleHandoffs } from "../handoffs.ts";
 import { projectOwners } from "../owners.ts";
-import { findModel } from "../models.ts";
+import { findModel } from "../settings/models.ts";
 import { answerWaiting, isRunning, onRunsChanged, requestReply, runningChat, userMessageTime } from "./runs.ts";
 import { expireInChat, onSuggestionsChanged } from "../suggestions.ts";
 import { listeners } from "../util.ts";

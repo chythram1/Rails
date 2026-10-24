@@ -6,7 +6,7 @@ import { fromCodex } from "./bridge/events.ts";
 import { forgetPanel, receive, record } from "./bridge/index.ts";
 import { handoffs, panels, projects, settings } from "./db.ts";
 import { cancelHandoff, expireHandoffs, HANDOFF_TTL_MS, MAX_HANDOFFS, planHandoff, startHandoffs } from "./handoffs.ts";
-import { models, refOf } from "./models.ts";
+import { models, refOf } from "./settings/models.ts";
 import { idle } from "./sprockets/runs.ts";
 import { createSprocket, deleteSprocket, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets/sprockets.ts";
 import { deliveredText } from "./suggestions.ts";

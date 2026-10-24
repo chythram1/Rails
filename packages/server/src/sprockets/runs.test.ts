@@ -2,7 +2,7 @@ import { fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall } from "@ear
 import { SPROCKET_DESCRIPTION_MAX } from "@rails/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projects, settings, sprocketRuns, sprockets } from "../db.ts";
-import { models, refOf } from "../models.ts";
+import { models, refOf } from "../settings/models.ts";
 import { CORE_MEMORY_MAX, editMemory } from "../harness/memory.ts";
 import { askedTeammates } from "./rounds.ts";
 import { idle, isRunning, onActivity, onTyping, readableError, REQUEST_TIMEOUT_MS, resumeRuns, RETRY_MS, textOf } from "./runs.ts";

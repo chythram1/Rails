@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
 import { RAILS_HOME } from "../config.ts";
 import { assignChats, panels, projects, settings, sprocketMessages, sprockets, suggestions } from "../db.ts";
-import { models, refOf } from "../models.ts";
+import { models, refOf } from "../settings/models.ts";
 import { idle, isRunning } from "./runs.ts";
 import { clearChat, createSprocket, deleteSprocket, directChat, listMessages, listSprockets, postEvent, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
 

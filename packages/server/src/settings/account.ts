@@ -5,10 +5,10 @@ import { execFile } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ServerInfo } from "@rails/shared";
-import { HOST, PORT, rotateToken, TOKEN_FROM_ENV } from "./config.ts";
-import { ServiceError } from "./errors.ts";
-import * as tmux from "./workspace/tmux.ts";
-import { listeners } from "./util.ts";
+import { HOST, PORT, rotateToken, TOKEN_FROM_ENV } from "../config.ts";
+import { ServiceError } from "../errors.ts";
+import * as tmux from "../workspace/tmux.ts";
+import { listeners } from "../util.ts";
 
 const signedOut = listeners();
 /** The token was replaced: open connections signed in with the old one should go. */
@@ -22,7 +22,7 @@ export function signOutEverywhere(): string {
   return token;
 }
 
-const repo = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+const repo = join(dirname(fileURLToPath(import.meta.url)), "../../../..");
 const build = new Promise<string | undefined>((resolve) =>
   execFile("git", ["rev-parse", "--short", "HEAD"], { cwd: repo }, (err, out) => resolve(err ? undefined : out.trim() || undefined)),
 );
