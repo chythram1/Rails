@@ -123,24 +123,25 @@ describe("a Sprocket's motion engine", () => {
     expect(end.left).toEqual({ dx: 0, dy: 0, sx: 1, sy: 1 });
   });
 
-  it("surveying: the eyes pop round, then scan an upside-down arc, again and again", () => {
+  it("surveying: the eyes pop round, scan an upside-down arc once, then it rests with open eyes", () => {
     const r = rig(input("idle", "rest"));
     setInput(r, input("talk", "rest"), r.clock);
     const popped = run(r, 200);
-    expect(popped.left.sx).toBeGreaterThan(1.35); // round within a fifth of a second
-    expect(popped.left.sy).toBeLessThan(0.8);
+    expect(popped.left.sx).toBeGreaterThan(1.5); // round within a fifth of a second
+    expect(popped.left.sy).toBeLessThan(0.85);
     const path: [number, number][] = [];
-    run(r, 8000, (f) => path.push(f.look));
+    run(r, 2400, (f) => path.push(f.look));
     const xs = path.map(([x]) => x);
     expect(Math.min(...xs)).toBeLessThan(-5);
     expect(Math.max(...xs)).toBeGreaterThan(5);
     // Lowest in the middle, higher at the ends: ∪.
     const near = (pred: (x: number) => boolean) => path.filter(([x]) => pred(x)).map(([, y]) => y);
-    const mid = near((x) => Math.abs(x) < 1.5);
-    const ends = near((x) => Math.abs(x) > 6);
-    expect(Math.min(...mid)).toBeGreaterThan(Math.max(...ends));
-    expect(r.gesture?.name).toBe("Survey"); // still going after 8s
-    setInput(r, input("idle", "rest"), r.clock);
-    expect(run(r, 800).left.sx).toBeCloseTo(1, 1);
+    expect(Math.min(...near((x) => Math.abs(x) < 1.5))).toBeGreaterThan(Math.max(...near((x) => Math.abs(x) > 6)));
+    // Over on time, though it's still writing: open eyes, and resting (a glance planned, no survey).
+    const after = run(r, 1200);
+    expect(after.left.sx).toBeCloseTo(1, 1);
+    expect(r.anim).toBeNull();
+    expect(r.gesture?.name ?? "").not.toBe("Survey");
+    expect(r.nextGlance).toBeLessThan(Infinity);
   });
 });

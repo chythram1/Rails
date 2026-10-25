@@ -7,9 +7,9 @@
 //   4. the face: an expression, a blink and happy eyes, on their own clocks.
 // The director picks what plays from the activity: resting glances now and then and leans in gently, thinking does
 // one move after another and leans in often, writing spins once, and a finished animation (animations.ts, such as
-// cheering) plays its gesture with its eyes.
+// cheering) plays its gesture with its eyes for as long as it lasts, then the Sprocket goes back to resting.
 import { POSES, type Pose, type Stance } from "./solid.ts";
-import { animationFor } from "./animations.ts";
+import { animationFor, type Animation } from "./animations.ts";
 import { BLINK_MS, EXPRESSIONS, GLANCE, LEAN_GLANCE, LEANS, OPEN, SPIN, THINKING, eyeAt, lidAt, type EyeShape, type Expression, type ExpressionName, type Gesture, type Rand, type Step } from "./clips.ts";
 
 /** What a Sprocket is doing: resting, thinking (direct chats), writing (the spin), cheering, or talking in a team. */
@@ -60,6 +60,8 @@ export interface Rig {
   shift: number;
   aim: [number, number] | null;
   gesture: { name: string; steps: Step[]; i: number; at: number } | null;
+  /** The finished animation playing: its eyes, and when it ends (then it rests, whatever its activity). */
+  anim: { eyes: Animation["eyes"]; until: number } | null;
   /** The last thinking move, so the next is a different one. */
   last: string;
   /** When the next resting glance starts. */
@@ -107,6 +109,7 @@ export function createRig(input: Input, from: Pose, now: number, rand: Rand = Ma
     shift: 0,
     aim: null,
     gesture: null,
+    anim: null,
     last: "",
     nextGlance: NEVER,
     lean: null,
@@ -131,28 +134,35 @@ export function setInput(r: Rig, input: Input, now: number) {
 
 /** Start what the current activity does, dropping what the last one was doing. */
 function begin(r: Rig, now: number) {
-  const { activity, stance, follow, faceOnly } = r.input;
+  const { activity, faceOnly } = r.input;
+  clear(r);
+  const a = animationFor(activity);
+  r.anim = a ? { eyes: a.eyes, until: now + a.ms } : null;
+  if (faceOnly) return;
+  if (a) play(r, a.name, a.gesture, now);
+  else if (activity === "think") {
+    r.last = "";
+    nextMove(r, now);
+    r.nextLean = now + between(r.rand, 300, 1200);
+  } else if (activity === "write") play(r, "spin", SPIN, now);
+  else rest(r, now);
+}
+
+/** Drop what it was doing: back to its stance. */
+function clear(r: Rig) {
   r.turn = r.tip = r.roll = r.shift = r.near = 0;
   r.aim = null;
   r.gesture = null;
   r.lean = null;
   r.spins = Math.round(r.spins); // whole turns look the same: keep the count, so it doesn't spin back
   r.nextGlance = r.nextLean = NEVER;
-  if (faceOnly) return;
-  const resting = activity === "idle" && stance === "rest" && !follow;
-  if (activity === "think") {
-    r.last = "";
-    nextMove(r, now);
-    r.nextLean = now + between(r.rand, 300, 1200);
-  } else if (resting) {
-    r.nextGlance = now + between(r.rand, 1500, 6000);
-    r.nextLean = now + between(r.rand, 2500, 6000);
-  } else if (activity === "write") {
-    play(r, "spin", SPIN, now);
-  } else {
-    const a = animationFor(activity);
-    if (a) play(r, a.name, a.gesture, now);
-  }
+}
+
+/** Rest: at its resting stance, and not following the pointer, it glances aside now and then and leans in gently. */
+function rest(r: Rig, now: number) {
+  if (r.input.stance !== "rest" || r.input.follow) return;
+  r.nextGlance = now + between(r.rand, 1500, 6000);
+  r.nextLean = now + between(r.rand, 2500, 6000);
 }
 
 /** Play a gesture now (the lab plays any by name). */
@@ -199,6 +209,12 @@ function direct(r: Rig, now: number) {
   }
   if (r.blink !== null && now - r.blink >= BLINK_MS) r.blink = null;
   if (r.expression && now - r.expression.start >= r.expression.keys.ms) r.expression = null;
+  // A finished animation ends on time; then it rests, whatever its activity.
+  if (r.anim && now >= r.anim.until) {
+    r.anim = null;
+    clear(r);
+    if (!faceOnly) rest(r, now);
+  }
   if (faceOnly) return;
   if (r.gesture && now >= r.gesture.at) {
     const g = r.gesture;
@@ -216,9 +232,7 @@ function direct(r: Rig, now: number) {
       g.at = now + s.ms;
     } else {
       r.gesture = null;
-      const a = animationFor(activity);
       if (activity === "think") nextMove(r, now);
-      else if (a?.loop) play(r, a.name, a.gesture, now);
       else if (g.name === "glance") r.nextGlance = now + between(r.rand, 2500, 7000);
     }
   }
@@ -288,7 +302,7 @@ export function advance(r: Rig, now: number, pointer: [number, number] | null): 
   go("squash", 0, 400, 16);
   go("lookX", leaning ? LEAN_GLANCE.aim : ax, ek, ed);
   go("lookY", ay, ek, ed);
-  const eyes = animationFor(activity)?.eyes;
+  const eyes = r.anim?.eyes;
   go("happy", eyes === "happy" ? 1 : 0, 300, 30);
   go("round", eyes === "round" ? 1 : 0, 900, 24); // sudden: it pops in, overshooting a little
   const t = now;
@@ -302,6 +316,6 @@ export function advance(r: Rig, now: number, pointer: [number, number] | null): 
     happy: Math.min(1, Math.max(0, s.happy.x)),
   };
   if (e || r.blink !== null) moving = true;
-  const due = [r.nextBlink, r.nextGlance, r.nextLean, r.gesture?.at ?? NEVER, r.lean?.at ?? NEVER];
+  const due = [r.nextBlink, r.nextGlance, r.nextLean, r.gesture?.at ?? NEVER, r.lean?.at ?? NEVER, r.anim?.until ?? NEVER];
   return { frame, moving, wake: Math.max(0, Math.min(...due) - now) };
 }

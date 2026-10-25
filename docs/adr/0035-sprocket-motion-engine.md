@@ -22,9 +22,9 @@ throwaway page and a strip of screenshots.
   and squash, a spin, an expression), lean-ins are lists of nearness and time, expressions are keyframes of each eye's
   shape, and the blink is a curve. A new move is a new entry, not more timer code.
 - **Finished animations, apart from their parts** (`animations.ts`): the polished set a Sprocket plays, each naming
-  when it plays, how long it lasts (or as long as its activity does, repeating), its gesture and its eyes (Cheer, then Survey for writing in a team). Every one shares the same blinks,
+  when it plays, how long it lasts, its gesture and its eyes (Cheer, then Survey for starting a reply in a team). Every one shares the same blinks,
   expressions and leaning in, so a Sprocket behaves predictably wherever it is; what's decided per animation is
-  when it plays. The parts in `clips.ts` are what they're built from.
+  when it plays. Each plays once, for a set time, then the Sprocket goes back to resting, whatever its activity. The parts in `clips.ts` are what they're built from.
 - **Eyes drawn from numbers.** Each frame gives each eye a shape (moved and sized), how shut its lid is and how happy
   it is; `Sprocket.tsx` paints them. The happy arc grows in as the open eye squashes away, so it can blend.
 - **One loop, one clock** (`motion.ts`): a single requestAnimationFrame loop runs every moving rig and sleeps until

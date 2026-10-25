@@ -34,13 +34,11 @@ export default function SprocketLab() {
   const [holding, setHolding] = useState(false);
   const [held, setHeld] = useState<Held>({ yaw: 0, pitch: 0, roll: 0, near: 1 });
   const rigs = useRef(new Map<string, Rig>());
-  // A finished animation plays as it does in the app: its activity for as long as it lasts, then back. One that lasts
-  // as long as its activity does plays until it's pressed again.
+  // A finished animation plays as it does in the app: its activity for as long as it lasts, then back.
   const [playing, setPlaying] = useState<keyof typeof ANIMATIONS | null>(null);
   useEffect(() => {
-    const ms = playing && ANIMATIONS[playing].ms;
-    if (!ms) return;
-    const t = setTimeout(() => setPlaying(null), ms / Math.max(Number(speed), 0.05));
+    if (!playing) return;
+    const t = setTimeout(() => setPlaying(null), ANIMATIONS[playing].ms / Math.max(Number(speed), 0.05));
     return () => clearTimeout(t);
   }, [playing]);
 
@@ -71,7 +69,7 @@ export default function SprocketLab() {
             <h2 id="lab-animations" className="lab-h">Animations</h2>
             {(Object.keys(ANIMATIONS) as (keyof typeof ANIMATIONS)[]).map((a) => (
               <div key={a} className="lab-animation">
-                <button className="btn" aria-pressed={playing === a} onClick={() => setPlaying(playing === a && !ANIMATIONS[a].ms ? null : a)}>
+                <button className="btn" aria-pressed={playing === a} onClick={() => setPlaying(a)}>
                   {ANIMATIONS[a].name}
                 </button>
                 <span className="muted">{ANIMATIONS[a].when}</span>

@@ -128,8 +128,7 @@ export const DANCE: Gesture = () => [
 
 /**
  * Surveying what's below: a pause at one end, then its eyes scanning along an upside-down arc (∪), from one side down
- * through the middle to the other and back, its body tipped down a little and turning after them. It ends where it
- * starts, so it can repeat.
+ * through the middle to the other and back, its body tipped down a little and turning after them.
  */
 export const SURVEY: Gesture = () => {
   const POINTS = 8;
