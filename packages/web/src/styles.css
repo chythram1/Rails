@@ -854,9 +854,16 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-head-side { display: flex; align-items: center; align-self: stretch; gap: 6px; min-width: 0; }
 .sp-head-side.end { justify-content: flex-end; }
 .sp-identity {
-  display: flex; align-items: center; gap: 8px; min-width: 0; max-width: min(360px, 50cqw); height: 38px; padding: 0 14px 0 8px;
-  border: 1px solid var(--border); border-radius: var(--bubble-r); background: var(--surface);
+  display: flex; align-items: center; gap: 8px; min-width: 0; max-width: min(360px, 50cqw); height: 40px; padding: 0 14px 0 8px;
+  border: 1px solid color-mix(in srgb, var(--text) 7%, transparent); border-radius: var(--bubble-r); background: var(--surface);
 }
+/* The face fills the card's height: its frame leaves room round the body (to move, and for the ground), so it's drawn
+   larger and centred on the body, without the ground. */
+.sp-identity-face { position: relative; flex-shrink: 0; width: 24px; height: 24px; }
+.sp-identity-face > * { position: absolute; left: -5px; top: -10px; }
+.sp-identity-face .s-shadow { display: none; }
+.sp-identity-face > .sp-face { left: -2px; top: -4px; } /* a team's faces fill their frame: just centred */
+.sp-identity h2 { font-size: 14px; font-weight: 500; }
 .sp-identity .sp-head-sub { font-size: 14px; }
 /* Narrow, the sides take what they need and the card the rest, centred in it, so nothing runs under it. */
 @container (max-width: 560px) {

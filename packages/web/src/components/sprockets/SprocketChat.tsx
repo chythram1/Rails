@@ -207,7 +207,9 @@ export function SprocketChat({
           </div>
           {/* Who it is, on a card: its face, still, and its name (a team's, then its members). */}
           <div className="sp-identity">
-            {team ? <TeamFace looks={members} size={26} /> : <Sprocket look={sprocket.look} size={26} still />}
+            <span className="sp-identity-face" aria-hidden>
+              {team ? <TeamFace looks={members} size={28} /> : <Sprocket look={sprocket.look} size={34} still />}
+            </span>
             <h2 id="sp-chat-title" className="truncate" title={team ? `${title} · ${members.map((m) => m.name).join(", ")}` : name}>
               {team ? (
                 <>
