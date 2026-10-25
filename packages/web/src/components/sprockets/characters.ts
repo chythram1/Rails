@@ -16,6 +16,21 @@ export const COLORS: Record<SprocketColor, string> = {
   grey: "#A3A3AD",
 };
 
+/** Each colour deepened in OKLCH, hue kept (yellow's turned a little toward amber, or it goes olive), until white text
+ * on it reads at 4.5:1 or better: your bubbles in a Sprocket's direct chat (the same in both themes). */
+export const DEEP: Record<SprocketColor, string> = {
+  brown: "#9c6a37",
+  red: "#d8364d",
+  orange: "#b45f00",
+  yellow: "#a06a01",
+  green: "#00881b",
+  teal: "#018379",
+  blue: "#147bb9",
+  purple: "#8a5adb",
+  pink: "#b7518d",
+  grey: "#74747e",
+};
+
 type Point = [number, number];
 
 /** A body shape: a path, or an ellipse (bodies made of several shapes overlap into one blob). */

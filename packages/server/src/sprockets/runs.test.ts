@@ -52,6 +52,42 @@ describe("runs", () => {
     expect(seen.at(-1)).toBeNull(); // typing ends with null
   });
 
+  it("a new Sprocket introduces itself and asks what to start with", async () => {
+    let said = "";
+    faux.setResponses([
+      (context) => {
+        said = JSON.stringify(context.messages);
+        return fauxAssistantMessage(
+          [
+            fauxText("Hi, I'm Helper! I can read your project and remember things for you."),
+            fauxToolCall("codemode", { code: 'await tools.ask_user({ question: "What should I start with?", options: ["Review a PR", "Write docs", "Fix a bug"] })' }),
+          ],
+          { stopReason: "toolUse" },
+        );
+      },
+    ]);
+    const s = createSprocket({ name: "Helper", look }, { introduce: true });
+    await idle();
+    expect(said).toContain("You were just made");
+    const [hello, ask] = listMessages(directChat(s.id));
+    expect(hello.text).toMatch(/^Hi, I'm Helper/);
+    expect(ask.ask).toEqual({ question: "What should I start with?", options: ["Review a PR", "Write docs", "Fix a bug"] });
+    // Tapping an option answers it, as any question.
+    faux.setResponses([fauxAssistantMessage("On it.")]);
+    sendMessage(directChat(s.id), "Write docs");
+    await idle();
+    expect(listMessages(directChat(s.id))[1].ask?.answer).toBe("Write docs");
+  });
+
+  it("a new Sprocket with no model to think with says hello from a template", async () => {
+    settings.set("defaultModel", null);
+    settings.set("profile.name", "Sam");
+    const s = createSprocket({ name: "Helper", look }, { introduce: true });
+    await idle();
+    settings.set("profile.name", null);
+    expect(authors(s.id)).toEqual(["sprocket: Hi Sam, I'm Helper! Once I have a model to think with (Settings → Providers), tell me what you'd like a hand with."]);
+  });
+
   it("explains instead of replying when there's no model", async () => {
     settings.set("defaultModel", null);
     const s = sprocket();

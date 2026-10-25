@@ -15,7 +15,8 @@ import { PanelToggle } from "./SprocketSettings.tsx";
 import { EventRow } from "./EventRow.tsx";
 import { SuggestionCard } from "./SuggestionCard.tsx";
 import { MessageActions } from "./MessageActions.tsx";
-import { COLORS } from "./characters.ts";
+import { AskCard } from "./AskCard.tsx";
+import { COLORS, DEEP } from "./characters.ts";
 import { rowId, useFlight, useStep } from "./flight.ts";
 import { VIEW } from "./Sprocket.tsx";
 import { useThreadScroll } from "./threadScroll.ts";
@@ -55,8 +56,8 @@ function stamp(iso: string): string {
  * name above (in its colour) and its face at the foot. Every member reads every message, several at once: an icon at
  * the bottom left turns from one member into the next, with a line naming those thinking ("Bo and Cy are
  * thinking…"); no typing dots. Members' names read as
- * chips, with an @ or without, and the composer completes @mentions. A question with options shows as buttons under it
- * until it's answered (ADR 0023). Pass lines from before ADR 0033 aren't shown.
+ * chips, with an @ or without, and the composer completes @mentions. A question with options shows as a card of them,
+ * lettered (AskCard, ADR 0023). Pass lines from before ADR 0033 aren't shown.
  */
 export function SprocketChat({
   sprocket,
@@ -165,6 +166,8 @@ export function SprocketChat({
   // In a team, in the team's order, so the line naming them doesn't reorder as runs start and end.
   const onIt = team ? members.filter((m) => watching.includes(m.id)) : watching.flatMap((w) => speaker(w) ?? []);
   const one = team ? undefined : onIt[0];
+  /** A question with options waits for your answer: the composer says you can type one. */
+  const asking = !!messages?.some((m) => m.ask?.options.length && m.ask.answer === undefined);
   /**
    * In a team, who's thinking now, by name: "Bo is thinking…", "Bo and Cy are thinking…". A member stays named a
    * moment after it stops, so one that rereads quietly for a moment (a teammate's reply woke it) doesn't flicker in and out.
@@ -262,8 +265,13 @@ export function SprocketChat({
             </div>
           ))}
         {!!messages?.length && (
-          // A log: screen readers announce new messages.
-          <ol className={"sp-messages" + (team ? " in-team" : "")} aria-label={chatName} role="log">
+          // A log: screen readers announce new messages. In its direct chat your bubbles take the Sprocket's colour.
+          <ol
+            className={"sp-messages" + (team ? " in-team" : "") + (chat.kind === "direct" ? " tinted" : "")}
+            style={chat.kind === "direct" ? ({ "--mine": DEEP[sprocket.look.color] } as CSSProperties) : undefined}
+            aria-label={chatName}
+            role="log"
+          >
             {messages.map((m, i) => {
               const prev = messages[i - 1];
               const next = messages[i + 1];
@@ -297,9 +305,8 @@ export function SprocketChat({
                   </li>
                 );
               }
-              // A question with options waiting for an answer: the options to tap, under its last bubble. A message
-              // for someone else leaves it waiting, so they stay until it's answered.
-              const options = m.ask && !m.ask.answer ? m.ask.options : undefined;
+              // A question with options is a card of them (AskCard), answered or not.
+              const asks = !!m.ask?.options.length;
               // One bubble per message, paragraphs and all. A code block can't go in a <p>.
               const read = m.author === "notice" || m.card || m.approval ? undefined : blocks(m.text);
               const Bubble = read?.some((b) => b.kind === "fence") ? "div" : "p";
@@ -329,20 +336,15 @@ export function SprocketChat({
                           // The time and copy sit beside the bubble, on its inner side, so a run of messages stays close.
                           <div className="sp-line">
                             {/* Focusable by a tap (not by Tab), so a touch screen can show its details. */}
-                            <Bubble className="sp-bubble" tabIndex={m.author === "notice" ? undefined : -1}>
-                              {m.author === "sprocket" && <span className="sr-only">{by?.name ?? "A deleted Sprocket"}: </span>}
-                              {read ? <Marked blocks={read} text={text} /> : m.text}
-                            </Bubble>
+                            {asks ? (
+                              <AskCard ask={m.ask!} name={by?.name ?? "A deleted Sprocket"} onPick={(o) => void send(o)} />
+                            ) : (
+                              <Bubble className="sp-bubble" tabIndex={m.author === "notice" ? undefined : -1}>
+                                {m.author === "sprocket" && <span className="sr-only">{by?.name ?? "A deleted Sprocket"}: </span>}
+                                {read ? <Marked blocks={read} text={text} /> : m.text}
+                              </Bubble>
+                            )}
                             {m.author !== "notice" && <MessageActions text={m.text} at={m.createdAt} now={now} reply={m.author !== "user"} />}
-                          </div>
-                        )}
-                        {!!options?.length && (
-                          <div className="sp-ask" role="group" aria-label="Answers to pick">
-                            {options.map((o) => (
-                              <button key={o} type="button" className="btn small" onClick={() => void send(o)}>
-                                {o}
-                              </button>
-                            ))}
                           </div>
                         )}
                       </div>
@@ -384,7 +386,7 @@ export function SprocketChat({
         )}
         {error && <p className="error" role="alert">{error}</p>}
         <Composer
-          placeholder={team ? `Message ${title}, or @ someone` : `Message ${title}`}
+          placeholder={asking ? "Type your answer, or talk about something else" : team ? `Message ${title}, or @ someone` : `Message ${title}`}
           onSubmit={(text) => void send(text)}
           autoFocus={!embedded}
           compact

@@ -314,7 +314,7 @@ app.delete("/api/models/sign-ins/:id", async (c) => {
 // ---- Sprockets (ADR 0005, 0006) ----
 app.get("/api/sprockets", (c) => c.json(listSprockets()));
 
-app.post("/api/sprockets", async (c) => c.json(createSprocket(await c.req.json<Partial<SprocketInput>>()), 201));
+app.post("/api/sprockets", async (c) => c.json(createSprocket(await c.req.json<Partial<SprocketInput>>(), { introduce: true }), 201));
 
 app.put("/api/sprockets/:id", async (c) => c.json(updateSprocket(c.req.param("id"), await c.req.json<Partial<SprocketInput>>())));
 

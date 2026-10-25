@@ -22,6 +22,8 @@ Scope: exactly three coding agents, Claude Code, Codex and pi (ADR 0002).
 - Show the session's model in the composer and let the user change it
 
 ## Later
+- **One chat per Sprocket:** combine a Sprocket's direct chat and its project chat (ADR 0021) into one, so
+  there's a single place to talk to it (your bubbles already take its colour in its direct chat).
 - **Desktop app:** ship the server and UI as one desktop app. Electron is the likely shell, since it keeps
   the Node server (node-pty, `node:sqlite`, tmux) as it is; the native folder picker (ADR 0004) fits a desktop
   app well. An earlier idea, a Rust port with Tauri, is dropped unless a real need appears. Write an ADR

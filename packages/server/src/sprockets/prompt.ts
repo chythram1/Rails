@@ -3,7 +3,7 @@
 import type { Api, AssistantMessage, Message, Model } from "@earendil-works/pi-ai";
 import { type Handoff, type SprocketCardAction, type SprocketMessage } from "@rails/shared";
 import { AGENT } from "../bridge/board.ts";
-import { automationRuns, handoffs, projects, sessionEvents, sprocketChats, sprocketMessages, sprockets, suggestions, type StoredChat, type StoredRun } from "../db.ts";
+import { automationRuns, handoffs, projects, sessionEvents, settings, sprocketChats, sprocketMessages, sprockets, suggestions, type StoredChat, type StoredRun } from "../db.ts";
 import { resultText } from "../harness/mcpTools.ts";
 import { CORE_MEMORY_MAX } from "../harness/memory.ts";
 import { waitingAsks, type TeamInfo } from "./members.ts";
@@ -351,6 +351,27 @@ export function whyNow(r: StoredRun): string[] {
     ];
   }
   return [];
+}
+
+/** The user's name, when they've set one (Settings → Account; until then the profile shows the machine's). */
+const userName = () => settings.get("profile.name")?.trim() || undefined;
+
+/**
+ * A Sprocket just made, its direct chat still empty: it says hello and asks what to start with, as its first message.
+ */
+export function introNow(project?: string): string {
+  const name = userName();
+  return [
+    `You were just made, and this is the start of your direct chat with your user${name ? `, ${name}` : ""}. Nobody has written yet: you speak first.`,
+    `Introduce yourself in one or two short sentences: your name and what you can do for them here, from your tools${project ? ` and your project, ${project}` : ""}. Don't list every tool.`,
+    "Then call ask_user once, with no other tool before it: ask what they'd like to start with, with 3 to 5 short options they'd likely pick, each something you can really do.",
+  ].join("\n");
+}
+
+/** The intro without a model to write it (introNow): who it is, and what it needs first. */
+export function introTemplate(sprocket: string): string {
+  const name = userName();
+  return `Hi${name ? ` ${name}` : ""}, I'm ${sprocket}! Once I have a model to think with (Settings → Providers), tell me what you'd like a hand with.`;
 }
 
 /**

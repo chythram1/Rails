@@ -117,3 +117,12 @@ team member's one answer came apart, next to everyone else's. A message is one b
 in whole. Several messages in a row come only from separate sends (`send_message`, or text before a tool call), and
 the prompt now says so instead of asking for 40-word paragraphs. In the reference group chat app, a 300-word answer
 was one bubble, and a reply that read a page was two: a short heads-up, then the answer.
+
+Amendment (2026-10-25): a question's options are a card, and a new Sprocket asks first. A question with options
+(`ask_user`, now up to 6) shows as a card in place of its bubble: the question, then lettered rows to tap, and a
+"Something else" row that goes to the composer; answered, the pick stays marked, and a question answered in other
+words reads "Dismissed". Made in the app (`POST /api/sprockets`), a Sprocket gets one run of its own (trigger
+`intro`) in its empty direct chat: it introduces itself in a sentence or two, from its tools and project, and asks
+what to start with with `ask_user`, as a new bot in the reference app does, so the chat never opens blank. Without a
+model to write it, Rails posts a line in its name instead, saying it needs one. A message the user sends before the
+intro runs is answered as usual.

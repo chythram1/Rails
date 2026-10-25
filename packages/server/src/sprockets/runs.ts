@@ -43,7 +43,7 @@ import { findModel, models } from "../settings/models.ts";
 import { projectOwners } from "../coordination/owners.ts";
 import { resendWhenSilent } from "./resend.ts";
 import { sessionTitle } from "../workspace/titles.ts";
-import { elsewhere, severalEvents, systemPrompt, teamNow, TEXTING_NOW, toLlm, whyNow } from "./prompt.ts";
+import { elsewhere, introNow, introTemplate, severalEvents, systemPrompt, teamNow, TEXTING_NOW, toLlm, whyNow } from "./prompt.ts";
 import { teamInfo } from "./members.ts";
 import { listeners } from "../util.ts";
 
@@ -326,15 +326,22 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   );
   // A decided approval (ADR 0025) or a card's settled actions (ADR 0031) are new even though no message came: the
   // Sprocket goes on with what came of them.
-  if (!last || (!fresh.length && r.trigger !== "approval" && r.trigger !== "actions")) return;
+  // A Sprocket just made speaks first: its chat is empty (a message the user wrote meanwhile is answered as usual).
+  const intro = r.trigger === "intro" && !history.length;
+  if (!intro && (!last || (!fresh.length && r.trigger !== "approval" && r.trigger !== "actions"))) return;
   // What this run answers: everything since the last reply.
   const unanswered = history.slice(history.findLastIndex((m) => m.author === "sprocket") + 1);
-  const start = Math.max(Date.now(), Date.parse(last.createdAt) + 1);
+  const start = Math.max(Date.now(), last ? Date.parse(last.createdAt) + 1 : 0);
   const g = going.get(r.id);
   if (g) g.start = start;
   const startedAt = new Date(start).toISOString();
   const ref = s.model ?? settings.get("defaultModel");
   const model = findModel(ref);
+  if (!model && intro) {
+    sprocketMessages.create(chatId, "sprocket", introTemplate(s.name), postTime(chatId), { sprocketId: id, runId: r.id });
+    changed();
+    return;
+  }
   if (!model) {
     const whose = team ? `${s.name}'s model` : "The model";
     notice(chatId, ref ? `${whose} ${ref} isn't available. Check its provider in Settings → Providers.` : `Pick a model${team ? ` for ${s.name}` : ""} first: connect a provider in Settings → Providers.`, id);
@@ -370,7 +377,7 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   const skills = toolbox.skills.length ? listSkills().filter((k) => toolbox.skills.includes(k.id)) : [];
   const unreachable = servers.filter((x) => x.error).map((x) => `[Rails] The MCP server ${x.server.name} can't be reached right now (${x.error}), so its tools aren't here this turn.`);
   if (chat.kind !== "project")
-    context.push({ role: "user", content: [team ? `${TEXTING_NOW}\n${teamNow(r, team, alsoAnswering(chatId, id), fresh)}` : [TEXTING_NOW, ...whyNow(r)].join("\n"), ...unreachable].join("\n"), timestamp: Date.now() });
+    context.push({ role: "user", content: [team ? `${TEXTING_NOW}\n${teamNow(r, team, alsoAnswering(chatId, id), fresh)}` : [TEXTING_NOW, ...(intro ? [introNow(project?.name)] : whyNow(r))].join("\n"), ...unreachable].join("\n"), timestamp: Date.now() });
   // Events that came in together (one arrived while it answered another): models answered only the latest.
   // (An agent's drafted message doesn't wake it, and needs nothing.)
   const events = unanswered.filter((m) => m.author === "event" && m.event && m.event.what !== "message");

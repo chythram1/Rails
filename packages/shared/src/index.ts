@@ -525,7 +525,7 @@ export interface SprocketAsk {
   answer?: string;
 }
 export const ASK_OPTIONS_MIN = 2;
-export const ASK_OPTIONS_MAX = 4;
+export const ASK_OPTIONS_MAX = 6;
 
 /**
  * A card a Sprocket shows in a chat (ADR 0024, show_card): a title and a few blocks, drawn by Rails from its own

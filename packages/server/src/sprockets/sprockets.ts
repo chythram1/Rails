@@ -104,10 +104,13 @@ export function listSprockets(): Sprocket[] {
   return sprockets.list().map(withLook);
 }
 
-export function createSprocket(body: Partial<SprocketInput> | undefined): Sprocket {
+/** Make a Sprocket. With `introduce` (the app's creator) it says hello in its direct chat and asks what to start with. */
+export function createSprocket(body: Partial<SprocketInput> | undefined, { introduce = false } = {}): Sprocket {
   const { name, look } = parseInput(body);
   const created = withLook(sprockets.create(name, look));
   changed();
+  const direct = introduce ? sprocketChats.of(created.id, "direct") : undefined;
+  if (direct) requestReply(direct.id, created.id, { trigger: "intro" });
   return created;
 }
 

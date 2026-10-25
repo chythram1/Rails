@@ -840,7 +840,8 @@ export const sprocketMessages = {
 export type RunStatus = "queued" | "running" | "waiting" | "done" | "failed" | "cancelled";
 /** `approval`: the user allowed or denied an MCP call the Sprocket asked for (ADR 0025). */
 /** `pass` is from before ADR 0033 (a member passed the turn); now a teammate's message wakes a member (`teammate`). */
-export type RunTrigger = "user" | "teammate" | "pass" | "event" | "approval" | "actions" | "automation";
+/** `intro`: a Sprocket just made introduces itself in its direct chat and asks what to start with. */
+export type RunTrigger = "user" | "teammate" | "pass" | "event" | "approval" | "actions" | "automation" | "intro";
 type RunRow = {
   id: string;
   chat_id: string;
