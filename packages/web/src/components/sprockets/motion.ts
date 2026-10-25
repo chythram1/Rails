@@ -255,7 +255,7 @@ const set = (l: Poser, turn: number, tip: number, roll: number, aim: [number, nu
 
 /**
  * What a thinking Sprocket does, one after another: pondering upward, looking one way then the other, peeking round,
- * nodding, tilting its head (a roll), leaning in (coming closer to the screen, pulsing there), a bounce, a scrunch (its eyes squeezing, going round or one big), and now and
+ * nodding, tilting its head (a roll), a bounce, a scrunch (its eyes squeezing, going round or one big), and now and
  * then a spin. Each takes a second or two; `weight` is
  * how often it comes up.
  */
@@ -282,12 +282,6 @@ const MOVES: Record<string, { weight: number; steps: () => MoveStep[] }> = {
     const side = pick([-1, 1]);
     return [[700, (l) => set(l, side * 10, 6, side * 22, [side * 0.5, -0.5])], [700, (l) => set(l, -side * 6, 6, -side * 16, [-side * 0.4, -0.5])], [400, (l) => set(l, 0, 0, 0, null)]];
   } },
-  lean: { weight: 2, steps: () => [
-    [1100, (l) => ((l.closer = 0.16), set(l, rand(-6, 6), rand(-4, 2), 0, [0, 0]))],
-    [650, (l) => (l.closer = 0.09)],
-    [650, (l) => (l.closer = 0.16)],
-    [900, (l) => ((l.closer = 0), set(l, l.turn, 0, 0, null))],
-  ] },
   bounce: { weight: 2, steps: () => [
     [260, (l) => ((l.squash.v -= 2.4), set(l, l.turn, 0, 0, [0, 0.2]))],
     [700, (l) => ((l.hop.v += rand(170, 220)), (l.squash.v += 3), set(l, l.turn, 10, 0, [0, -0.6]))],
@@ -296,6 +290,20 @@ const MOVES: Record<string, { weight: number; steps: () => MoveStep[] }> = {
   scrunch: { weight: 1.5, steps: () => [[900, (l) => (express(l.el, pick(["squeeze", "curious", "wide", "dots"])), set(l, rand(-12, 12), rand(-4, 6), pick([-1, 1]) * 4, null))], [500, (l) => set(l, l.turn, 0, 0, null)]] },
   spin: { weight: 0.6, steps: () => [[1300, (l) => ((l.spins += pick([-1, 1])), (l.hop.v += 150), set(l, 0, 6, 0, [0, -0.4]))], [400, (l) => set(l, 0, 0, 0, null)]] },
 };
+
+/**
+ * Leaning in: it comes closer to the screen (`closer`, how much bigger it looks) and goes back, in one of a few
+ * shapes, each a list of [nearness, ms held]. It plays on its own, alongside the moves, so it's the motion seen most:
+ * every 1.5–3.5s while thinking, and smaller and rarer at rest.
+ */
+const LEANS: (() => [number, number][])[] = [
+  // In, hold, back.
+  () => [[rand(0.11, 0.15), rand(900, 1500)], [0, 0]],
+  // In, then a pulse or two there.
+  () => [[0.14, 700], [0.08, 450], [0.14, 500], ...(Math.random() < 0.5 ? ([[0.08, 450], [0.14, 500]] as [number, number][]) : []), [0, 0]],
+  // A long, slow breath in and out.
+  () => [[0.1, 1400], [0.06, 600], [0.1, 900], [0, 0]],
+];
 
 /**
  * Move a Sprocket while `enabled`: `paint` draws a pose. At rest it's calm: still, glancing aside now and then, its
@@ -361,6 +369,23 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
     kick();
     let timer: ReturnType<typeof setTimeout>;
     const later = (ms: number, then: () => void) => (timer = setTimeout(then, ms));
+    // Leaning in, on its own clock: while thinking, or at rest where it moves on its own (not facing you or
+    // following the pointer, which hold their pose).
+    let leanTimer: ReturnType<typeof setTimeout>;
+    const leaning = busy || (stance === "rest" && !follow);
+    const lean = () => {
+      const steps = LEANS[Math.floor(Math.random() * LEANS.length)]();
+      const soft = busy ? 1 : 0.6; // at rest it leans in less
+      const run = (i: number) => {
+        if (i >= steps.length) return (leanTimer = setTimeout(lean, busy ? rand(1500, 3500) : rand(5000, 11000)));
+        const [near, ms] = steps[i];
+        if (document.visibilityState === "visible") l.closer = near * soft;
+        kick();
+        leanTimer = setTimeout(() => run(i + 1), ms || 900); // the last step (back) settles before the wait
+      };
+      run(0);
+    };
+    if (leaning) leanTimer = setTimeout(lean, busy ? rand(300, 1200) : rand(2500, 6000));
     if (busy) {
       // Thinking: one move after another, each a second or two, never the same one twice running.
       let last = "";
@@ -407,7 +432,11 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
         later(rand(1500, 6000), glance);
       }
     }
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(leanTimer);
+      l.closer = 0;
+    };
   }, [stance, follow, busy, enabled]);
 
   // A spin: one whole turn, with a hop.
