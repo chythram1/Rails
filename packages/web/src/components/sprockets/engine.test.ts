@@ -107,9 +107,27 @@ describe("a Sprocket's motion engine", () => {
     expect(blinked).toBe(true);
   });
 
+  it("it leans in its resting pose only while nothing's going on: a cheer, an idle or thinking faces you", () => {
+    const r = rig(input("idle", "rest"));
+    let f = run(r, 3000);
+    expect(f.pose.roll).toBeCloseTo(POSES.rest.roll, 0); // leaning
+    perform(r, ANIMATIONS.cheer, r.clock);
+    run(r, 700); // turning to face you
+    let roll = 0;
+    run(r, 1200, (g) => (roll = Math.max(roll, Math.abs(g.pose.roll))));
+    expect(roll).toBeLessThan(15); // unrolled as it dances (the dance's own lean only)
+    f = run(r, 4000);
+    expect(f.pose.roll).toBeCloseTo(POSES.rest.roll, 0); // back to leaning once it's done
+    setIdles(r, IDLES, r.clock);
+    expect(run(r, 2000).pose.yaw).toBeLessThan(15); // idling faces you, between idles too
+    setIdles(r, null, r.clock);
+    setInput(r, input("think", "rest"), r.clock);
+    expect(Math.abs(run(r, 1500).pose.roll)).toBeLessThan(15);
+  });
+
   it("writing spins round once; holding still, it sleeps until the next blink", () => {
     const r = rig(input("write", "rest"));
-    expect(run(r, 2000).pose.yaw).toBeCloseTo(POSES.rest.yaw + 360, 0);
+    expect(run(r, 2000).pose.yaw).toBeCloseTo(POSES.front.yaw + 360, 0); // facing you while it writes
     const f = rig(input("idle", "front"));
     run(f, 3000);
     const out = advance(f, f.clock + 16, null);

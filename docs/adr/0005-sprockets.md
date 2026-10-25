@@ -74,5 +74,8 @@ as the body is round (a sphere through its edges for the roundest, flat for Bloc
 eye narrows and bends and the slant comes from the turn. The resting pose is Grok's, and the separate "toward" pose
 (turned 40°, tipped 26°, rocking back) is gone: done in a team it holds its resting pose. Bean, Bell and Momo are
 nearly as deep as they're wide (106 to 110), and their faces and Lune's sit at the body's middle, so their eyes travel
-up and to the right as a ball's would. Still no shading or mesh: the depth follows the 2D outline.
+up and to the right as a ball's would. Still no shading or mesh: the depth follows the 2D outline. The lean is only how it rests: anything it plays (an
+activity, an animation, idling between idle animations, the dots) faces you and moves about facing you, as Grok's
+clips all rotate about facing front, and it leans again once nothing's going on; its glances and leaning in at rest
+stay in the lean, and with only its face moving it holds its stance.
 

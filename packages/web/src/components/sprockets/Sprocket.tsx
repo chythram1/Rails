@@ -99,7 +99,8 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
   });
 
   const moving = !still;
-  const rig = useRig(svg, paint, moving, { stance, follow, activity, faceOnly: !motion || size < 20 }, from);
+  // As three dots it faces you: they read as an ellipsis only upright.
+  const rig = useRig(svg, paint, moving, { stance: dots ? "front" : stance, follow, activity, faceOnly: !motion || size < 20 }, from);
   useEffect(() => {
     onRig?.(moving ? rig.current : null);
     return () => onRig?.(null);

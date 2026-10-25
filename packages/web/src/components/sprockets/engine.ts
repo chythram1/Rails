@@ -177,6 +177,11 @@ export function perform(r: Rig, a: Animation, now: number) {
 /** Resting, with nothing left playing: holding REST_POSE, still (following the pointer wakes it). */
 const still = (r: Rig) => r.resting && !r.anim && !r.gesture && !r.input.follow;
 
+/** Doing something (an animation, an activity such as thinking, or idling between idle animations): it faces you
+ * while it does, as a Grok bot's clips all move about facing front; its resting pose (leaning up and to the right)
+ * is only for when nothing is going on, its glances and leaning in at rest included. With only its face moving it holds its stance: turning to you is motion. */
+const playing = (r: Rig) => !r.input.faceOnly && (!!r.anim || r.input.activity !== "idle" || r.idles !== null);
+
 /** The pose a resting Sprocket holds: the one it has beside its messages. */
 export const REST_POSE: Stance = "rest";
 
@@ -361,7 +366,7 @@ export function advance(r: Rig, now: number, pointer: [number, number] | null): 
   r.clock = now;
   direct(r, now);
   const { stance, activity, follow } = r.input;
-  const base = POSES[still(r) ? REST_POSE : stance];
+  const base = POSES[still(r) ? REST_POSE : playing(r) ? "front" : stance];
   const s = r.springs;
   const watching = follow && pointer ? pointer : null;
   const [px, py] = watching ?? [0, 0];
