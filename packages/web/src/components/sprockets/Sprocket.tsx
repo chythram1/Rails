@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import type { SprocketLook } from "@rails/shared";
 import { CHARACTERS, COLORS, type Primitive } from "./characters.ts";
 import type { Frame } from "./morph.ts";
-import { CHEER_MS, squash, useBlink, usePose, useSprocketMotion } from "./motion.ts";
+import { squash, useBlink, usePose, useSprocketMotion } from "./motion.ts";
 import { Eyes } from "./parts.tsx";
 import { LAYERS, layout, poseOf, type Box, type Pose, type Stance } from "./solid.ts";
 
@@ -23,7 +23,8 @@ interface Props {
   busy?: boolean;
   /** Spin round, as it starts writing: plays when this turns true. */
   spin?: boolean;
-  /** A message that just came in: start at rest, dance a moment with happy eyes, turn to `stance`, then hold still. */
+  /** Cheering (its message just landed): happy eyes while true, dancing as it starts (`useCheering`). Starting
+   * cheering, it starts from rest and turns to `stance`. */
   cheer?: boolean;
   /** The drawing midway between two Sprockets (TeamThinking's morph), instead of `look`'s. */
   drawing?: Frame;
@@ -39,21 +40,13 @@ const BOX: Box = { x: 40, y: 80, width: 120, height: 116 };
  * the outline and where the eyes sit, never as shading), the slab's band seen edge-on, and the eyes on the front face. s-pop squashes on a change of
  * look; s-eyes looks (motion.ts writes --ex/--ey); s-lid blinks; each s-eye changes size and shape.
  */
-export function Sprocket({ look, size, still: stillProp, stance = "rest", follow, busy = false, spin = false, cheer, drawing, label }: Props) {
+export function Sprocket({ look, size, still, stance = "rest", follow, busy = false, spin = false, cheer, drawing, label }: Props) {
   const def = CHARACTERS[look.character];
   const color = drawing?.color ?? COLORS[look.color];
   const round = drawing ? drawing.round : (def.round ?? 0);
   const face = drawing?.face ?? def.face;
   const axis = def.shadow.x;
   const motion = useSprocketMotion();
-  // After its dance it settles, then holds still (no blinks) like any face beside a message.
-  const [danced, setDanced] = useState(false);
-  useEffect(() => {
-    if (!cheer) return;
-    const t = setTimeout(() => setDanced(true), CHEER_MS + 900);
-    return () => clearTimeout(t);
-  }, [cheer]);
-  const still = stillProp || danced;
   const live = !still && motion;
 
   const svg = useRef<SVGSVGElement>(null);

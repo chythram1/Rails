@@ -3,7 +3,7 @@
 // turns, tips, rolls, leans, hops and squashes) with where its eyes look: calm at rest with a glance now and then,
 // toward the pointer in the creator and a hovered row, busy with one small move after another while thinking, a spin
 // round as it starts writing, and a little dance with happy eyes as its message arrives in a team.
-import { useEffect, useRef, useSyncExternalStore, type RefObject } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import { POSES, type Pose, type Stance } from "./solid.ts";
 
 /** Playful identity: arrivals overshoot ~10%; three durations. */
@@ -67,8 +67,26 @@ export function squash(el: Element | null) {
   );
 }
 
-/** How long a dance lasts (happy eyes, rocking). */
-export const CHEER_MS = 1700;
+/** How long a Sprocket cheers when its message lands: happy eyes (^ ^) the whole time, dancing for the first 1.5s. */
+const CHEER_MS = 5000;
+
+/**
+ * True while a Sprocket cheers: for CHEER_MS from each time `key` (its newest message) changes, or from the start if
+ * it starts set and `fromStart`. The timer isn't cleared on cleanup, so StrictMode's second effect run can't end it.
+ */
+export function useCheering(key: string | undefined, fromStart = false): boolean {
+  const seen = useRef(fromStart ? undefined : key);
+  const count = useRef(0);
+  const [on, setOn] = useState(fromStart && key !== undefined);
+  useEffect(() => {
+    if (key === undefined || key === seen.current) return;
+    seen.current = key;
+    const n = ++count.current;
+    setOn(true);
+    setTimeout(() => n === count.current && setOn(false), CHEER_MS);
+  }, [key]);
+  return on;
+}
 
 /** How long the spin takes (SprocketChat holds the typing dots back until it's done). */
 export const SPIN_MS = 700;
@@ -238,7 +256,7 @@ interface PoseOptions {
   busy?: boolean;
   /** Spin round once when this turns true. */
   spin?: boolean;
-  /** Dance a moment with happy eyes when this turns true (or starts true). */
+  /** Cheering: happy eyes while true, dancing as it starts. */
   cheer?: boolean;
   /** The pose it starts from (it turns from there to its stance). */
   from: Pose;
@@ -451,15 +469,12 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
     kick();
   }, [spin, enabled]);
 
-  // A dance: happy eyes (^ ^), rocking side to side with little hops, then back to its stance.
-  const cheered = useRef(false);
+  // Cheering: happy eyes (^ ^) while it lasts, and a dance as it starts, twisting side to side with little hops.
   useEffect(() => {
     const l = poser.current;
-    const was = cheered.current;
-    cheered.current = cheer;
-    if (!l || !cheer || was) return;
+    if (!l || !cheer) return;
     l.el.classList.add("joy");
-    const beats = [14, -14, 12, -10, 6, 0];
+    const beats = [20, -20, 16, -14, 8, 0];
     const timers = beats.map((roll, i) =>
       setTimeout(() => {
         l.tilt = roll;
@@ -467,7 +482,6 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
         kick();
       }, i * 230),
     );
-    timers.push(setTimeout(() => l.el.classList.remove("joy"), CHEER_MS));
     return () => {
       timers.forEach(clearTimeout);
       l.el.classList.remove("joy");

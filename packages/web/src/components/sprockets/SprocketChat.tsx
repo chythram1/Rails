@@ -16,7 +16,7 @@ import { EventRow } from "./EventRow.tsx";
 import { SuggestionCard } from "./SuggestionCard.tsx";
 import { MessageActions } from "./MessageActions.tsx";
 import { COLORS } from "./characters.ts";
-import { SPIN_MS, useSprocketMotion } from "./motion.ts";
+import { SPIN_MS, useCheering, useSprocketMotion } from "./motion.ts";
 import { useThreadScroll } from "./threadScroll.ts";
 import { TeamThinking } from "./TeamThinking.tsx";
 import { findNames } from "./mentions.ts";
@@ -354,7 +354,7 @@ export function SprocketChat({
                       {team && m.author === "sprocket" && (
                         <span className="sp-avatar" aria-hidden>
                           {/* Done: turned and leaning toward its message (turning there if it just came in). */}
-                          {last && by && !tail.has(m.id) && <Sprocket look={by.look} size={26} stance="toward" still={!pop} cheer={pop} />}
+                          {last && by && !tail.has(m.id) && <DoneFace look={by.look} id={m.id} pop={pop} />}
                         </span>
                       )}
                       <div className="sp-bubbles">
@@ -531,4 +531,13 @@ function ChatTab({ href: to, current, label, chat }: { href: string; current: bo
       {!current && chat.pending > 0 && <span className="tab-attention" role="img" aria-label={chat.pending > 1 ? `${chat.pending} replies ready` : "A reply is ready"} />}
     </a>
   );
+}
+
+/**
+ * A team member's face at the foot of its last message: looking up toward it. One that just came in cheers first
+ * (happy eyes and a dance), then holds still, without blinking, like the rest.
+ */
+function DoneFace({ look, id, pop }: { look: SprocketData["look"]; id: string; pop: boolean }) {
+  const cheering = useCheering(pop ? id : undefined, true);
+  return <Sprocket look={look} size={26} stance="toward" still={!cheering} cheer={cheering} />;
 }

@@ -15,6 +15,7 @@ import { SprocketCreator } from "./SprocketCreator.tsx";
 import { SprocketSettings } from "./SprocketSettings.tsx";
 import { groupSprockets } from "./groups.ts";
 import { useSprockets } from "./useSprockets.ts";
+import { useCheering } from "./motion.ts";
 import { plain } from "./marks.ts";
 
 type SprocketsRoute = Extract<Route, { name: "sprockets" }>;
@@ -195,7 +196,7 @@ function SprocketList(props: {
               <ul className="sp-rows">
                 {g.list.map((s) => (
                   <li key={s.id}>
-                    <SprocketRow sprocket={s} active={s.id === activeId} />
+                    <SprocketRow sprocket={s} teams={chats} active={s.id === activeId} />
                   </li>
                 ))}
               </ul>
@@ -211,21 +212,30 @@ function SprocketList(props: {
  * A Sprocket in the list, by its character and name. It opens its project chat when it has one (ADR 0021), its
  * direct chat otherwise; the line under its name is the newer of the two, and the dot shows replies waiting in either.
  */
-function SprocketRow({ sprocket: s, active }: { sprocket: SprocketData; active: boolean }) {
-  // Its character holds still in the list. It comes alive while the pointer is on it (following the pointer), or it
-  // has focus or its chat is open (facing you), and turns back before it holds still again.
+function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; teams: SprocketTeam[]; active: boolean }) {
+  // Its character holds still in the list. It comes alive while the pointer is on it (following the pointer), it has
+  // focus or its chat is open (facing you), it's working on a reply in any of its chats, teams included (thinking),
+  // and while it cheers as its message lands (happy eyes and a dance); it turns back before it holds still again.
   const [hover, setHover] = useState(false);
   const [focus, setFocus] = useState(false);
   const [awake, setAwake] = useState(active);
+  const chats = [s.direct, ...(s.projectChat ? [s.projectChat] : [])];
+  const mine = teams.filter((t) => t.members.includes(s.id));
+  const busy = chats.some((c) => c.running) || mine.some((t) => t.replying.includes(s.id));
+  const newest = [...chats, ...mine]
+    .map((c) => c.lastMessage)
+    .filter((m) => m?.author === "sprocket" && m.sprocketId === s.id)
+    .reduce<SprocketChatInfo["lastMessage"]>((a, m) => (!a || m!.createdAt > a.createdAt ? m : a), undefined);
+  const cheering = useCheering(newest?.id);
   const facing = focus || active;
+  const live = hover || facing || busy || cheering;
   useEffect(() => {
-    if (hover || facing) return setAwake(true);
+    if (live) return setAwake(true);
     const t = setTimeout(() => setAwake(false), 700);
     return () => clearTimeout(t);
-  }, [hover, facing]);
-  const chats = [s.direct, ...(s.projectChat ? [s.projectChat] : [])];
-  const newest = chats.reduce((a, b) => ((b.lastMessage?.createdAt ?? "") > (a.lastMessage?.createdAt ?? "") ? b : a));
-  const shown: SprocketChatInfo = { ...newest, running: chats.some((c) => c.running), pending: chats.reduce((n, c) => n + c.pending, 0) };
+  }, [live]);
+  const latest = chats.reduce((a, b) => ((b.lastMessage?.createdAt ?? "") > (a.lastMessage?.createdAt ?? "") ? b : a));
+  const shown: SprocketChatInfo = { ...latest, running: chats.some((c) => c.running), pending: chats.reduce((n, c) => n + c.pending, 0) };
   return (
     <a
       className="sp-row"
@@ -237,7 +247,7 @@ function SprocketRow({ sprocket: s, active }: { sprocket: SprocketData; active: 
       onFocus={() => setFocus(true)}
       onBlur={() => setFocus(false)}
     >
-      <Sprocket look={s.look} size={50} still={!awake} stance={facing ? "front" : "rest"} follow={hover} />
+      <Sprocket look={s.look} size={50} still={!awake} stance={facing ? "front" : "rest"} follow={hover && !busy && !cheering} busy={busy && !cheering} cheer={cheering} />
       <RowText name={s.name} chat={shown} />
     </a>
   );
