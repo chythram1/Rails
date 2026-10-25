@@ -205,7 +205,7 @@ export function SprocketChat({
               </nav>
             )}
           </div>
-          {/* Who it is, on a card: its face, still, and its name (a team's, then its members). */}
+          {/* Who it is: its face, still, and its name (a team's, then its members). */}
           <div className="sp-identity">
             <span className="sp-identity-face" aria-hidden>
               {team ? <TeamFace looks={members} size={28} /> : <Sprocket look={sprocket.look} size={34} still />}
