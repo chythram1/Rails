@@ -251,7 +251,7 @@ export function systemPrompt(
  */
 const TEXTING = [
   "How you write: like a person texting, not like a document.",
-  "- Everything you write is shown, in order: text you write before a tool call is sent as a message of its own right away, then your reply after it. What a script prints (text()) is for you alone: your user never sees it. Each message shows as one chat bubble, paragraphs and all. To send several messages in a row (your user asks for them, or a quick heads-up such as \"Looking now.\" before slow work), post each but the last with send_message. Don't repeat what you already wrote.",
+  "- Everything you write is shown, in order: text you write before a tool call is sent as a message of its own right away, then your reply after it. What a script prints (text()) is for you alone: your user never sees it. Each message shows as one chat bubble, paragraphs and all. To send several messages in a row (your user asks for them, or a quick heads-up such as \"Looking now.\" before slow work), post each but the last with send_message. Don't repeat what you already wrote, and don't add a line saying what you sent or that you're done.",
   "- When you can't go on without something only your user knows (their choice, a fact about their project), ask with ask_user instead of writing the question (with two to four options to tap when a few short answers are likely, none for an open question): their answer comes back to you. When you can give a useful answer already, give it (say what you assumed) rather than asking first.",
   "- Keep it short: most replies are a few sentences. When your user asks for more (a length, a plan, a checklist), write all of it, in short paragraphs or a list.",
   "- No headings, no bold, no Markdown tables. A short list is fine. Use Markdown only for code.",
@@ -380,22 +380,36 @@ export const TEXTING_NOW =
 const list = (names: string[]) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
 
 /**
- * What a team member is told right before it writes (ADR 0033): facts only. What woke it, who else is answering now
- * (they can't see its message, nor it theirs, until it's posted), and the questions waiting for the user.
+ * What a team member is told right before it writes (ADR 0033): what's new since it last read the chat, who else is
+ * answering now (they can't see its message, nor it theirs, until it's posted), and the questions waiting for the
+ * user. Only teammates' messages new: a teammate's message is mostly an answer to the user, so the bar to answer it
+ * is higher than for the user's own.
  */
-export function teamNow(r: StoredRun, team: TeamInfo, alsoAnswering: string[]): string {
+export function teamNow(r: StoredRun, team: TeamInfo, alsoAnswering: string[], fresh: SprocketMessage[]): string {
   const nameOf = (id: string | undefined) => team.members.find((m) => m.id === id)?.name;
-  const from = r.trigger === "teammate" ? nameOf(r.from) : undefined;
+  const fromUser = fresh.some((m) => m.author === "user");
+  const teammates = [...new Set(fresh.filter((m) => m.author === "sprocket" && m.sprocketId !== r.sprocketId).flatMap((m) => nameOf(m.sprocketId) ?? []))];
   const others = alsoAnswering.flatMap((id) => nameOf(id) ?? []);
   const open = waitingAsks(r.chatId).flatMap((a) => {
     const who = a.sprocketId === r.sprocketId ? "You" : nameOf(a.sprocketId);
     return who ? [`${who} asked ${JSON.stringify(a.question)}`] : [];
   });
+  const now = fromUser
+    ? [
+        `Your user wrote since you last answered${teammates.length ? `, and so did ${list(teammates)}` : ""}.`,
+        "Write only if it's for you or you have something of your own to add; otherwise reply with exactly (quiet).",
+      ]
+    : teammates.length
+      ? [
+          `${list(teammates)} wrote since you last answered; your user hasn't.`,
+          "A teammate's message is mostly their answer to your user, not a question for you. Answer it only if it names you with a question or a request, gets a fact in your area wrong, or leaves out something only your role knows that your user needs, or if your user asked you to talk something over with that teammate and you haven't yet said where you land. Agreeing, thanking, acknowledging, giving an update or adding a small point isn't a reason: reply with exactly (quiet).",
+        ]
+      : [whyNow(r)[0] ?? "", "Write only if you have something of your own to add; otherwise reply with exactly (quiet)."];
   return [
-    from ? `${from}'s message is the newest here.` : r.trigger === "user" ? "Your user's message is the newest here." : (whyNow(r)[0] ?? ""),
+    now[0],
     ...(others.length ? [`${list(others)} ${others.length === 1 ? "is" : "are"} reading it too and may answer at the same time as you.`] : []),
     ...(open.length ? [`Waiting for your user's answer: ${open.join("; ")}.`] : []),
-    "Write only if it's for you or you have something of your own to add; otherwise reply with exactly (quiet).",
+    now[1],
   ]
     .filter(Boolean)
     .join("\n");
@@ -416,7 +430,8 @@ function teamPrompt(team: TeamInfo & { self: string }, projectName: string | und
     `Every message here reaches every member, your user's and your teammates' alike, and each of you decides for yourself whether to answer (one with @Name reaches only those it names). Your teammates' messages reach you with their name in brackets, like [${other}]; the others are your user's, or Rails' notes in [Rails]. Write only your own message, with no name in front.`,
     "Answer when the message is for you (it names you, asks about your role, or follows up on what you said) or when your role adds something your teammates won't. Otherwise reply with exactly (quiet) and nothing else: nothing is posted. When a message is for all of you (a question, a greeting, thanks), each answers in their own words.",
     "Talk like one person in a group chat: write your message, as yourself, from your own role. Never write lines for a teammate or play out the conversation yourself. Don't repeat what a teammate already said (if they said what you'd say, add only what's new, or stay quiet).",
-    "To ask a teammate something or hand them part of the work, name them in your message: they read it and answer. Do your own part first: post the work itself (the draft, the answer, the list), not that you'll do it. Don't reply to a teammate just to thank or agree.",
+    "To ask a teammate something or hand them part of the work, name them in your message: they read it and answer. Do your own part first: post the work itself (the draft, the answer, the list), not that you'll do it.",
+    "Don't reply to a teammate just to agree, thank, acknowledge or build on their point; one message from you per thing your user asked is usually enough. Don't promise to do something later (pull data, send a file, get back to someone): do it now with your tools, or say once that you can't. Don't tell your teammates what to do with their own memory or work unless your user asked you to.",
     "Never talk about Rails, who is answering, turns, or staying quiet: just say what you have to say.",
     ...(projectName
       ? [`Rails' events about ${JSON.stringify(projectName)} (sessions that wait for your user, overlaps, handoffs, agents' drafts) go to its project chat, not here: read them with project_chat when they matter.`]

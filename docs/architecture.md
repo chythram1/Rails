@@ -133,7 +133,7 @@ packages/
   Each has its direct chat, and an attached one its project's chat, where events land (ADR 0021, `sprocket_chats`;
   `GET`/`POST /api/chats/:id/messages`, `DELETE` to clear). Team chats (ADR 0022, `teams.ts`, `/api/teams`) hold two to four
   Sprockets: every message wakes every member at once (only those it @mentions, or for a tapped option whoever asked),
-  and each writes or replies `(quiet)`; a member's reply wakes its teammates, at most 4 levels after the user's message,
+  and each writes or replies `(quiet)`; a member's reply wakes its teammates (once all members answering are done, each once), at most 4 levels after the user's message,
   and a new message lets replies being written finish (ADR 0033). Each message shows as one bubble, paragraphs and all (ADR 0023). Runs are rows
   (`sprocket_runs`, ADR 0023): a user message, a teammate's message or (for a Coordinator) an event queues one in that chat (`runs.ts`),
   one chat at a time per Sprocket, team members at once, and up to 6 runs at once. A run reads its chat's last 40 messages and the latest of

@@ -149,11 +149,13 @@ export function requestReply(
   pump();
 }
 
+type Wake = { trigger: RunTrigger; sourceId?: string; from?: string; hop: number };
+
 /**
  * Wake team member `sprocketId` (ADR 0033). A run already queued for it there is enough (it reads everything new when
  * it starts), but takes what woke it now when that's nearer the user's message, so a chain isn't cut short.
  */
-export function wake(chatId: string, sprocketId: string, w: { trigger: RunTrigger; sourceId?: string; from?: string; hop: number }): void {
+export function wake(chatId: string, sprocketId: string, w: Wake): void {
   const queued = sprocketRuns.list(["queued"], chatId).find((r) => r.sprocketId === sprocketId);
   if (!queued) sprocketRuns.create({ chatId, sprocketId, ...w });
   else if (w.hop < queued.hop) sprocketRuns.rewake(queued.id, w);
@@ -176,8 +178,31 @@ export function startQueued(): void {
   pump();
 }
 
+/**
+ * Teammates a member's message wakes, held while other members are still answering in that chat (ADR 0033,
+ * amended): they're woken once the last is done, each once, and read all the replies together. A member whose run
+ * starts meanwhile reads them then, so its hold goes. In memory only: a restart drops them.
+ */
+const held = new Map<string, Map<string, Wake>>();
+
+/** Hold the wakes of a member's message for `members`, keeping each one's nearest to the user's message. */
+function hold(chatId: string, members: string[], w: Wake): void {
+  const chat = held.get(chatId) ?? new Map<string, Wake>();
+  held.set(chatId, chat);
+  for (const who of members) if (!chat.has(who) || w.hop < chat.get(who)!.hop) chat.set(who, w);
+}
+
+/** Wake those held in a chat, once none of its runs is queued or running. */
+function release(chatId: string): void {
+  const chat = held.get(chatId);
+  if (!chat || sprocketRuns.list(["queued", "running"], chatId).length) return;
+  held.delete(chatId);
+  for (const [who, w] of chat) wake(chatId, who, w);
+}
+
 /** Cancel a chat's queued runs, and with `waiting` its questions waiting for an answer too. */
 export function cancelRuns(chatId: string, { waiting = false }: { waiting?: boolean } = {}): void {
+  held.delete(chatId);
   if (sprocketRuns.cancel(chatId, waiting ? ["queued", "waiting"] : ["queued"])) changed();
 }
 
@@ -232,6 +257,7 @@ export function resumeRuns(): void {
 async function start(r: StoredRun, chat: StoredChat) {
   const { chatId, sprocketId } = r;
   going.set(r.id, { sprocketId, chatId });
+  held.get(chatId)?.delete(sprocketId); // it reads everything new now
   sprocketRuns.setStatus(r.id, "running");
   changed();
   let status: RunStatus = "done";
@@ -251,7 +277,8 @@ async function start(r: StoredRun, chat: StoredChat) {
     activityChanges.emit(sprocketId, chatId, null, null);
     // Cancelled meanwhile (the chat was cleared): it stays so.
     if (sprocketRuns.get(r.id)?.status === "running") sprocketRuns.setStatus(r.id, status, error);
-    for (const who of woke?.members ?? []) wake(chatId, who, { trigger: "teammate", sourceId: woke?.sourceId, from: sprocketId, hop: r.hop + 1 });
+    if (woke) hold(chatId, woke.members, { trigger: "teammate", sourceId: woke.sourceId, from: sprocketId, hop: r.hop + 1 });
+    release(chatId);
     changed();
     pump();
   }
@@ -343,7 +370,7 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   const skills = toolbox.skills.length ? listSkills().filter((k) => toolbox.skills.includes(k.id)) : [];
   const unreachable = servers.filter((x) => x.error).map((x) => `[Rails] The MCP server ${x.server.name} can't be reached right now (${x.error}), so its tools aren't here this turn.`);
   if (chat.kind !== "project")
-    context.push({ role: "user", content: [team ? `${TEXTING_NOW}\n${teamNow(r, team, alsoAnswering(chatId, id))}` : [TEXTING_NOW, ...whyNow(r)].join("\n"), ...unreachable].join("\n"), timestamp: Date.now() });
+    context.push({ role: "user", content: [team ? `${TEXTING_NOW}\n${teamNow(r, team, alsoAnswering(chatId, id), fresh)}` : [TEXTING_NOW, ...whyNow(r)].join("\n"), ...unreachable].join("\n"), timestamp: Date.now() });
   // Events that came in together (one arrived while it answered another): models answered only the latest.
   // (An agent's drafted message doesn't wake it, and needs nothing.)
   const events = unanswered.filter((m) => m.author === "event" && m.event && m.event.what !== "message");

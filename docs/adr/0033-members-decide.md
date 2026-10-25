@@ -62,10 +62,33 @@ Amendment (2026-10-24): greetings and thanks to everyone get an answer from each
 first instructions asked for one answer to small talk, and "Hello everyone" got only one.
 
 Consequences:
-- Each message costs one run per member (four in a team of four), and each posted reply up to one more per
-  teammate. Quiet runs are short, but they read the whole chat.
+- Each message costs one run per member (four in a team of four), and the replies to it one more per member,
+  once they're all in (amendment above). Quiet runs are short, but they read the whole chat.
 - Who answers is the members' judgment, so it can be wrong: two members can both answer a thanks, or nobody can
   answer a vague message. `@Name` always reaches who it names.
 - The user never needs to know a rule to be answered by the right member.
 - Two members answering at once can say the same thing; the instructions and different roles keep it rare.
 - Members talk to each other in the chat, where the user sees it, up to four levels after each user message.
+
+Amendment (2026-10-24, later): fewer runs and fewer replies to replies. A fixed script of six messages (a question
+for everyone, a fact for all, an @mention, a greeting, a discussion the user asked for, a correction mid-reply) on
+three models took 62 runs and 35 messages on average. Members agreed with each other ("Agreed, and I'd add…") until
+the limit, promised work they couldn't do and then gave updates on it, and each reply woke the others on its own, so
+a member re-read nearly the same chat two or three times. Now:
+- **Woken once per batch.** While other members are still answering in a chat (a run of theirs is queued or
+  running), what a member posts doesn't wake anyone yet. When the last is done, each member it would have woken is
+  woken once, and reads all the replies together (`hold` and `release` in `runs.ts`). A member whose run starts
+  meanwhile reads them then. The wakes are held in memory, so a restart drops them. "Hello everyone" in a team of
+  three is now six runs: three for the message, then one each.
+- **A teammate's message has a higher bar.** The note before a member writes says what's new since it last read
+  the chat: the user's message, or only teammates'. For only teammates', it says a teammate's message is mostly
+  their answer to the user, and to answer only when it names this member with a question or request, gets a fact in
+  its area wrong, leaves out something only its role knows, or continues a discussion the user asked for that hasn't
+  reached a conclusion; agreeing, thanking, acknowledging, an update or a small addition is not a reason.
+- **What not to post** is named in the team instructions: replies just to agree or build on a point, promises to
+  do something later, telling teammates what to do with their own memory or work; and in every chat, a line saying
+  what was sent or that it's done.
+
+The same script then took 38 runs and 20 messages (57 seconds instead of 80); only a discussion the user asked for
+went past one level of replies, so the limit stays at four. Scripts and results: `scratch/team-quiet/` (not
+tracked).

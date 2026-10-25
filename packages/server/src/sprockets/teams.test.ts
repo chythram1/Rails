@@ -124,7 +124,7 @@ describe("team chats", () => {
     await idle();
     expect(said(team.id)).toEqual(["user: Chandler, ask Becky the cheapest test.", "Chandler: Becky, cheapest test?", "Becky: Five interviews for $0."]);
     expect(becky).toContain("[Chandler] Becky, cheapest test?");
-    expect(becky).toContain("Chandler's message is the newest here.");
+    expect(becky).toContain("Chandler wrote since you last answered; your user hasn't.");
   });
 
   it("wakes only the teammates a member @mentions", async () => {
@@ -355,5 +355,44 @@ describe("a Sprocket's other chats", () => {
     sendMessage(directChat(ada.id), "and now?");
     await idle();
     expect(prompt).not.toContain("Your other chats");
+  });
+});
+
+// Members answering the same message at once (ADR 0033, amended): what they post wakes their teammates once all of
+// them are done, so each reads every reply together, once.
+describe("waking teammates once per batch", () => {
+  it("wakes each member once after everyone has answered a greeting, with every reply in front of it", async () => {
+    const { team } = crew();
+    const second: Record<string, string> = {};
+    const later = (name: string) => (c: TranscriptContext) => ((second[name] = seen(c)), reply("(quiet)"));
+    const calls = scriptMembers(faux, { Ada: [reply("Hi from Ada."), later("Ada")], Bo: [reply("Hi from Bo."), later("Bo")], Cy: [reply("Hi from Cy."), later("Cy")] });
+    sendMessage(team.id, "hello everyone");
+    await idle();
+    expect(calls).toEqual({ Ada: 2, Bo: 2, Cy: 2 });
+    expect(second.Ada).toContain("[Bo] Hi from Bo.");
+    expect(second.Ada).toContain("[Cy] Hi from Cy.");
+    expect(second.Ada).toContain("Bo and Cy wrote since you last answered; your user hasn't.");
+  });
+
+  it("holds a fast member's wake until the slower ones are done, then wakes it once", async () => {
+    const { team } = crew();
+    const [bo, cy] = [gate(), gate()];
+    let adaSecond = "";
+    const calls = scriptMembers(faux, {
+      Ada: [reply("Quick answer."), (c) => ((adaSecond = seen(c)), reply("(quiet)"))],
+      Bo: [async () => (await bo.wait, reply("Bo's answer."))],
+      Cy: [async () => (await cy.wait, reply("Cy's answer."))],
+    });
+    sendMessage(team.id, "thoughts?");
+    await until(() => said(team.id).includes("Ada: Quick answer."));
+    bo.open();
+    await until(() => said(team.id).includes("Bo: Bo's answer."));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(calls.Ada).toBe(1); // not woken by Bo's answer while Cy still writes
+    cy.open();
+    await idle();
+    expect(calls.Ada).toBe(2);
+    expect(adaSecond).toContain("[Bo] Bo's answer.");
+    expect(adaSecond).toContain("[Cy] Cy's answer.");
   });
 });
