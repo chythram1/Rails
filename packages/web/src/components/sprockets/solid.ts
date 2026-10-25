@@ -126,27 +126,29 @@ export function layout(p: Pose, axis: number, face: { x: number; y: number }, bo
     const q = (v: number) => +v.toFixed(5); // the scales finer, or a slice's middle drifts off the axis
     return `matrix(${q(ma)} ${q(mb)} ${q(mc)} ${q(md)} ${f(e)} ${f(f_)})`;
   });
-  // The front's curve: a dome as round as the body (a sphere through its edges for the roundest, flat for a box).
+  // The front's curve: a dome as round as the body (a sphere through its edges for the roundest, flat for a box),
+  // centred on the face, so the eyes sit either side of its top and stay parallel (on a face below the body's middle,
+  // as Drop's is, centred there they'd tip toward each other).
   const r = (box.width / 2) / Math.max(0.001, Math.min(1, body.puff * 2.5));
-  const onFront = (X: number, Y: number): [number, number, number] => {
-    if (body.puff <= 0) return [X, Y, depth];
-    const [u, v] = [X / r, Y / r];
-    return [r * Math.sin(u) * Math.cos(v), r * Math.sin(v), depth + r * (Math.cos(u) * Math.cos(v) - 1)];
+  const [fx, fy] = [face.x - axis, mid - face.y];
+  const onFront = (x: number, y: number): [number, number, number] => {
+    if (body.puff <= 0) return [fx + x, fy + y, depth];
+    const [u, v] = [x / r, y / r];
+    return [fx + r * Math.sin(u) * Math.cos(v), fy + r * Math.sin(v), depth + r * (Math.cos(u) * Math.cos(v) - 1)];
   };
   const turn = ([x, y, z]: [number, number, number]): [number, number, number] => [
     R[0][0] * x + R[0][1] * y + R[0][2] * z,
     R[1][0] * x + R[1][1] * y + R[1][2] * z,
     R[2][0] * x + R[2][1] * y + R[2][2] * z,
   ];
-  const [fx, fy] = [face.x - axis, mid - face.y];
   const project = (x: number, y: number): [number, number] => {
-    const [X, Y] = turn(onFront(fx + x, fy - y));
+    const [X, Y] = turn(onFront(x, -y));
     return [axis + X, mid - Y];
   };
   // Each eye fades as its side of the face turns away: its surface's facing, from how the dome slopes there.
   const facing = (side: number) => {
-    const X = fx + side * EYE_X;
-    const nrm: [number, number, number] = body.puff <= 0 ? [0, 0, 1] : [Math.sin(X / r) * Math.cos(fy / r), Math.sin(fy / r), Math.cos(X / r) * Math.cos(fy / r)];
+    const u = (side * EYE_X) / r;
+    const nrm: [number, number, number] = body.puff <= 0 ? [0, 0, 1] : [Math.sin(u), 0, Math.cos(u)];
     return f(clamp((turn(nrm)[2] - 0.15) / 0.25));
   };
   return {

@@ -66,6 +66,17 @@ describe("a Sprocket as a solid", () => {
     expect(POSES.rest).toMatchObject({ yaw: 33, pitch: 16, roll: -16 });
   });
 
+  it("its eyes stay parallel on a face below the body's middle (Drop's), facing you and at rest", () => {
+    const low = { x: 100, y: mid + 18 };
+    const lean = (p: Pose, side: -1 | 1) => {
+      const { project } = layout(p, 100, low, box, 50, ball).eyes;
+      const [a, b] = [project(side * EYE_X, -15), project(side * EYE_X, 15)];
+      return Math.atan2(b[0] - a[0], b[1] - a[1]);
+    };
+    for (const p of [poseOf("front"), poseOf("rest")]) expect(lean(p, 1)).toBeCloseTo(lean(p, -1), 3);
+    expect(lean(poseOf("front"), 1)).toBeCloseTo(0, 3);
+  });
+
   it("looking up and to the right, an upright eye's top leans left", () => {
     const { project } = box_(soft, at(33, 16)).eyes;
     expect(project(EYE_X, -15)[0]).toBeLessThan(project(EYE_X, 15)[0]);
