@@ -47,11 +47,12 @@ drawings and their pop-in and wobble motion went with them.
 
 Amendment (2026-10-24, later): Sprockets are solids that turn. Characters bobbed and swayed all the time and only
 their eyes moved about; a flat drawing can't look somewhere else, or show it's busy except by moving faster. Now
-each is drawn as the front of a soft, round body with some depth (`solid.ts`): the body's outline in layers, back to
-front, all in its colour. Turned or tipped, the body hardly narrows; its face travels across it toward where it looks,
-the eyes narrowing near the edge, and the depth swells the outline on the far side. Only a spin passes through
-edge-on, a sliver, to its back. There's no shading: a darker side read as stacked layers, and narrowing the whole
-body with the turn made characters look thin. Facing you it's exactly the flat drawing, so every character keeps its
+each is drawn as the front of a body with its own thickness and roundness (`solid.ts`; `depth` and `puff` in
+`characters.ts`): slices of the outline, back to front, all in its colour, shrinking toward the front and back on a
+round body. Turned or tipped it's seen in true perspective, so a thin body (Block, a pizza box) narrows to a sliver
+while a deep, soft one (Bean, Bell, Momo) stays round from every side; one depth for all made them all look like the
+same cylinder. The eyes ride the front, slanting as they would on a dome. There's no shading: a darker side read as
+stacked layers. Facing you it's exactly the flat drawing, so every character keeps its
 look. One set of springs (`motion.ts`) moves its turn, tip, roll, lean, hop and squash, painted straight into the
 SVG. The poses: resting almost facing you and still, glancing now and then; facing
 you in its open chat's row; following the pointer in a hovered row and in the creator; while thinking, one small move

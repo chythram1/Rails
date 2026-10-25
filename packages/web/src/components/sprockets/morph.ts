@@ -12,6 +12,9 @@ export interface Frame {
   color: string;
   /** Stroke in the body colour that rounds sharp tips (lune's horns); 0 for none. */
   round: number;
+  /** The body's thickness and puff (characters.ts). */
+  depth: number;
+  puff: number;
   face: { x: number; y: number };
 }
 
@@ -56,6 +59,8 @@ export function morph(a: SprocketLook, b: SprocketLook): (t: number) => Frame {
     d: body(t),
     color: mix(COLORS[a.color], COLORS[b.color], t),
     round: lerp(da.round ?? 0, db.round ?? 0, t),
+    depth: lerp(da.depth, db.depth, t),
+    puff: lerp(da.puff, db.puff, t),
     face: { x: lerp(da.face.x, db.face.x, t), y: lerp(da.face.y, db.face.y, t) },
   });
 }
@@ -65,5 +70,5 @@ export function still(look: SprocketLook): Frame {
   const def = CHARACTERS[look.character];
   const shapes = shapesOf(look);
   const d = shapes.map((s) => (typeof s === "string" ? s : `M ${s.map((p) => p.join(" ")).join(" L ")} Z`)).join(" ");
-  return { d, color: COLORS[look.color], round: def.round ?? 0, face: { ...def.face } };
+  return { d, color: COLORS[look.color], round: def.round ?? 0, depth: def.depth, puff: def.puff, face: { ...def.face } };
 }

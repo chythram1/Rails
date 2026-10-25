@@ -4,7 +4,7 @@ import { CHARACTERS, COLORS, type Primitive } from "./characters.ts";
 import type { Frame } from "./morph.ts";
 import { squash, useBlink, usePose, useSprocketMotion } from "./motion.ts";
 import { Eyes } from "./parts.tsx";
-import { LAYERS, layout, poseOf, type Box, type Pose, type Stance } from "./solid.ts";
+import { layerCount, layout, poseOf, type Box, type Pose, type Stance } from "./solid.ts";
 
 /** The drawn area of the shared 200×215 coordinate system (the shadow included). */
 export const VIEW = { x: 14, y: 24, w: 172, h: 190 };
@@ -67,7 +67,7 @@ export function Sprocket({ look, size, still, stance = "rest", follow, busy = fa
   const paint = useRef((p: Pose) => {
     shown.current = p;
     const g = geometry.current;
-    const l = layout(p, g.axis, g.face, box.current, g.half);
+    const l = layout(p, g.axis, g.face, box.current, g.half, g.body);
     rig.current?.setAttribute("transform", l.rig);
     layers.current.forEach((el, i) => el?.setAttribute("transform", l.layers[i]));
     const b = band.current;
@@ -77,15 +77,16 @@ export function Sprocket({ look, size, still, stance = "rest", follow, busy = fa
     eyes.current?.querySelectorAll<SVGGElement>(".s-slant").forEach((el) => el.setAttribute("transform", `rotate(${l.eyes.slant} ${el.dataset.x} 0)`));
     shadow.current?.setAttribute("rx", String(l.shadow.rx));
   });
-  const geometry = useRef({ axis, face, half: def.shadow.half });
-  geometry.current = { axis, face, half: def.shadow.half };
+  const solid = { depth: drawing?.depth ?? def.depth, puff: drawing?.puff ?? def.puff };
+  const geometry = useRef({ axis, face, half: def.shadow.half, body: solid });
+  geometry.current = { axis, face, half: def.shadow.half, body: solid };
 
   useBlink(lid, !still);
   usePose(svg, paint, live && size >= 20, { stance, follow, busy, spin, cheer, from });
 
   // The band is as tall as the body: measure it (again when the body changes), and redraw where it is.
   useLayoutEffect(() => {
-    const b = layers.current[LAYERS - 1]?.getBBox(); // its own coordinates, before its transform
+    const b = layers.current[layers.current.length - 1]?.getBBox(); // its own coordinates, before its transform
     if (b && b.width) box.current = { x: b.x, y: b.y, width: b.width, height: b.height };
     if (live) paint.current(shown.current);
   }, [look.character, drawing?.d, live]);
@@ -99,8 +100,9 @@ export function Sprocket({ look, size, still, stance = "rest", follow, busy = fa
     mounted.current = true;
   }, []);
 
-  const l = layout(pose, axis, face, box.current, def.shadow.half);
-  const body = drawing ? <path d={drawing.d} /> : def.body.map((p, i) => <Shape key={i} p={p} />);
+  const l = layout(pose, axis, face, box.current, def.shadow.half, solid);
+  layers.current.length = layerCount(solid); // a morph to a thinner body drops slices
+  const shape = drawing ? <path d={drawing.d} /> : def.body.map((p, i) => <Shape key={i} p={p} />);
   const style = { width: size, height: (size * VIEW.h) / VIEW.w } as CSSProperties;
 
   return (
@@ -128,11 +130,11 @@ export function Sprocket({ look, size, still, stance = "rest", follow, busy = fa
                 strokeWidth={round || undefined}
                 strokeLinejoin="round"
               >
-                {body}
+                {shape}
               </g>
             );
             // The slab seen edge-on goes under the front face.
-            return i === LAYERS - 1 ? [<rect key="band" ref={band} style={{ fill: color }} {...l.band} />, layer] : layer;
+            return i === l.layers.length - 1 ? [<rect key="band" ref={band} style={{ fill: color }} {...l.band} />, layer] : layer;
           })}
           <g ref={eyes} transform={l.eyes.transform} opacity={l.eyes.opacity}>
             <g className="s-eyes">

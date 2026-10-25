@@ -26,6 +26,10 @@ interface CharacterDef {
   body: Primitive[];
   /** Stroke in the body colour, which rounds sharp tips (e.g. the moon's horns). */
   round?: number;
+  /** How thick it is (viewBox units; bodies are about 120 wide), and how much its outline shrinks toward its front
+   * and back (0 for straight sides, like a box; 0.4 for a soft, round body). solid.ts draws it. */
+  depth: number;
+  puff: number;
   /** Centre of the face. The eyes stand upright facing you; the pose slants them (solid.ts). */
   face: { x: number; y: number };
   /** Ground shadow: centre and half-width. */
@@ -95,18 +99,24 @@ function gear(cx: number, cy: number, outer: number, inner: number, teeth: numbe
 export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
   block: {
     name: "Block",
+    depth: 10,
+    puff: 0, // a pizza box: thin and flat
     body: [{ d: roundedPoly([[46, 86], [154, 86], [154, 196], [46, 196]], 30) }],
     face: { x: 100, y: 138 },
     shadow: { x: 100, half: 52 },
   },
   bean: {
     name: "Bean",
+    depth: 72,
+    puff: 0.4, // round from every side
     body: [{ d: "M 64 84 C 92 68 122 78 128 104 C 132 122 150 126 164 140 C 182 160 172 196 132 196 L 96 196 C 56 196 36 168 38 134 C 40 108 48 92 64 84 Z" }],
     face: { x: 110, y: 150 },
     shadow: { x: 104, half: 56 },
   },
   lune: {
     name: "Lune",
+    depth: 30,
+    puff: 0.2,
     body: [{ d: crescent(98, 138, 58, 142, 102, 42) }],
     round: 12,
     face: { x: 80, y: 150 },
@@ -114,30 +124,40 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
   },
   bell: {
     name: "Bell",
+    depth: 70,
+    puff: 0.4,
     body: [{ d: "M 100 80 C 132 80 146 102 148 134 C 150 160 158 172 170 182 C 178 190 172 197 160 197 L 40 197 C 28 197 22 190 30 182 C 42 172 50 160 52 134 C 54 102 68 80 100 80 Z" }],
     face: { x: 100, y: 146 },
     shadow: { x: 100, half: 62 },
   },
   starry: {
     name: "Starry",
+    depth: 12,
+    puff: 0.04, // thin
     body: [{ d: roundedPoly(star(100, 140, 68, 38, 5), (i) => (i % 2 ? 12 : 26)) }],
     face: { x: 100, y: 146 },
     shadow: { x: 100, half: 54 },
   },
   cog: {
     name: "Cog",
+    depth: 22,
+    puff: 0.06,
     body: [{ d: roundedPoly(gear(100, 138, 60, 47, 8), 6) }],
     face: { x: 100, y: 140 },
     shadow: { x: 100, half: 50 },
   },
   roo: {
     name: "Roo",
+    depth: 26,
+    puff: 0.12,
     body: [{ d: roundedPoly([[100, 74], [162, 136], [100, 198], [38, 136]], 22) }],
     face: { x: 100, y: 138 },
     shadow: { x: 100, half: 44 },
   },
   momo: {
     name: "Momo",
+    depth: 74,
+    puff: 0.4,
     body: [
       { cx: 77, cy: 140, rx: 43, ry: 56, rot: -6 },
       { cx: 123, cy: 140, rx: 43, ry: 56, rot: 6 },
