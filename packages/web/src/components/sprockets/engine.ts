@@ -53,6 +53,7 @@ export interface Rig {
   turn: number;
   tip: number;
   roll: number;
+  shift: number;
   aim: [number, number] | null;
   gesture: { name: string; steps: Step[]; i: number; at: number } | null;
   /** The last thinking move, so the next is a different one. */
@@ -98,6 +99,7 @@ export function createRig(input: Input, from: Pose, now: number, rand: Rand = Ma
     turn: 0,
     tip: 0,
     roll: 0,
+    shift: 0,
     aim: null,
     gesture: null,
     last: "",
@@ -125,7 +127,7 @@ export function setInput(r: Rig, input: Input, now: number) {
 /** Start what the current activity does, dropping what the last one was doing. */
 function begin(r: Rig, now: number) {
   const { activity, stance, follow, faceOnly } = r.input;
-  r.turn = r.tip = r.roll = r.near = 0;
+  r.turn = r.tip = r.roll = r.shift = r.near = 0;
   r.aim = null;
   r.gesture = null;
   r.lean = null;
@@ -199,6 +201,7 @@ function direct(r: Rig, now: number) {
       if (s.turn !== undefined) r.turn = s.turn;
       if (s.tip !== undefined) r.tip = s.tip;
       if (s.roll !== undefined) r.roll = s.roll;
+      if (s.shift !== undefined) r.shift = s.shift;
       if (s.aim !== undefined) r.aim = s.aim;
       if (s.hop) r.springs.hop.v += s.hop;
       if (s.squash) r.springs.squash.v += s.squash;
@@ -264,7 +267,9 @@ export function advance(r: Rig, now: number, pointer: [number, number] | null): 
   go("pitch", h.pitch ?? (watching ? -py * 24 : base.pitch + r.tip), k, d);
   go("roll", h.roll ?? (watching ? px * 7 : r.roll), 140, 11);
   go("near", h.near ?? 1 + r.near, 45, 11); // slow: it eases toward the screen
-  go("slide", leaning ? LEAN_GLANCE.slide : 0, 60, 13);
+  // Aside: slowly with a lean-in's glance, quicker when a gesture moves it (a dance's bounces).
+  if (leaning) go("slide", LEAN_GLANCE.slide, 60, 13);
+  else go("slide", r.shift, 150, 15);
   go("lean", base.lean, 110, 12);
   go("hop", 0, 300, 18);
   go("squash", 0, 400, 16);

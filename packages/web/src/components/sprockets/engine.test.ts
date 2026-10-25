@@ -55,17 +55,20 @@ describe("a Sprocket's motion engine", () => {
     expect(seen).toBeGreaterThan(100);
   });
 
-  it("cheering: happy eyes and a dance rocking both ways, then back to its open eyes", () => {
+  it("cheering: happy eyes and a dance bouncing side to side, then back to its open eyes", () => {
     const r = rig(input("idle", "toward"));
     setInput(r, input("cheer", "toward"), r.clock);
-    let [lo, hi] = [0, 0];
+    let [lo, hi, up] = [0, 0, 0];
     const f = run(r, 1500, (f) => {
-      lo = Math.min(lo, f.pose.roll);
-      hi = Math.max(hi, f.pose.roll);
+      lo = Math.min(lo, f.pose.slide);
+      hi = Math.max(hi, f.pose.slide);
+      up = Math.max(up, f.pose.hop);
     });
     expect(f.happy).toBeGreaterThan(0.95);
-    expect(lo).toBeLessThan(-10);
-    expect(hi).toBeGreaterThan(10);
+    expect(lo).toBeLessThan(-6);
+    expect(hi).toBeGreaterThan(6);
+    expect(up).toBeGreaterThan(6);
+    expect(run(r, 1500).pose.slide).toBeCloseTo(0, 0); // back in the middle
     setInput(r, input("idle", "toward"), r.clock);
     expect(run(r, 1000).happy).toBeLessThan(0.05);
   });

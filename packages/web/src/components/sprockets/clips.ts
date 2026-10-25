@@ -11,8 +11,9 @@ const pick = <T,>(r: Rand, xs: readonly T[]): T => xs[Math.floor(r() * xs.length
 // ---- gestures ----
 
 /**
- * One step of a gesture, held for `ms`: where it turns (`turn`, degrees, + to the viewer's right), tips (`tip`, + up)
- * and rolls (`roll`), and where its eyes look (`aim`, -1 to 1 each way, null for ahead). A field left out keeps its
+ * One step of a gesture, held for `ms`: where it turns (`turn`, degrees, + to the viewer's right), tips (`tip`, + up),
+ * rolls (`roll`) and moves aside (`shift`, viewBox units, + right), and where its eyes look (`aim`, -1 to 1 each way,
+ * null for ahead). A field left out keeps its
  * value from the step before. `hop` and `squash` kick those springs, `spin` adds a whole turn either way, and `face`
  * plays an expression.
  */
@@ -21,6 +22,7 @@ export interface Step {
   turn?: number;
   tip?: number;
   roll?: number;
+  shift?: number;
   aim?: [number, number] | null;
   hop?: number;
   squash?: number;
@@ -111,9 +113,18 @@ export const SPIN: Gesture = () => [{ ms: 0, spin: 1, hop: 240 }];
 /** How long the spin takes (SprocketChat holds the typing dots back until it's done). */
 export const SPIN_MS = 700;
 
-/** Cheering, as its message lands: a dance, twisting side to side with little hops. */
-export const DANCE: Gesture = () =>
-  [20, -20, 16, -14, 8, 0].map((roll, i) => ({ ms: 230, roll, ...(i % 2 === 0 && roll ? { hop: 110 } : {}) }));
+/**
+ * Cheering, as its message lands: a dance, bouncing side to side. Each bounce hops it over to one side, stretching as it
+ * takes off and squashing as it lands, leaning and turning the way it's going with its eyes leading; four bounces,
+ * then back to the middle.
+ */
+export const DANCE: Gesture = () => [
+  ...[-1, 1, -1, 1].flatMap((s): Step[] => [
+    { ms: 210, shift: s * 11, turn: s * 14, roll: s * 9, aim: [s * 0.5, -0.4], hop: 320, squash: -1.6 },
+    { ms: 190, squash: 1.8, roll: s * 4 },
+  ]),
+  { ms: 300, shift: 0, turn: 0, roll: 0, aim: null },
+];
 
 // ---- leaning in ----
 
