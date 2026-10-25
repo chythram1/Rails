@@ -792,6 +792,8 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .lab-chats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .lab-chat { margin: 0; padding: 16px; border: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; gap: 12px; font-size: 13px; }
 .lab-chat-row, .lab-chat-flight { display: flex; align-items: center; gap: 10px; }
+.lab-chat-flight { min-height: 36px; }
+.lab-note { font-size: 13px; margin: 0 0 8px; }
 .lab-flight { width: 26px; height: calc(26px * 190 / 172); overflow: visible; }
 @media (max-width: 860px) { .lab-body { flex-direction: column; } .lab-controls { width: 100%; } .lab-stage { position: static; width: 100%; } }
 

@@ -44,6 +44,42 @@ export default function SprocketLab() {
   }, [playing]);
   const [idling, setIdling] = useState(false);
   const [chats, setChats] = useState(false);
+  const [dots, setDots] = useState(false);
+  useEffect(() => {
+    if (!dots) return;
+    const t = setTimeout(() => setDots(false), 2500 / Math.max(Number(speed), 0.05));
+    return () => clearTimeout(t);
+  }, [dots]);
+  // A reply, played as a Grok bot's goes. Direct: its own face working, the dots while it thinks, typing, then the
+  // in-flight icon goes and its row (the same drawing) celebrates. Team: the icon goes through the members until the
+  // replies land, then goes; nothing is left to celebrate.
+  const [direct, setDirect] = useState<"working" | "thinking" | "typing" | null>(null);
+  const [team, setTeam] = useState(false);
+  const later = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => later.current.forEach(clearTimeout), []);
+  const at = (ms: number, fn: () => void) => later.current.push(setTimeout(fn, ms / Math.max(Number(speed), 0.05)));
+  const onDirect = (a: AnimationName) => {
+    const r = rigs.current.get("direct");
+    if (r) perform(r, ANIMATIONS[a], clock());
+    kick();
+  };
+  const playDirect = () => {
+    setDirect("working");
+    onDirect("focus");
+    at(2500, () => setDirect("thinking"));
+    at(4700, () => {
+      setDirect("typing");
+      onDirect("stream");
+    });
+    at(7400, () => {
+      setDirect(null);
+      onDirect("cheer");
+    });
+  };
+  const playTeam = () => {
+    setTeam(true);
+    at(6000, () => setTeam(false));
+  };
 
   const each = (fn: (r: Rig, now: number) => void) => {
     const now = clock();
@@ -56,7 +92,16 @@ export default function SprocketLab() {
     setPlaying(a);
     each((r, now) => perform(r, ANIMATIONS[a], now));
   };
-  const group = (kind: "idle" | "activity") => (Object.keys(ANIMATIONS) as AnimationName[]).filter((a) => ANIMATIONS[a].kind === kind);
+  const group = (kind: "idle" | "activity", moment?: "in flight" | "done") => (Object.keys(ANIMATIONS) as AnimationName[]).filter((a) => ANIMATIONS[a].kind === kind && (!moment || (ANIMATIONS[a] as { moment?: string }).moment === moment));
+  const buttons = (names: AnimationName[]) =>
+    names.map((a) => (
+      <div key={a} className="lab-animation">
+        <button className="btn" aria-pressed={playing === a} onClick={() => perform1(a)}>
+          {ANIMATIONS[a].name}
+        </button>
+        <span className="muted">{ANIMATIONS[a].when}</span>
+      </div>
+    ));
   // Leaving the lab leaves motion running in real time.
   useEffect(() => () => setSpeed(1), []);
 
@@ -81,30 +126,28 @@ export default function SprocketLab() {
               <label htmlFor="lab-idling">Now and then while resting</label>
               <Switch id="lab-idling" checked={idling} onChange={setIdling} />
             </div>
-            {group("idle").map((a) => (
-              <div key={a} className="lab-animation">
-                <button className="btn" aria-pressed={playing === a} onClick={() => perform1(a)}>
-                  {ANIMATIONS[a].name}
-                </button>
-                <span className="muted">{ANIMATIONS[a].when}</span>
-              </div>
-            ))}
+            {buttons(group("idle"))}
           </section>
 
-          <section aria-labelledby="lab-activity-animations">
-            <h2 id="lab-activity-animations" className="lab-h">Animations: activity</h2>
+          <section aria-labelledby="lab-flight">
+            <h2 id="lab-flight" className="lab-h">Animations: in flight</h2>
             <div className="lab-row">
-              <label htmlFor="lab-chats">Show it in a direct and a team chat</label>
+              <label htmlFor="lab-chats">Show a direct and a team chat</label>
               <Switch id="lab-chats" checked={chats} onChange={setChats} />
             </div>
-            {group("activity").map((a) => (
-              <div key={a} className="lab-animation">
-                <button className="btn" aria-pressed={playing === a} onClick={() => perform1(a)}>
-                  {ANIMATIONS[a].name}
-                </button>
-                <span className="muted">{ANIMATIONS[a].when}</span>
-              </div>
-            ))}
+            <div className="lab-animation">
+              <button className="btn" aria-pressed={dots} onClick={() => setDots(true)}>
+                Dots
+              </button>
+              <span className="muted">Thinking in a direct chat: it becomes an ellipsis. Not in a team chat.</span>
+            </div>
+            {buttons(group("activity", "in flight"))}
+          </section>
+
+          <section aria-labelledby="lab-done">
+            <h2 id="lab-done" className="lab-h">Animations: done</h2>
+            <p className="muted lab-note">Once it has finished typing. Seen on its row in the list: a direct chat's in-flight icon is the row's own drawing, and a team chat leaves no icon behind.</p>
+            {buttons(group("activity", "done"))}
           </section>
 
           <section aria-labelledby="lab-look">
@@ -221,29 +264,45 @@ export default function SprocketLab() {
         <div className="lab-stages">
           <div className={"lab-stage" + (all ? " all" : "")}>
             {shown.map((c) => (
-              <Sprocket key={c} look={{ character: c, color }} size={Number(size)} stance={stance} follow={follow} activity={activity} label={CHARACTERS[c].name} onRig={track(c)} />
+              <Sprocket key={c} look={{ character: c, color }} size={Number(size)} stance={stance} follow={follow} activity={activity} dots={dots} label={CHARACTERS[c].name} onRig={track(c)} />
             ))}
           </div>
           {chats && (
             <div className="lab-chats">
               <figure className="lab-chat">
-                <figcaption className="muted">Direct chat: its row and the icon by a reply in flight are one drawing, so they move exactly alike.</figcaption>
+                <figcaption className="muted">Direct chat: the icon by a reply in flight is its row's own drawing, so they move exactly alike; once it's done the icon goes and the row celebrates.</figcaption>
                 <div className="lab-chat-row">
-                  <Sprocket id="lab-direct" look={{ character, color }} size={50} stance="rest" activity={activity} onRig={track("direct")} />
+                  <Sprocket id="lab-direct" look={{ character, color }} size={50} stance="rest" activity={activity} dots={direct === "thinking"} onRig={track("direct")} />
                   <span>{CHARACTERS[character].name}</span>
                 </div>
                 <div className="lab-chat-flight">
-                  <svg className="lab-flight" viewBox={`0 0 50 ${(50 * VIEW.h) / VIEW.w}`} aria-hidden>
-                    <use href="#lab-direct" />
-                  </svg>
-                  <span className="muted">{CHARACTERS[character].name} is thinking…</span>
+                  {direct ? (
+                    <>
+                      <svg className="lab-flight" viewBox={`0 0 50 ${(50 * VIEW.h) / VIEW.w}`} aria-hidden>
+                        <use href="#lab-direct" />
+                      </svg>
+                      <span className="muted">{direct === "working" ? "Working on it…" : direct === "thinking" ? "Mulling it over…" : "Typing…"}</span>
+                    </>
+                  ) : (
+                    <button className="btn" onClick={playDirect}>
+                      Play a reply
+                    </button>
+                  )}
                 </div>
               </figure>
               <figure className="lab-chat">
-                <figcaption className="muted">Team chat: the icon goes through the members thinking on its own, apart from their rows.</figcaption>
+                <figcaption className="muted">Team chat: the icon goes through the members on its own, apart from their rows, never as dots; once the replies land it goes, so there's nothing left to celebrate.</figcaption>
                 <div className="lab-chat-flight">
-                  <TeamThinking looks={SPROCKET_CHARACTERS.slice(0, 3).map((c, i) => ({ id: c, look: { character: c, color: SPROCKET_COLORS[(SPROCKET_COLORS.indexOf(color) + i) % SPROCKET_COLORS.length] } }))} size={26} />
-                  <span className="muted">{SPROCKET_CHARACTERS.slice(0, 3).map((c) => CHARACTERS[c].name).join(", ")} are thinking…</span>
+                  {team ? (
+                    <>
+                      <TeamThinking looks={SPROCKET_CHARACTERS.slice(0, 3).map((c, i) => ({ id: c, look: { character: c, color: SPROCKET_COLORS[(SPROCKET_COLORS.indexOf(color) + i) % SPROCKET_COLORS.length] } }))} size={26} />
+                      <span className="muted">{SPROCKET_CHARACTERS.slice(0, 3).map((c) => CHARACTERS[c].name).join(", ")} are working…</span>
+                    </>
+                  ) : (
+                    <button className="btn" onClick={playTeam}>
+                      Play a reply
+                    </button>
+                  )}
                 </div>
               </figure>
             </div>

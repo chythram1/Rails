@@ -16,6 +16,8 @@ export interface Drawing {
   depth: number;
   puff: number;
   face: { x: number; y: number };
+  /** How much the eyes show (1 if left out): they fade as it becomes three dots. */
+  eyes?: number;
 }
 
 /** Points round an ellipse, as flubber takes a ring. */
@@ -72,3 +74,41 @@ export function still(look: SprocketLook): Drawing {
   const d = shapes.map((s) => (typeof s === "string" ? s : `M ${s.map((p) => p.join(" ")).join(" L ")} Z`)).join(" ");
   return { d, color: COLORS[look.color], round: def.round ?? 0, depth: def.depth, puff: def.puff, face: { ...def.face } };
 }
+
+// ---- the ellipsis: a Sprocket thinking in a direct chat becomes three dots (as a Grok bot does) ----
+
+/** The three dots' centres and size (viewBox), low on the body like a typing ellipsis. */
+export const DOTS = { y: 156, xs: [60, 100, 140], r: 17, hop: 11, beat: 900 } as const;
+const circle = (cx: number, cy: number, r: number) => `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${2 * r} 0 a ${r} ${r} 0 1 0 ${-2 * r} 0 Z`;
+
+/** From `t` 0 (its body) to 1 (three dots at rest) and the drawing between: its outline splits into the dots, it
+ * thins and its eyes fade. */
+export function toDots(look: SprocketLook): (t: number) => Drawing {
+  const def = CHARACTERS[look.character];
+  const from = shapesOf(look);
+  const dots = DOTS.xs.map((x) => ring({ cx: x, cy: DOTS.y, rx: DOTS.r, ry: DOTS.r }, 32));
+  const options = { maxSegmentLength: 4, single: true };
+  // One shape splits in three; several (momo's two) each become one, the last twice over.
+  const body = from.length === 1 ? separate(from[0], dots, options) : interpolateAll([...from, from[from.length - 1]].slice(0, 3), dots, options);
+  return (t) => ({
+    d: t <= 0 ? still(look).d : body(t),
+    color: COLORS[look.color],
+    round: lerp(def.round ?? 0, 0, t),
+    depth: lerp(def.depth, 8, t),
+    puff: lerp(def.puff, 0, t),
+    face: { ...def.face },
+    eyes: Math.max(0, 1 - t * 1.6),
+  });
+}
+
+/** The three dots `ms` into their bounce: each hops in turn, a wave going round every DOTS.beat. */
+export function dotsAt(look: SprocketLook, ms: number): Drawing {
+  const d = DOTS.xs
+    .map((x, i) => {
+      const phase = (ms / DOTS.beat) * Math.PI * 2 - i * 0.9;
+      return circle(x, DOTS.y - DOTS.hop * Math.max(0, Math.sin(phase)), DOTS.r);
+    })
+    .join(" ");
+  return { ...toDots(look)(1), d };
+}
+

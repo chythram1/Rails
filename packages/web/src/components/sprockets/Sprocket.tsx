@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { SprocketLook } from "@rails/shared";
 import { CHARACTERS, COLORS, type Primitive } from "./characters.ts";
-import type { Drawing } from "./morph.ts";
+import { dotsAt, toDots, type Drawing } from "./morph.ts";
 import { pop, type Activity, type Frame, type Rig } from "./engine.ts";
 import { kick, useRig, useSprocketMotion } from "./motion.ts";
 import { EYE, EYE_X, Eyes } from "./parts.tsx";
@@ -33,6 +33,8 @@ interface Props {
   onRig?: (rig: Rig | null) => void;
   /** Its SVG's id, so another place can show the same drawing (`<use href>`), moving exactly as it does. */
   id?: string;
+  /** Thinking in a direct chat: it becomes three bouncing dots, an ellipsis, and back when this turns off. */
+  dots?: boolean;
 }
 
 /** A body's bounds before it's measured (most bodies sit about here). */
@@ -43,13 +45,15 @@ const BOX: Box = { x: 40, y: 80, width: 120, height: 116 };
  * the outline and where the eyes sit, never as shading), the band seen edge-on, and the eyes on the front face. While
  * it moves, its rig (engine.ts, run by motion.ts) paints every frame straight into the SVG.
  */
-export function Sprocket({ look, size, still, stance = "rest", follow = false, activity = "idle", drawing, label, onRig, id }: Props) {
+export function Sprocket({ look, size, still, stance = "rest", follow = false, activity = "idle", drawing: given, label, onRig, id, dots = false }: Props) {
   const def = CHARACTERS[look.character];
+  const motion = useSprocketMotion();
+  const dotted = useDots(look, dots, motion);
+  const drawing = given ?? dotted;
   const color = drawing?.color ?? COLORS[look.color];
   const round = drawing ? drawing.round : (def.round ?? 0);
   const face = drawing?.face ?? def.face;
   const axis = def.shadow.x;
-  const motion = useSprocketMotion();
 
   const svg = useRef<SVGSVGElement>(null);
   const rigEl = useRef<SVGGElement>(null);
@@ -63,8 +67,8 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
   // Moving, it's drawn from where it starts and the rig paints every frame after; still, from its stance.
   const [from] = useState(() => poseOf(activity === "cheer" ? "rest" : stance));
   const solid = { depth: drawing?.depth ?? def.depth, puff: drawing?.puff ?? def.puff };
-  const geometry = useRef({ axis, face, half: def.shadow.half, body: solid });
-  geometry.current = { axis, face, half: def.shadow.half, body: solid };
+  const geometry = useRef({ axis, face, half: def.shadow.half, body: solid, eyes: drawing?.eyes ?? 1 });
+  geometry.current = { axis, face, half: def.shadow.half, body: solid, eyes: drawing?.eyes ?? 1 };
   const shown = useRef<Frame | null>(null);
   const paint = useRef((f: Frame) => {
     shown.current = f;
@@ -75,7 +79,7 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
     const b = band.current;
     if (b) for (const [k, v] of Object.entries(l.band)) b.setAttribute(k, String(v));
     eyes.current?.setAttribute("transform", l.eyes.transform);
-    eyes.current?.setAttribute("opacity", String(l.eyes.opacity));
+    eyes.current?.setAttribute("opacity", String(l.eyes.opacity * g.eyes));
     look_.current?.setAttribute("transform", `translate(${f.look[0].toFixed(2)} ${f.look[1].toFixed(2)})`);
     shadow.current?.setAttribute("rx", String(l.shadow.rx));
     paintEyes(eyes.current, f, l.eyes.slant);
@@ -143,7 +147,7 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
           // The body seen edge-on goes under the front face.
           return i === l.layers.length - 1 ? [<rect key="band" ref={band} style={{ fill: color }} {...l.band} />, layer] : layer;
         })}
-        <g ref={eyes} transform={l.eyes.transform} opacity={l.eyes.opacity}>
+        <g ref={eyes} transform={l.eyes.transform} opacity={l.eyes.opacity * (drawing?.eyes ?? 1)}>
           <g ref={look_}>
             <Eyes slant={l.eyes.slant} />
           </g>
@@ -186,3 +190,38 @@ function Shape({ p }: { p: Primitive }) {
   if ("d" in p) return <path d={p.d} />;
   return <ellipse cx={p.cx} cy={p.cy} rx={p.rx} ry={p.ry} transform={p.rot ? `rotate(${p.rot} ${p.cx} ${p.cy})` : undefined} />;
 }
+
+/** How long it takes to become the dots, and to come back (ms). */
+const DOTS_MS = 380;
+const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+
+/** The drawing while it is, or is turning into or back from, three dots (morph.ts); undefined as itself. With
+ * reduced motion it is the dots at once, still. */
+function useDots(look: SprocketLook, on: boolean, motion: boolean): Drawing | undefined {
+  const [frame, setFrame] = useState<Drawing | undefined>(undefined);
+  const amount = useRef(0);
+  useEffect(() => {
+    if (!motion) {
+      amount.current = on ? 1 : 0;
+      setFrame(on ? toDots(look)(1) : undefined);
+      return;
+    }
+    if (!on && amount.current === 0) return;
+    const step = toDots(look);
+    let raf = 0;
+    let last = performance.now();
+    const start = last;
+    const tick = (now: number) => {
+      amount.current = Math.min(1, Math.max(0, amount.current + ((on ? 1 : -1) * (now - last)) / DOTS_MS));
+      last = now;
+      const a = amount.current;
+      if (!on && a === 0) return setFrame(undefined);
+      setFrame(a < 1 ? step(easeInOut(a)) : dotsAt(look, now - start));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [on, motion, look.character, look.color]);
+  return frame;
+}
+

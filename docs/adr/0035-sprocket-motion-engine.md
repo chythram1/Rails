@@ -52,14 +52,19 @@ frames; numbers are Grok's, Rails' animations use their own values):
   Given a list (`setIdles`), a resting rig plays them on a Grok bot's timing: a beat to settle first
   (`IDLE_FIRST`, 1.5–3 s), then one straight after another with half a second still between (`IDLE_GAP`),
   weighted (Breathe most), the rarer ones never twice running; anything to do stops them at once.
-- **Activity**: while it works on a message (in flight: Stream, Focus, Idea, Inspect, Rummage, and Survey) or as
-  something lands (alerts: Cheer, Satisfied, Notify, Puzzled, Droop, Hooray, Twirl). In flight and alerts are one
-  set; what differs is the chat. In a direct chat the icon by a reply in flight and the Sprocket's row are one
-  drawing (`<use>` of the row's SVG, its `id`), so they move exactly alike. In a team chat the thinking icon is
-  its own Sprocket, going through the members thinking, apart from their rows.
+- **Activity**, at one of two moments (`moment`): in flight, while it thinks or types (Stream, Focus, Idea, Inspect,
+  Rummage, Survey, and the dots), and done, only once it has finished typing: celebrating mostly (Cheer, Satisfied,
+  Notify, Hooray, Twirl), or finishing stuck or failed (Puzzled, Droop). What differs is the chat, as a Grok bot's:
+  - In a direct chat the icon by a reply in flight and the Sprocket's row are one drawing (`<use>` of the row's
+    SVG, its `id`), so they move exactly alike, and while it thinks it becomes an ellipsis: its outline splits into
+    three bouncing dots and back (`dots` on `Sprocket`, `toDots` and `dotsAt` in `morph.ts`). Once it's done the
+    icon goes, and the row, being the same drawing, is where it celebrates.
+  - In a team chat the thinking icon is its own Sprocket, going through the members, apart from their rows, and
+    never dots. Once the replies land it goes; the team's own picture is still, so nothing is left to celebrate.
 
 Moves gained `near`, `lookY`, held faces (`eyes`: named shapes in `FACES`, blending over `FACE_MS`) and their own
 `blinks`: while an animation with moves plays, those are its only blinks, so a blink never lands on a face it
 didn't plan for. The new animations are in the lab only (its Idle and Activity groups, a switch to idle now and
-then, and a panel showing the direct mirror and the team icon); where each plays in the app is still to decide.
+then, the dots, and a panel playing a reply in a direct and in a team chat); where each plays in the app is still
+to decide.
 
