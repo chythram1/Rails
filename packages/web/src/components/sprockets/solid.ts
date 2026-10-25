@@ -25,11 +25,12 @@ export interface Pose {
   slide: number;
 }
 
-/** Where it rests, beside its messages too: turned up and to the viewer's right, rolled a quarter turn's worth to the
- * left, its face to the upper right (Grok's bots' resting pose, measured: tipped 16° up, turned 33°, rolled 25°).
+/** Where it rests, beside its messages too: turned up and to the viewer's right, rolled a little to the left, its face
+ * to the upper right (Grok's bots' resting pose: tipped 16° up, turned 33°, rolled 16°, measured on its square's and
+ * tablet's edges; rolled further, a flat body looks like it's lying on its back).
  * Facing you, it's the flat drawing. */
 export const POSES = {
-  rest: { yaw: 33, pitch: 16, roll: -25, lean: 0 },
+  rest: { yaw: 33, pitch: 16, roll: -16, lean: 0 },
   front: { yaw: 0, pitch: 0, roll: 0, lean: 0 },
 } as const;
 export type Stance = keyof typeof POSES;

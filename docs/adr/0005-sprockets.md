@@ -66,7 +66,9 @@ lands; a team's picture stays still. The constant bob and sway, the per-characte
 It's not a 3D model (there's no mesh or lighting): bodies are any 2D outline, so the depth follows the outline.
 
 Amendment (2026-10-25): turned in 3D, resting up and to the right. A Grok bot rests turned up and to the right as a
-solid (its renderer turns a mesh: tipped 16° up, turned 33°, rolled 25° to the left, its eyes wrapped on the body), and
+solid (its renderer turns a mesh: tipped 16° up, turned 33°, rolled 16° to the left, its eyes wrapped on the body;
+the roll measured on its square's and tablet's edges, after a first reading of 25° from its code made flat
+bodies look like they were lying on their backs), and
 the same pose sits beside its messages; Sprockets barely moved their bodies and only shifted their eyes, both the same
 shape. Now `solid.ts` turns each slice by the full rotation (tipped, then turned; the roll stays the rig's turn in the
 plane), so a flat body shears into a parallelogram, and places every point of each eye on a front that curves as much

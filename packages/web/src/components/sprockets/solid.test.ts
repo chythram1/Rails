@@ -63,7 +63,7 @@ describe("a Sprocket as a solid", () => {
     const rest = poseOf("rest");
     expect(eyeWidth(soft, rest, 1)).toBeLessThan(eyeWidth(soft, rest, -1) * 0.85);
     expect(eyeWidth(pizza, rest, 1)).toBeCloseTo(eyeWidth(pizza, rest, -1), 1);
-    expect(POSES.rest).toMatchObject({ yaw: 33, pitch: 16, roll: -25 });
+    expect(POSES.rest).toMatchObject({ yaw: 33, pitch: 16, roll: -16 });
   });
 
   it("looking up and to the right, an upright eye's top leans left", () => {
