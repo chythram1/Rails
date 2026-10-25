@@ -26,7 +26,9 @@ export type Route =
    */
   | { name: "automate"; view: "list" | "templates" }
   | { name: "automate"; view: "new"; template?: string }
-  | { name: "automate"; view: "item"; id: string };
+  | { name: "automate"; view: "item"; id: string }
+  /** The Sprocket lab (ADR 0035): dev builds only. */
+  | { name: "lab" };
 
 export type CustomizeTab = "connectors" | "skills" | "prompts";
 /** What a new item in Customize is: a skill, a prompt, or a custom server with a URL or a command. */
@@ -46,6 +48,7 @@ export function parse(hash: string): Route {
     if (parts[1]) return { name: "sprockets", view: "chat", id: parts[1], ...(project ? { project } : {}) };
     return { name: "sprockets", view: "list" };
   }
+  if (parts[0] === "lab" && import.meta.env.DEV) return { name: "lab" };
   if (parts[0] === "new" && parts[1]) return { name: "home", promptId: parts[1] };
   if (parts[0] === "customize") {
     if (parts[1] === "apps" && parts[2] === "google") return { name: "customize", view: "app", tab: "connectors", app: "google" };

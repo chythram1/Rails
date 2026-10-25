@@ -16,7 +16,8 @@ import { EventRow } from "./EventRow.tsx";
 import { SuggestionCard } from "./SuggestionCard.tsx";
 import { MessageActions } from "./MessageActions.tsx";
 import { COLORS } from "./characters.ts";
-import { SPIN_MS, useCheering, useSprocketMotion } from "./motion.ts";
+import { useCheering, useSprocketMotion } from "./motion.ts";
+import { SPIN_MS } from "./clips.ts";
 import { useThreadScroll } from "./threadScroll.ts";
 import { TeamThinking } from "./TeamThinking.tsx";
 import { findNames } from "./mentions.ts";
@@ -227,7 +228,7 @@ export function SprocketChat({
           <a className="icon-btn sp-back" href={href.sprockets()} aria-label="All Sprockets">
             <ChevronLeft size={18} />
           </a>
-          {team ? <TeamFace looks={members} size={28} /> : <Sprocket look={sprocket.look} size={28} busy={running} />}
+          {team ? <TeamFace looks={members} size={28} /> : <Sprocket look={sprocket.look} size={28} activity={running ? "think" : "idle"} />}
           {/* A team's name, then its members. */}
           <h2 id="sp-chat-title" className="truncate" title={team ? `${title} · ${members.map((m) => m.name).join(", ")}` : name}>
             {team ? (
@@ -419,7 +420,7 @@ export function SprocketChat({
                       </div>
                     ) : (
                       <span key={one.id} className="sp-watcher">
-                        <Sprocket look={one.look} size={26} busy={spinning !== one.id} spin={spinning === one.id} />
+                        <Sprocket look={one.look} size={26} activity={spinning === one.id ? "write" : "think"} />
                       </span>
                     )}
                   </li>
@@ -539,5 +540,5 @@ function ChatTab({ href: to, current, label, chat }: { href: string; current: bo
  */
 function DoneFace({ look, id, pop }: { look: SprocketData["look"]; id: string; pop: boolean }) {
   const cheering = useCheering(pop ? id : undefined, true);
-  return <Sprocket look={look} size={26} stance="toward" still={!cheering} cheer={cheering} />;
+  return <Sprocket look={look} size={26} stance="toward" still={!cheering} activity={cheering ? "cheer" : "idle"} />;
 }

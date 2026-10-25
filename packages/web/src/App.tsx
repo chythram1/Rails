@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { IconLayoutSidebar as PanelLeft } from "@tabler/icons-react";
 import { api, onSignedOut, Unauthorized } from "./api.ts";
 import { CustomizePage } from "./components/customize/CustomizePage.tsx";
@@ -17,6 +17,9 @@ import { StoreProvider } from "./store.tsx";
 import { socket } from "./ws.ts";
 
 type Auth = "checking" | "in" | "out" | "down";
+
+/** The Sprocket lab (ADR 0035), in dev builds only: production builds leave it out. */
+const SprocketLab = import.meta.env.DEV ? lazy(() => import("./components/sprockets/SprocketLab.tsx")) : null;
 
 export function App() {
   const [auth, setAuth] = useState<Auth>("checking");
@@ -113,6 +116,11 @@ function Shell() {
           {route.name === "sprockets" && <SprocketsPage route={route} />}
           {route.name === "customize" && <CustomizePage route={route} />}
           {route.name === "automate" && <AutomatePage route={route} />}
+          {route.name === "lab" && SprocketLab && (
+            <Suspense>
+              <SprocketLab />
+            </Suspense>
+          )}
         </main>
         {settings && (
           <SettingsDialog

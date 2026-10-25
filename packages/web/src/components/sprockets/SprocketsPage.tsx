@@ -255,7 +255,7 @@ function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; t
       onFocus={() => setFocus(true)}
       onBlur={() => setFocus(false)}
     >
-      <Sprocket look={s.look} size={50} still={!awake} stance={facing ? "front" : "rest"} follow={hover && !busy && !cheering} busy={busy && !cheering} cheer={cheering} />
+      <Sprocket look={s.look} size={50} still={!awake} stance={facing ? "front" : "rest"} follow={hover && !busy && !cheering} activity={cheering ? "cheer" : busy ? "think" : "idle"} />
       <RowText name={s.name} chat={shown} />
     </a>
   );
@@ -304,7 +304,7 @@ function Gallery({ list }: { list: SprocketData[] }) {
         {list.map((s) => (
           <li key={s.id}>
             <a className="sp-card" href={href.sprocket(s.id)} title={s.name}>
-              <Sprocket look={s.look} size={84} busy={s.running} />
+              <Sprocket look={s.look} size={84} activity={s.running ? "think" : "idle"} />
               <span className="sp-card-name truncate">{s.name}</span>
               <span className="muted small truncate">{preview(s.direct)}</span>
             </a>

@@ -53,7 +53,7 @@ round body. Turned or tipped it's seen in true perspective, so a thin body (Bloc
 while a deep, soft one (Bean, Bell, Momo) stays round from every side; one depth for all made them all look like the
 same cylinder. The eyes ride the front, slanting as they would on a dome. There's no shading: a darker side read as
 stacked layers. Facing you it's exactly the flat drawing, so every character keeps its
-look. One set of springs (`motion.ts`) moves its turn, tip, roll, lean, hop and squash, painted straight into the
+look. One set of springs (now a rig in `engine.ts`, ADR 0035) moves its turn, tip, roll, lean, hop and squash, painted straight into the
 SVG. The poses: resting almost facing you and still, glancing now and then; facing
 you in its open chat's row; following the pointer in a hovered row and in the creator; while thinking, one small move
 after another (pondering, looking about, peeking, nodding, tilting, a bounce, a scrunch, now and then a spin),

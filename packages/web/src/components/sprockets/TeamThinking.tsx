@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { SprocketLook } from "@rails/shared";
-import { morph, type Frame } from "./morph.ts";
+import { morph, type Drawing } from "./morph.ts";
 import { useSprocketMotion } from "./motion.ts";
 import { Sprocket } from "./Sprocket.tsx";
 
@@ -19,7 +19,7 @@ const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 
 export function TeamThinking({ looks, size }: { looks: { id: string; look: SprocketLook }[]; size: number }) {
   const motion = useSprocketMotion();
   const [at, setAt] = useState(0);
-  const [frame, setFrame] = useState<Frame | undefined>(undefined);
+  const [frame, setFrame] = useState<Drawing | undefined>(undefined);
   // The member shown, by id, so a list that grows or reorders doesn't make it jump.
   const shown = useRef<string | undefined>(undefined);
   const index = Math.max(0, looks.findIndex((l) => l.id === shown.current));
@@ -58,5 +58,5 @@ export function TeamThinking({ looks, size }: { looks: { id: string; look: Sproc
   }, [motion, key, at]);
 
   if (!current) return null;
-  return <Sprocket look={current.look} drawing={frame} size={size} busy />;
+  return <Sprocket look={current.look} drawing={frame} size={size} activity="think" />;
 }

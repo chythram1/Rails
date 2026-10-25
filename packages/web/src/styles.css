@@ -767,22 +767,25 @@ textarea.input { resize: vertical; line-height: 1.5; }
 }
 
 /* ---- Sprocket characters (components/sprockets) ----
-   A solid (solid.ts): motion.ts paints its pose (turn, lean, hop, squash) into SVG transforms, so nothing here
-   loops. These are the one-shot pieces: a squash on a change of look (s-pop), blinks (s-lid), the eyes looking
-   (s-eyes, from --ex/--ey) and changing shape (each s-eye). */
+   A solid (solid.ts) whose rig (engine.ts, ADR 0035) paints every frame into SVG attributes, so nothing here
+   animates. */
 .sprocket { display: block; overflow: visible; flex-shrink: 0; }
-.sprocket :is(.s-pop, .s-lid) { transform-box: fill-box; }
-.sprocket .s-pop { transform-origin: 50% 100%; }
-.sprocket .s-lid { transform-origin: 50% 50%; }
-/* Each eye changes size and shape about its own centre (motion.ts express). */
-.sprocket .s-eye { transform-box: fill-box; transform-origin: 50% 50%; }
 /* The ground shadow: black in both themes, lighter on a light page (--sprocket-shadow). */
 .sprocket .s-shadow { fill: #000; opacity: var(--sprocket-shadow); }
-/* Eyes look about (motion.ts writes --ex/--ey in viewBox units). */
-.sprocket .s-eyes { transform: translate(calc(var(--ex, 0) * 1px), calc(var(--ey, 0) * 1px)); }
-/* Happy eyes (^ ^) while it dances (motion.ts adds `joy`). */
-.sprocket .s-happy, .sprocket.joy .s-open { opacity: 0; }
-.sprocket.joy .s-happy { opacity: 1; }
+
+/* The Sprocket lab (SprocketLab.tsx, dev builds only): controls on the left, the stage on the right. */
+.lab { max-width: 1280px; }
+.lab-title { font: 600 24px/1.2 var(--grotesk); margin: 0 0 4px; }
+.lab-body { display: flex; gap: 32px; margin-top: 24px; align-items: flex-start; }
+.lab-controls { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; gap: 20px; }
+.lab-h { font: 400 11px/1 var(--mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.lab-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; font-size: 14px; }
+.lab-row input[type="range"] { flex: 1; accent-color: var(--blue); }
+.lab-value { width: 44px; text-align: right; font: 400 12px var(--mono); color: var(--text-2); }
+.lab-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.lab-stage { flex: 1; min-height: 420px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); background: var(--surface); position: sticky; top: 24px; }
+.lab-stage.all { flex-wrap: wrap; gap: 16px; align-content: center; padding: 24px; }
+@media (max-width: 860px) { .lab-body { flex-direction: column; } .lab-controls { width: 100%; } .lab-stage { position: static; width: 100%; } }
 
 /* ---- Sprockets page: list column + chat or creator (components/sprockets) ---- */
 .sprockets { display: flex; height: 100%; min-height: 0; }

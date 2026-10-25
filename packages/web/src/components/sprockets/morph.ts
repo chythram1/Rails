@@ -6,7 +6,7 @@ import type { SprocketLook } from "@rails/shared";
 import { CHARACTERS, COLORS, type Primitive } from "./characters.ts";
 
 /** A Sprocket's drawing at one point of a morph. */
-export interface Frame {
+export interface Drawing {
   /** The body, as one path (several rings for a body of several shapes). */
   d: string;
   color: string;
@@ -52,7 +52,7 @@ function outline(a: SprocketLook, b: SprocketLook): Interpolator {
 }
 
 /** A function from `t` (0 is `a`, 1 is `b`) to the drawing between them. */
-export function morph(a: SprocketLook, b: SprocketLook): (t: number) => Frame {
+export function morph(a: SprocketLook, b: SprocketLook): (t: number) => Drawing {
   const [da, db] = [CHARACTERS[a.character], CHARACTERS[b.character]];
   const body = outline(a, b);
   return (t) => ({
@@ -66,7 +66,7 @@ export function morph(a: SprocketLook, b: SprocketLook): (t: number) => Frame {
 }
 
 /** A Sprocket's drawing, still. */
-export function still(look: SprocketLook): Frame {
+export function still(look: SprocketLook): Drawing {
   const def = CHARACTERS[look.character];
   const shapes = shapesOf(look);
   const d = shapes.map((s) => (typeof s === "string" ? s : `M ${s.map((p) => p.join(" ")).join(" L ")} Z`)).join(" ");
