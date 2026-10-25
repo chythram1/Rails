@@ -10,7 +10,7 @@ export interface Animation {
   when: string;
   /** What the Sprocket is doing while it plays (engine.ts's activity). */
   activity: "cheer";
-  /** How long it lasts. */
+  /** How long it lasts, its eyes included: one piece, so they go with it. */
   ms: number;
   /** The gesture it plays as it starts. */
   gesture: Gesture;
@@ -23,7 +23,7 @@ export const ANIMATIONS = {
     name: "Cheer",
     when: "Its message lands, in any chat: beside the message, and on its row in the list.",
     activity: "cheer",
-    ms: 5000,
+    ms: 2200, // the dance (1.9s), and a moment for the eyes to ease back as it settles
     gesture: DANCE,
     eyes: "happy",
   },
