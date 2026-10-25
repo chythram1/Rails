@@ -2,7 +2,6 @@
 // every moving Sprocket's rig (engine.ts). The loop draws a frame while anything moves, then sleeps until the next
 // thing a rig has planned (a blink, a glance, a lean-in). Its clock can be slowed, paused and stepped (the lab).
 import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
-import { ANIMATIONS } from "./animations.ts";
 import { advance, createRig, setInput, type Frame, type Input, type Rig } from "./engine.ts";
 import type { Pose } from "./solid.ts";
 
@@ -21,19 +20,20 @@ export function useSprocketMotion(): boolean {
 }
 
 /**
- * True while a Sprocket cheers (animations.ts): for as long as the cheer lasts from each time `key` (its newest message) changes, or from the start if
- * it starts set and `fromStart`. The timer isn't cleared on cleanup, so StrictMode's second effect run can't end it.
+ * True for `ms` from each time `key` changes (not for the key it starts with): while an animation plays for it, such
+ * as a done one for a Sprocket's newest message. The timer isn't cleared on cleanup, so StrictMode's second effect
+ * run can't end it.
  */
-export function useCheering(key: string | undefined, fromStart = false): boolean {
-  const seen = useRef(fromStart ? undefined : key);
+export function usePlaying(key: string | undefined, ms: number): boolean {
+  const seen = useRef(key);
   const count = useRef(0);
-  const [on, setOn] = useState(fromStart && key !== undefined);
+  const [on, setOn] = useState(false);
   useEffect(() => {
     if (key === undefined || key === seen.current) return;
     seen.current = key;
     const n = ++count.current;
     setOn(true);
-    setTimeout(() => n === count.current && setOn(false), ANIMATIONS.cheer.ms);
+    setTimeout(() => n === count.current && setOn(false), ms);
   }, [key]);
   return on;
 }

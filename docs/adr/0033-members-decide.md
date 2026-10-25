@@ -55,7 +55,7 @@ Decisions:
   the message (the outline morphs, flubber, and the colour fades across), and a line beside it names those still
   thinking, in the team's order ("Becky and Chandler are thinking…"). A member that finishes drops out of the line, not
   the icon, so nothing flickers; a member stays named for 800ms after it stops. A team has no typing dots or spin;
-  direct chats keep them. Members' names in messages read as chips, with or without an @; a chip is a reference and
+  direct chats keep dots, now as the Sprocket itself (ADR 0035's amendment, in the app). Members' names in messages read as chips, with or without an @; a chip is a reference and
   wakes nobody.
 
 Amendment (2026-10-24): greetings and thanks to everyone get an answer from each member who wants to give one. The

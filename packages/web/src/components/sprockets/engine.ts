@@ -189,12 +189,14 @@ function clear(r: Rig) {
 
 /** Rest: at its resting stance, and not following the pointer, it glances aside now and then and leans in gently. */
 function rest(r: Rig, now: number) {
-  if (r.input.stance !== "rest" || r.input.follow) return;
+  if (r.input.follow) return;
+  // Idle animations play in any stance (an open chat's row faces you); glances and leaning in only at rest.
   if (r.idles?.length && r.input.activity === "idle") {
     const [a, b] = r.lastIdle ? IDLE_GAP : IDLE_FIRST;
     r.nextIdle = now + between(r.rand, a, b);
     return;
   }
+  if (r.input.stance !== "rest") return;
   r.nextGlance = now + between(r.rand, 1500, 6000);
   r.nextLean = now + between(r.rand, 2500, 6000);
 }

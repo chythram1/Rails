@@ -16,8 +16,8 @@ import { EventRow } from "./EventRow.tsx";
 import { SuggestionCard } from "./SuggestionCard.tsx";
 import { MessageActions } from "./MessageActions.tsx";
 import { COLORS } from "./characters.ts";
-import { useCheering, useSprocketMotion } from "./motion.ts";
-import { SPIN_MS } from "./clips.ts";
+import { rowId, useFlight, useStep } from "./flight.ts";
+import { VIEW } from "./Sprocket.tsx";
 import { useThreadScroll } from "./threadScroll.ts";
 import { TeamThinking } from "./TeamThinking.tsx";
 import { findNames } from "./mentions.ts";
@@ -158,45 +158,13 @@ export function SprocketChat({
   /** In a team, members' names read as chips. */
   const text = (t: string) => (team ? withMentions(t, members) : t);
 
-  // Who's on it, in a direct or project chat: the Sprocket's face. It shows while it reads and thinks; when it starts
-  // writing, it spins round (SPIN_MS) and turns into the typing dots, which stay, with no face, through every message
-  // of its turn (a reply can be several), until its turn is over. A team has no dots or spin (ADR 0033): one icon
-  // turns from one member into the next, round those thinking since the message (TeamThinking), with a line naming
-  // those still at it.
-  const motion = useSprocketMotion();
-  const [spinning, setSpinning] = useState<string | null>(null);
-  /** Members who have started writing in their current turn: dots until it ends. */
-  const [started, setStarted] = useState<string[]>([]);
+  // Who's on it, in a direct or project chat: an icon by the reply in flight that is the Sprocket's row in the list
+  // (FlightIcon, ADR 0035): it becomes three dots while it thinks, and goes once the reply is done, when the row
+  // plays its done animation. A team has no dots (ADR 0033): one icon turns from one member into the next, round those
+  // thinking since the message (TeamThinking), with a line naming those still at it; it goes when the replies land.
   // In a team, in the team's order, so the line naming them doesn't reorder as runs start and end.
   const onIt = team ? members.filter((m) => watching.includes(m.id)) : watching.flatMap((w) => speaker(w) ?? []);
   const one = team ? undefined : onIt[0];
-  const dots = !!one && (one.id === writing || started.includes(one.id)) && spinning !== one.id;
-  const face = one && !dots ? one.id : null;
-  // The face last shown, and when it went (Infinity while it shows): between thinking and writing there can be a
-  // moment with no one on it.
-  const lastFace = useRef<{ id: string; at: number } | null>(null);
-  // Before paint, so neither the dots nor the face flash. A turn's first writing starts it (and the spin, if its
-  // face was showing); a member whose turn is over (no longer on it) starts afresh next time.
-  useLayoutEffect(() => {
-    if (team || !writing || started.includes(writing)) return;
-    setStarted((s) => [...s, writing]);
-    const last = lastFace.current;
-    if (!motion || last?.id !== writing || Date.now() - last.at > 1500) return;
-    setSpinning(writing);
-  }, [writing]);
-  // Its own timer, so writing pausing between messages can't leave it spinning.
-  useEffect(() => {
-    if (!spinning) return;
-    const t = setTimeout(() => setSpinning(null), SPIN_MS);
-    return () => clearTimeout(t);
-  }, [spinning]);
-  useLayoutEffect(() => {
-    if (started.some((m) => !watching.includes(m))) setStarted((s) => s.filter((m) => watching.includes(m)));
-  }, [watching.join()]);
-  useLayoutEffect(() => {
-    if (face) lastFace.current = { id: face, at: Infinity };
-    else if (lastFace.current?.at === Infinity) lastFace.current = { ...lastFace.current, at: Date.now() };
-  });
   /**
    * In a team, who's thinking now, by name: "Bo is thinking…", "Bo and Cy are thinking…". A member stays named a
    * moment after it stops, so one that rereads quietly for a moment (a teammate's reply woke it) doesn't flicker in and out.
@@ -210,15 +178,6 @@ export function SprocketChat({
     if (team) setCycle((c) => (named.length ? [...c, ...named.filter((w) => !c.includes(w))] : []));
   }, [named.join()]);
   const cycling = team ? cycle.flatMap((c) => speaker(c) ?? []) : [];
-  /** The messages at the end of the chat from the Sprocket writing them now (its current turn): its face waits. */
-  const tail = new Set<string>();
-  const end = [...(messages ?? [])].reverse();
-  const onTurn = new Set([...(writing ? [writing] : []), ...started]);
-  const writer = !team && end[0]?.author === "sprocket" && onTurn.has(end[0].sprocketId) ? end[0].sprocketId : undefined;
-  for (const m of end) {
-    if (m.author !== "sprocket" || m.sprocketId !== writer) break;
-    tail.add(m.id);
-  }
 
 
   return (
@@ -354,8 +313,8 @@ export function SprocketChat({
                     <div className="sp-said">
                       {team && m.author === "sprocket" && (
                         <span className="sp-avatar" aria-hidden>
-                          {/* Done: turned and leaning toward its message (turning there if it just came in). */}
-                          {last && by && !tail.has(m.id) && <DoneFace look={by.look} id={m.id} pop={pop} />}
+                          {/* Done: turned and leaning toward its message, still: a team chat leaves nothing to celebrate (ADR 0035). */}
+                          {last && by && <DoneFace look={by.look} />}
                         </span>
                       )}
                       <div className="sp-bubbles">
@@ -396,8 +355,8 @@ export function SprocketChat({
                 </li>
               );
             })}
-            {/* Who's on it (above): it pops up when it gets the message, spins as it starts writing, then writes as
-                dots in its colour. In a team, the icon that turns through the members thinking. */}
+            {/* Who's on it (above): in a team, the icon that turns through the members thinking; otherwise the
+                Sprocket's row, mirrored. */}
             {team && thinking && cycling.length > 0 && (
               <li className="sp-message sprocket sp-watching team" aria-hidden>
                 <span className="sp-watcher">
@@ -406,26 +365,11 @@ export function SprocketChat({
                 <span className="sp-working">{thinking}</span>
               </li>
             )}
-            {one &&
-              (() => {
-                return (
-                  <li className="sp-message sprocket sp-watching" aria-hidden>
-                    {dots ? (
-                      <div key={one.id} className="sp-said">
-                        <span className="sp-dots" style={{ "--who": COLORS[one.look.color] } as CSSProperties}>
-                          <i />
-                          <i />
-                          <i />
-                        </span>
-                      </div>
-                    ) : (
-                      <span key={one.id} className="sp-watcher">
-                        <Sprocket look={one.look} size={26} activity={spinning === one.id ? "write" : "think"} />
-                      </span>
-                    )}
-                  </li>
-                );
-              })()}
+            {one && (
+              <li className="sp-message sprocket sp-watching" aria-hidden>
+                <FlightIcon who={one} working={running} />
+              </li>
+            )}
           </ol>
         )}
         <div className="sp-spacer" ref={spacer} aria-hidden />
@@ -534,11 +478,34 @@ function ChatTab({ href: to, current, label, chat }: { href: string; current: bo
   );
 }
 
+/** A team member's face at the foot of its last message: looking up toward it, still (ADR 0035). */
+function DoneFace({ look }: { look: SprocketData["look"] }) {
+  return <Sprocket look={look} size={26} stance="toward" still />;
+}
+
 /**
- * A team member's face at the foot of its last message: looking up toward it. One that just came in cheers first
- * (happy eyes and a dance), then holds still, without blinking, like the rest.
+ * The icon by a reply in flight in a direct or project chat (ADR 0035): the Sprocket's row in the list, the same
+ * drawing (`<use>`), so they move exactly alike, with the tool step it's on beside it. Where the list isn't on screen
+ * it's a Sprocket of its own, playing the same (useFlight).
  */
-function DoneFace({ look, id, pop }: { look: SprocketData["look"]; id: string; pop: boolean }) {
-  const cheering = useCheering(pop ? id : undefined, true);
-  return <Sprocket look={look} size={26} stance="toward" still={!cheering} activity={cheering ? "cheer" : "idle"} />;
+function FlightIcon({ who, working }: { who: SprocketData; working: boolean }) {
+  const id = rowId(who.id);
+  const [mirror, setMirror] = useState(false);
+  useLayoutEffect(() => setMirror(!!document.getElementById(id)), [id]);
+  const flight = useFlight(who.id, working);
+  const step = useStep(who.id);
+  return (
+    <>
+      <span className="sp-watcher">
+        {mirror ? (
+          <svg className="sp-flight" viewBox={`0 0 50 ${(50 * VIEW.h) / VIEW.w}`}>
+            <use href={`#${id}`} />
+          </svg>
+        ) : (
+          <Sprocket look={who.look} size={26} dots={flight.dots} play={flight.play} />
+        )}
+      </span>
+      {working && step && <span className="sp-working">{step}</span>}
+    </>
+  );
 }

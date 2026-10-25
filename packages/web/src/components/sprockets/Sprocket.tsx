@@ -2,8 +2,9 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import type { SprocketLook } from "@rails/shared";
 import { CHARACTERS, COLORS, type Primitive } from "./characters.ts";
 import { dotsAt, toDots, type Drawing } from "./morph.ts";
-import { pop, type Activity, type Frame, type Rig } from "./engine.ts";
-import { kick, useRig, useSprocketMotion } from "./motion.ts";
+import { perform, pop, setIdles, type Activity, type Frame, type Rig } from "./engine.ts";
+import { clock, kick, useRig, useSprocketMotion } from "./motion.ts";
+import { ANIMATIONS, IDLES, type AnimationName } from "./animations.ts";
 import { EYE, EYE_X, Eyes } from "./parts.tsx";
 import { layerCount, layout, poseOf, type Box, type Stance } from "./solid.ts";
 
@@ -35,6 +36,10 @@ interface Props {
   id?: string;
   /** Thinking in a direct chat: it becomes three bouncing dots, an ellipsis, and back when this turns off. */
   dots?: boolean;
+  /** An animation (animations.ts) to play once each time `key` changes; then it rests. */
+  play?: { name: AnimationName; key: string };
+  /** Play idle animations now and then while it rests (engine.ts setIdles). */
+  idles?: boolean;
 }
 
 /** A body's bounds before it's measured (most bodies sit about here). */
@@ -45,7 +50,7 @@ const BOX: Box = { x: 40, y: 80, width: 120, height: 116 };
  * the outline and where the eyes sit, never as shading), each stroked to join its neighbours when turned, and the eyes on the front face. While
  * it moves, its rig (engine.ts, run by motion.ts) paints every frame straight into the SVG.
  */
-export function Sprocket({ look, size, still, stance = "rest", follow = false, activity = "idle", drawing: given, label, onRig, id, dots = false }: Props) {
+export function Sprocket({ look, size, still, stance = "rest", follow = false, activity = "idle", drawing: given, label, onRig, id, dots = false, play, idles = false }: Props) {
   const def = CHARACTERS[look.character];
   const motion = useSprocketMotion();
   const dotted = useDots(look, dots, motion);
@@ -98,6 +103,18 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
     onRig?.(moving ? rig.current : null);
     return () => onRig?.(null);
   }, [moving, onRig, rig]);
+  // After the rig's own effects (useRig, above), so a change of activity at the same time doesn't cut these short.
+  useEffect(() => {
+    if (!rig.current) return;
+    setIdles(rig.current, idles ? IDLES : null, clock());
+    kick();
+  }, [idles, moving]);
+  useEffect(() => {
+    if (!rig.current || !play) return;
+    perform(rig.current, ANIMATIONS[play.name], clock());
+    kick();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [play?.key, moving]);
 
   // Measure the body (again when it changes), and redraw where it is.
   useLayoutEffect(() => {

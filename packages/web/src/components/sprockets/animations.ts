@@ -2,6 +2,7 @@
 // They're built from the parts in clips.ts, and every one shares the same blinks, expressions and leaning in, so a
 // Sprocket behaves the same way wherever it is. Each plays once, for a set time, then the Sprocket goes back to
 // resting. What's left to decide per animation is when it plays.
+import type { SprocketMessage } from "@rails/shared";
 import { BREATHE, DANCE, DAYDREAM, DOZE, DROOP, FOCUS, HOORAY, HUM, IDEA, INSPECT, LOOK_AROUND, NOD, NOTIFY, PUZZLED, RUMMAGE, STREAM, STRETCH, SURVEY, TWIRL, type Gesture, type Moves } from "./clips.ts";
 
 /** One finished animation. */
@@ -83,3 +84,22 @@ export const animationFor = (activity: string): Animation | undefined => Object.
 
 /** The idle animations, for a rig that plays them now and then (engine.ts setIdles). */
 export const IDLES: Animation[] = Object.values(ANIMATIONS as Record<string, Animation>).filter((a) => a.kind === "idle");
+
+/** Rails' notices that a run stopped short of a reply without failing: a cap it hit (runs.ts). */
+const STOPPED = /^(Stopped after|Paused)/;
+
+/**
+ * What a Sprocket plays once its reply is done, by how it ended (`m`, its newest message or Rails' notice about it):
+ * stopped short, Puzzled; failed, Droop; asking the user something or offering a card to act on, Notify; otherwise
+ * a celebration, Cheer, Satisfied or Hooray, and now and then Twirl. The pick is fixed by the message's id, so it's
+ * the same wherever and however often it's drawn.
+ */
+export function doneFor(m: Pick<SprocketMessage, "id" | "author" | "text" | "ask" | "card">): AnimationName {
+  if (m.author === "notice") return STOPPED.test(m.text) ? "puzzled" : "droop";
+  if ((m.ask && !m.ask.answer) || m.card?.actions?.length) return "notify";
+  let h = 0;
+  for (const c of m.id) h = (Math.imul(h, 31) + c.charCodeAt(0)) | 0;
+  const n = (h >>> 0) % 10;
+  return n === 0 ? "twirl" : (["cheer", "satisfied", "hooray"] as const)[n % 3];
+}
+

@@ -409,8 +409,6 @@ export const GLANCE: Gesture = (r) => {
 
 /** Starting to write: one whole turn, with a hop. */
 export const SPIN: Gesture = () => [{ ms: 0, spin: 1, hop: 240 }];
-/** How long the spin takes (SprocketChat holds the typing dots back until it's done). */
-export const SPIN_MS = 700;
 
 /**
  * Cheering, as its message lands: a jelly dance from side to side, timed like the satisfied nod. It squashes down,

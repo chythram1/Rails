@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { IconChevronDown as ChevronDown, IconEdit as Compose, IconFilter as Filter, IconPlus as Plus, IconSearch as Search, IconUsersPlus as UsersPlus } from "@tabler/icons-react";
 import type { Project, Sprocket as SprocketData, SprocketChatInfo, SprocketTeam } from "@rails/shared";
 import { href, navigate, type Route } from "../../router.ts";
@@ -15,7 +15,9 @@ import { SprocketCreator } from "./SprocketCreator.tsx";
 import { SprocketSettings } from "./SprocketSettings.tsx";
 import { groupSprockets } from "./groups.ts";
 import { useSprockets } from "./useSprockets.ts";
-import { useCheering } from "./motion.ts";
+import { usePlaying } from "./motion.ts";
+import { ANIMATIONS, doneFor } from "./animations.ts";
+import { rowId, useFlight } from "./flight.ts";
 import { plain } from "./marks.ts";
 
 type SprocketsRoute = Extract<Route, { name: "sprockets" }>;
@@ -212,10 +214,16 @@ function SprocketList(props: {
  * A Sprocket in the list, by its character and name. It opens its project chat when it has one (ADR 0021), its
  * direct chat otherwise; the line under its name is the newer of the two, and the dot shows replies waiting in either.
  */
+/** How long a row idles after its Sprocket last worked, before it holds still again (ms). */
+const IDLE_FOR = 120_000;
+
 function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; teams: SprocketTeam[]; active: boolean }) {
   // Its character holds still in the list. It comes alive while the pointer is on it (following the pointer), it has
-  // focus or its chat is open (facing you), it's working on a reply in any of its chats (from about a second after it
-  // starts: thinking, or surveying in a team), and while it cheers as its message lands (happy eyes and a dance); it turns back before it holds still again.
+  // focus or its chat is open (facing you), and it's working on a reply in any of its chats, from about a second after
+  // it starts: in a team it surveys; otherwise, as the icon by its reply (the same drawing, ADR 0035), it becomes
+  // three dots while it thinks, inspects or rummages at each tool step, and streams as it types. Once its reply is
+  // done it plays a done animation by how it ended (doneFor), then idles for a while (IDLE_FOR) before it holds still
+  // again, as a Grok bot's row does.
   const [hover, setHover] = useState(false);
   const [focus, setFocus] = useState(false);
   const [awake, setAwake] = useState(active);
@@ -232,11 +240,27 @@ function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; t
   }, [working]);
   const newest = [...chats, ...mine]
     .map((c) => c.lastMessage)
-    .filter((m) => m?.author === "sprocket" && m.sprocketId === s.id)
+    .filter((m) => (m?.author === "sprocket" || m?.author === "notice") && m.sprocketId === s.id)
     .reduce<SprocketChatInfo["lastMessage"]>((a, m) => (!a || m!.createdAt > a.createdAt ? m : a), undefined);
-  const cheering = useCheering(newest?.id);
+  const done = newest ? doneFor(newest) : undefined;
+  const ending = usePlaying(newest?.id, done ? ANIMATIONS[done].ms : 0);
+  const flight = useFlight(s.id, busy && !talking);
+  // Still until it has done something; then it idles for a while after each time.
+  const [idleUntil, setIdleUntil] = useState(0);
+  const did = useRef(false);
+  useEffect(() => {
+    if (working) did.current = true;
+    else if (did.current) setIdleUntil(Date.now() + IDLE_FOR);
+  }, [working]);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (idleUntil <= Date.now()) return;
+    const t = setTimeout(() => tick((n) => n + 1), idleUntil - Date.now());
+    return () => clearTimeout(t);
+  }, [idleUntil]);
+  const idling = !working && !hover && idleUntil > Date.now();
   const facing = focus || active;
-  const live = hover || facing || busy || cheering;
+  const live = hover || facing || busy || ending || idling;
   useEffect(() => {
     if (live) return setAwake(true);
     const t = setTimeout(() => setAwake(false), 700);
@@ -255,7 +279,18 @@ function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; t
       onFocus={() => setFocus(true)}
       onBlur={() => setFocus(false)}
     >
-      <Sprocket look={s.look} size={50} still={!awake} stance={facing ? "front" : "rest"} follow={hover && !busy && !cheering} activity={cheering ? "cheer" : busy ? (talking ? "talk" : "think") : "idle"} />
+      <Sprocket
+        id={rowId(s.id)}
+        look={s.look}
+        size={50}
+        still={!awake}
+        stance={facing ? "front" : "rest"}
+        follow={hover && !busy && !ending}
+        activity={busy && talking ? "talk" : "idle"}
+        dots={flight.dots}
+        play={ending && newest && done ? { name: done, key: newest.id } : flight.play}
+        idles={idling}
+      />
       <RowText name={s.name} chat={shown} />
     </a>
   );

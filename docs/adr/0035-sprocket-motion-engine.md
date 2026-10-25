@@ -68,3 +68,15 @@ didn't plan for. The new animations are in the lab only (its Idle and Activity g
 then, the dots, and a panel playing a reply in a direct and in a team chat); where each plays in the app is still
 to decide.
 
+## Amendment (2026-10-25, later): in the app
+
+- A Sprocket's row in the list (`SprocketsPage.tsx`) plays them. In flight: surveying in a team; otherwise the
+  dots while it thinks, Inspect or Rummage at each tool step and Stream as it types (`flight.ts`, from the socket's
+  `sprockets.typing` and `sprockets.activity`). Done: by how it ended (`doneFor`). Idle: for two minutes after it
+  last worked (`IDLE_FOR`); still before it has worked since the page opened, and after.
+- A direct or project chat's icon by a reply in flight is that row's drawing (`<use href>` of its `id`); the typing
+  pill with dots and the spin are gone. Where the list isn't on screen the icon is a Sprocket of its own driven the
+  same way.
+- A team chat no longer cheers beside a member's new message; the face there stays still.
+- `Sprocket` takes `play` (an animation by name, once per key) and `idles`.
+
