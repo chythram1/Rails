@@ -149,7 +149,7 @@ describe("a Sprocket's motion engine", () => {
     const r = rig(input("idle", "toward"));
     setInput(r, input("satisfied", "toward"), r.clock);
     let [wide, tall, up, slide, airborneWide, lid] = [1, 1, 0, 0, 1, 0];
-    const f = run(r, 1100, (f) => {
+    const f = run(r, 2200, (f) => {
       wide = Math.max(wide, f.pose.sx);
       tall = Math.min(tall, f.pose.sx);
       up = Math.max(up, f.pose.hop);
@@ -158,12 +158,12 @@ describe("a Sprocket's motion engine", () => {
       lid = Math.max(lid, f.lid);
     });
     expect(f.happy).toBeGreaterThan(0.95);
-    expect(wide).toBeGreaterThan(1.18); // squashed wide
-    expect(tall).toBeLessThan(0.88); // stretched tall
+    expect(wide).toBeGreaterThan(1.08); // squashed wide
+    expect(tall).toBeLessThan(0.92); // stretched tall
     expect(up).toBeGreaterThan(15);
     expect(airborneWide).toBeLessThan(1.05); // it squashes on the ground, not in the air
     expect(lid).toBe(0); // ^ ^ eyes don't blink
     expect(slide).toBeLessThan(0.5); // in place: no side to side
-    expect(run(r, 1000).happy).toBeLessThan(0.05); // over on time
+    expect(run(r, 1200).happy).toBeLessThan(0.05); // over on time
   });
 });

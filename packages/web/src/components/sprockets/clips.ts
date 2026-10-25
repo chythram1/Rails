@@ -48,17 +48,19 @@ export function sample(keys: Key[], t: number): number {
 }
 
 /**
- * A satisfied nod, an elastic bounce in place: it squashes down with its head dipped, springs up stretched with its
- * chin raised, lands squashed wide with a nod, rebounds in a smaller hop, and wobbles to a stop.
+ * A satisfied nod, a jelly bounce in place: it squashes down with its head dipped, springs up stretched with its chin
+ * raised, and floats (half a second in the air); each landing is a quick squash straight into the next, lower hop,
+ * three in all, nodding as it lands; then it wobbles slowly to a stop, like jelly.
  */
 export const NOD: Moves = {
-  hop: [[0, 0], [140, 0], [320, 18, "out"], [480, 0, "in"], [560, 0], [670, 7, "out"], [780, 0, "in"]],
+  hop: [[0, 0], [170, 0], [430, 17, "out"], [690, 0, "in"], [740, 0], [930, 9, "out"], [1120, 0, "in"], [1150, 0], [1260, 3.5, "out"], [1370, 0, "in"]],
   squash: [
-    [0, 1], [140, 1.14, "out"], [220, 0.84, "out"], [320, 0.97], [470, 0.92, "in"], // down, up and falling
-    [530, 1.22, "out"], [600, 0.9, "out"], [680, 1], [770, 0.96, "in"], // lands, and rebounds
-    [820, 1.1, "out"], [890, 0.96], [960, 1.03], [1040, 0.99], [1120, 1], // lands again, and wobbles
+    [0, 1], [150, 1.1, "out"], [180, 1.06], [230, 0.9, "out"], [540, 1], [650, 0.97, "in"], // down, up, floating, falling
+    [715, 1.1, "out"], [745, 1.06], [790, 0.93, "out"], [1000, 1], [1090, 0.98, "in"], // lands, and up again
+    [1145, 1.07, "out"], [1180, 1.04], [1220, 0.97, "out"], [1370, 1], // lands, and a little hop
+    [1405, 1.07, "out"], [1630, 0.95], [1850, 1.03], [2050, 0.99], [2250, 1], // lands, and the jelly wobble
   ],
-  tip: [[0, 0], [140, -6, "out"], [300, 9], [540, -10, "out"], [680, 4], [820, -4], [1000, 0]],
+  tip: [[0, 0], [150, -5, "out"], [430, 9], [710, -8, "out"], [930, 5], [1140, -5, "out"], [1260, 2], [1400, -3, "out"], [1750, 0]],
 };
 
 // ---- gestures ----

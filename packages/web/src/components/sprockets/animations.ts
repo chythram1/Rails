@@ -33,7 +33,7 @@ export const ANIMATIONS = {
     name: "Satisfied",
     when: "Not placed in the app yet.",
     activity: "satisfied",
-    ms: 1500, // the nod (1.1s), and a moment for the eyes to ease back as it settles
+    ms: 2500, // the bounce and wobble (2.25s), and a moment for the eyes to ease back as it settles
     moves: NOD,
     eyes: "happy",
   },
