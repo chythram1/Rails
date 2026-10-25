@@ -12,8 +12,8 @@ const MORPH_MS = 650;
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 /**
- * The team's thinking icon (ADR 0033): one Sprocket, thinking as a Sprocket does (one small move after
- * another), that turns from one member into the next round `looks` (those thinking since the user's message), its
+ * The team's thinking icon (ADR 0033): one Sprocket, surveying as a Sprocket writing in a team does (animations.ts:
+ * round eyes scanning what's below), that turns from one member into the next round `looks` (those thinking since the user's message), its
  * outline and colour reforming as it moves. With reduced motion it holds the first member's shape.
  */
 export function TeamThinking({ looks, size }: { looks: { id: string; look: SprocketLook }[]; size: number }) {
@@ -58,5 +58,5 @@ export function TeamThinking({ looks, size }: { looks: { id: string; look: Sproc
   }, [motion, key, at]);
 
   if (!current) return null;
-  return <Sprocket look={current.look} drawing={frame} size={size} activity="think" />;
+  return <Sprocket look={current.look} drawing={frame} size={size} activity="talk" />;
 }

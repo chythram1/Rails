@@ -126,6 +126,21 @@ export const DANCE: Gesture = () => [
   { ms: 300, shift: 0, turn: 0, roll: 0, aim: null },
 ];
 
+/**
+ * Surveying what's below: a pause at one end, then its eyes scanning along an upside-down arc (∪), from one side down
+ * through the middle to the other and back, its body tipped down a little and turning after them. It ends where it
+ * starts, so it can repeat.
+ */
+export const SURVEY: Gesture = () => {
+  const POINTS = 8;
+  const sweep = (from: number): Step[] =>
+    Array.from({ length: POINTS }, (_, i) => {
+      const x = from * (1 - (2 * (i + 1)) / POINTS);
+      return { ms: 125, aim: [x, 0.25 + 0.6 * (1 - x * x)], turn: x * 12, tip: -8, roll: x * 3 };
+    });
+  return [{ ms: 380, aim: [-1, 0.25], turn: -12, tip: -8, roll: -3 }, ...sweep(-1), { ms: 200 }, ...sweep(1)];
+};
+
 // ---- leaning in ----
 
 /**

@@ -34,11 +34,13 @@ export default function SprocketLab() {
   const [holding, setHolding] = useState(false);
   const [held, setHeld] = useState<Held>({ yaw: 0, pitch: 0, roll: 0, near: 1 });
   const rigs = useRef(new Map<string, Rig>());
-  // A finished animation plays as it does in the app: its activity for as long as it lasts, then back.
+  // A finished animation plays as it does in the app: its activity for as long as it lasts, then back. One that lasts
+  // as long as its activity does plays until it's pressed again.
   const [playing, setPlaying] = useState<keyof typeof ANIMATIONS | null>(null);
   useEffect(() => {
-    if (!playing) return;
-    const t = setTimeout(() => setPlaying(null), ANIMATIONS[playing].ms / Math.max(Number(speed), 0.05));
+    const ms = playing && ANIMATIONS[playing].ms;
+    if (!ms) return;
+    const t = setTimeout(() => setPlaying(null), ms / Math.max(Number(speed), 0.05));
     return () => clearTimeout(t);
   }, [playing]);
 
@@ -69,7 +71,7 @@ export default function SprocketLab() {
             <h2 id="lab-animations" className="lab-h">Animations</h2>
             {(Object.keys(ANIMATIONS) as (keyof typeof ANIMATIONS)[]).map((a) => (
               <div key={a} className="lab-animation">
-                <button className="btn" aria-pressed={playing === a} onClick={() => setPlaying(a)}>
+                <button className="btn" aria-pressed={playing === a} onClick={() => setPlaying(playing === a && !ANIMATIONS[a].ms ? null : a)}>
                   {ANIMATIONS[a].name}
                 </button>
                 <span className="muted">{ANIMATIONS[a].when}</span>
@@ -105,7 +107,7 @@ export default function SprocketLab() {
             </div>
             <div className="lab-row">
               <span id="lab-activity">Activity</span>
-              <Segmented name="lab-activity" aria-labelledby="lab-activity" small value={activity} onChange={(v) => setActivity(v as Activity)} options={[{ value: "idle", label: "Idle" }, { value: "think", label: "Think" }, { value: "write", label: "Write" }, { value: "cheer", label: "Cheer" }]} />
+              <Segmented name="lab-activity" aria-labelledby="lab-activity" small value={activity} onChange={(v) => setActivity(v as Activity)} options={[{ value: "idle", label: "Idle" }, { value: "think", label: "Think" }, { value: "write", label: "Write" }, { value: "cheer", label: "Cheer" }, { value: "talk", label: "Talk" }]} />
             </div>
             <div className="lab-row">
               <label htmlFor="lab-follow">Follow the pointer</label>

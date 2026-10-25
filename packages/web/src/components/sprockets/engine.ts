@@ -9,11 +9,11 @@
 // one move after another and leans in often, writing spins once, and a finished animation (animations.ts, such as
 // cheering) plays its gesture with its eyes.
 import { POSES, type Pose, type Stance } from "./solid.ts";
-import { ANIMATIONS } from "./animations.ts";
+import { animationFor } from "./animations.ts";
 import { BLINK_MS, EXPRESSIONS, GLANCE, LEAN_GLANCE, LEANS, OPEN, SPIN, THINKING, eyeAt, lidAt, type EyeShape, type Expression, type ExpressionName, type Gesture, type Rand, type Step } from "./clips.ts";
 
-/** What a Sprocket is doing. */
-export type Activity = "idle" | "think" | "write" | "cheer";
+/** What a Sprocket is doing: resting, thinking (direct chats), writing (the spin), cheering, or talking in a team. */
+export type Activity = "idle" | "think" | "write" | "cheer" | "talk";
 
 /** What a rig is told by its Sprocket. */
 export interface Input {
@@ -41,7 +41,9 @@ interface Spring {
   x: number;
   v: number;
 }
-type Channel = "yaw" | "pitch" | "roll" | "near" | "slide" | "lean" | "hop" | "squash" | "lookX" | "lookY" | "happy";
+type Channel = "yaw" | "pitch" | "roll" | "near" | "slide" | "lean" | "hop" | "squash" | "lookX" | "lookY" | "happy" | "round";
+/** Round eyes: dilated circles (an open eye is 14×31; round, 24 across), each 3 units further out so they don't touch. */
+const ROUND = { sx: 24 / 14, sy: 24 / 31, out: 3 };
 
 export interface Rig {
   input: Input;
@@ -96,6 +98,7 @@ export function createRig(input: Input, from: Pose, now: number, rand: Rand = Ma
       lookX: at(0),
       lookY: at(0),
       happy: at(0),
+      round: at(0),
     },
     spins: 0,
     turn: 0,
@@ -146,8 +149,9 @@ function begin(r: Rig, now: number) {
     r.nextLean = now + between(r.rand, 2500, 6000);
   } else if (activity === "write") {
     play(r, "spin", SPIN, now);
-  } else if (activity === "cheer") {
-    play(r, "cheer", ANIMATIONS.cheer.gesture, now);
+  } else {
+    const a = animationFor(activity);
+    if (a) play(r, a.name, a.gesture, now);
   }
 }
 
@@ -212,7 +216,9 @@ function direct(r: Rig, now: number) {
       g.at = now + s.ms;
     } else {
       r.gesture = null;
+      const a = animationFor(activity);
       if (activity === "think") nextMove(r, now);
+      else if (a?.loop) play(r, a.name, a.gesture, now);
       else if (g.name === "glance") r.nextGlance = now + between(r.rand, 2500, 7000);
     }
   }
@@ -236,6 +242,11 @@ function direct(r: Rig, now: number) {
       r.nextLean = now + (activity === "think" ? between(r.rand, 1500, 3500) : between(r.rand, 5000, 11000));
     }
   }
+}
+
+/** An eye's shape, `round` of the way to a dilated circle; `side` is -1 for the left eye, 1 for the right. */
+function dilate(e: EyeShape, round: number, side: number): EyeShape {
+  return round ? { dx: e.dx + side * ROUND.out * round, dy: e.dy, sx: e.sx * (1 + (ROUND.sx - 1) * round), sy: e.sy * (1 + (ROUND.sy - 1) * round) } : e;
 }
 
 function spring(s: Spring, to: number, stiffness: number, damping: number, dt: number) {
@@ -277,14 +288,16 @@ export function advance(r: Rig, now: number, pointer: [number, number] | null): 
   go("squash", 0, 400, 16);
   go("lookX", leaning ? LEAN_GLANCE.aim : ax, ek, ed);
   go("lookY", ay, ek, ed);
-  go("happy", activity === "cheer" && ANIMATIONS.cheer.eyes === "happy" ? 1 : 0, 300, 30);
+  const eyes = animationFor(activity)?.eyes;
+  go("happy", eyes === "happy" ? 1 : 0, 300, 30);
+  go("round", eyes === "round" ? 1 : 0, 900, 24); // sudden: it pops in, overshooting a little
   const t = now;
   const e = r.expression;
   const frame: Frame = {
     pose: { yaw: s.yaw.x, pitch: s.pitch.x, roll: s.roll.x, near: s.near.x, slide: s.slide.x, lean: s.lean.x, sx: 1 + s.squash.x, sy: 1 - s.squash.x, hop: Math.max(0, s.hop.x) },
     look: [s.lookX.x * 9, s.lookY.x * 6],
-    left: e ? eyeAt(e.keys.left, t - e.start, e.keys.ms) : OPEN,
-    right: e ? eyeAt(e.keys.right, t - e.start, e.keys.ms) : OPEN,
+    left: dilate(e ? eyeAt(e.keys.left, t - e.start, e.keys.ms) : OPEN, s.round.x, -1),
+    right: dilate(e ? eyeAt(e.keys.right, t - e.start, e.keys.ms) : OPEN, s.round.x, 1),
     lid: r.blink === null ? 0 : lidAt(t - r.blink),
     happy: Math.min(1, Math.max(0, s.happy.x)),
   };

@@ -122,4 +122,25 @@ describe("a Sprocket's motion engine", () => {
     const end = run(r, 1000);
     expect(end.left).toEqual({ dx: 0, dy: 0, sx: 1, sy: 1 });
   });
+
+  it("surveying: the eyes pop round, then scan an upside-down arc, again and again", () => {
+    const r = rig(input("idle", "rest"));
+    setInput(r, input("talk", "rest"), r.clock);
+    const popped = run(r, 200);
+    expect(popped.left.sx).toBeGreaterThan(1.35); // round within a fifth of a second
+    expect(popped.left.sy).toBeLessThan(0.8);
+    const path: [number, number][] = [];
+    run(r, 8000, (f) => path.push(f.look));
+    const xs = path.map(([x]) => x);
+    expect(Math.min(...xs)).toBeLessThan(-5);
+    expect(Math.max(...xs)).toBeGreaterThan(5);
+    // Lowest in the middle, higher at the ends: ∪.
+    const near = (pred: (x: number) => boolean) => path.filter(([x]) => pred(x)).map(([, y]) => y);
+    const mid = near((x) => Math.abs(x) < 1.5);
+    const ends = near((x) => Math.abs(x) > 6);
+    expect(Math.min(...mid)).toBeGreaterThan(Math.max(...ends));
+    expect(r.gesture?.name).toBe("Survey"); // still going after 8s
+    setInput(r, input("idle", "rest"), r.clock);
+    expect(run(r, 800).left.sx).toBeCloseTo(1, 1);
+  });
 });
