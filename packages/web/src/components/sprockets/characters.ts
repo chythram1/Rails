@@ -120,7 +120,7 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
     name: "Block",
     depth: 10,
     puff: 0, // a pizza box: thin and flat
-    body: [{ d: roundedPoly([[46, 86], [154, 86], [154, 196], [46, 196]], 30) }],
+    body: [{ d: roundedPoly([[46, 86], [154, 86], [154, 196], [46, 196]], 12) }],
     face: { x: 100, y: 138 },
     shadow: { x: 100, half: 52 },
   },
