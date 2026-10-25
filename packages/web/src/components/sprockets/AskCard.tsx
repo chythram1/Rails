@@ -2,6 +2,8 @@ import { IconCheck as Check } from "@tabler/icons-react";
 import type { SprocketAsk } from "@rails/shared";
 
 const LETTERS = "ABCDEFG"; // up to six options, then "Something else"
+/** An option that only says "I'll answer another way": the card's own last row says it. */
+const OTHER = /^(something|anything) else\.?$|^other\.?$/i;
 
 /**
  * A question with options to pick (ask_user, ADR 0023), as a card in place of its bubble: the question, then a row per
@@ -10,14 +12,15 @@ const LETTERS = "ABCDEFG"; // up to six options, then "Something else"
  */
 export function AskCard({ ask, name, onPick }: { ask: SprocketAsk; name: string; onPick(option: string): void }) {
   const open = ask.answer === undefined;
-  const picked = open ? undefined : ask.options.find((o) => o === ask.answer);
+  const options = ask.options.filter((o) => !OTHER.test(o.trim()));
+  const picked = open ? undefined : options.find((o) => o === ask.answer);
   const state = open ? "" : picked ? " answered" : " dismissed";
   const ownWords = () => document.querySelector<HTMLTextAreaElement>(".sp-compose textarea")?.focus();
   return (
     <div className={"sp-bubble sp-ask-card" + state} role="group" aria-label={`${name} asks: ${ask.question}`}>
       <p className="sp-ask-q">{ask.question}</p>
       <ul className="sp-ask-options">
-        {ask.options.map((o, i) => (
+        {options.map((o, i) => (
           <li key={o}>
             <button type="button" className={"sp-ask-option" + (o === picked ? " picked" : "")} disabled={!open} aria-pressed={o === picked} onClick={() => onPick(o)}>
               <span className="sp-ask-letter" aria-hidden>
@@ -30,7 +33,7 @@ export function AskCard({ ask, name, onPick }: { ask: SprocketAsk; name: string;
         {open && (
           <li>
             <button type="button" className="sp-ask-option other" onClick={ownWords}>
-              <span className="sp-ask-letter" aria-hidden>{LETTERS[ask.options.length]}</span>
+              <span className="sp-ask-letter" aria-hidden>{LETTERS[options.length]}</span>
               <span>Something else</span>
             </button>
           </li>

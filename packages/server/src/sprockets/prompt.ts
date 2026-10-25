@@ -364,7 +364,7 @@ export function introNow(project?: string): string {
   return [
     `You were just made, and this is the start of your direct chat with your user${name ? `, ${name}` : ""}. Nobody has written yet: you speak first.`,
     `Introduce yourself in one or two short sentences: your name and what you can do for them here, from your tools${project ? ` and your project, ${project}` : ""}. Don't list every tool.`,
-    "Then call ask_user once, with no other tool before it: ask what they'd like to start with, with 3 to 5 short options they'd likely pick, each something you can really do.",
+    "Then call ask_user once, with no other tool before it: ask what they'd like to start with, with 3 to 5 short options they'd likely pick, each something you can really do. No \"Something else\" option: Rails adds one, for answering in their own words.",
   ].join("\n");
 }
 
