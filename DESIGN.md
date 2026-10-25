@@ -3,8 +3,8 @@ version: alpha
 name: Rails
 description: A square, ruled console around the terminals of Claude Code, Codex and pi, in a light and a dark theme.
 colors:
-  bg: "#1d1d1d"
-  sidebar: "#141414"
+  bg: "#121212"
+  sidebar: "#0e0e0e"
   surface: "#1d1d1d"
   surface-2: "#262626"
   hover: "#2c2c2c"
@@ -36,12 +36,12 @@ colors:
   diff-add-ink: "#a8dcae"
   diff-del: "#3a2222"
   diff-del-ink: "#f2a3a0"
-  term-bg: "#1d1d1d"
-  light-bg: "#ffffff"
-  light-sidebar: "#fafafa"
+  term-bg: "#121212"
+  light-bg: "#fcfcfc"
+  light-sidebar: "#f5f5f5"
   light-surface: "#ffffff"
-  light-surface-2: "#f0f0f0"
-  light-hover: "#f4f4f4"
+  light-surface-2: "#ededed"
+  light-hover: "#f0f0f0"
   light-dialog: "#fafafa"
   light-field: "#ffffff"
   light-btn: "#ffffff"
@@ -70,7 +70,7 @@ colors:
   light-diff-add-ink: "#1f6b2a"
   light-diff-del: "#fbeaea"
   light-diff-del-ink: "#a8322b"
-  light-term-bg: "#1d1d1d"
+  light-term-bg: "#121212"
 typography:
   display-xl:
     fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
@@ -151,6 +151,7 @@ typography:
 rounded:
   none: 0px
   row: 6px
+  bubble: 12px
   pill: 999px
 spacing:
   2xs: 2px
@@ -332,8 +333,8 @@ Rails is where someone watches and steers several coding agents at once. The ter
 It's an operate surface: dense, familiar and consistent from screen to screen, in a light and a dark theme. Personality lives in the type and in a few deliberate places, the Sprockets and the avatars.
 
 **Key Characteristics:**
-- Two palettes with the same token names: paper white and charcoal. Terminals stay dark in both.
-- Square everything: fields, buttons, menus, dialogs, cards, the composer. Navigation rows are the one rounded rectangle (6px); dots, avatars, swatches and the switch are round.
+- Two palettes with the same token names: paper white and near-black, the sidebar a step darker than the canvas in both. Terminals stay dark in both.
+- Square everything: fields, buttons, menus, dialogs, cards, the composer. Navigation rows (6px) and chat bubbles (12px) are the rounded rectangles; dots, avatars, swatches and the switch are round.
 - 1px rules between regions and rows; tabs and segments sit in ruled strips.
 - Four type roles: Inter for text (its display cut for headlines), Space Grotesk for the wordmark and Sprocket names, Space Mono for small capitals and technical values, the system monospace in terminals.
 - Flat: only floating layers (menus, dialogs) get a shadow. No motion in the chrome, except the logo: an armadillo that walks under the pointer and curls up into a ball when the sidebar collapses. The Sprockets are the one thing that moves on its own.
@@ -346,8 +347,8 @@ Each token has a dark and a light value (front matter: `bg` and `light-bg`). Dar
 - **Ink Button** (`--primary`, text on it `--on-primary`): the one primary action in a view and the send block. Near-white on dark, near-black on light; `--primary-hover` on hover.
 
 ### Neutral
-- **Canvas** (`--bg`): the page, chat, side panel, the shown tab.
-- **Sidebar** (`--sidebar`): the sidebar, the dock's tab strips, the side panel's header.
+- **Canvas** (`--bg`): the page, chat, the Sprockets list, side panel, the shown tab. Near-black in dark (`#121212`), off-white in light (`#fcfcfc`).
+- **Sidebar** (`--sidebar`): the sidebar, the dock's tab strips, the side panel's header: a step darker than the canvas in both themes (`#0e0e0e`, `#f5f5f5`), so the frame recedes and the work sits forward.
 - **Surface** (`--surface`): menus and popovers (their edge sets them apart).
 - **Surface 2** (`--surface-2`): the selected row, the current page in the nav, user chat bubbles, gallery cards, insets.
 - **Hover** (`--hover`): hover on actions: menu items, buttons, icon buttons, files.
@@ -355,7 +356,7 @@ Each token has a dark and a light value (front matter: `bg` and `light-bg`). Dar
 - **Field** (`--field`) and **Button** (`--btn`): the fill of inputs and of default buttons.
 - **Rule** (`--border`): between regions and rows. **Edge** (`--border-strong`): floating layers, cards, buttons, the composer. **Field Edge** (`--border-field`): inputs. **Field Focus** (`--border-focus`): a field's edge while focused or open.
 - **Ink** (`--text`), **Soft Ink** (`--text-2`, navigation, field labels, inactive tabs) and **Muted** (`--muted`, secondary text and every placeholder).
-- **Terminal** (`--term-bg`): the same charcoal in both themes; `TerminalView.tsx`'s xterm theme matches it.
+- **Terminal** (`--term-bg`): the same near-black in both themes, the dark canvas's; `TerminalView.tsx`'s xterm theme matches it.
 
 ### Accents
 - **Blue** (`--blue`): links (underlined), keyboard focus rings, the drop target in the dock, diff hunk headers.
@@ -423,9 +424,10 @@ Depth comes from rules and tone, not shadow: regions are divided by 1px `--borde
 
 ## Shapes
 
-Square by default (`rounded.none`): fields, buttons, icon buttons, menus and their items, dropdowns, dialogs, the composer and its send block, cards, gallery cells, suggestion cards, rule and handoff rows, chat bubbles, tags, tab strips, segments, thumbnails.
+Square by default (`rounded.none`): fields, buttons, icon buttons, menus and their items, dropdowns, dialogs, the composer and its send block, cards, gallery cells, suggestion cards, rule and handoff rows, tags, tab strips, segments, thumbnails.
 
 - **6px** (`rounded.row`, `--row-r`): navigation rows only: sidebar nav items, projects, sessions, the account row, Settings sections and search results, the Sprocket list's rows.
+- **12px** (`rounded.bubble`, `--bubble-r`): chat bubbles, the user's and replies, so a conversation reads softer than the console around it; what sits inside one (code) stays square.
 - **Circles and pills** (`rounded.pill`): status dots, avatars, colour swatches, and the switch.
 - The Sprocket characters keep their own soft shapes, and the logo is built from round-ended bars: against the square frame they're the softest things on screen.
 
@@ -517,7 +519,7 @@ Square by default (`rounded.none`): fields, buttons, icon buttons, menus and the
 
 ### Chat (Sprockets)
 - The composer is 12px wider than the message column on each side, so its edges sit outside the text instead of on the edge where replies start and the user's bubbles end.
-- **Bubbles, as in a text app:** the user's messages are square `--surface-2` bubbles on the right, replies the same on the left (at most 620px), one bubble per message with its paragraphs inside. Messages from the same author in a row sit 4px apart, a change of author 20px. A Sprocket's several messages in a row come from separate sends (`send_message`, or text before a tool call); Sprockets are told to write short, like texting. A bubble draws the little Markdown they write (`sprockets/marks.ts`): `**bold**` in 600, `` `code` `` in Space Mono at 0.86em on `--surface` (1px × 4px in), and fenced code blocks as a `--surface` inset, 12.5px Space Mono, 8px × 10px in, scrolling sideways; anything else stays as typed, and previews drop the marks. Rails' own notices are centered 13px `--muted` text. Day stamps are 11px Space Mono capitals, centered.
+- **Bubbles, as in a text app:** the user's messages are `--surface-2` bubbles rounded 12px on the right, replies the same on the left (at most 620px), one bubble per message with its paragraphs inside. Messages from the same author in a row sit 4px apart, a change of author 20px. A Sprocket's several messages in a row come from separate sends (`send_message`, or text before a tool call); Sprockets are told to write short, like texting. A bubble draws the little Markdown they write (`sprockets/marks.ts`): `**bold**` in 600, `` `code` `` in Space Mono at 0.86em on `--surface` (1px × 4px in), and fenced code blocks as a `--surface` inset, 12.5px Space Mono, 8px × 10px in, scrolling sideways; anything else stays as typed, and previews drop the marks. Rails' own notices are centered 13px `--muted` text. Day stamps are 11px Space Mono capitals, centered.
 - **The character appears once per view.** An empty chat greets the user with the 120px character ("Say hello to …", or "app's chat" for a project chat, 24px Space Grotesk; a team's members stand side by side at 72px, each named); once the chat has messages, a single muted line ("This is the beginning of your chat with …", or "of app's chat with …") marks where it starts. Otherwise the character shows beside the name (the list's rows, the chat header, the side panel's bar), while it's on a message (below), and in a team at the foot of each member's replies.
 - **The chat header is the character and the name** (a team: its picture, its name, then its members' names in `--muted` 400). An attached Sprocket's two chats follow as tabs (13px, `--muted`; the shown one `--text` with a 2px `--tint-ink` line at the header's foot, the other with a red dot while a reply waits there): the project's name, then Direct. On phones the character makes room for them. Then Clear chat, an icon button with an arrow going round (it starts the chat over; confirmed, disabled while the chat is empty) and the panel toggle at the far right: no project chip, and no line under it (the list's and the panel's headers carry the rule). While the panel is open, the toggle sits at the panel's top right instead, at the same inset, so it never leaves the corner.
 - **The panel** (`sprockets/SprocketSettings.tsx`) is in tabs, in its 52px header where a chat's are in the chat header (13px, `--muted`; the shown one `--text` with a 2px `--tint-ink` line on the header's rule): **About** (name, description, model, usage, and Delete, a small danger button, "Delete Lead", confirmed, 28px below them), **Project** (the project, with one muted line saying what it does there; projects another Sprocket looks after are listed, greyed, with its name; then pending handoffs and owners), **Rules** (a Coordinator's only) and **Tools** (a ruled row per connector, MCP server and skill in Customize: its 28px mark (a skill's book in a ruled square), the name over a muted 13px kind and tool count, "Can't connect" in red, and a switch; a muted line links to Customize). Only the tab's page scrolls, so a long list never pushes the others down; the panel opens on the tab last shown. The tabs take the arrow keys; Escape closes the panel. Phones get a back arrow to the chat before the tabs instead of the toggle. A muted "Saved" sits before the right-hand icons for two seconds after each save. Fields are 16px apart, Delete 28px below them. Everything saves as you go: a text field when it loses focus (Enter for the name; Escape puts either back), a choice at once. At most one muted line of help per field. A Sprocket's look is chosen once, in the creator. A team's panel (`sprockets/TeamSettings.tsx`) is one page in the same frame: its name, its member slots (as in New team; each change saves, and a team keeps two), one muted line on how members answer, and Delete.

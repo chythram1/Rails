@@ -11,7 +11,7 @@ type Theme = "light" | "dark";
 const KEY = "rails.appearance";
 const DARK = "(prefers-color-scheme: dark)";
 /** The browser's own bar (phones): each theme's canvas, `--bg` in styles.css. */
-const BAR: Record<Theme, string> = { light: "#ffffff", dark: "#1d1d1d" };
+const BAR: Record<Theme, string> = { light: "#fcfcfc", dark: "#121212" };
 
 const resolveTheme = (appearance: Appearance, osDark: boolean): Theme =>
   appearance === "system" ? (osDark ? "dark" : "light") : appearance;

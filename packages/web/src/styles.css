@@ -7,6 +7,7 @@
   --grotesk: "Space Grotesk Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --row-r: 6px; /* navigation rows: the one rounded rectangle */
+  --bubble-r: 12px; /* chat bubbles: softly rounded */
   --sidebar-w: 300px;
 }
 
@@ -14,8 +15,8 @@
 :root:not([data-theme="light"]) {
   color-scheme: dark;
   /* Surfaces. */
-  --bg: #1d1d1d; /* the canvas */
-  --sidebar: #141414; /* the sidebar, tab strips, side columns */
+  --bg: #121212; /* the canvas: chats, the Sprockets list, panels */
+  --sidebar: #0e0e0e; /* the sidebar, tab strips, side columns: a step darker than the canvas */
   --surface: #1d1d1d; /* menus and popovers (their edge sets them apart) */
   --surface-2: #262626; /* the selected row, user bubbles, insets */
   --hover: #2c2c2c; /* hover on actions: menu items, buttons, list rows */
@@ -53,18 +54,18 @@
   --diff-del: #3a2222;
   --diff-del-ink: #f2a3a0;
   /* Terminals stay dark in both themes (agents pick colors meant for dark backgrounds). */
-  --term-bg: #1d1d1d;
+  --term-bg: #121212;
   --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.5);
   --sprocket-shadow: 0.5;
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #ffffff;
-  --sidebar: #fafafa;
+  --bg: #fcfcfc;
+  --sidebar: #f5f5f5;
   --surface: #ffffff;
-  --surface-2: #f0f0f0;
-  --hover: #f4f4f4;
+  --surface-2: #ededed;
+  --hover: #f0f0f0;
   --dialog: #fafafa;
   --field: #ffffff;
   --btn: #ffffff;
@@ -93,7 +94,7 @@
   --diff-add-ink: #1f6b2a;
   --diff-del: #fbeaea;
   --diff-del-ink: #a8322b;
-  --term-bg: #1d1d1d;
+  --term-bg: #121212;
   --shadow-pop: 0 8px 24px rgb(0 0 0 / 0.08);
   --sprocket-shadow: 0.18;
 }
@@ -913,7 +914,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-stamp { align-self: center; margin: 12px 0 8px; color: var(--muted); font: 11px/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
 .sp-message:first-child .sp-stamp { margin-top: 0; }
 .sp-bubble {
-  margin: 0; max-width: min(560px, 85%); padding: 9px 14px; background: var(--surface-2);
+  margin: 0; max-width: min(560px, 85%); padding: 9px 14px; background: var(--surface-2); border-radius: var(--bubble-r);
   font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 /* What a bubble's Markdown says (marks.ts): `code` and code blocks in the mono face, on --surface. */
