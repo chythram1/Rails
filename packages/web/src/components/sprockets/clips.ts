@@ -19,13 +19,18 @@ export type Key = [t: number, v: number, ease?: Ease];
 /**
  * Body motion as keyframed tracks, played straight off the clock rather than through springs, so what has to happen
  * together does: it squashes the moment it lands, and stretches as it leaves the ground. On top of the pose: `hop`
- * (viewBox units up), `squash` (its width, 1 as drawn; its height is the inverse, so it keeps its volume) and `tip`
- * (degrees, + chin up). Each track starts and ends at rest (0, 1, 0).
+ * (viewBox units up), `squash` (its width, 1 as drawn; its height is the inverse, so it keeps its volume), `tip`
+ * (degrees, + chin up), `shift` (viewBox units, + right), `turn` and `roll` (degrees, + to the viewer's right) and
+ * `look` (where the eyes look across, -1 to 1). Each track starts and ends at rest (1 for squash, 0 for the rest).
  */
 export interface Moves {
   hop?: Key[];
   squash?: Key[];
   tip?: Key[];
+  shift?: Key[];
+  turn?: Key[];
+  roll?: Key[];
+  look?: Key[];
 }
 
 const EASES: Record<Ease, (x: number) => number> = {
@@ -169,17 +174,34 @@ export const SPIN: Gesture = () => [{ ms: 0, spin: 1, hop: 240 }];
 export const SPIN_MS = 700;
 
 /**
- * Cheering, as its message lands: a dance, bouncing side to side. Each bounce hops it over to one side, stretching as it
- * takes off and squashing as it lands, leaning and turning the way it's going with its eyes leading; four bounces,
- * then back to the middle.
+ * Cheering, as its message lands: a jelly dance from side to side, timed like the satisfied nod. It squashes down,
+ * then floats over to one side and back, four hops, each a little lower, leaning and turning the way it's going with
+ * its eyes leading; each landing is a quick squash straight into the next hop, the last one back to the middle, and
+ * it wobbles slowly to a stop.
  */
-export const DANCE: Gesture = () => [
-  ...[-1, 1, -1, 1].flatMap((s): Step[] => [
-    { ms: 210, shift: s * 11, turn: s * 14, roll: s * 9, aim: [s * 0.5, -0.4], hop: 320, squash: -1.6 },
-    { ms: 190, squash: 1.8, roll: s * 4 },
-  ]),
-  { ms: 300, shift: 0, turn: 0, roll: 0, aim: null },
-];
+export const DANCE: Moves = (() => {
+  const hops: [to: number, up: number, air: number][] = [[-11, 15, 440], [11, 14, 440], [-11, 12, 420], [0, 8, 360]];
+  const LAND = 60; // on the ground between hops: a quick squash
+  const m: Required<Moves> = { hop: [[0, 0], [160, 0]], squash: [[0, 1], [150, 1.1, "out"], [160, 1.08]], tip: [[0, 0], [150, -4, "out"]], shift: [[0, 0]], turn: [[0, 0]], roll: [[0, 0]], look: [[0, 0]] };
+  let [t, at] = [160, 0];
+  for (const [to, up, air] of hops) {
+    const dir = Math.sign(to - at);
+    m.squash.push([t + 50, 0.9, "out"], [t + air * 0.6, 1], [t + air - 20, 0.97, "in"], [t + air + 30, 1.1, "out"], [t + air + LAND, 1.06]);
+    m.hop.push([t + air / 2, up, "out"], [t + air, 0, "in"], [t + air + LAND, 0]);
+    m.shift.push([t, at], [t + air, to]);
+    m.turn.push([t + air * 0.4, dir * 14]);
+    m.roll.push([t + air * 0.4, dir * 9], [t + air + 40, dir * 3]);
+    m.look.push([t + air * 0.3, dir * 0.6]);
+    m.tip.push([t + air / 2, 6], [t + air + 30, -5, "out"]);
+    [t, at] = [t + air + LAND, to];
+  }
+  m.squash.push([t + 220, 0.95], [t + 440, 1.03], [t + 640, 0.99], [t + 820, 1]); // the jelly wobble
+  m.turn.push([t + 300, 0]);
+  m.roll.push([t + 150, -2], [t + 400, 0]);
+  m.look.push([t + 300, 0]);
+  m.tip.push([t + 350, 0]);
+  return m;
+})();
 
 /**
  * Surveying what's below: a pause at one end, then its eyes scanning along an upside-down arc (∪), from one side down

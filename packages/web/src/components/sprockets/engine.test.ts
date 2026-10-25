@@ -58,17 +58,19 @@ describe("a Sprocket's motion engine", () => {
   it("cheering: happy eyes and a dance bouncing side to side, then back to its open eyes", () => {
     const r = rig(input("idle", "toward"));
     setInput(r, input("cheer", "toward"), r.clock);
-    let [lo, hi, up] = [0, 0, 0];
-    const f = run(r, 1500, (f) => {
+    let [lo, hi, up, airborneWide] = [0, 0, 0, 1];
+    const f = run(r, 2000, (f) => {
       lo = Math.min(lo, f.pose.slide);
       hi = Math.max(hi, f.pose.slide);
       up = Math.max(up, f.pose.hop);
+      if (f.pose.hop > 2) airborneWide = Math.max(airborneWide, f.pose.sx);
     });
     expect(f.happy).toBeGreaterThan(0.95);
     expect(lo).toBeLessThan(-6);
     expect(hi).toBeGreaterThan(6);
-    expect(up).toBeGreaterThan(6);
-    expect(run(r, 1500).pose.slide).toBeCloseTo(0, 0); // back in the middle
+    expect(up).toBeGreaterThan(12);
+    expect(airborneWide).toBeLessThan(1.05); // it squashes on the ground, not in the air
+    expect(run(r, 1000).pose.slide).toBeCloseTo(0, 0); // back in the middle
     setInput(r, input("idle", "toward"), r.clock);
     expect(run(r, 1000).happy).toBeLessThan(0.05);
   });

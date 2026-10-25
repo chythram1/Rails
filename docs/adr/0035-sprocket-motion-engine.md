@@ -23,7 +23,7 @@ throwaway page and a strip of screenshots.
   shape, and the blink is a curve. A new move is a new entry, not more timer code. A move whose parts have to land
   together (squashing the moment it touches down) is keyframed tracks instead (`Moves`: hop, squash, tip, each key
   easing in, out or both), played straight off its animation's clock on top of the pose; kicks to free springs drift
-  apart and read as jerky. Satisfied's nod is the first.
+  apart and read as jerky. Satisfied's nod and Cheer's dance are built this way, on the same timing (each hop floats, each landing is a quick squash straight into the next, and a slow wobble ends it).
 - **Finished animations, apart from their parts** (`animations.ts`): the polished set a Sprocket plays, each naming
   when it plays, how long it lasts, its gesture or moves and its eyes (Cheer, Survey for starting a reply in a team, and Satisfied). Every one shares the same blinks (none while the eyes are ^ ^, which are already shut),
   expressions and leaning in, so a Sprocket behaves predictably wherever it is; what's decided per animation is

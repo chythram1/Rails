@@ -25,8 +25,8 @@ export const ANIMATIONS = {
     name: "Cheer",
     when: "Its message lands, in any chat: beside the message, and on its row in the list.",
     activity: "cheer",
-    ms: 2200, // the dance (1.9s), and a moment for the eyes to ease back as it settles
-    gesture: DANCE,
+    ms: 3000, // the dance and wobble (2.8s), and a moment for the eyes to ease back as it settles
+    moves: DANCE,
     eyes: "happy",
   },
   satisfied: {

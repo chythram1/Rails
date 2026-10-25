@@ -5,7 +5,7 @@ import { Segmented } from "../ui/Segmented.tsx";
 import { Switch } from "../ui/Switch.tsx";
 import { ANIMATIONS } from "./animations.ts";
 import { CHARACTERS } from "./characters.ts";
-import { DANCE, EXPRESSIONS, GLANCE, SPIN, THINKING, type ExpressionName, type Gesture } from "./clips.ts";
+import { EXPRESSIONS, GLANCE, SPIN, THINKING, type ExpressionName, type Gesture } from "./clips.ts";
 import { blink, express, leanIn, play, type Activity, type Rig } from "./engine.ts";
 import { clock, kick, setSpeed, stepClock } from "./motion.ts";
 import { COLOR_NAMES } from "./names.ts";
@@ -13,7 +13,7 @@ import { Sprocket } from "./Sprocket.tsx";
 import type { Stance } from "./solid.ts";
 
 /** Every gesture by name: the thinking moves, then the rest. */
-const GESTURES: Record<string, Gesture> = { ...Object.fromEntries(Object.entries(THINKING).map(([n, m]) => [n, m.steps])), glance: GLANCE, spin: SPIN, dance: DANCE };
+const GESTURES: Record<string, Gesture> = { ...Object.fromEntries(Object.entries(THINKING).map(([n, m]) => [n, m.steps])), glance: GLANCE, spin: SPIN };
 const HOLD = { yaw: [-180, 180, 0], pitch: [-60, 60, 0], roll: [-45, 45, 0], near: [0.8, 1.3, 1] } as const;
 type Held = Record<keyof typeof HOLD, number>;
 

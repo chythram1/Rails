@@ -10,7 +10,7 @@
 // cheering) plays its gesture with its eyes for as long as it lasts, then the Sprocket goes back to resting.
 import { POSES, type Pose, type Stance } from "./solid.ts";
 import { animationFor, type Animation } from "./animations.ts";
-import { BLINK_MS, EXPRESSIONS, GLANCE, LEAN_GLANCE, LEANS, OPEN, SPIN, THINKING, eyeAt, lidAt, sample, type EyeShape, type Expression, type ExpressionName, type Gesture, type Rand, type Step } from "./clips.ts";
+import { BLINK_MS, EXPRESSIONS, GLANCE, LEAN_GLANCE, LEANS, OPEN, SPIN, THINKING, eyeAt, lidAt, sample, type EyeShape, type Key, type Expression, type ExpressionName, type Gesture, type Rand, type Step } from "./clips.ts";
 
 /** What a Sprocket is doing: resting, thinking (direct chats), writing (the spin), or one of the finished animations
  * (animations.ts): cheering, talking in a team (surveying), satisfied. */
@@ -313,11 +313,12 @@ export function advance(r: Rig, now: number, pointer: [number, number] | null): 
   // An animation's keyframed moves, on its own clock, on top.
   const m = r.input.faceOnly ? undefined : r.anim?.moves;
   const at = r.anim ? now - r.anim.start : 0;
-  const [mh, ms, mt] = m ? [m.hop ? sample(m.hop, at) : 0, m.squash ? sample(m.squash, at) : 1, m.tip ? sample(m.tip, at) : 0] : [0, 1, 0];
+  const track = (keys: Key[] | undefined, rest: number) => (keys ? sample(keys, at) : rest);
+  const [mh, ms, mt, mshift, mturn, mroll, mlook] = [track(m?.hop, 0), track(m?.squash, 1), track(m?.tip, 0), track(m?.shift, 0), track(m?.turn, 0), track(m?.roll, 0), track(m?.look, 0)];
   if (m) moving = true;
   const frame: Frame = {
-    pose: { yaw: s.yaw.x, pitch: s.pitch.x + mt, roll: s.roll.x, near: s.near.x, slide: s.slide.x, lean: s.lean.x, sx: (1 + s.squash.x) * ms, sy: (1 - s.squash.x) / ms, hop: Math.max(0, s.hop.x) + mh },
-    look: [s.lookX.x * 9, s.lookY.x * 6],
+    pose: { yaw: s.yaw.x + mturn, pitch: s.pitch.x + mt, roll: s.roll.x + mroll, near: s.near.x, slide: s.slide.x + mshift, lean: s.lean.x, sx: (1 + s.squash.x) * ms, sy: (1 - s.squash.x) / ms, hop: Math.max(0, s.hop.x) + mh },
+    look: [(s.lookX.x + mlook) * 9, s.lookY.x * 6],
     left: dilate(e ? eyeAt(e.keys.left, t - e.start, e.keys.ms) : OPEN, s.round.x, -1),
     right: dilate(e ? eyeAt(e.keys.right, t - e.start, e.keys.ms) : OPEN, s.round.x, 1),
     lid: r.blink === null ? 0 : lidAt(t - r.blink),
