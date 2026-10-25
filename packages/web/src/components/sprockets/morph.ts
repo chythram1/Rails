@@ -12,7 +12,7 @@ export interface Frame {
   color: string;
   /** Stroke in the body colour that rounds sharp tips (lune's horns); 0 for none. */
   round: number;
-  face: { x: number; y: number; tilt: number };
+  face: { x: number; y: number };
 }
 
 /** Points round an ellipse, as flubber takes a ring. */
@@ -56,7 +56,7 @@ export function morph(a: SprocketLook, b: SprocketLook): (t: number) => Frame {
     d: body(t),
     color: mix(COLORS[a.color], COLORS[b.color], t),
     round: lerp(da.round ?? 0, db.round ?? 0, t),
-    face: { x: lerp(da.face.x, db.face.x, t), y: lerp(da.face.y, db.face.y, t), tilt: lerp(da.face.tilt, db.face.tilt, t) },
+    face: { x: lerp(da.face.x, db.face.x, t), y: lerp(da.face.y, db.face.y, t) },
   });
 }
 

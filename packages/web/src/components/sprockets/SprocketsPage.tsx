@@ -237,7 +237,7 @@ function SprocketRow({ sprocket: s, active }: { sprocket: SprocketData; active: 
       onFocus={() => setFocus(true)}
       onBlur={() => setFocus(false)}
     >
-      <Sprocket look={s.look} size={36} still={!awake} stance={facing ? "front" : "rest"} follow={hover} />
+      <Sprocket look={s.look} size={50} still={!awake} stance={facing ? "front" : "rest"} follow={hover} />
       <RowText name={s.name} chat={shown} />
     </a>
   );
@@ -248,7 +248,7 @@ function TeamRow({ team: g, list, active }: { team: SprocketTeam; list: Sprocket
   const members = g.members.flatMap((m) => list.find((s) => s.id === m) ?? []);
   return (
     <a className="sp-row" href={href.team(g.id)} title={`${g.name}: ${members.map((m) => m.name).join(", ")}`} aria-current={active ? "page" : undefined}>
-      <TeamFace looks={members} size={36} />
+      <TeamFace looks={members} size={50} />
       <RowText name={g.name} chat={g} nameOf={(id) => list.find((s) => s.id === id)?.name} />
     </a>
   );

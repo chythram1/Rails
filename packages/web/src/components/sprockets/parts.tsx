@@ -1,18 +1,20 @@
-// A Sprocket's eyes, drawn round the face's centre; the renderer places them, and motion.ts animates each one. Each
-// eye is drawn open and happy (^, shown while the Sprocket has the class `joy`).
+// A Sprocket's eyes, drawn round the face's centre; the renderer places and slants them (`s-slant`, from the pose),
+// and motion.ts animates each one. Each eye is drawn open and happy (^, shown while the Sprocket has the class `joy`).
 
 const INK = "#17171c";
 /** Distance from the face centre to each eye. */
 const EYE_X = 13;
 
-export function Eyes({ tilt }: { tilt: number }) {
+export function Eyes({ slant }: { slant: number }) {
   return (
     <>
       {[-EYE_X, EYE_X].map((x) => (
         // Each eye in its own group, so expressions (motion.ts) can squash, move and size them apart.
         <g key={x} className="s-eye">
-          <rect className="s-open" x={x - 7} y={-14} width={14} height={28} rx={7} fill={INK} transform={`rotate(${tilt} ${x} 0)`} />
-          <path className="s-happy" d={`M${x - 9} 5 Q${x} -13 ${x + 9} 5`} fill="none" stroke={INK} strokeWidth={6.5} strokeLinecap="round" />
+          <g className="s-slant" data-x={x} transform={`rotate(${slant} ${x} 0)`}>
+            <rect className="s-open" x={x - 7} y={-15.5} width={14} height={31} rx={7} fill={INK} />
+            <path className="s-happy" d={`M${x - 9} 5 Q${x} -13 ${x + 9} 5`} fill="none" stroke={INK} strokeWidth={6.5} strokeLinecap="round" />
+          </g>
         </g>
       ))}
     </>

@@ -81,6 +81,7 @@ export function Sprocket({ look, size, still: stillProp, stance = "rest", follow
     if (b) for (const [k, v] of Object.entries(l.band)) b.setAttribute(k, String(v));
     eyes.current?.setAttribute("transform", l.eyes.transform);
     eyes.current?.setAttribute("opacity", String(l.eyes.opacity));
+    eyes.current?.querySelectorAll<SVGGElement>(".s-slant").forEach((el) => el.setAttribute("transform", `rotate(${l.eyes.slant} ${el.dataset.x} 0)`));
     shadow.current?.setAttribute("rx", String(l.shadow.rx));
   });
   const geometry = useRef({ axis, face, half: def.shadow.half });
@@ -143,7 +144,7 @@ export function Sprocket({ look, size, still: stillProp, stance = "rest", follow
           <g ref={eyes} transform={l.eyes.transform} opacity={l.eyes.opacity}>
             <g className="s-eyes">
               <g className="s-lid" ref={lid}>
-                <Eyes tilt={face.tilt} />
+                <Eyes slant={l.eyes.slant} />
               </g>
             </g>
           </g>

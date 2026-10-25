@@ -1,6 +1,7 @@
 // A Sprocket as a solid (ADR 0005, amended): its drawing is the front of a soft, round body. Facing you it's the flat
-// drawing. Turned or tipped, the body hardly narrows: its face moves instead, the eyes travelling across it toward
-// where it looks (narrowing as they near its edge, as on a dome), while its thickness, in its one colour with no
+// drawing, its eyes upright. Turned or tipped, the body hardly narrows: its face moves instead, the eyes travelling a
+// little toward where it looks and slanting as they would on a dome (looking up and to the right, the pair rises to
+// the right and each eye's top leans left), while its thickness, in its one colour with no
 // shading, swells the outline on the far side. Only a spin takes it through edge-on, a sliver, to its back. Drawn as
 // layers of the body from back to front, the front one with the eyes. Pure geometry: Sprocket.tsx draws it, motion.ts
 // moves it.
@@ -20,11 +21,11 @@ export interface Pose {
 }
 
 /** Where it rests: almost facing you, glancing up a little. Facing you, it's the flat drawing. Done with a message
- * in a team, it looks up toward it and leans in. */
+ * in a team, it looks up toward it, rocking back a little. */
 export const POSES = {
   rest: { yaw: 6, pitch: 6, lean: 0 },
   front: { yaw: 0, pitch: 0, lean: 0 },
-  toward: { yaw: 40, pitch: 18, lean: 6 },
+  toward: { yaw: 40, pitch: 26, lean: -6 },
 } as const;
 export type Stance = keyof typeof POSES;
 
@@ -36,7 +37,9 @@ const DEPTH = 22;
 export const LAYERS = 7;
 /** How far the face travels across the body as it turns, as a share of the body's half-width (and half-height for
  * tipping). */
-const TRAVEL = 0.75;
+const TRAVEL = 0.45;
+/** How much the eyes' pair turns with a look up and aside, in degrees per unit of sin(yaw)·sin(pitch). */
+const PAIR = 30;
 /** How little a turn narrows the body: its width goes as cos^SOFT, so small turns barely show and a spin still
  * passes through a sliver. */
 const SOFT = 0.35;
@@ -55,7 +58,8 @@ export interface Layout {
   /** The body seen edge-on (in a spin): a band as tall as the body, round at its ends, fading in near edge-on
    * (between the layers, which are lines by then). */
   band: { x: number; y: number; width: number; height: number; rx: number; opacity: number };
-  eyes: { transform: string; opacity: number };
+  /** Where the eyes sit and how the pair turns; `slant` turns each eye about its own centre (degrees). */
+  eyes: { transform: string; opacity: number; slant: number };
   shadow: { rx: number; opacity: number };
 }
 
@@ -100,8 +104,10 @@ export function layout(p: Pose, axis: number, face: { x: number; y: number }, bo
       opacity: f(clamp((Math.abs(s) - 0.85) / 0.12)),
     },
     eyes: {
-      transform: `translate(${f(eyeX)} ${f(eyeY)}) scale(${f(Math.max(c, 0.001) ** 0.6)} ${f(Math.max(cp, 0.001) ** 0.6)})`,
+      transform: `translate(${f(eyeX)} ${f(eyeY)}) rotate(${f(-PAIR * s * sp)}) scale(${f(Math.max(c, 0.001) ** 0.6)} ${f(Math.max(cp, 0.001) ** 0.6)})`,
       opacity: f(clamp((c - 0.15) / 0.25)),
+      // The face's "up" on a dome turned by yaw then pitch, seen from the front.
+      slant: f((Math.atan2(-s * sp, cp) * 180) / Math.PI),
     },
     shadow: { rx: f(half * (0.9 + 0.1 * Math.abs(w)) * (1 - clamp(p.hop / 60, 0, 0.5))), opacity: f(1 - clamp(p.hop / 50, 0, 0.5)) },
   };

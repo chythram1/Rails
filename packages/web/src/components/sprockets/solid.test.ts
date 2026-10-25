@@ -13,7 +13,7 @@ describe("a Sprocket as a solid", () => {
     expect(l.layers.every((t) => shiftX(t) === 100)).toBe(true); // every layer on the axis: no depth shows
     expect(l.band.opacity).toBe(0);
     expect(l.eyes.opacity).toBe(1);
-    expect(l.eyes.transform).toMatch(/^translate\(110 140\) scale\(1 1\)/); // exactly the flat drawing
+    expect(l.eyes.transform).toMatch(/^translate\(110 140\) rotate\(0\) scale\(1 1\)/); // exactly the flat drawing
   });
 
   it("turned, hardly narrows: its face travels toward the turn, eyes narrowing", () => {
@@ -22,14 +22,19 @@ describe("a Sprocket as a solid", () => {
     expect(scaleX(front)).toBeGreaterThan(0.85); // never thin
     expect(shiftX(front)).toBeGreaterThan(100);
     expect(shiftX(l.layers[0])).toBeLessThan(100);
-    expect(shiftX(l.eyes.transform)).toBeGreaterThan(shiftX(front) + 15); // the face moves, not the body
+    expect(shiftX(l.eyes.transform)).toBeGreaterThan(shiftX(front) + 8); // the face moves, not the body
     expect(scaleX(l.eyes.transform)).toBeLessThan(1);
     expect(l.eyes.opacity).toBe(1);
   });
 
+  it("looking up and to the right, each eye's top leans left; facing you they stand upright", () => {
+    expect(layout(at(0), 100, { x: 100, y: 140 }, box, 50).eyes.slant).toBe(0);
+    expect(layout({ ...at(40), pitch: 26 }, 100, { x: 100, y: 140 }, box, 50).eyes.slant).toBeLessThan(-10);
+  });
+
   it("tipped up, its face travels up", () => {
     const l = layout({ ...at(0), pitch: 20 }, 100, { x: 100, y: 140 }, box, 50);
-    expect(Number(l.eyes.transform.match(/translate\([\d.]+ ([\d.]+)/)![1])).toBeLessThan(130);
+    expect(Number(l.eyes.transform.match(/translate\([\d.]+ ([\d.]+)/)![1])).toBeLessThan(135);
   });
 
   it("in a spin, edge-on is a sliver, and past that its back, mirrored, with no eyes", () => {

@@ -26,8 +26,8 @@ interface CharacterDef {
   body: Primitive[];
   /** Stroke in the body colour, which rounds sharp tips (e.g. the moon's horns). */
   round?: number;
-  /** Centre of the face, and how much the eyes lean (degrees). */
-  face: { x: number; y: number; tilt: number };
+  /** Centre of the face. The eyes stand upright facing you; the pose slants them (solid.ts). */
+  face: { x: number; y: number };
   /** Ground shadow: centre and half-width. */
   shadow: { x: number; half: number };
 }
@@ -96,44 +96,44 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
   block: {
     name: "Block",
     body: [{ d: roundedPoly([[46, 86], [154, 86], [154, 196], [46, 196]], 30) }],
-    face: { x: 100, y: 138, tilt: 6 },
+    face: { x: 100, y: 138 },
     shadow: { x: 100, half: 52 },
   },
   bean: {
     name: "Bean",
     body: [{ d: "M 64 84 C 92 68 122 78 128 104 C 132 122 150 126 164 140 C 182 160 172 196 132 196 L 96 196 C 56 196 36 168 38 134 C 40 108 48 92 64 84 Z" }],
-    face: { x: 110, y: 150, tilt: 10 },
+    face: { x: 110, y: 150 },
     shadow: { x: 104, half: 56 },
   },
   lune: {
     name: "Lune",
     body: [{ d: crescent(98, 138, 58, 142, 102, 42) }],
     round: 12,
-    face: { x: 80, y: 150, tilt: 8 },
+    face: { x: 80, y: 150 },
     shadow: { x: 100, half: 54 },
   },
   bell: {
     name: "Bell",
     body: [{ d: "M 100 80 C 132 80 146 102 148 134 C 150 160 158 172 170 182 C 178 190 172 197 160 197 L 40 197 C 28 197 22 190 30 182 C 42 172 50 160 52 134 C 54 102 68 80 100 80 Z" }],
-    face: { x: 100, y: 146, tilt: 6 },
+    face: { x: 100, y: 146 },
     shadow: { x: 100, half: 62 },
   },
   starry: {
     name: "Starry",
     body: [{ d: roundedPoly(star(100, 140, 68, 38, 5), (i) => (i % 2 ? 12 : 26)) }],
-    face: { x: 100, y: 146, tilt: 6 },
+    face: { x: 100, y: 146 },
     shadow: { x: 100, half: 54 },
   },
   cog: {
     name: "Cog",
     body: [{ d: roundedPoly(gear(100, 138, 60, 47, 8), 6) }],
-    face: { x: 100, y: 140, tilt: 6 },
+    face: { x: 100, y: 140 },
     shadow: { x: 100, half: 50 },
   },
   roo: {
     name: "Roo",
     body: [{ d: roundedPoly([[100, 74], [162, 136], [100, 198], [38, 136]], 22) }],
-    face: { x: 100, y: 138, tilt: 6 },
+    face: { x: 100, y: 138 },
     shadow: { x: 100, half: 44 },
   },
   momo: {
@@ -142,7 +142,7 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
       { cx: 77, cy: 140, rx: 43, ry: 56, rot: -6 },
       { cx: 123, cy: 140, rx: 43, ry: 56, rot: 6 },
     ],
-    face: { x: 100, y: 150, tilt: 6 },
+    face: { x: 100, y: 150 },
     shadow: { x: 100, half: 62 },
   },
 };
