@@ -60,7 +60,6 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
   const dotted = useDots(look, dots, motion);
   const drawing = given ?? dotted;
   const color = drawing?.color ?? COLORS[look.color];
-  const round = drawing ? drawing.round : (def.round ?? 0);
   const face = drawing?.face ?? def.face;
   const axis = def.shadow.x;
 
@@ -73,18 +72,18 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
 
   // Moving, it's drawn from where it starts and the rig paints every frame after; still, from its stance.
   const [from] = useState(() => poseOf(resting ? REST_POSE : stance));
-  const solid = { depth: drawing?.depth ?? def.depth, puff: drawing?.puff ?? def.puff };
+  const solid = { depth: drawing?.depth ?? def.depth, puff: drawing?.puff ?? def.puff, spun: drawing?.spun ?? def.spun ?? 0 };
   // Strokes are drawn in screen pixels (non-scaling, as the layers are squashed when turned): viewBox units to pixels.
   const px = size / VIEW.w;
-  const geometry = useRef({ axis, face, half: def.shadow.half, body: solid, eyes: drawing?.eyes ?? 1, round, px });
-  geometry.current = { axis, face, half: def.shadow.half, body: solid, eyes: drawing?.eyes ?? 1, round, px };
+  const geometry = useRef({ axis, face, half: def.shadow.half, body: solid, eyes: drawing?.eyes ?? 1, px });
+  geometry.current = { axis, face, half: def.shadow.half, body: solid, eyes: drawing?.eyes ?? 1, px };
   const shown = useRef<Frame | null>(null);
   const paint = useRef((f: Frame) => {
     shown.current = f;
     const g = geometry.current;
     const l = layout(f.pose, g.axis, g.face, box.current, g.half, g.body);
     rigEl.current?.setAttribute("transform", l.rig);
-    const stroke = String(strokeOf(g.round, l.gap, g.px * f.pose.near * Math.max(f.pose.sx, f.pose.sy)));
+    const stroke = String(strokeOf(l.gap, g.px * f.pose.near * Math.max(f.pose.sx, f.pose.sy)));
     layers.current.forEach((el, i) => {
       if (!el) return;
       // The denser slices, turned well aside; facing you the extra ones are hidden.
@@ -175,7 +174,7 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
               display={t ? undefined : "none"}
               className="s-layer"
               style={{ fill: color, stroke: color }}
-              strokeWidth={strokeOf(round, l.gap, px)}
+              strokeWidth={strokeOf(l.gap, px)}
               strokeLinejoin="round"
             >
               {shape}
@@ -206,8 +205,8 @@ function paintEyes(root: SVGGElement | null, f: Frame, l: Layout) {
   });
 }
 
-/** A layer's stroke in screen pixels: its rounding (lune's horns) and what joins it to the next layer, at `px` a unit. */
-const strokeOf = (round: number, gap: number, px: number) => +((round + gap) * px).toFixed(2);
+/** A layer's stroke in screen pixels: what joins it to the next layer, at `px` a unit. */
+const strokeOf = (gap: number, px: number) => +(gap * px).toFixed(2);
 
 function Shape({ p }: { p: Primitive }) {
   if ("d" in p) return <path d={p.d} />;

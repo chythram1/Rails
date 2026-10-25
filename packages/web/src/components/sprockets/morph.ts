@@ -10,11 +10,10 @@ export interface Drawing {
   /** The body, as one path (several rings for a body of several shapes). */
   d: string;
   color: string;
-  /** Stroke in the body colour that rounds sharp tips (lune's horns); 0 for none. */
-  round: number;
-  /** The body's thickness and puff (characters.ts). */
+  /** The body's thickness, puff and how spun it is (characters.ts). */
   depth: number;
   puff: number;
+  spun: number;
   face: { x: number; y: number };
   /** How much the eyes show (1 if left out): they fade as it becomes three dots. */
   eyes?: number;
@@ -60,8 +59,8 @@ export function morph(a: SprocketLook, b: SprocketLook): (t: number) => Drawing 
   return (t) => ({
     d: body(t),
     color: mix(COLORS[a.color], COLORS[b.color], t),
-    round: lerp(da.round ?? 0, db.round ?? 0, t),
     depth: lerp(da.depth, db.depth, t),
+    spun: lerp(da.spun ?? 0, db.spun ?? 0, t),
     puff: lerp(da.puff, db.puff, t),
     face: { x: lerp(da.face.x, db.face.x, t), y: lerp(da.face.y, db.face.y, t) },
   });
@@ -72,7 +71,7 @@ export function still(look: SprocketLook): Drawing {
   const def = CHARACTERS[look.character];
   const shapes = shapesOf(look);
   const d = shapes.map((s) => (typeof s === "string" ? s : `M ${s.map((p) => p.join(" ")).join(" L ")} Z`)).join(" ");
-  return { d, color: COLORS[look.color], round: def.round ?? 0, depth: def.depth, puff: def.puff, face: { ...def.face } };
+  return { d, color: COLORS[look.color], depth: def.depth, puff: def.puff, spun: def.spun ?? 0, face: { ...def.face } };
 }
 
 // ---- the ellipsis: a Sprocket thinking in a direct chat becomes three dots (as a Grok bot does) ----
@@ -93,8 +92,8 @@ export function toDots(look: SprocketLook): (t: number) => Drawing {
   return (t) => ({
     d: t <= 0 ? still(look).d : body(t),
     color: COLORS[look.color],
-    round: lerp(def.round ?? 0, 0, t),
     depth: lerp(def.depth, 8, t),
+    spun: lerp(def.spun ?? 0, 0, t),
     puff: lerp(def.puff, 0, t),
     face: { ...def.face },
     eyes: Math.max(0, 1 - t * 1.6),

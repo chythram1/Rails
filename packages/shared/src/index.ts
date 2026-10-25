@@ -315,7 +315,7 @@ export interface GitStatus {
 // ---- Sprockets: always-on agents (ADR 0005, 0006). ----
 
 /** The cast: the shapes a Sprocket can have. */
-export const SPROCKET_CHARACTERS = ["block", "bean", "lune", "bell", "starry", "cog", "roo", "momo"] as const;
+export const SPROCKET_CHARACTERS = ["block", "blob", "drop", "bell", "starry", "cog", "roo", "momo"] as const;
 export type SprocketCharacter = (typeof SPROCKET_CHARACTERS)[number];
 
 /** Body colours (the web holds the hex values). */

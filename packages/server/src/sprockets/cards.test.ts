@@ -10,7 +10,7 @@ import { createSprocket, directChat, listMessages, projectChat, sendMessage, upd
 const faux = fauxProvider();
 models.setProvider(faux.provider);
 const ref = refOf(faux.getModel());
-const look = { character: "bean", color: "teal" } as const;
+const look = { character: "blob", color: "teal" } as const;
 beforeEach(() => settings.set("defaultModel", ref));
 
 const script = (code: string) => fauxAssistantMessage([fauxToolCall("codemode", { code })], { stopReason: "toolUse" });

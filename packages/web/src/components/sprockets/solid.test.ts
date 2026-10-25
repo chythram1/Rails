@@ -22,11 +22,12 @@ const eyeWidth = (body: Body, p: Pose, side: -1 | 1) => {
 };
 
 const pizza: Body = { depth: 10, puff: 0 };
-const bean: Body = { depth: 110, puff: 0.4 };
+const soft: Body = { depth: 110, puff: 0.4 };
+const ball: Body = { depth: 120, puff: 0.4, spun: 1 };
 
 describe("a Sprocket as a solid", () => {
   it("is the flat drawing facing you: eyes where they're drawn, upright", () => {
-    for (const body of [pizza, bean]) {
+    for (const body of [pizza, soft]) {
       const l = box_(body, at(0));
       expect(l.layers).toHaveLength(layerCount(body));
       expect(l.layers.every((t) => Math.abs(centre(t) - 100) < 0.01)).toBe(true);
@@ -42,8 +43,8 @@ describe("a Sprocket as a solid", () => {
 
   it("a thin body narrows as it turns; a deep, round one stays round", () => {
     expect(span(pizza, 60)).toBeLessThan(box.width * 0.6);
-    expect(span(bean, 60)).toBeGreaterThan(box.width * 0.75);
-    expect(span(bean, 60)).toBeGreaterThan(span(pizza, 60) * 1.4);
+    expect(span(soft, 60)).toBeGreaterThan(box.width * 0.75);
+    expect(span(soft, 60)).toBeGreaterThan(span(pizza, 60) * 1.4);
   });
 
   it("tipped and turned, a flat body shears: its upright edges lean", () => {
@@ -54,31 +55,41 @@ describe("a Sprocket as a solid", () => {
   it("its eyes ride the front, travelling further on a deep body", () => {
     const x = (body: Body, p: Pose) => box_(body, p).eyes.project(0, 0)[0] - 100;
     expect(x(pizza, at(40))).toBeGreaterThan(0);
-    expect(x(bean, at(40))).toBeGreaterThan(x(pizza, at(40)) + 25);
-    expect(box_(bean, at(0, 20)).eyes.project(0, 0)[1]).toBeLessThan(mid - 15); // tipped up, they travel up
+    expect(x(soft, at(40))).toBeGreaterThan(x(pizza, at(40)) + 25);
+    expect(box_(soft, at(0, 20)).eyes.project(0, 0)[1]).toBeLessThan(mid - 15); // tipped up, they travel up
   });
 
   it("at rest, the far eye narrows on a round face, as on a ball; on a flat one both match", () => {
     const rest = poseOf("rest");
-    expect(eyeWidth(bean, rest, 1)).toBeLessThan(eyeWidth(bean, rest, -1) * 0.85);
+    expect(eyeWidth(soft, rest, 1)).toBeLessThan(eyeWidth(soft, rest, -1) * 0.85);
     expect(eyeWidth(pizza, rest, 1)).toBeCloseTo(eyeWidth(pizza, rest, -1), 1);
     expect(POSES.rest).toMatchObject({ yaw: 33, pitch: 16, roll: -25 });
   });
 
   it("looking up and to the right, an upright eye's top leans left", () => {
-    const { project } = box_(bean, at(33, 16)).eyes;
+    const { project } = box_(soft, at(33, 16)).eyes;
     expect(project(EYE_X, -15)[0]).toBeLessThan(project(EYE_X, 15)[0]);
   });
 
+  it("a spun body (a ball) keeps its outline as it turns: only its eyes go round, and come back over the top in a spin", () => {
+    const front = box_(ball, at(0)).layers;
+    for (const yaw of [33, 90, 200]) expect(box_(ball, at(yaw)).layers).toEqual(front);
+    expect(box_(ball, at(33, 16)).layers).not.toEqual(front); // tipped, its slices still move
+    const x = (yaw: number) => box_(ball, at(yaw)).eyes.project(0, 0)[0] - 100;
+    expect(x(40)).toBeGreaterThan(30); // the eyes travel round the ball
+    expect(box_(ball, at(180)).eyes.opacity).toEqual([0, 0]); // round the back
+    expect(eyeWidth(ball, poseOf("rest"), 1)).toBeLessThan(eyeWidth(ball, poseOf("rest"), -1) * 0.85); // the far eye bends away
+  });
+
   it("in a spin, edge-on is a sliver, and past that its back, mirrored, with no eyes", () => {
-    const edge = box_(bean, at(90));
+    const edge = box_(soft, at(90));
     // Edge-on it draws denser slices, each stroked so their round ends join into one side.
-    expect(edge.layers).toHaveLength(layerCount(bean, true));
+    expect(edge.layers).toHaveLength(layerCount(soft, true));
     expect(edge.layers.every((t) => Math.abs(matrix(t)[0]) > 0)).toBe(true); // never squashed to nothing
     // Edge-on, the eye on the far side is gone; the near one, on the round face's last sliver, has mostly faded.
     expect(edge.eyes.opacity[1]).toBe(0);
     expect(edge.eyes.opacity[0]).toBeLessThan(0.5);
-    const back = box_(bean, at(180));
+    const back = box_(soft, at(180));
     expect(matrix(back.layers.at(-1)!)[0]).toBeLessThan(0);
     expect(back.eyes.opacity).toEqual([0, 0]);
   });

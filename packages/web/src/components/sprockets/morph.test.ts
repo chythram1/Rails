@@ -12,11 +12,11 @@ describe("morph", () => {
   });
 
   it("mixes the colour, and moves the face", () => {
-    const m = morph({ character: "block", color: "red" }, { character: "bean", color: "blue" });
+    const m = morph({ character: "block", color: "red" }, { character: "blob", color: "blue" });
     expect(m(0).color).toBe("#ff5c6c");
     expect(m(1).color).toBe("#63bdff");
     expect(m(0).face).toEqual(still({ character: "block", color: "red" }).face);
-    expect(m(1).face).toEqual(still({ character: "bean", color: "blue" }).face);
+    expect(m(1).face).toEqual(still({ character: "blob", color: "blue" }).face);
   });
 });
 
@@ -33,7 +33,7 @@ describe("the ellipsis", () => {
     }
   });
   it("the dots hop in turn, a wave going round", () => {
-    const ys = (ms: number) => [...dotsAt(look("bean"), ms).d.matchAll(/M (\S+) (\S+)/g)].map((m) => Number(m[2]));
+    const ys = (ms: number) => [...dotsAt(look("blob"), ms).d.matchAll(/M (\S+) (\S+)/g)].map((m) => Number(m[2]));
     const quarter = ys(DOTS.beat / 4);
     expect(quarter[0]).toBeLessThan(DOTS.y - DOTS.hop * 0.9); // the first is up
     expect(quarter[2]).toBeGreaterThan(quarter[0]); // the last is lower

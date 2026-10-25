@@ -1,5 +1,6 @@
 // A Sprocket as a solid (ADR 0005, amended): its drawing is the front of a body with its own thickness and roundness
-// (characters.ts `depth`, `puff`): a pizza box is thin with straight sides, a bean deep and soft. It's turned as a
+// (characters.ts `depth`, `puff`): a pizza box is thin with straight sides, a bell deep and soft. A round body is
+// spun (`spun`): a solid turned about its upright middle, like a ball, whose outline stays put as it turns. It's turned as a
 // solid in 3D, tipped then turned then rolled (as Grok's bots are), and seen straight on (no vanishing point): facing
 // you it's the flat drawing, its eyes upright; turned and tipped, a flat body shears into a parallelogram while a
 // deep, round one stays round, its depth filling out the outline, all in its one colour with no shading. Drawn as
@@ -65,10 +66,12 @@ export interface Layout {
   shadow: { rx: number; opacity: number };
 }
 
-/** A body's thickness and roundness (characters.ts). */
+/** A body's thickness and roundness, and how spun it is (characters.ts): 1 a solid turned about its upright middle,
+ * whose outline stays put as it turns; 0 a slab of its outline. */
 export interface Body {
   depth: number;
   puff: number;
+  spun?: number;
 }
 
 const clamp = (n: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, n));
@@ -87,27 +90,38 @@ export function layout(p: Pose, axis: number, face: { x: number; y: number }, bo
   // Never quite edge-on: a slice squashed to nothing wouldn't draw (its stroke makes the sliver).
   const nudge = (v: number) => (Math.abs(v) < 0.002 ? (v < 0 ? -0.002 : 0.002) : v);
   const [ca, sa, cp, sp] = [nudge(Math.cos(a)), Math.sin(a), nudge(Math.cos(b)), Math.sin(b)];
+  // A spun body (a ball, a bell) looks the same from every side as it turns: its slices take only the tip, and the
+  // turn shows in its eyes going round (below). In between, part of the turn.
+  const spun = body.spun ?? 0;
+  const ls = Math.sin(a * (1 - spun));
+  const lc = nudge(Math.cos(a * (1 - spun)));
   // Tipped up by the pitch, then turned by the yaw, in a frame with y up and z toward you; rows of the rotation.
   const R = [
     [ca, -sa * sp, sa * cp],
     [0, cp, sp],
     [-sa, -ca * sp, ca * cp],
   ];
+  // The slices' rotation: R, with only the unspun part of the turn.
+  const S = [
+    [lc, -ls * sp, ls * cp],
+    [0, cp, sp],
+    [-ls, -lc * sp, lc * cp],
+  ];
   // Which way the front faces: toward the viewer the front is drawn last, else the back is.
-  const toward = R[2][2] >= 0 ? 1 : -1;
+  const toward = S[2][2] >= 0 ? 1 : -1;
   const mid = box.y + box.height / 2;
   const depth = body.depth / 2;
   // A slice's size at u (-1 back, 0 middle, 1 front): an ellipse through 1 - puff at the faces, so the sides curve.
   const k = 1 - (1 - body.puff) ** 2;
-  const n = layerCount(body, Math.abs(sa) > TURNED);
+  const n = layerCount(body, Math.abs(ls) > TURNED);
   const layers = Array.from({ length: n }, (_, i) => {
     const u = (i / (n - 1)) * 2 - 1; // -1 farthest .. 1 nearest
     const z = u * toward * depth; // + toward the front face
     const size = Math.sqrt(1 - k * u * u);
     // (x, y) on the drawing to the screen: x' = axis + R0·(x - axis, mid - y, z), y' = mid - R1·(…).
-    const [ma, mb, mc, md] = [R[0][0] * size, -R[1][0] * size, -R[0][1] * size, R[1][1] * size];
-    const e = axis + R[0][2] * z - ma * axis - mc * mid;
-    const f_ = mid - R[1][2] * z - mb * axis - md * mid;
+    const [ma, mb, mc, md] = [S[0][0] * size, -S[1][0] * size, -S[0][1] * size, S[1][1] * size];
+    const e = axis + S[0][2] * z - ma * axis - mc * mid;
+    const f_ = mid - S[1][2] * z - mb * axis - md * mid;
     const q = (v: number) => +v.toFixed(5); // the scales finer, or a slice's middle drifts off the axis
     return `matrix(${q(ma)} ${q(mb)} ${q(mc)} ${q(md)} ${f(e)} ${f(f_)})`;
   });
@@ -137,8 +151,8 @@ export function layout(p: Pose, axis: number, face: { x: number; y: number }, bo
   return {
     rig: `translate(${f(p.slide)} ${f(-p.hop)}) rotate(${f(p.lean)} ${axis} ${GROUND}) rotate(${f(p.roll)} ${axis} ${f(mid)}) translate(${axis} ${f(mid)}) scale(${f(p.near)}) translate(${-axis} ${f(-mid)}) translate(${axis} ${GROUND}) scale(${f(p.sx)} ${f(p.sy)}) translate(${-axis} ${-GROUND})`,
     layers,
-    gap: f((body.depth / (n - 1)) * Math.hypot(sa, sp) * (1.15 + 0.85 * sa * sa)),
+    gap: f((body.depth / (n - 1)) * Math.hypot(ls, sp) * (1.15 + 0.85 * ls * ls)),
     eyes: { project, opacity: [facing(-1), facing(1)] },
-    shadow: { rx: f(half * (0.9 + 0.1 * Math.abs(ca)) * (1 - clamp(p.hop / 60, 0, 0.5))), opacity: f(1 - clamp(p.hop / 50, 0, 0.5)) },
+    shadow: { rx: f(half * (0.9 + 0.1 * Math.abs(lc)) * (1 - clamp(p.hop / 60, 0, 0.5))), opacity: f(1 - clamp(p.hop / 50, 0, 0.5)) },
   };
 }

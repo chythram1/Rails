@@ -34,6 +34,14 @@ describe("sprockets", () => {
     expect(s.look).toEqual({ character: "block", color: "yellow" });
   });
 
+  it("loads Bean and Lune, which were replaced, as Blob and Drop", () => {
+    const bean = sprockets.create("Bean", { character: "bean", color: "green" } as never);
+    const lune = sprockets.create("Lune", { character: "lune", color: "blue" } as never);
+    const list = listSprockets();
+    expect(list.find((x) => x.id === bean.id)!.look).toEqual({ character: "blob", color: "green" });
+    expect(list.find((x) => x.id === lune.id)!.look).toEqual({ character: "drop", color: "blue" });
+  });
+
   it("updates, stores messages in order and deletes them with the Sprocket", async () => {
     const s = createSprocket({ name: "Helper", look });
     expect(updateSprocket(s.id, { name: "Helper 2", look: { ...look, color: "green" } }).look.color).toBe("green");

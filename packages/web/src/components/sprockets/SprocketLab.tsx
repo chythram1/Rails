@@ -24,7 +24,7 @@ type Held = Record<keyof typeof HOLD, number>;
  * slowed, paused and stepped.
  */
 export default function SprocketLab() {
-  const [character, setCharacter] = useState<SprocketCharacter>("bean");
+  const [character, setCharacter] = useState<SprocketCharacter>("blob");
   const [color, setColor] = useState<SprocketColor>("green");
   const [size, setSize] = useState("160");
   const [stance, setStance] = useState<Stance>("rest");

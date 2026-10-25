@@ -12,7 +12,7 @@ import { createSprocket, deleteSprocket, detachFromProject, directChat, listMess
 const faux = fauxProvider();
 models.setProvider(faux.provider);
 const ref = refOf(faux.getModel());
-const look = { character: "bean", color: "teal" } as const;
+const look = { character: "blob", color: "teal" } as const;
 
 const authors = (id: string) => listMessages(directChat(id)).map((m) => `${m.author}: ${m.text}`);
 const sprocket = () => createSprocket({ name: "Helper", look });

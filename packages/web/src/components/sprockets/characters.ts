@@ -24,12 +24,14 @@ export type Primitive = { d: string } | { cx: number; cy: number; rx: number; ry
 interface CharacterDef {
   name: string;
   body: Primitive[];
-  /** Stroke in the body colour, which rounds sharp tips (e.g. the moon's horns). */
-  round?: number;
   /** How thick it is (viewBox units; bodies are about 120 wide), and how much its outline shrinks toward its front
    * and back (0 for straight sides, like a box; 0.4 for a soft, round body). solid.ts draws it. */
   depth: number;
   puff: number;
+  /** A round body is spun (1): a solid turned about its upright middle, like a ball or a bell, whose outline stays put
+   * as it turns, only its eyes travelling round. A flat one (0, or left out) is a slab of its outline that shears and
+   * narrows. solid.ts draws it. */
+  spun?: number;
   /** Centre of the face. The eyes stand upright facing you; the pose slants them (solid.ts). */
   face: { x: number; y: number };
   /** Ground shadow: centre and half-width. */
@@ -65,18 +67,20 @@ const polar = (cx: number, cy: number, r: number, deg: number): Point => {
   return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
 };
 
-/** A crescent: the circle (cx, cy, r) with the circle (cx2, cy2, r2) cut out of it. */
-function crescent(cx: number, cy: number, r: number, cx2: number, cy2: number, r2: number): string {
-  const dx = cx2 - cx;
-  const dy = cy2 - cy;
-  const d = Math.hypot(dx, dy);
-  const a = (r * r - r2 * r2 + d * d) / (2 * d);
-  const h = Math.sqrt(r * r - a * a);
-  const bx = cx + (a * dx) / d;
-  const by = cy + (a * dy) / d;
-  const p1: Point = [bx + (h * dy) / d, by - (h * dx) / d];
-  const p2: Point = [bx - (h * dy) / d, by + (h * dx) / d];
-  return `M ${f(p1[0])} ${f(p1[1])} A ${r} ${r} 0 1 0 ${f(p2[0])} ${f(p2[1])} A ${r2} ${r2} 0 0 1 ${f(p1[0])} ${f(p1[1])} Z`;
+/** A drop, point up: the circle (cx, cy, r) and its two tangents meeting `rise` above its centre, the point rounded
+ * `tip` back along them. */
+function drop(cx: number, cy: number, r: number, rise: number, tip: number): string {
+  const top: Point = [cx, cy - rise];
+  const phi = Math.acos(r / rise); // from straight up to where each tangent touches the circle
+  const [sx, sy] = [r * Math.sin(phi), r * Math.cos(phi)];
+  const right: Point = [cx + sx, cy - sy];
+  const left: Point = [cx - sx, cy - sy];
+  const along = (to: Point): Point => {
+    const l = Math.hypot(to[0] - top[0], to[1] - top[1]);
+    return [top[0] + ((to[0] - top[0]) / l) * tip, top[1] + ((to[1] - top[1]) / l) * tip];
+  };
+  const [a, b] = [along(left), along(right)];
+  return `M ${f(a[0])} ${f(a[1])} Q ${f(top[0])} ${f(top[1])} ${f(b[0])} ${f(b[1])} L ${f(right[0])} ${f(right[1])} A ${r} ${r} 0 1 1 ${f(left[0])} ${f(left[1])} Z`;
 }
 
 function star(cx: number, cy: number, outer: number, inner: number, points: number): Point[] {
@@ -105,27 +109,29 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
     face: { x: 100, y: 138 },
     shadow: { x: 100, half: 52 },
   },
-  bean: {
-    name: "Bean",
-    depth: 110,
-    puff: 0.4, // round from every side
-    body: [{ d: "M 64 84 C 92 68 122 78 128 104 C 132 122 150 126 164 140 C 182 160 172 196 132 196 L 96 196 C 56 196 36 168 38 134 C 40 108 48 92 64 84 Z" }],
-    face: { x: 110, y: 138 },
-    shadow: { x: 104, half: 56 },
+  blob: {
+    name: "Blob",
+    depth: 120,
+    puff: 0.4,
+    spun: 1, // a ball
+    body: [{ cx: 100, cy: 138, rx: 60, ry: 60 }],
+    face: { x: 100, y: 138 },
+    shadow: { x: 100, half: 56 },
   },
-  lune: {
-    name: "Lune",
-    depth: 30,
-    puff: 0.2,
-    body: [{ d: crescent(98, 138, 58, 142, 102, 42) }],
-    round: 12,
-    face: { x: 80, y: 140 },
-    shadow: { x: 100, half: 54 },
+  drop: {
+    name: "Drop",
+    depth: 112,
+    puff: 0.4,
+    spun: 1, // a drop, its point up
+    body: [{ d: drop(100, 142, 56, 70, 16) }],
+    face: { x: 100, y: 142 },
+    shadow: { x: 100, half: 52 },
   },
   bell: {
     name: "Bell",
     depth: 106,
     puff: 0.4,
+    spun: 1,
     body: [{ d: "M 100 80 C 132 80 146 102 148 134 C 150 160 158 172 170 182 C 178 190 172 197 160 197 L 40 197 C 28 197 22 190 30 182 C 42 172 50 160 52 134 C 54 102 68 80 100 80 Z" }],
     face: { x: 100, y: 136 },
     shadow: { x: 100, half: 62 },
@@ -158,6 +164,7 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
     name: "Momo",
     depth: 110,
     puff: 0.4,
+    spun: 1,
     body: [
       { cx: 77, cy: 140, rx: 43, ry: 56, rot: -6 },
       { cx: 123, cy: 140, rx: 43, ry: 56, rot: 6 },

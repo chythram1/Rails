@@ -37,7 +37,7 @@ describe("transactions", () => {
   });
 
   it("deletes a Sprocket whole, with the team it was the last member of", () => {
-    const s = createSprocket({ name: "Solo", look: { character: "bean", color: "teal" } });
+    const s = createSprocket({ name: "Solo", look: { character: "blob", color: "teal" } });
     const team = sprocketChats.createTeam("Just me", [s.id]);
     sprockets.remove(s.id);
     expect(sprockets.get(s.id)).toBeUndefined();

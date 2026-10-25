@@ -52,12 +52,16 @@ function parseLook(raw: unknown): SprocketLook {
 
 /**
  * A stored look, with ids that no longer exist replaced by defaults instead of breaking the page. Looks saved before
- * accessories went (ADR 0005's amendment) still have one; it's dropped.
+ * accessories went (ADR 0005's amendment) still have one; it's dropped. Bean and Lune became Blob and Drop (ADR 0005's
+ * amendment of 2026-10-25), the round characters nearest them.
  */
+const RENAMED: Record<string, string> = { bean: "blob", lune: "drop" };
+
 function repairLook(raw: unknown): SprocketLook {
   const look = (raw ?? {}) as Record<string, unknown>;
+  const character = RENAMED[String(look.character)] ?? look.character;
   return {
-    character: isOneOf(SPROCKET_CHARACTERS, look.character) ? look.character : "block",
+    character: isOneOf(SPROCKET_CHARACTERS, character) ? character : "block",
     color: isOneOf(SPROCKET_COLORS, look.color) ? look.color : "yellow",
   };
 }

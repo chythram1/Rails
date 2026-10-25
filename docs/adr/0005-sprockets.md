@@ -79,3 +79,12 @@ activity, an animation, idling between idle animations, the dots) faces you and 
 clips all rotate about facing front, and it leans again once nothing's going on; its glances and leaning in at rest
 stay in the lean, and with only its face moving it holds its stance.
 
+Amendment (2026-10-25, later): symmetric characters, round ones spun. Bean (a lopsided blob) and Lune (a crescent,
+its face off to one side) looked awkward in motion: turned, their bulge or bite slid sideways and squashed so they read
+as a different shape, and rolled they pivoted about a point that wasn't their middle. Grok's set is nearly all
+mirror-symmetric, and its round shapes are solids of revolution. So Bean became Blob (a ball) and Lune became Drop (a
+drop, point up), and stored looks map the old ids to them (`repairLook`), so no Sprocket breaks. Blob, Drop, Bell and
+Momo are spun (`spun` in `characters.ts`): their slices take only the tip, not the turn, so the outline stays put and
+the turn shows in the eyes going round the front (painted on it as before). Block, Starry, Cog and Roo stay slabs. The
+moon's rounding stroke (`round`) went with Lune.
+

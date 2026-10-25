@@ -14,7 +14,7 @@ import { createSprocket, directChat, listMessages, listSprockets, projectChat, s
 const faux = fauxProvider();
 models.setProvider(faux.provider);
 const ref = refOf(faux.getModel());
-const look = { character: "bean", color: "teal" } as const;
+const look = { character: "blob", color: "teal" } as const;
 beforeEach(() => settings.set("defaultModel", ref));
 afterAll(() => disconnectAll());
 
