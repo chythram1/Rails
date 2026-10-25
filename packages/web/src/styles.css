@@ -854,13 +854,16 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sp-head-side { display: flex; align-items: center; align-self: stretch; gap: 6px; min-width: 0; }
 .sp-head-side.end { justify-content: flex-end; }
 .sp-identity {
-  display: flex; align-items: center; gap: 8px; min-width: 0; max-width: min(360px, 50cqw); height: 40px;
+  display: flex; align-items: center; gap: 12px; min-width: 0; max-width: min(360px, 50cqw); height: 40px;
 }
 /* The face fills its 24px: its frame leaves room round the body (to move, and for the ground), so it's drawn
    larger and centred on the body, without the ground. */
 .sp-identity-face { position: relative; flex-shrink: 0; width: 24px; height: 24px; }
 .sp-identity-face > * { position: absolute; left: -5px; top: -10px; }
 .sp-identity-face .s-shadow { display: none; }
+/* Wide bodies reach past the 24px either side at rest (measured): room for them, so every face is as far from its name. */
+.sp-identity-face:is([data-character="bell"], [data-character="momo"]) { margin-inline: 4px; }
+.sp-identity-face:is([data-character="blob"], [data-character="cog"]) { margin-inline: 2px; }
 .sp-identity-face > .sp-face { left: -2px; top: -4px; } /* a team's faces fill their frame: just centred */
 .sp-identity h2 { font-size: 14px; font-weight: 500; }
 .sp-identity .sp-head-sub { font-size: 14px; }
