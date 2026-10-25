@@ -904,7 +904,6 @@ textarea.input { resize: vertical; line-height: 1.5; }
 /* The thread opens with the Sprocket; on an empty chat that intro sits in the middle instead. */
 .sp-intro { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 8px auto 28px; max-width: 340px; text-align: center; text-wrap: balance; }
 .sp-intro.alone { margin: auto; }
-.sp-intro-line { margin: 0 0 12px; text-align: center; }
 .sp-intro p { margin: 0; }
 /* A Sprocket's name where it introduces itself, and on its gallery card: Space Grotesk, the characters' voice. */
 .sp-intro-title { margin-top: 10px; font: 600 24px/1.2 var(--grotesk); letter-spacing: -0.01em; }
@@ -1250,8 +1249,6 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
   .sp-message:is(:hover, :focus-within) .sp-msg-actions { opacity: 1; }
   .sp-messages:hover .sp-message:not(:hover) .sp-msg-actions { opacity: 0; }
 }
-.sp-intro-members { list-style: none; margin: 0 0 6px; padding: 0; display: flex; justify-content: center; gap: 20px; }
-.sp-intro-members li { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 /* The team's member slots (the New team dialog, team settings): two to a row, filled ones ruled, empty ones dashed. The lead's carries a star. */
 .sp-slots-label { margin: 18px 0 8px; }
 .sp-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

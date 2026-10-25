@@ -299,6 +299,9 @@ function underRateLimit(id: string, chatId: string, name: string, team: boolean)
   return false;
 }
 
+/** How long a new Sprocket without a model waits before its hello (introTemplate). */
+const INTRO_PAUSE_MS = 2400;
+
 /** Count a run toward its Sprocket's hourly limit. */
 const countRun = (id: string) => recent.set(id, [...lastHour(id), Date.now()]);
 
@@ -338,6 +341,9 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   const ref = s.model ?? settings.get("defaultModel");
   const model = findModel(ref);
   if (!model && intro) {
+    // As long as a new Sprocket takes to gather itself in the app (the web's GATHER), so its hello comes after.
+    await new Promise((done) => setTimeout(done, INTRO_PAUSE_MS));
+    if (!sprockets.get(id) || sprocketMessages.list(chatId).length) return; // deleted, or the user wrote meanwhile
     sprocketMessages.create(chatId, "sprocket", introTemplate(s.name), postTime(chatId), { sprocketId: id, runId: r.id });
     changed();
     return;

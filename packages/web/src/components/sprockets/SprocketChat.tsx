@@ -45,8 +45,8 @@ function stamp(iso: string): string {
 
 /**
  * One of a Sprocket's chats (ADR 0005, 0006, 0021): its direct chat with the user, or its project's chat, where the
- * sessions that waited for the user show (EventRow). The thread opens with the Sprocket itself (once there are
- * messages, one quiet line), and time labels break it up where there are gaps. The user's messages sit on the right,
+ * sessions that waited for the user show (EventRow). The thread starts with its first message (an empty project chat
+ * says what it's for), and time labels break it up where there are gaps. The user's messages sit on the right,
  * replies on the left, both as bubbles, and Rails' own notices (no model yet, errors) in the middle. As in a text
  * app, a reply isn't shown as it's written: the Sprocket's face pops up at the bottom left once it has the message,
  * turns into dots in its colour while it writes, and the reply then pops in whole, one bubble per message, paragraphs
@@ -167,6 +167,10 @@ export function SprocketChat({
   // In a team, in the team's order, so the line naming them doesn't reorder as runs start and end.
   const onIt = team ? members.filter((m) => watching.includes(m.id)) : watching.flatMap((w) => speaker(w) ?? []);
   const one = team ? undefined : onIt[0];
+  /** Who's on it by a reply in flight: the Sprocket answering, or one just made, gathering itself in its direct chat
+   * (spawn.ts) before it speaks first. */
+  const spawning = useSpawn(sprocket.id) !== undefined && chat.kind === "direct";
+  const flier = one ?? (spawning ? sprocket : undefined);
   /** A question with options waits for your answer: the composer says you can type one. */
   const asking = !!messages?.some((m) => m.ask?.options.length && m.ask.answer === undefined);
   /**
@@ -222,40 +226,16 @@ export function SprocketChat({
             <button className="btn" onClick={() => void load()}>Try again</button>
           </div>
         )}
-        {/* One quiet line marks where it starts. An empty team or project chat says how it works instead; a direct chat is
-            never empty for long: a new Sprocket speaks first. */}
-        {messages &&
-          (messages.length || (!team && !projectChat) ? (
-            <p className="sp-intro-line muted small">
-              {team
-                ? `This is the beginning of the team chat ${title}.`
-                : projectChat && project
-                  ? `This is the beginning of ${project.name}'s chat with ${name}.`
-                  : `This is the beginning of your chat with ${name}.`}
-            </p>
-          ) : team ? (
-            <div className="sp-intro alone">
-              <ul className="sp-intro-members">
-                {members.map((m, i) => (
-                  <li key={m.id}>
-                    <Sprocket look={m.look} size={72} />
-                    <span className="small">{m.name}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="sp-intro-title">Say hello to {title}</p>
-              <p className="muted small">
-                Everyone reads every message, and whoever has something to add answers. @mention someone to ask only them.
-              </p>
-            </div>
-          ) : (
-            <div className="sp-intro alone">
-              <Sprocket look={sprocket.look} size={120} />
-              <p className="sp-intro-title">{project?.name ?? "The project"}'s chat</p>
-              <p className="muted small">{name} posts here when a session in {project?.name ?? "its project"} needs you. Tell it here who owns what, or what to pass on.</p>
-            </div>
-          ))}
-        {!!messages?.length && (
+        {/* An empty chat is empty: a new Sprocket speaks first, and a team waits for you. Only an empty project chat
+            says what it's for. */}
+        {messages && !messages.length && projectChat && !flier && (
+          <div className="sp-intro alone">
+            <Sprocket look={sprocket.look} size={120} />
+            <p className="sp-intro-title">{project?.name ?? "The project"}'s chat</p>
+            <p className="muted small">{name} posts here when a session in {project?.name ?? "its project"} needs you. Tell it here who owns what, or what to pass on.</p>
+          </div>
+        )}
+        {!!messages && (messages.length > 0 || !!flier || (!!team && !!thinking)) && (
           // A log: screen readers announce new messages. In its direct chat your bubbles take the Sprocket's colour.
           <ol
             className={"sp-messages" + (team ? " in-team" : "") + (chat.kind === "direct" ? " tinted" : "")}
@@ -358,9 +338,9 @@ export function SprocketChat({
                 <span className="sp-working">{thinking}</span>
               </li>
             )}
-            {one && (
+            {flier && (
               <li className="sp-message sprocket sp-watching" aria-hidden>
-                <FlightIcon who={one} working={running} />
+                <FlightIcon who={flier} working={running} />
               </li>
             )}
           </ol>

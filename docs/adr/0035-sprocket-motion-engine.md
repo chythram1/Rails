@@ -102,6 +102,7 @@ A Sprocket just made gathers itself, as a Grok bot does (its `spawning` state, t
 shrinks into a seed, five specks spiral in round it, and it grows back into itself. Like the dots, it's a drawing
 (`toSeed`, `specksAt` in `morph.ts`) the rig paints while it faces you, not a clip: the engine's poses and timings are
 unchanged. `spawn.ts` marks a Sprocket made on this device (the creator does, as the server returns it) for the
-spawn's length, and its list row plays it; the icon by its first reply mirrors the row. Other devices see it arrive
-without the spawn, which is cosmetic.
+spawn's length, and its list row plays it; its direct chat shows the icon by a reply in flight from that moment,
+mirroring the row, so the spawn plays where its first message will be. Without a model its hello (a template) waits
+out the spawn on the server (`INTRO_PAUSE_MS`). Other devices see it arrive without the spawn, which is cosmetic.
 
