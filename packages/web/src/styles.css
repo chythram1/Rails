@@ -772,6 +772,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sprocket { display: block; overflow: visible; flex-shrink: 0; }
 /* The ground shadow: black in both themes, lighter on a light page (--sprocket-shadow). */
 .sprocket .s-shadow { fill: #000; opacity: var(--sprocket-shadow); }
+.sprocket .s-layer > * { vector-effect: non-scaling-stroke; } /* strokes in screen pixels (solid.ts gap) */
 
 /* The Sprocket lab (SprocketLab.tsx, dev builds only): controls on the left, the stage on the right. */
 .lab { max-width: 1280px; }

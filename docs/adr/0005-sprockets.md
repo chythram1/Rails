@@ -49,7 +49,9 @@ Amendment (2026-10-24, later): Sprockets are solids that turn. Characters bobbed
 their eyes moved about; a flat drawing can't look somewhere else, or show it's busy except by moving faster. Now
 each is drawn as the front of a body with its own thickness and roundness (`solid.ts`; `depth` and `puff` in
 `characters.ts`): slices of the outline, back to front, all in its colour, shrinking toward the front and back on a
-round body. Turned or tipped it's seen in true perspective, so a thin body (Block, a pizza box) narrows to a sliver
+round body. (Later: turned well aside it draws slices three times as dense, and each is stroked in its colour as wide
+as the gap to its neighbours on screen, so near edge-on, where slices are slivers, they join into one smooth side;
+the edge-on band this replaced was a plain rectangle, fading in, and showed past the outline as a darker crescent.) Turned or tipped it's seen in true perspective, so a thin body (Block, a pizza box) narrows to a sliver
 while a deep, soft one (Bean, Bell, Momo) stays round from every side; one depth for all made them all look like the
 same cylinder. The eyes ride the front, slanting as they would on a dome. There's no shading: a darker side read as
 stacked layers. Facing you it's exactly the flat drawing, so every character keeps its

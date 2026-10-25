@@ -42,7 +42,7 @@ const BOX: Box = { x: 40, y: 80, width: 120, height: 116 };
 
 /**
  * A Sprocket character, as a solid (solid.ts): the body's layers back to front, all in its colour (depth shows in
- * the outline and where the eyes sit, never as shading), the band seen edge-on, and the eyes on the front face. While
+ * the outline and where the eyes sit, never as shading), each stroked to join its neighbours when turned, and the eyes on the front face. While
  * it moves, its rig (engine.ts, run by motion.ts) paints every frame straight into the SVG.
  */
 export function Sprocket({ look, size, still, stance = "rest", follow = false, activity = "idle", drawing: given, label, onRig, id, dots = false }: Props) {
@@ -58,7 +58,6 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
   const svg = useRef<SVGSVGElement>(null);
   const rigEl = useRef<SVGGElement>(null);
   const layers = useRef<(SVGGElement | null)[]>([]);
-  const band = useRef<SVGRectElement>(null);
   const eyes = useRef<SVGGElement>(null);
   const look_ = useRef<SVGGElement>(null);
   const shadow = useRef<SVGEllipseElement>(null);
@@ -67,17 +66,25 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
   // Moving, it's drawn from where it starts and the rig paints every frame after; still, from its stance.
   const [from] = useState(() => poseOf(activity === "cheer" ? "rest" : stance));
   const solid = { depth: drawing?.depth ?? def.depth, puff: drawing?.puff ?? def.puff };
-  const geometry = useRef({ axis, face, half: def.shadow.half, body: solid, eyes: drawing?.eyes ?? 1 });
-  geometry.current = { axis, face, half: def.shadow.half, body: solid, eyes: drawing?.eyes ?? 1 };
+  // Strokes are drawn in screen pixels (non-scaling, as the layers are squashed when turned): viewBox units to pixels.
+  const px = size / VIEW.w;
+  const geometry = useRef({ axis, face, half: def.shadow.half, body: solid, eyes: drawing?.eyes ?? 1, round, px });
+  geometry.current = { axis, face, half: def.shadow.half, body: solid, eyes: drawing?.eyes ?? 1, round, px };
   const shown = useRef<Frame | null>(null);
   const paint = useRef((f: Frame) => {
     shown.current = f;
     const g = geometry.current;
     const l = layout(f.pose, g.axis, g.face, box.current, g.half, g.body);
     rigEl.current?.setAttribute("transform", l.rig);
-    layers.current.forEach((el, i) => el?.setAttribute("transform", l.layers[i]));
-    const b = band.current;
-    if (b) for (const [k, v] of Object.entries(l.band)) b.setAttribute(k, String(v));
+    const stroke = String(strokeOf(g.round, l.gap, g.px * f.pose.near * Math.max(f.pose.sx, f.pose.sy)));
+    layers.current.forEach((el, i) => {
+      if (!el) return;
+      // The denser slices, turned well aside; facing you the extra ones are hidden.
+      if (i >= l.layers.length) return el.setAttribute("display", "none");
+      el.removeAttribute("display");
+      el.setAttribute("transform", l.layers[i]);
+      el.setAttribute("stroke-width", stroke);
+    });
     eyes.current?.setAttribute("transform", l.eyes.transform);
     eyes.current?.setAttribute("opacity", String(l.eyes.opacity * g.eyes));
     look_.current?.setAttribute("transform", `translate(${f.look[0].toFixed(2)} ${f.look[1].toFixed(2)})`);
@@ -92,9 +99,9 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
     return () => onRig?.(null);
   }, [moving, onRig, rig]);
 
-  // The band is as tall as the body: measure it (again when the body changes), and redraw where it is.
+  // Measure the body (again when it changes), and redraw where it is.
   useLayoutEffect(() => {
-    const b = layers.current[layers.current.length - 1]?.getBBox(); // its own coordinates, before its transform
+    const b = layers.current[0]?.getBBox(); // its own coordinates, before its transform (every slice is the same shape)
     if (b && b.width) box.current = { x: b.x, y: b.y, width: b.width, height: b.height };
     if (shown.current) paint.current(shown.current);
   }, [look.character, drawing?.d, moving]);
@@ -112,7 +119,10 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
 
   // React draws where it starts (the rig takes over from there) or, still, its stance.
   const l = layout(moving ? from : poseOf(stance), axis, face, box.current, def.shadow.half, solid);
-  layers.current.length = layerCount(solid); // a morph to a thinner body drops slices
+  // Moving, enough slices for it turned well aside (solid.ts); still, only those it draws. A morph to a thinner body
+  // drops some.
+  const slots = moving ? layerCount(solid, true) : l.layers.length;
+  layers.current.length = slots;
   const shape = drawing ? <path d={drawing.d} /> : def.body.map((p, i) => <Shape key={i} p={p} />);
   const style = { width: size, height: (size * VIEW.h) / VIEW.w } as CSSProperties;
 
@@ -129,23 +139,25 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
     >
       <ellipse ref={shadow} className="s-shadow" cx={axis} cy={203} rx={l.shadow.rx} ry={6} />
       <g ref={rigEl} transform={l.rig}>
-        {l.layers.map((t, i) => {
+        {Array.from({ length: slots }, (_, i) => {
+          const t = l.layers[i];
           const layer = (
             <g
               key={i}
               ref={(el) => {
                 layers.current[i] = el;
               }}
-              transform={t}
-              style={{ fill: color, stroke: round ? color : undefined }}
-              strokeWidth={round || undefined}
+              transform={t ?? l.layers[l.layers.length - 1]}
+              display={t ? undefined : "none"}
+              className="s-layer"
+              style={{ fill: color, stroke: color }}
+              strokeWidth={strokeOf(round, l.gap, px)}
               strokeLinejoin="round"
             >
               {shape}
             </g>
           );
-          // The body seen edge-on goes under the front face.
-          return i === l.layers.length - 1 ? [<rect key="band" ref={band} style={{ fill: color }} {...l.band} />, layer] : layer;
+          return layer;
         })}
         <g ref={eyes} transform={l.eyes.transform} opacity={l.eyes.opacity * (drawing?.eyes ?? 1)}>
           <g ref={look_}>
@@ -185,6 +197,9 @@ function paintEyes(root: SVGGElement | null, f: Frame, slant: number) {
     arc?.setAttribute("transform", `translate(${x} 0) scale(${(s.sx * wide).toFixed(3)} ${(s.sy * shut * (0.5 + 0.5 * f.happy)).toFixed(3)}) translate(${-x} 0)`);
   });
 }
+
+/** A layer's stroke in screen pixels: its rounding (lune's horns) and what joins it to the next layer, at `px` a unit. */
+const strokeOf = (round: number, gap: number, px: number) => +((round + gap) * px).toFixed(2);
 
 function Shape({ p }: { p: Primitive }) {
   if ("d" in p) return <path d={p.d} />;

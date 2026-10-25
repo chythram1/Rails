@@ -22,7 +22,7 @@ describe("a Sprocket as a solid", () => {
       expect(l.layers).toHaveLength(layerCount(body));
       expect(l.layers.every((t) => shiftX(t) === 100)).toBe(true);
       expect(span(body, 0)).toBe(box.width); // the middle slice is the drawing
-      expect(l.band.opacity).toBe(0);
+      expect(l.gap).toBe(0); // no strokes joining layers: the drawing as it is
       expect(l.eyes.transform).toBe("translate(100 140) rotate(0) scale(1 1)");
       expect(l.eyes.slant).toBe(0);
     }
@@ -48,8 +48,10 @@ describe("a Sprocket as a solid", () => {
 
   it("in a spin, edge-on is a sliver, and past that its back, mirrored, with no eyes", () => {
     const edge = box_(bean, at(90));
-    expect(edge.band.opacity).toBe(1);
-    expect(edge.band.width).toBe(72);
+    // Edge-on it draws denser slices, 1.5 units apart, each stroked twice that, so their round ends join into one side.
+    expect(edge.layers).toHaveLength(layerCount(bean, true));
+    expect(edge.gap).toBeCloseTo((2 * 72) / (layerCount(bean, true) - 1), 2);
+    expect(edge.layers.every((t) => Math.abs(scaleX(t)) > 0)).toBe(true); // never scaled to nothing (it wouldn't draw)
     expect(edge.eyes.opacity).toBe(0);
     const back = box_(bean, at(180));
     expect(scaleX(back.layers.at(-1)!)).toBeLessThan(0);

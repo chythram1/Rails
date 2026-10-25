@@ -34,8 +34,13 @@ export type Stance = keyof typeof POSES;
 export const poseOf = (stance: Stance): Pose => ({ ...POSES[stance], roll: 0, near: 1, sx: 1, sy: 1, hop: 0, slide: 0 });
 
 /** How many slices of the body are drawn, back to front: about one every 4 units of depth, so a deep body's edge
- * stays smooth (at least 5, and an odd number, so one is its middle). */
-export const layerCount = (body: Body) => Math.max(5, Math.round(body.depth / 8) * 2 + 1);
+ * stays smooth (at least 5, and an odd number, so one is its middle). Turned well aside (`turned`), where the
+ * slices are narrow and their rounded tops would show as scallops along its side, one every 1.5 units. */
+export const layerCount = (body: Body, turned = false) =>
+  turned ? Math.max(9, Math.round(body.depth / 3) * 2 + 1) : Math.max(5, Math.round(body.depth / 8) * 2 + 1);
+/** How far aside (|sin yaw|) it is when it draws the denser slices: they overlap so much there that the change
+ * doesn't show. */
+const TURNED = 0.3;
 /** How much the eyes' pair turns with a look up and aside, in degrees per unit of sin(yaw)·sin(pitch). */
 const PAIR = 30;
 const GROUND = 200;
@@ -50,9 +55,10 @@ export interface Layout {
   rig: string;
   /** Each layer's transform, back to front as drawn. The first and last are the faces. */
   layers: string[];
-  /** The body seen edge-on (in a spin): a band as tall as the body, round at its ends as the body is, fading in near
-   * edge-on (between the layers, which are lines by then). */
-  band: { x: number; y: number; width: number; height: number; rx: number; opacity: number };
+  /** How wide each layer's stroke in its colour is (viewBox units), so turned toward edge-on, where layers are
+   * slivers, they join into one smooth side instead of a comb: a little over the gap between neighbours, up to twice
+   * it edge-on, where their round ends must overlap well to make one curve. Facing you it's 0: the drawing as it is. */
+  gap: number;
   /** Where the eyes sit and how the pair turns; `slant` turns each eye about its own centre (degrees). */
   eyes: { transform: string; opacity: number; slant: number };
   shadow: { rx: number; opacity: number };
@@ -84,29 +90,23 @@ export function layout(p: Pose, axis: number, face: { x: number; y: number }, bo
   const depth = body.depth / 2;
   // A slice's size at u (-1 back, 0 middle, 1 front): an ellipse through 1 - puff at the faces, so the sides curve.
   const k = 1 - (1 - body.puff) ** 2;
-  const n = layerCount(body);
+  const n = layerCount(body, Math.abs(s) > TURNED);
   const layers = Array.from({ length: n }, (_, i) => {
     const u = (i / (n - 1)) * 2 - 1; // -1 farthest .. 1 nearest
     const z = u * toward * depth; // + toward the front face
     const size = Math.sqrt(1 - k * u * u);
-    return `translate(${f(axis + z * s)} ${f(mid - z * sp)}) scale(${f(c * size)} ${f(cp * size)}) translate(${f(-axis)} ${f(-mid)})`;
+    // Never quite 0 wide: edge-on, a layer is a line its stroke thickens (a layer scaled to nothing isn't drawn).
+    const wide = Math.sign(c || 1) * Math.max(Math.abs(c * size), 0.002);
+    return `translate(${f(axis + z * s)} ${f(mid - z * sp)}) scale(${f(wide)} ${f(cp * size)}) translate(${f(-axis)} ${f(-mid)})`;
   });
   // The face rides the front, and the eyes narrow with it (less on a round body, whose front is a dome).
   const eyeX = axis + (face.x - axis) * c + depth * s;
   const eyeY = mid + (face.y - mid) * cp - depth * sp;
   const flat = 1 - body.puff;
-  const width = body.depth * Math.abs(s);
   return {
     rig: `translate(${f(p.slide)} ${f(-p.hop)}) rotate(${f(p.lean)} ${axis} ${GROUND}) rotate(${f(p.roll)} ${axis} ${f(mid)}) translate(${axis} ${f(mid)}) scale(${f(p.near)}) translate(${-axis} ${f(-mid)}) translate(${axis} ${GROUND}) scale(${f(p.sx)} ${f(p.sy)}) translate(${-axis} ${-GROUND})`,
     layers,
-    band: {
-      x: f(axis - width / 2),
-      y: f(mid - (box.height * cp) / 2),
-      width: f(width),
-      height: f(box.height * cp),
-      rx: f(Math.min(width / 2, 4 + body.puff * 90)),
-      opacity: f(clamp((Math.abs(s) - 0.85) / 0.12)),
-    },
+    gap: f((body.depth / (n - 1)) * Math.hypot(s, sp) * (1.15 + 0.85 * s * s)),
     eyes: {
       transform: `translate(${f(eyeX)} ${f(eyeY)}) rotate(${f(-PAIR * s * sp)}) scale(${f(Math.max(c, 0.001) ** flat)} ${f(Math.max(cp, 0.001) ** flat)})`,
       opacity: f(clamp((c - 0.15) / 0.25)),
