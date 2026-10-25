@@ -11,8 +11,8 @@ export function Eyes({ tilt }: { tilt: number }) {
       {[-EYE_X, EYE_X].map((x) => (
         // Each eye in its own group, so expressions (motion.ts) can squash, move and size them apart.
         <g key={x} className="s-eye">
-          <rect className="s-open" x={x - 4.5} y={-11} width={9} height={22} rx={4.5} fill={INK} transform={`rotate(${tilt} ${x} 0)`} />
-          <path className="s-happy" d={`M${x - 8} 4 Q${x} -12 ${x + 8} 4`} fill="none" stroke={INK} strokeWidth={5.5} strokeLinecap="round" />
+          <rect className="s-open" x={x - 7} y={-14} width={14} height={28} rx={7} fill={INK} transform={`rotate(${tilt} ${x} 0)`} />
+          <path className="s-happy" d={`M${x - 9} 5 Q${x} -13 ${x + 9} 5`} fill="none" stroke={INK} strokeWidth={6.5} strokeLinecap="round" />
         </g>
       ))}
     </>

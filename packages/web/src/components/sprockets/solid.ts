@@ -6,12 +6,13 @@
 // moves it.
 
 /** How a Sprocket stands: turned (`yaw`, degrees, + to the viewer's right), tipped (`pitch`, degrees, + looking
- * up), rolled about its middle (`roll`, degrees), leaning from its base (`lean`, degrees), squashed (`sx`, `sy`) and
- * lifted off the ground (`hop`, viewBox units). */
+ * up), rolled about its middle (`roll`, degrees), how near the screen it's come (`near`, a scale, 1 where it stands),
+ * leaning from its base (`lean`, degrees), squashed (`sx`, `sy`) and lifted off the ground (`hop`, viewBox units). */
 export interface Pose {
   yaw: number;
   pitch: number;
   roll: number;
+  near: number;
   lean: number;
   sx: number;
   sy: number;
@@ -27,7 +28,7 @@ export const POSES = {
 } as const;
 export type Stance = keyof typeof POSES;
 
-export const poseOf = (stance: Stance): Pose => ({ ...POSES[stance], roll: 0, sx: 1, sy: 1, hop: 0 });
+export const poseOf = (stance: Stance): Pose => ({ ...POSES[stance], roll: 0, near: 1, sx: 1, sy: 1, hop: 0 });
 
 /** The body's depth, in viewBox units (bodies are about 120 wide). */
 const DEPTH = 22;
@@ -88,7 +89,7 @@ export function layout(p: Pose, axis: number, face: { x: number; y: number }, bo
   const eyeY = mid + (face.y - mid) * h - (box.height / 2) * TRAVEL * sp;
   const width = DEPTH * Math.abs(s);
   return {
-    rig: `translate(0 ${f(-p.hop)}) rotate(${f(p.lean)} ${axis} ${GROUND}) rotate(${f(p.roll)} ${axis} ${f(mid)}) translate(${axis} ${GROUND}) scale(${f(p.sx)} ${f(p.sy)}) translate(${-axis} ${-GROUND})`,
+    rig: `translate(0 ${f(-p.hop)}) rotate(${f(p.lean)} ${axis} ${GROUND}) rotate(${f(p.roll)} ${axis} ${f(mid)}) translate(${axis} ${f(mid)}) scale(${f(p.near)}) translate(${-axis} ${f(-mid)}) translate(${axis} ${GROUND}) scale(${f(p.sx)} ${f(p.sy)}) translate(${-axis} ${-GROUND})`,
     layers,
     band: {
       x: f(axis - width / 2),

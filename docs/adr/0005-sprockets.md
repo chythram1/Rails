@@ -55,7 +55,8 @@ body with the turn made characters look thin. Facing you it's exactly the flat d
 look. One set of springs (`motion.ts`) moves its turn, tip, roll, lean, hop and squash, painted straight into the
 SVG. The poses: resting almost facing you and still, glancing now and then; facing
 you in its open chat's row; following the pointer in a hovered row and in the creator; while thinking, one small move
-after another (pondering, looking about, peeking, nodding, tilting, a bounce, a scrunch, now and then a spin);
+after another (pondering, looking about, peeking, nodding, tilting, leaning in toward the screen, a bounce, a
+scrunch, now and then a spin);
 looking up and leaning toward its message when done in a team, after a short dance with happy eyes as the message
 arrives. The constant bob and sway, the per-character tempo and the spin's streaks are gone.
 It's not a 3D model (there's no mesh or lighting): bodies are any 2D outline, so the depth follows the outline.

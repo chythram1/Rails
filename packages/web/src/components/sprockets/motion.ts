@@ -24,17 +24,27 @@ export function useSprocketMotion(): boolean {
   );
 }
 
-/** Blink now and then (2–5.5s apart, sometimes twice). Runs with motion off too: it's tiny and rare. */
+/** Blink now and then (2–5.5s apart, sometimes twice): the lids close quickly, rest shut a beat and open softly,
+ * the eyes widening a touch as they shut. Runs with motion off too: it's tiny and rare. */
 export function useBlink(lid: RefObject<SVGGElement | null>, enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     let timer: ReturnType<typeof setTimeout>;
-    const blink = () => lid.current?.animate([{ transform: "scaleY(1)" }, { transform: "scaleY(0.1)" }, { transform: "scaleY(1)" }], { duration: 160, easing: "ease-in-out" });
+    const blink = () =>
+      lid.current?.animate(
+        [
+          { transform: "scale(1, 1)", easing: "cubic-bezier(0.5, 0, 0.9, 0.6)" },
+          { transform: "scale(1.08, 0.08)", offset: 0.32 },
+          { transform: "scale(1.08, 0.08)", offset: 0.45, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)" },
+          { transform: "scale(1, 1)" },
+        ],
+        { duration: 300 },
+      );
     const next = () => {
       timer = setTimeout(() => {
         if (document.visibilityState === "visible") {
           blink();
-          if (Math.random() < 0.2) setTimeout(blink, 240);
+          if (Math.random() < 0.2) setTimeout(blink, 420);
         }
         next();
       }, 2000 + Math.random() * 3500);
@@ -56,6 +66,9 @@ export function squash(el: Element | null) {
     { duration: DURATION.slow, easing: "ease-out" },
   );
 }
+
+/** How long a dance lasts (happy eyes, rocking). */
+export const CHEER_MS = 1700;
 
 /** How long the spin takes (SprocketChat holds the typing dots back until it's done). */
 export const SPIN_MS = 700;
@@ -116,6 +129,7 @@ interface Poser {
   yaw: Spring;
   pitch: Spring;
   roll: Spring;
+  near: Spring;
   lean: Spring;
   hop: Spring;
   squash: Spring;
@@ -125,10 +139,11 @@ interface Poser {
   stance: Stance;
   follow: boolean;
   busy: boolean;
-  /** Turn, tip and roll added on its own (a glance, a move while thinking), and whole turns from spins. */
+  /** Turn, tip, roll and nearness added on its own (a glance, a move while thinking), and whole turns from spins. */
   turn: number;
   tip: number;
   tilt: number;
+  closer: number;
   spins: number;
   /** Where its eyes look on their own, -1 to 1 on each axis. */
   aim: [number, number] | null;
@@ -190,13 +205,14 @@ function step(now: number) {
     moving = spring(l.yaw, yaw + l.spins * 360, k, d, dt) || moving;
     moving = spring(l.pitch, pitch, k, d, dt) || moving;
     moving = spring(l.roll, roll, 140, 11, dt) || moving;
+    moving = spring(l.near, 1 + l.closer, 45, 11, dt) || moving; // slow: it eases toward the screen
     moving = spring(l.lean, base.lean, 110, 12, dt) || moving;
     moving = spring(l.hop, 0, 300, 18, dt) || moving;
     moving = spring(l.squash, 0, 400, 16, dt) || moving;
     moving = spring(l.eyesX, ax, watching ? 260 : 620, watching ? 26 : 40, dt) || moving;
     moving = spring(l.eyesY, ay, watching ? 260 : 620, watching ? 26 : 40, dt) || moving;
     const q = l.squash.x;
-    l.paint({ yaw: l.yaw.x, pitch: l.pitch.x, roll: l.roll.x, lean: l.lean.x, sx: 1 + q, sy: 1 - q, hop: Math.max(0, l.hop.x) });
+    l.paint({ yaw: l.yaw.x, pitch: l.pitch.x, roll: l.roll.x, near: l.near.x, lean: l.lean.x, sx: 1 + q, sy: 1 - q, hop: Math.max(0, l.hop.x) });
     write(l, l.eyesX.x * 9, l.eyesY.x * 6);
   }
   frame = moving ? requestAnimationFrame(step) : 0;
@@ -239,7 +255,7 @@ const set = (l: Poser, turn: number, tip: number, roll: number, aim: [number, nu
 
 /**
  * What a thinking Sprocket does, one after another: pondering upward, looking one way then the other, peeking round,
- * nodding, tilting its head (a roll), a bounce, a scrunch (its eyes squeezing, going round or one big), and now and
+ * nodding, tilting its head (a roll), leaning in (coming closer to the screen, pulsing there), a bounce, a scrunch (its eyes squeezing, going round or one big), and now and
  * then a spin. Each takes a second or two; `weight` is
  * how often it comes up.
  */
@@ -266,6 +282,12 @@ const MOVES: Record<string, { weight: number; steps: () => MoveStep[] }> = {
     const side = pick([-1, 1]);
     return [[700, (l) => set(l, side * 10, 6, side * 22, [side * 0.5, -0.5])], [700, (l) => set(l, -side * 6, 6, -side * 16, [-side * 0.4, -0.5])], [400, (l) => set(l, 0, 0, 0, null)]];
   } },
+  lean: { weight: 2, steps: () => [
+    [1100, (l) => ((l.closer = 0.16), set(l, rand(-6, 6), rand(-4, 2), 0, [0, 0]))],
+    [650, (l) => (l.closer = 0.09)],
+    [650, (l) => (l.closer = 0.16)],
+    [900, (l) => ((l.closer = 0), set(l, l.turn, 0, 0, null))],
+  ] },
   bounce: { weight: 2, steps: () => [
     [260, (l) => ((l.squash.v -= 2.4), set(l, l.turn, 0, 0, [0, 0.2]))],
     [700, (l) => ((l.hop.v += rand(170, 220)), (l.squash.v += 3), set(l, l.turn, 10, 0, [0, -0.6]))],
@@ -292,6 +314,7 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
       yaw: at(from.yaw),
       pitch: at(from.pitch),
       roll: at(from.roll),
+      near: at(from.near),
       lean: at(from.lean),
       hop: at(from.hop),
       squash: at(0),
@@ -304,6 +327,7 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
       turn: 0,
       tip: 0,
       tilt: 0,
+      closer: 0,
       spins: 0,
       aim: null,
     };
@@ -357,7 +381,7 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
       };
       next();
     } else {
-      l.turn = l.tip = l.tilt = 0;
+      l.turn = l.tip = l.tilt = l.closer = 0;
       l.aim = null;
       l.spins = Math.round(l.spins); // whole turns look the same; keep the count, so it doesn't spin back
       kick();
@@ -414,7 +438,7 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
         kick();
       }, i * 230),
     );
-    timers.push(setTimeout(() => l.el.classList.remove("joy"), 1700));
+    timers.push(setTimeout(() => l.el.classList.remove("joy"), CHEER_MS));
     return () => {
       timers.forEach(clearTimeout);
       l.el.classList.remove("joy");
