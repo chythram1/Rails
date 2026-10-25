@@ -111,3 +111,47 @@ export function dotsAt(look: SprocketLook, ms: number): Drawing {
   return { ...toDots(look)(1), d };
 }
 
+
+// ---- the spawn: a Sprocket just made gathers itself (as a Grok bot does) ----
+
+/** The spawn's timing (ms) and sizes (viewBox): it shrinks into a seed, five specks spiral in round it from the edge of
+ * the frame, one every `stagger`, each over `travel`, then it grows back into its body. From Grok Bot's `gather`. */
+export const GATHER = { ms: 2000, shrink: 300, grow: 320, seed: 19, specks: 5, reach: 96, stagger: 180, travel: 1240, speck: 9 } as const;
+
+/** From `t` 0 (its body) to 1 (the seed, a dot where its face is) and the drawing between: it shrinks, thins and its
+ * eyes fade, as into the dots. */
+export function toSeed(look: SprocketLook): (t: number) => Drawing {
+  const def = CHARACTERS[look.character];
+  const from = shapesOf(look);
+  const seed = ring({ cx: def.face.x, cy: def.face.y, rx: GATHER.seed, ry: GATHER.seed }, 32);
+  const options = { maxSegmentLength: 4, single: true };
+  const body = from.length === 1 ? interpolate(from[0], seed, options) : combine(from, seed, options);
+  return (t) => ({
+    d: t <= 0 ? still(look).d : body(t),
+    color: COLORS[look.color],
+    depth: lerp(def.depth, 8, t),
+    spun: lerp(def.spun ?? 0, 0, t),
+    puff: lerp(def.puff, 0, t),
+    face: { ...def.face },
+    eyes: Math.max(0, 1 - t * 1.6),
+  });
+}
+
+/** The specks `ms` into the spawn, as one path: each comes in from the frame's edge on a squashed spiral (cubic ease
+ * out), growing from half its size and fading in, gone once it touches the seed. */
+export function specksAt(look: SprocketLook, ms: number): string {
+  const { x, y } = CHARACTERS[look.character].face;
+  const out: string[] = [];
+  for (let e = 0; e < GATHER.specks; e++) {
+    const p = Math.min(1, Math.max(0, (ms - e * GATHER.stagger) / GATHER.travel));
+    if (p <= 0 || p >= 1) continue;
+    const a = 1 - (1 - p) ** 3;
+    const angle = e * 2.4 + p * 2.2;
+    const r = GATHER.reach * (1 - a);
+    const size = (GATHER.speck / 2) * (0.5 + 0.5 * a) * Math.min(1, p * 5);
+    // Once it touches the seed it's part of it (drawn over it, the two would cancel out where they overlap).
+    if (r < GATHER.seed + size) continue;
+    out.push(circle(x + r * Math.cos(angle), y + r * Math.sin(angle) * 0.8, size));
+  }
+  return out.join(" ");
+}

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { SprocketLook } from "@rails/shared";
 import { CHARACTERS, COLORS, type Primitive } from "./characters.ts";
-import { dotsAt, toDots, type Drawing } from "./morph.ts";
+import { dotsAt, GATHER, specksAt, toDots, toSeed, type Drawing } from "./morph.ts";
 import { REST_POSE, perform, pop, setIdles, setResting, type Activity, type Frame, type Rig } from "./engine.ts";
 import { clock, kick, useRig, useSprocketMotion } from "./motion.ts";
 import { ANIMATIONS, IDLES, type AnimationName } from "./animations.ts";
@@ -37,6 +37,9 @@ interface Props {
   id?: string;
   /** Thinking in a direct chat: it becomes three bouncing dots, an ellipsis, and back when this turns off. */
   dots?: boolean;
+  /** Just made: when its spawn started (performance.now(), spawn.ts). It shrinks into a seed, specks spiral in round it,
+   * and it grows back into itself (morph.ts, GATHER), once; the dots wait until it has. */
+  spawn?: number;
   /** An animation (animations.ts) to play once each time `key` changes; then it rests. */
   play?: { name: AnimationName; key: string };
   /** Play idle animations now and then while it rests (engine.ts setIdles). */
@@ -54,11 +57,12 @@ const BOX: Box = { x: 40, y: 80, width: 120, height: 116 };
  * the outline and where the eyes sit, never as shading), each stroked to join its neighbours when turned, and the eyes on the front face. While
  * it moves, its rig (engine.ts, run by motion.ts) paints every frame straight into the SVG.
  */
-export function Sprocket({ look, size, still, stance = "rest", follow = false, activity = "idle", drawing: given, label, onRig, id, dots = false, play, idles = false, resting = false }: Props) {
+export function Sprocket({ look, size, still, stance = "rest", follow = false, activity = "idle", drawing: given, label, onRig, id, dots = false, spawn, play, idles = false, resting = false }: Props) {
   const def = CHARACTERS[look.character];
   const motion = useSprocketMotion();
-  const dotted = useDots(look, dots, motion);
-  const drawing = given ?? dotted;
+  const gathering = useGather(look, spawn, motion);
+  const dotted = useDots(look, dots && !gathering, motion);
+  const drawing = given ?? gathering ?? dotted;
   const color = drawing?.color ?? COLORS[look.color];
   const face = drawing?.face ?? def.face;
   const axis = def.shadow.x;
@@ -99,7 +103,7 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
 
   const moving = !still;
   // As three dots it faces you: they read as an ellipsis only upright.
-  const rig = useRig(svg, paint, moving, { stance: dots ? "front" : stance, follow, activity, faceOnly: !motion || size < 20 }, from);
+  const rig = useRig(svg, paint, moving, { stance: dots || gathering ? "front" : stance, follow, activity, faceOnly: !motion || size < 20 }, from);
   useEffect(() => {
     onRig?.(moving ? rig.current : null);
     return () => onRig?.(null);
@@ -212,6 +216,29 @@ function Shape({ p }: { p: Primitive }) {
   if ("d" in p) return <path d={p.d} />;
   return <ellipse cx={p.cx} cy={p.cy} rx={p.rx} ry={p.ry} transform={p.rot ? `rotate(${p.rot} ${p.cx} ${p.cy})` : undefined} />;
 }
+
+/** The drawing while it spawns (morph.ts, GATHER): its body shrinks into the seed as the specks spiral in, then the seed
+ * grows back into its body and its eyes open; undefined once it has, or never with reduced motion (it's just there). */
+function useGather(look: SprocketLook, start: number | undefined, motion: boolean): Drawing | undefined {
+  const [frame, setFrame] = useState<Drawing | undefined>(undefined);
+  useEffect(() => {
+    if (start === undefined || !motion) return;
+    const seed = toSeed(look);
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = now - start;
+      if (t >= GATHER.ms + GATHER.grow) return setFrame(undefined);
+      const body = t < GATHER.ms ? seed(easeInOut(Math.min(1, t / GATHER.shrink))) : seed(1 - easeOut((t - GATHER.ms) / GATHER.grow));
+      const specks = t < GATHER.ms ? specksAt(look, t) : "";
+      setFrame({ ...body, d: specks ? `${body.d} ${specks}` : body.d });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => (cancelAnimationFrame(raf), setFrame(undefined));
+  }, [start, motion, look.character, look.color]);
+  return frame;
+}
+const easeOut = (t: number) => 1 - (1 - t) ** 3;
 
 /** How long it takes to become the dots, and to come back (ms). */
 const DOTS_MS = 380;

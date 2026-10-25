@@ -95,3 +95,13 @@ until you select it, then no new idle animation starts, and 1.4 s later (`SEEN_A
 is over, so it settles in about 3 to 5 s. Resting never cuts an animation short. Following the pointer wakes it;
 keyboard focus turns it to face you, and a click's focus doesn't. The two-minute idle window this replaces is gone,
 and an open chat's row no longer faces you.
+
+## Amendment (2026-10-25, later still): the spawn
+
+A Sprocket just made gathers itself, as a Grok bot does (its `spawning` state, the `gather` morph, 2 s): its body
+shrinks into a seed, five specks spiral in round it, and it grows back into itself. Like the dots, it's a drawing
+(`toSeed`, `specksAt` in `morph.ts`) the rig paints while it faces you, not a clip: the engine's poses and timings are
+unchanged. `spawn.ts` marks a Sprocket made on this device (the creator does, as the server returns it) for the
+spawn's length, and its list row plays it; the icon by its first reply mirrors the row. Other devices see it arrive
+without the spawn, which is cosmetic.
+

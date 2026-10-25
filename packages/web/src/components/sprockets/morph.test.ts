@@ -1,6 +1,7 @@
 import { SPROCKET_CHARACTERS } from "@rails/shared";
 import { describe, expect, it } from "vitest";
-import { DOTS, dotsAt, morph, still, toDots } from "./morph.ts";
+import { DOTS, dotsAt, GATHER, morph, specksAt, still, toDots, toSeed } from "./morph.ts";
+import { CHARACTERS } from "./characters.ts";
 
 describe("morph", () => {
   it("goes from one Sprocket to the next, between every pair of shapes", () => {
@@ -41,3 +42,34 @@ describe("the ellipsis", () => {
   });
 });
 
+
+describe("the spawn", () => {
+  const specks = (ms: number) => (specksAt({ character: "blob", color: "teal" }, ms).match(/M/g) ?? []).length;
+
+  it("every body shrinks into a seed where its face is, its eyes gone, and back", () => {
+    for (const c of SPROCKET_CHARACTERS) {
+      const seed = toSeed({ character: c, color: "teal" });
+      expect(seed(0).d).toBe(still({ character: c, color: "teal" }).d);
+      for (const t of [0.5, 1]) expect(seed(t).d).toMatch(/^M(?!.*NaN)/);
+      expect(seed(1).eyes).toBe(0);
+      const xs = [...seed(1).d.matchAll(/(-?[\d.]+)[ ,](-?[\d.]+)/g)].map((m) => Math.hypot(+m[1] - CHARACTERS[c].face.x, +m[2] - CHARACTERS[c].face.y));
+      expect(Math.max(...xs)).toBeLessThan(GATHER.seed + 1);
+    }
+  });
+
+  it("five specks spiral in one after another, and are gone by its end", () => {
+    expect(specks(1)).toBe(1);
+    expect(specks(GATHER.stagger + 10)).toBe(2);
+    // Each joins the seed when it reaches it, so all five come and go.
+    const counts = Array.from({ length: 100 }, (_, i) => specks(i * 20));
+    expect(Math.max(...counts)).toBeLessThanOrEqual(GATHER.specks);
+    expect(specks(GATHER.stagger * 4 + 10)).toBeGreaterThan(0);
+    expect(specks(GATHER.ms)).toBe(0);
+    // Coming in: the first speck is nearer its middle as it goes.
+    const at = (ms: number) => {
+      const [, x, y] = specksAt({ character: "blob", color: "teal" }, ms).match(/^M (-?[\d.]+) (-?[\d.]+)/)!.map(Number);
+      return Math.hypot(x - CHARACTERS.blob.face.x, y - CHARACTERS.blob.face.y);
+    };
+    expect(at(600)).toBeLessThan(at(100));
+  });
+});

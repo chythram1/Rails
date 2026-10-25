@@ -18,6 +18,7 @@ import { useSprockets } from "./useSprockets.ts";
 import { usePlaying } from "./motion.ts";
 import { ANIMATIONS, doneFor } from "./animations.ts";
 import { rowId, useFlight } from "./flight.ts";
+import { spawned, useSpawn } from "./spawn.ts";
 import { plain } from "./marks.ts";
 
 type SprocketsRoute = Extract<Route, { name: "sprockets" }>;
@@ -98,7 +99,7 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
       {creating && (
         <SprocketCreator
           taken={list.map((s) => s.name)}
-          onSaved={(s) => (setMaking(false), setWelcomed(true), navigate(href.sprocket(s.id)))}
+          onSaved={(s) => (spawned(s.id), setMaking(false), setWelcomed(true), navigate(href.sprocket(s.id)))}
           onClose={closeCreator}
         />
       )}
@@ -262,9 +263,10 @@ function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; t
   const done = newest ? doneFor(newest) : undefined;
   const ending = usePlaying(newest?.id, done ? ANIMATIONS[done].ms : 0);
   const flight = useFlight(s.id, busy && !talking);
+  const spawn = useSpawn(s.id);
   const { seen, selected, see } = useSeen(newest?.id, working, active);
   const idling = !working && !ending && !hover && !seen;
-  const live = hover || focus || busy || ending || idling;
+  const live = hover || focus || busy || ending || idling || spawn !== undefined;
   const latest = chats.reduce((a, b) => ((b.lastMessage?.createdAt ?? "") > (a.lastMessage?.createdAt ?? "") ? b : a));
   const shown: SprocketChatInfo = { ...latest, running: chats.some((c) => c.running), pending: chats.reduce((n, c) => n + c.pending, 0) };
   return (
@@ -287,6 +289,7 @@ function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; t
         follow={hover && !busy && !ending}
         activity={busy && talking ? "talk" : "idle"}
         dots={flight.dots}
+        spawn={spawn}
         play={ending && newest && done ? { name: done, key: newest.id } : flight.play}
         idles={idling && !selected}
         resting={!live}

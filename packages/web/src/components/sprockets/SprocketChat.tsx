@@ -16,6 +16,7 @@ import { EventRow } from "./EventRow.tsx";
 import { SuggestionCard } from "./SuggestionCard.tsx";
 import { MessageActions } from "./MessageActions.tsx";
 import { AskCard } from "./AskCard.tsx";
+import { useSpawn } from "./spawn.ts";
 import { COLORS, DEEP } from "./characters.ts";
 import { rowId, useFlight, useStep } from "./flight.ts";
 import { VIEW } from "./Sprocket.tsx";
@@ -221,9 +222,10 @@ export function SprocketChat({
             <button className="btn" onClick={() => void load()}>Try again</button>
           </div>
         )}
-        {/* The character greets an empty chat; once it has messages, one quiet line marks where it starts. */}
+        {/* One quiet line marks where it starts. An empty team or project chat says how it works instead; a direct chat is
+            never empty for long: a new Sprocket speaks first. */}
         {messages &&
-          (messages.length ? (
+          (messages.length || (!team && !projectChat) ? (
             <p className="sp-intro-line muted small">
               {team
                 ? `This is the beginning of the team chat ${title}.`
@@ -249,19 +251,8 @@ export function SprocketChat({
           ) : (
             <div className="sp-intro alone">
               <Sprocket look={sprocket.look} size={120} />
-              {projectChat && project ? (
-                <>
-                  <p className="sp-intro-title">{project.name}'s chat</p>
-                  <p className="muted small">{name} posts here when a session in {project.name} needs you. Tell it here who owns what, or what to pass on.</p>
-                </>
-              ) : (
-                <>
-                  <p className="sp-intro-title">Say hello to {name}</p>
-                  <p className="muted small">
-                    {project ? `${name} looks after ${project.name}. What its sessions need goes to the project chat.` : `${name} isn't attached to a project. You can attach it in Settings.`}
-                  </p>
-                </>
-              )}
+              <p className="sp-intro-title">{project?.name ?? "The project"}'s chat</p>
+              <p className="muted small">{name} posts here when a session in {project?.name ?? "its project"} needs you. Tell it here who owns what, or what to pass on.</p>
             </div>
           ))}
         {!!messages?.length && (
@@ -496,6 +487,7 @@ function FlightIcon({ who, working }: { who: SprocketData; working: boolean }) {
   useLayoutEffect(() => setMirror(!!document.getElementById(id)), [id]);
   const flight = useFlight(who.id, working);
   const step = useStep(who.id);
+  const spawn = useSpawn(who.id);
   return (
     <>
       <span className="sp-watcher">
@@ -504,7 +496,7 @@ function FlightIcon({ who, working }: { who: SprocketData; working: boolean }) {
             <use href={`#${id}`} />
           </svg>
         ) : (
-          <Sprocket look={who.look} size={26} dots={flight.dots} play={flight.play} />
+          <Sprocket look={who.look} size={26} dots={flight.dots} spawn={spawn} play={flight.play} />
         )}
       </span>
       {working && step && <span className="sp-working">{step}</span>}
