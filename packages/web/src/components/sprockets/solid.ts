@@ -8,7 +8,8 @@
 
 /** How a Sprocket stands: turned (`yaw`, degrees, + to the viewer's right), tipped (`pitch`, degrees, + looking
  * up), rolled about its middle (`roll`, degrees), how near the screen it's come (`near`, a scale, 1 where it stands),
- * leaning from its base (`lean`, degrees), squashed (`sx`, `sy`) and lifted off the ground (`hop`, viewBox units). */
+ * leaning from its base (`lean`, degrees), squashed (`sx`, `sy`), lifted off the ground (`hop`, viewBox units) and
+ * moved aside (`slide`, viewBox units, + to the viewer's right). */
 export interface Pose {
   yaw: number;
   pitch: number;
@@ -18,6 +19,7 @@ export interface Pose {
   sx: number;
   sy: number;
   hop: number;
+  slide: number;
 }
 
 /** Where it rests: almost facing you, glancing up a little. Facing you, it's the flat drawing. Done with a message
@@ -29,7 +31,7 @@ export const POSES = {
 } as const;
 export type Stance = keyof typeof POSES;
 
-export const poseOf = (stance: Stance): Pose => ({ ...POSES[stance], roll: 0, near: 1, sx: 1, sy: 1, hop: 0 });
+export const poseOf = (stance: Stance): Pose => ({ ...POSES[stance], roll: 0, near: 1, sx: 1, sy: 1, hop: 0, slide: 0 });
 
 /** How many slices of the body are drawn, back to front: about one every 4 units of depth, so a deep body's edge
  * stays smooth (at least 5, and an odd number, so one is its middle). */
@@ -95,7 +97,7 @@ export function layout(p: Pose, axis: number, face: { x: number; y: number }, bo
   const flat = 1 - body.puff;
   const width = body.depth * Math.abs(s);
   return {
-    rig: `translate(0 ${f(-p.hop)}) rotate(${f(p.lean)} ${axis} ${GROUND}) rotate(${f(p.roll)} ${axis} ${f(mid)}) translate(${axis} ${f(mid)}) scale(${f(p.near)}) translate(${-axis} ${f(-mid)}) translate(${axis} ${GROUND}) scale(${f(p.sx)} ${f(p.sy)}) translate(${-axis} ${-GROUND})`,
+    rig: `translate(${f(p.slide)} ${f(-p.hop)}) rotate(${f(p.lean)} ${axis} ${GROUND}) rotate(${f(p.roll)} ${axis} ${f(mid)}) translate(${axis} ${f(mid)}) scale(${f(p.near)}) translate(${-axis} ${f(-mid)}) translate(${axis} ${GROUND}) scale(${f(p.sx)} ${f(p.sy)}) translate(${-axis} ${-GROUND})`,
     layers,
     band: {
       x: f(axis - width / 2),

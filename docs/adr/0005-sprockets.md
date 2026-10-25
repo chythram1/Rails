@@ -57,7 +57,7 @@ look. One set of springs (`motion.ts`) moves its turn, tip, roll, lean, hop and 
 SVG. The poses: resting almost facing you and still, glancing now and then; facing
 you in its open chat's row; following the pointer in a hovered row and in the creator; while thinking, one small move
 after another (pondering, looking about, peeking, nodding, tilting, a bounce, a scrunch, now and then a spin),
-and on top of those, most often, leaning in toward the screen and pulsing there (gentler at rest);
+and on top of those, most often, leaning in toward the screen and pulsing there while glancing to the viewer's left (gentler at rest);
 looking up toward its message, rocking back a little, when done in a team, after cheering (happy eyes and a dance)
 as the message arrives. Its own row in the list thinks while it works in any of its chats and cheers as its message
 lands; a team's picture stays still. The constant bob and sway, the per-character tempo and the spin's streaks are gone.

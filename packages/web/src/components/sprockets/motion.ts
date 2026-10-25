@@ -148,6 +148,7 @@ interface Poser {
   pitch: Spring;
   roll: Spring;
   near: Spring;
+  slide: Spring;
   lean: Spring;
   hop: Spring;
   squash: Spring;
@@ -162,6 +163,8 @@ interface Poser {
   tip: number;
   tilt: number;
   closer: number;
+  /** Where it glances while leaning in (degrees of turn, - to the viewer's left). */
+  glance: number;
   spins: number;
   /** Where its eyes look on their own, -1 to 1 on each axis. */
   aim: [number, number] | null;
@@ -217,20 +220,24 @@ function step(now: number) {
     const [ax, ay] = watching ? [px, py] : (l.aim ?? [0, 0]);
     // Following the pointer it faces it, turning and tipping toward it; otherwise its stance plus its own moves.
     const [k, d] = l.busy ? [95, 12] : watching ? [90, 15] : [70, 14];
-    const yaw = watching ? px * 36 : base.yaw + l.turn;
+    // Leaning in, it also glances to the viewer's left: a turn, its body and its eyes moving that way a little. The
+    // glance leads; a move's own turn only nudges it.
+    const leaning = !watching && l.closer > 0;
+    const yaw = watching ? px * 36 : base.yaw + (leaning ? l.glance + l.turn * 0.2 : l.turn);
     const pitch = watching ? -py * 24 : base.pitch + l.tip;
     const roll = watching ? px * 7 : l.tilt;
     moving = spring(l.yaw, yaw + l.spins * 360, k, d, dt) || moving;
     moving = spring(l.pitch, pitch, k, d, dt) || moving;
     moving = spring(l.roll, roll, 140, 11, dt) || moving;
     moving = spring(l.near, 1 + l.closer, 45, 11, dt) || moving; // slow: it eases toward the screen
+    moving = spring(l.slide, leaning ? -6 : 0, 60, 13, dt) || moving;
     moving = spring(l.lean, base.lean, 110, 12, dt) || moving;
     moving = spring(l.hop, 0, 300, 18, dt) || moving;
     moving = spring(l.squash, 0, 400, 16, dt) || moving;
-    moving = spring(l.eyesX, ax, watching ? 260 : 620, watching ? 26 : 40, dt) || moving;
+    moving = spring(l.eyesX, leaning ? -0.6 : ax, watching ? 260 : 620, watching ? 26 : 40, dt) || moving;
     moving = spring(l.eyesY, ay, watching ? 260 : 620, watching ? 26 : 40, dt) || moving;
     const q = l.squash.x;
-    l.paint({ yaw: l.yaw.x, pitch: l.pitch.x, roll: l.roll.x, near: l.near.x, lean: l.lean.x, sx: 1 + q, sy: 1 - q, hop: Math.max(0, l.hop.x) });
+    l.paint({ yaw: l.yaw.x, pitch: l.pitch.x, roll: l.roll.x, near: l.near.x, slide: l.slide.x, lean: l.lean.x, sx: 1 + q, sy: 1 - q, hop: Math.max(0, l.hop.x) });
     write(l, l.eyesX.x * 9, l.eyesY.x * 6);
   }
   frame = moving ? requestAnimationFrame(step) : 0;
@@ -310,8 +317,8 @@ const MOVES: Record<string, { weight: number; steps: () => MoveStep[] }> = {
 };
 
 /**
- * Leaning in: it comes closer to the screen (`closer`, how much bigger it looks) and goes back, in one of a few
- * shapes, each a list of [nearness, ms held]. It plays on its own, alongside the moves, so it's the motion seen most:
+ * Leaning in: it comes closer to the screen (`closer`, how much bigger it looks), glancing to the viewer's left as it
+ * does (turning 20–30°, its body and eyes moving that way a little), and goes back, in one of a few shapes, each a list of [nearness, ms held]. It plays on its own, alongside the moves, so it's the motion seen most:
  * every 1.5–3.5s while thinking, and smaller and rarer at rest.
  */
 const LEANS: (() => [number, number][])[] = [
@@ -341,6 +348,7 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
       pitch: at(from.pitch),
       roll: at(from.roll),
       near: at(from.near),
+      slide: at(from.slide),
       lean: at(from.lean),
       hop: at(from.hop),
       squash: at(0),
@@ -354,6 +362,7 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
       tip: 0,
       tilt: 0,
       closer: 0,
+      glance: 0,
       spins: 0,
       aim: null,
     };
@@ -393,6 +402,7 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
     const leaning = busy || (stance === "rest" && !follow);
     const lean = () => {
       const steps = LEANS[Math.floor(Math.random() * LEANS.length)]();
+      l.glance = -rand(20, 30);
       const soft = busy ? 1 : 0.6; // at rest it leans in less
       const run = (i: number) => {
         if (i >= steps.length) return (leanTimer = setTimeout(lean, busy ? rand(1500, 3500) : rand(5000, 11000)));
