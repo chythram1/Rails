@@ -120,12 +120,12 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
   },
   drop: {
     name: "Drop",
-    depth: 112,
+    depth: 104,
     puff: 0.4,
-    spun: 1, // a drop, its point up
-    body: [{ d: drop(100, 142, 56, 70, 16) }],
-    face: { x: 100, y: 142 },
-    shadow: { x: 100, half: 52 },
+    spun: 1, // a drop, its point up, well above its round part so it isn't a ball with a bump
+    body: [{ d: drop(100, 146, 52, 92, 22) }],
+    face: { x: 100, y: 148 },
+    shadow: { x: 100, half: 50 },
   },
   bell: {
     name: "Bell",
