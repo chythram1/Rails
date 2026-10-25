@@ -82,11 +82,16 @@ to decide.
 
 ## Amendment (2026-10-25, later still): resting rows
 
-A Grok bot's row pauses once nothing's going on: its state stays "finished" for 8 s after a turn settles, then
-idle, and 1.4 s later the drawing pauses in its resting pose; hovering wakes it. Rails' rows do the same
-(`resting` on `Sprocket`, `setResting` in `engine.ts`): from 9.4 s after a reply settles (`REST_AFTER`), and from
-the start, a row holds the pose it has beside its messages (`REST_POSE`, `toward`), with no blinks or glances, so
-the loop sleeps. Resting never cuts an animation short: a done or idle one plays out first. Following the pointer
-wakes it; a focused row faces you. The two-minute idle window this replaces is gone, and an open chat's row no
-longer faces you: it rests like the others.
+A Grok bot's row rests in a still pose until it has something you haven't seen. Measured in Grok Bot 0.75.8: after
+a launch every row is still; once a bot's reply lands, its row plays its done animation and then idles with no end
+(23 cycles over 90 s, and on for minutes with its DM open the whole time) until you select its row, by opening its
+DM or clicking the row while the DM is open. Moving the pointer or clicking inside the chat doesn't count. 1.2 to
+2.2 s after the selection it settles into its resting pose and stops, and it stays still after you leave.
 
+Rails' rows do the same (`resting` on `Sprocket`, `setResting` in `engine.ts`, `useSeen` in `SprocketsPage.tsx`).
+A row starts out resting, holding the pose it has beside its messages (`REST_POSE`, `toward`), with no blinks or
+glances, so the loop sleeps. Its newest message changing, or its work ending, makes the reply unseen: it idles
+until you select it, then no new idle animation starts, and 1.4 s later (`SEEN_AFTER`) it rests once what's playing
+is over, so it settles in about 3 to 5 s. Resting never cuts an animation short. Following the pointer wakes it;
+keyboard focus turns it to face you, and a click's focus doesn't. The two-minute idle window this replaces is gone,
+and an open chat's row no longer faces you.

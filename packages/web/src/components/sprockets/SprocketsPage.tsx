@@ -214,9 +214,8 @@ function SprocketList(props: {
  * A Sprocket in the list, by its character and name. It opens its project chat when it has one (ADR 0021), its
  * direct chat otherwise; the line under its name is the newer of the two, and the dot shows replies waiting in either.
  */
-/** How long after its reply settles a row rests, holding the pose it has beside its messages (ms): as a Grok bot's
- * row, whose state stays "finished" for 8 s, then lingers 1.4 s before it pauses. */
-const REST_AFTER = 9_400;
+/** How long after you select a row whose reply you haven't seen it rests (ms): Grok's rows stop 1.2 to 2.2 s after. */
+const SEEN_AFTER = 1_400;
 
 function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; teams: SprocketTeam[]; active: boolean }) {
   // Its character rests in the list, holding the pose it has beside its messages, still (as a Grok bot's row does,
@@ -224,7 +223,9 @@ function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; t
   // while it's working on a reply in any of its chats, from about a second after it starts: in a team it surveys;
   // otherwise, as the icon by its reply (the same drawing), it becomes three dots while it thinks, inspects or
   // rummages at each tool step, and streams as it types. Once its reply is done it plays a done animation by how it
-  // ended (doneFor), then idles until REST_AFTER from then. Resting waits for what's playing to finish.
+  // ended (doneFor), then idles until you've seen it: once you select its row (open its chat, or click it while it's
+  // open), it rests SEEN_AFTER later. Having its chat open as the reply lands doesn't count. Resting waits for what's
+  // playing to finish.
   const [hover, setHover] = useState(false);
   const [focus, setFocus] = useState(false);
   const chats = [s.direct, ...(s.projectChat ? [s.projectChat] : [])];
@@ -245,9 +246,8 @@ function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; t
   const done = newest ? doneFor(newest) : undefined;
   const ending = usePlaying(newest?.id, done ? ANIMATIONS[done].ms : 0);
   const flight = useFlight(s.id, busy && !talking);
-  // Settled: its reply landed, or its work ended. It idles from then until it rests.
-  const settled = useSettled(newest?.id, working);
-  const idling = !working && !ending && !hover && settled;
+  const { seen, selected, see } = useSeen(newest?.id, working, active);
+  const idling = !working && !ending && !hover && !seen;
   const live = hover || focus || busy || ending || idling;
   const latest = chats.reduce((a, b) => ((b.lastMessage?.createdAt ?? "") > (a.lastMessage?.createdAt ?? "") ? b : a));
   const shown: SprocketChatInfo = { ...latest, running: chats.some((c) => c.running), pending: chats.reduce((n, c) => n + c.pending, 0) };
@@ -257,9 +257,10 @@ function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; t
       href={href.sprocket(s.id, !!s.projectChat)}
       title={s.name}
       aria-current={active ? "page" : undefined}
+      onClick={see}
       onPointerEnter={() => setHover(true)}
       onPointerLeave={() => setHover(false)}
-      onFocus={() => setFocus(true)}
+      onFocus={(e) => setFocus(e.currentTarget.matches(":focus-visible"))} // from the keyboard, not a click
       onBlur={() => setFocus(false)}
     >
       <Sprocket
@@ -271,7 +272,7 @@ function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; t
         activity={busy && talking ? "talk" : "idle"}
         dots={flight.dots}
         play={ending && newest && done ? { name: done, key: newest.id } : flight.play}
-        idles={idling}
+        idles={idling && !selected}
         resting={!live}
       />
       <RowText name={s.name} chat={shown} />
@@ -279,28 +280,35 @@ function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; t
   );
 }
 
-/** True for REST_AFTER from each time `key` (its newest message) changes or `working` ends: its reply has just
- * settled. */
-function useSettled(key: string | undefined, working: boolean): boolean {
+/**
+ * Whether you've seen its latest reply, as a Grok bot's row decides: unseen from each time `key` (its newest message)
+ * changes or `working` ends, seen SEEN_AFTER after you select it (`see`, or its chat becoming `active`). It starts
+ * seen. `selected`: you've selected it since, so no new idle animation starts.
+ */
+function useSeen(key: string | undefined, working: boolean, active: boolean) {
+  const [settledAt, setSettledAt] = useState(0);
+  const [seenAt, setSeenAt] = useState(0);
   const first = useRef(key);
-  const [at, setAt] = useState(0);
   const was = useRef(working);
   useEffect(() => {
-    if (key !== first.current) setAt(Date.now());
+    if (key !== first.current) setSettledAt(Date.now());
     first.current = key;
   }, [key]);
   useEffect(() => {
-    if (was.current && !working) setAt(Date.now());
+    if (was.current && !working) setSettledAt(Date.now());
     was.current = working;
   }, [working]);
+  const see = () => setSeenAt(Date.now());
+  useEffect(() => void (active && see()), [active]);
   const [, tick] = useState(0);
   useEffect(() => {
-    const left = at + REST_AFTER - Date.now();
+    const left = seenAt + SEEN_AFTER - Date.now();
     if (left <= 0) return;
     const t = setTimeout(() => tick((n) => n + 1), left);
     return () => clearTimeout(t);
-  }, [at]);
-  return Date.now() < at + REST_AFTER;
+  }, [seenAt]);
+  const selected = seenAt > settledAt;
+  return { seen: settledAt === 0 || (selected && Date.now() >= seenAt + SEEN_AFTER), selected, see };
 }
 
 /** A team chat (ADR 0022): its members' characters (the lead in front), its name, and the last line with who wrote it. */
