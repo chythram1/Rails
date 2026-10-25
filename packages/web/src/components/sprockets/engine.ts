@@ -10,7 +10,7 @@
 // cheering) plays its gesture with its eyes for as long as it lasts, then the Sprocket goes back to resting.
 import { POSES, type Pose, type Stance } from "./solid.ts";
 import { animationFor, type Animation } from "./animations.ts";
-import { BLINK_MS, EXPRESSIONS, GLANCE, LEAN_GLANCE, LEANS, OPEN, SPIN, THINKING, eyeAt, lidAt, sample, type EyeShape, type Key, type Expression, type ExpressionName, type Gesture, type Rand, type Step } from "./clips.ts";
+import { BLINK_MS, EXPRESSIONS, GLANCE, LEAN_GLANCE, LEANS, OPEN, SPIN, THINKING, eyeAt, faceAt, lidAt, sample, type EyeShape, type Key, type Expression, type ExpressionName, type Gesture, type Rand, type Step } from "./clips.ts";
 
 /** What a Sprocket is doing: resting, thinking (direct chats), writing (the spin), or one of the finished animations
  * (animations.ts): cheering, talking in a team (surveying), satisfied. */
@@ -62,7 +62,11 @@ export interface Rig {
   aim: [number, number] | null;
   gesture: { name: string; steps: Step[]; i: number; at: number } | null;
   /** The finished animation playing: its eyes, and when it ends (then it rests, whatever its activity). */
-  anim: { eyes: Animation["eyes"]; moves?: Animation["moves"]; start: number; until: number } | null;
+  anim: { eyes: Animation["eyes"]; moves?: Animation["moves"]; start: number; until: number; blinked: number } | null;
+  /** Idle animations it plays now and then while resting (the lab; the app doesn't yet), the last one, and when next. */
+  idles: Animation[] | null;
+  lastIdle: Animation | null;
+  nextIdle: number;
   /** The last thinking move, so the next is a different one. */
   last: string;
   /** When the next resting glance starts. */
@@ -82,6 +86,12 @@ export interface Rig {
 
 const NEVER = Infinity;
 const between = (r: Rand, a: number, b: number) => a + r() * (b - a);
+/**
+ * Idle timing, as a Grok bot's (measured live): once it has done something it idles without stopping, one clip
+ * straight after another with half a second still between; before it first idles, a beat to settle.
+ */
+export const IDLE_FIRST = [1500, 3000] as const;
+export const IDLE_GAP = [400, 700] as const;
 
 export function createRig(input: Input, from: Pose, now: number, rand: Rand = Math.random): Rig {
   const at = (x: number): Spring => ({ x, v: 0 });
@@ -111,6 +121,9 @@ export function createRig(input: Input, from: Pose, now: number, rand: Rand = Ma
     aim: null,
     gesture: null,
     anim: null,
+    idles: null,
+    lastIdle: null,
+    nextIdle: NEVER,
     last: "",
     nextGlance: NEVER,
     lean: null,
@@ -137,18 +150,31 @@ export function setInput(r: Rig, input: Input, now: number) {
 function begin(r: Rig, now: number) {
   const { activity, faceOnly } = r.input;
   clear(r);
+  r.lastIdle = null;
   const a = animationFor(activity);
-  r.anim = a ? { eyes: a.eyes, moves: a.moves, start: now, until: now + a.ms } : null;
-  if (faceOnly) return;
-  if (a) {
-    if (a.gesture) play(r, a.name, a.gesture, now);
-  }
+  r.anim = null;
+  if (a) perform(r, a, now);
+  else if (faceOnly) return;
   else if (activity === "think") {
     r.last = "";
     nextMove(r, now);
     r.nextLean = now + between(r.rand, 300, 1200);
   } else if (activity === "write") play(r, "spin", SPIN, now);
   else rest(r, now);
+}
+
+/** Play a finished animation now, whatever its activity (the lab plays any this way); then it rests. */
+export function perform(r: Rig, a: Animation, now: number) {
+  clear(r);
+  r.anim = { eyes: a.eyes, moves: a.moves, start: now, until: now + a.ms, blinked: -1 };
+  if (!r.input.faceOnly && a.gesture) play(r, a.name, a.gesture, now);
+}
+
+/** Let it play these idle animations now and then while resting (null: never). */
+export function setIdles(r: Rig, idles: Animation[] | null, now: number) {
+  r.idles = idles;
+  r.nextIdle = NEVER;
+  if (!r.anim && r.gesture === null) rest(r, now);
 }
 
 /** Drop what it was doing: back to its stance. */
@@ -158,12 +184,17 @@ function clear(r: Rig) {
   r.gesture = null;
   r.lean = null;
   r.spins = Math.round(r.spins); // whole turns look the same: keep the count, so it doesn't spin back
-  r.nextGlance = r.nextLean = NEVER;
+  r.nextGlance = r.nextLean = r.nextIdle = NEVER;
 }
 
 /** Rest: at its resting stance, and not following the pointer, it glances aside now and then and leans in gently. */
 function rest(r: Rig, now: number) {
   if (r.input.stance !== "rest" || r.input.follow) return;
+  if (r.idles?.length && r.input.activity === "idle") {
+    const [a, b] = r.lastIdle ? IDLE_GAP : IDLE_FIRST;
+    r.nextIdle = now + between(r.rand, a, b);
+    return;
+  }
   r.nextGlance = now + between(r.rand, 1500, 6000);
   r.nextLean = now + between(r.rand, 2500, 6000);
 }
@@ -205,9 +236,20 @@ function nextMove(r: Rig, now: number) {
 /** Run what's due by `now`: gesture steps, glances, lean-ins, blinks. */
 function direct(r: Rig, now: number) {
   const { activity, faceOnly } = r.input;
-  // Blinks, even with only the face moving; sometimes two together. Not with happy eyes: the ^ ^ are already shut.
+  // An animation's own blinks, when it has them.
+  const scripted = r.anim?.moves ? (r.anim.moves.blinks ?? []) : undefined;
+  if (r.anim && scripted) {
+    const at = now - r.anim.start;
+    const due = scripted.findLastIndex((b) => b <= at);
+    if (due > r.anim.blinked) {
+      r.anim.blinked = due;
+      r.blink = now;
+    }
+  }
+  // Blinks, even with only the face moving; sometimes two together. Not while an animation plays its own (above), nor
+  // with happy eyes: the ^ ^ are already shut.
   if (now >= r.nextBlink) {
-    if (r.anim?.eyes !== "happy") r.blink = now;
+    if (r.anim?.eyes !== "happy" && !scripted) r.blink = now;
     r.nextBlink = now + (r.rand() < 0.2 ? 420 : between(r.rand, 2000, 5500));
   }
   if (r.blink !== null && now - r.blink >= BLINK_MS) r.blink = null;
@@ -219,6 +261,14 @@ function direct(r: Rig, now: number) {
     if (!faceOnly) rest(r, now);
   }
   if (faceOnly) return;
+  if (!r.anim && r.idles?.length && now >= r.nextIdle) {
+    // Weighted, and the rarer ones never twice running.
+    const options = r.idles.filter((a) => a !== r.lastIdle || (a.weight ?? 1) > 1);
+    let n = r.rand() * options.reduce((sum, a) => sum + (a.weight ?? 1), 0);
+    const a = options.find((o) => (n -= o.weight ?? 1) < 0) ?? options[0];
+    r.lastIdle = a;
+    perform(r, a, now);
+  }
   if (r.gesture && now >= r.gesture.at) {
     const g = r.gesture;
     if (g.i < g.steps.length) {
@@ -305,7 +355,10 @@ export function advance(r: Rig, now: number, pointer: [number, number] | null): 
   go("squash", 0, 400, 16);
   go("lookX", leaning ? LEAN_GLANCE.aim : ax, ek, ed);
   go("lookY", ay, ek, ed);
-  const eyes = r.anim?.eyes;
+  // A held face from its moves (blended in), or the eyes it holds the whole time.
+  const faces = r.anim?.moves?.eyes;
+  const held = faces ? faceAt(faces, now - r.anim!.start) : null;
+  const eyes = held ? (held.face.happy ? "happy" : held.face.round ? "round" : null) : r.anim?.eyes;
   go("happy", eyes === "happy" ? 1 : 0, 300, 30);
   go("round", eyes === "round" ? 1 : 0, 900, 24); // sudden: it pops in, overshooting a little
   const t = now;
@@ -314,17 +367,24 @@ export function advance(r: Rig, now: number, pointer: [number, number] | null): 
   const m = r.input.faceOnly ? undefined : r.anim?.moves;
   const at = r.anim ? now - r.anim.start : 0;
   const track = (keys: Key[] | undefined, rest: number) => (keys ? sample(keys, at) : rest);
-  const [mh, ms, mt, mshift, mturn, mroll, mlook] = [track(m?.hop, 0), track(m?.squash, 1), track(m?.tip, 0), track(m?.shift, 0), track(m?.turn, 0), track(m?.roll, 0), track(m?.look, 0)];
-  if (m) moving = true;
+  const [mh, ms, mt, mshift, mturn, mroll, mnear, mlook, mlookY] = [track(m?.hop, 0), track(m?.squash, 1), track(m?.tip, 0), track(m?.shift, 0), track(m?.turn, 0), track(m?.roll, 0), track(m?.near, 1), track(m?.look, 0), track(m?.lookY, 0)];
+  if (m || held) moving = true;
+  const heldEye = (side: "left" | "right", base: EyeShape): EyeShape => {
+    if (!held) return base;
+    const [a, b] = [held.from[side], held.face[side]];
+    const mix = (x: number, y: number) => x + (y - x) * held.mix;
+    const h = { dx: mix(a.dx, b.dx), dy: mix(a.dy, b.dy), sx: mix(a.sx, b.sx), sy: mix(a.sy, b.sy) };
+    return { dx: base.dx + h.dx, dy: base.dy + h.dy, sx: base.sx * h.sx, sy: base.sy * h.sy };
+  };
   const frame: Frame = {
-    pose: { yaw: s.yaw.x + mturn, pitch: s.pitch.x + mt, roll: s.roll.x + mroll, near: s.near.x, slide: s.slide.x + mshift, lean: s.lean.x, sx: (1 + s.squash.x) * ms, sy: (1 - s.squash.x) / ms, hop: Math.max(0, s.hop.x) + mh },
-    look: [(s.lookX.x + mlook) * 9, s.lookY.x * 6],
-    left: dilate(e ? eyeAt(e.keys.left, t - e.start, e.keys.ms) : OPEN, s.round.x, -1),
-    right: dilate(e ? eyeAt(e.keys.right, t - e.start, e.keys.ms) : OPEN, s.round.x, 1),
+    pose: { yaw: s.yaw.x + mturn, pitch: s.pitch.x + mt, roll: s.roll.x + mroll, near: s.near.x * mnear, slide: s.slide.x + mshift, lean: s.lean.x, sx: (1 + s.squash.x) * ms, sy: (1 - s.squash.x) / ms, hop: Math.max(0, s.hop.x) + mh },
+    look: [(s.lookX.x + mlook) * 9, (s.lookY.x + mlookY) * 6],
+    left: dilate(heldEye("left", e ? eyeAt(e.keys.left, t - e.start, e.keys.ms) : OPEN), s.round.x, -1),
+    right: dilate(heldEye("right", e ? eyeAt(e.keys.right, t - e.start, e.keys.ms) : OPEN), s.round.x, 1),
     lid: r.blink === null ? 0 : lidAt(t - r.blink),
     happy: Math.min(1, Math.max(0, s.happy.x)),
   };
   if (e || r.blink !== null) moving = true;
-  const due = [r.nextBlink, r.nextGlance, r.nextLean, r.gesture?.at ?? NEVER, r.lean?.at ?? NEVER, r.anim?.until ?? NEVER];
+  const due = [r.nextBlink, r.nextGlance, r.nextLean, r.nextIdle, r.gesture?.at ?? NEVER, r.lean?.at ?? NEVER, r.anim?.until ?? NEVER];
   return { frame, moving, wake: Math.max(0, Math.min(...due) - now) };
 }

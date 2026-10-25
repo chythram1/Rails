@@ -31,6 +31,8 @@ interface Props {
   label?: string;
   /** Hands over its rig while it moves (the lab plays clips on it). */
   onRig?: (rig: Rig | null) => void;
+  /** Its SVG's id, so another place can show the same drawing (`<use href>`), moving exactly as it does. */
+  id?: string;
 }
 
 /** A body's bounds before it's measured (most bodies sit about here). */
@@ -41,7 +43,7 @@ const BOX: Box = { x: 40, y: 80, width: 120, height: 116 };
  * the outline and where the eyes sit, never as shading), the band seen edge-on, and the eyes on the front face. While
  * it moves, its rig (engine.ts, run by motion.ts) paints every frame straight into the SVG.
  */
-export function Sprocket({ look, size, still, stance = "rest", follow = false, activity = "idle", drawing, label, onRig }: Props) {
+export function Sprocket({ look, size, still, stance = "rest", follow = false, activity = "idle", drawing, label, onRig, id }: Props) {
   const def = CHARACTERS[look.character];
   const color = drawing?.color ?? COLORS[look.color];
   const round = drawing ? drawing.round : (def.round ?? 0);
@@ -113,6 +115,7 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
   return (
     <svg
       ref={svg}
+      id={id}
       className={"sprocket" + (still ? " still" : "")}
       viewBox={`${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`}
       style={style}

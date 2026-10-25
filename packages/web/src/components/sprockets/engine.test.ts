@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { advance, createRig, express, setInput, type Activity, type Frame, type Input, type Rig } from "./engine.ts";
-import { BLINK_MS, lidAt } from "./clips.ts";
+import { IDLE_FIRST, IDLE_GAP, advance, createRig, express, perform, setIdles, setInput, type Activity, type Frame, type Input, type Rig } from "./engine.ts";
+import { ANIMATIONS, IDLES } from "./animations.ts";
+import { BLINK_MS, FACES, FACE_MS, faceAt, lidAt } from "./clips.ts";
 import { POSES, poseOf, type Stance } from "./solid.ts";
 
 /** A seeded random source, so a run's choices replay. */
@@ -167,5 +168,82 @@ describe("a Sprocket's motion engine", () => {
     expect(lid).toBe(0); // ^ ^ eyes don't blink
     expect(slide).toBeLessThan(0.5); // in place: no side to side
     expect(run(r, 1200).happy).toBeLessThan(0.05); // over on time
+  });
+
+  it("idle animations: one after another while resting, on a Grok bot's timing, the rarer ones never twice running", () => {
+    const r = rig(input("idle"));
+    setIdles(r, IDLES, r.clock);
+    const plays: { name: string; at: number; ended: number }[] = [];
+    let current: string | null = null;
+    run(r, 300_000, (_, r) => {
+      const name = r.anim ? r.lastIdle!.name : null;
+      if (name && (name !== current || r.anim!.start !== plays.at(-1)?.at)) plays.push({ name, at: r.anim!.start, ended: r.anim!.until });
+      current = name;
+    });
+    expect(plays.length).toBeGreaterThan(20);
+    expect(plays[0].at).toBeGreaterThanOrEqual(IDLE_FIRST[0]);
+    expect(plays[0].at).toBeLessThanOrEqual(IDLE_FIRST[1] + 16);
+    for (let i = 1; i < plays.length; i++) {
+      const gap = plays[i].at - plays[i - 1].ended;
+      expect(gap).toBeGreaterThanOrEqual(IDLE_GAP[0] - 16);
+      expect(gap).toBeLessThanOrEqual(IDLE_GAP[1] + 32);
+      if (plays[i].name !== "Breathe") expect(plays[i].name).not.toBe(plays[i - 1].name);
+    }
+    expect(new Set(plays.map((p) => p.name)).size).toBe(IDLES.length);
+    // Breathe comes up most.
+    const count = (n: string) => plays.filter((p) => p.name === n).length;
+    expect(count("Breathe")).toBeGreaterThan(count("Doze"));
+  });
+
+  it("idle animations stop the moment it has something to do, and wait a beat to start again", () => {
+    const r = rig(input("idle"));
+    setIdles(r, IDLES, r.clock);
+    run(r, 5000);
+    setInput(r, input("think"), r.clock);
+    expect(r.anim).toBeNull();
+    run(r, 5000, (_, r) => expect(r.anim).toBeNull());
+    setInput(r, input("idle"), r.clock);
+    const back = r.clock;
+    let started = 0;
+    run(r, 5000, (_, r) => (started ||= r.anim ? r.clock : 0));
+    expect(started - back).toBeGreaterThanOrEqual(IDLE_FIRST[0]);
+  });
+
+  it("an animation's faces blend in and out, and it blinks only where it says", () => {
+    const r = rig(input("idle", "toward"));
+    perform(r, ANIMATIONS.doze, r.clock);
+    const lids: number[] = [];
+    let narrowest = 1;
+    run(r, ANIMATIONS.doze.ms, (f) => {
+      lids.push(f.lid);
+      narrowest = Math.min(narrowest, f.left.sy);
+    });
+    expect(narrowest).toBeLessThan(0.3); // sleepy
+    // Doze blinks once, near its end; no other blink lands on its sleepy eyes.
+    const shut = lids.map((l, i) => (l > 0.9 ? i * 16 : -1)).filter((t) => t >= 0);
+    expect(shut.length).toBeGreaterThan(0);
+    expect(Math.min(...shut)).toBeGreaterThan(5500);
+    // A face key blends over FACE_MS.
+    const keys: [number, keyof typeof FACES][] = [[100, "wide"]];
+    expect(faceAt(keys, 100).mix).toBe(0);
+    expect(faceAt(keys, 100 + FACE_MS / 2).mix).toBeCloseTo(0.5, 1);
+    expect(faceAt(keys, 100 + FACE_MS).mix).toBe(1);
+  });
+
+  it("every animation starts and ends at rest, so one can follow another without a jump", () => {
+    for (const a of Object.values(ANIMATIONS)) {
+      const r = rig(input("idle", "toward"));
+      perform(r, a, r.clock);
+      const first = run(r, 16);
+      const last = run(r, a.ms + 600);
+      expect(Math.abs(first.pose.hop), a.name).toBeLessThan(1);
+      expect(Math.abs(last.pose.hop), a.name).toBeLessThan(0.5);
+      expect(Math.abs(last.pose.sx - 1), a.name).toBeLessThan(0.02);
+      expect(Math.abs(last.pose.slide), a.name).toBeLessThan(0.5);
+      expect(Math.abs(last.pose.near - 1), a.name).toBeLessThan(0.02);
+      const turned = (((last.pose.yaw - POSES.toward.yaw) % 360) + 360) % 360;
+      expect(Math.min(turned, 360 - turned), a.name).toBeLessThan(1); // facing the same way (whole turns look the same)
+      expect(last.happy, a.name).toBeLessThan(0.05);
+    }
   });
 });

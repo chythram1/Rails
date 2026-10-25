@@ -3,13 +3,14 @@ import { SPROCKET_CHARACTERS, SPROCKET_COLORS, type SprocketCharacter, type Spro
 import { Dropdown } from "../ui/Dropdown.tsx";
 import { Segmented } from "../ui/Segmented.tsx";
 import { Switch } from "../ui/Switch.tsx";
-import { ANIMATIONS } from "./animations.ts";
+import { ANIMATIONS, IDLES, type AnimationName } from "./animations.ts";
 import { CHARACTERS } from "./characters.ts";
 import { EXPRESSIONS, GLANCE, SPIN, THINKING, type ExpressionName, type Gesture } from "./clips.ts";
-import { blink, express, leanIn, play, type Activity, type Rig } from "./engine.ts";
+import { blink, express, leanIn, perform, play, setIdles, type Activity, type Rig } from "./engine.ts";
+import { TeamThinking } from "./TeamThinking.tsx";
 import { clock, kick, setSpeed, stepClock } from "./motion.ts";
 import { COLOR_NAMES } from "./names.ts";
-import { Sprocket } from "./Sprocket.tsx";
+import { Sprocket, VIEW } from "./Sprocket.tsx";
 import type { Stance } from "./solid.ts";
 
 /** Every gesture by name: the thinking moves, then the rest. */
@@ -34,13 +35,15 @@ export default function SprocketLab() {
   const [holding, setHolding] = useState(false);
   const [held, setHeld] = useState<Held>({ yaw: 0, pitch: 0, roll: 0, near: 1 });
   const rigs = useRef(new Map<string, Rig>());
-  // A finished animation plays as it does in the app: its activity for as long as it lasts, then back.
-  const [playing, setPlaying] = useState<keyof typeof ANIMATIONS | null>(null);
+  // A finished animation plays on every Sprocket shown, for as long as it lasts.
+  const [playing, setPlaying] = useState<AnimationName | null>(null);
   useEffect(() => {
     if (!playing) return;
     const t = setTimeout(() => setPlaying(null), ANIMATIONS[playing].ms / Math.max(Number(speed), 0.05));
     return () => clearTimeout(t);
   }, [playing]);
+  const [idling, setIdling] = useState(false);
+  const [chats, setChats] = useState(false);
 
   const each = (fn: (r: Rig, now: number) => void) => {
     const now = clock();
@@ -48,6 +51,12 @@ export default function SprocketLab() {
     kick();
   };
   useEffect(() => each((r) => (r.hold = holding ? held : null)), [holding, held]);
+  useEffect(() => each((r, now) => setIdles(r, idling ? IDLES : null, now)), [idling]);
+  const perform1 = (a: AnimationName) => {
+    setPlaying(a);
+    each((r, now) => perform(r, ANIMATIONS[a], now));
+  };
+  const group = (kind: "idle" | "activity") => (Object.keys(ANIMATIONS) as AnimationName[]).filter((a) => ANIMATIONS[a].kind === kind);
   // Leaving the lab leaves motion running in real time.
   useEffect(() => () => setSpeed(1), []);
 
@@ -56,6 +65,7 @@ export default function SprocketLab() {
     if (r) {
       rigs.current.set(key, r);
       r.hold = holding ? held : null;
+      if (idling) setIdles(r, IDLES, clock());
     } else rigs.current.delete(key);
   };
 
@@ -65,11 +75,31 @@ export default function SprocketLab() {
       <p className="muted">Dev builds only. Play any clip, hold a pose, and slow the motion clock down to look closely.</p>
       <div className="lab-body">
         <div className="lab-controls">
-          <section aria-labelledby="lab-animations">
-            <h2 id="lab-animations" className="lab-h">Animations</h2>
-            {(Object.keys(ANIMATIONS) as (keyof typeof ANIMATIONS)[]).map((a) => (
+          <section aria-labelledby="lab-idle">
+            <h2 id="lab-idle" className="lab-h">Animations: idle</h2>
+            <div className="lab-row">
+              <label htmlFor="lab-idling">Now and then while resting</label>
+              <Switch id="lab-idling" checked={idling} onChange={setIdling} />
+            </div>
+            {group("idle").map((a) => (
               <div key={a} className="lab-animation">
-                <button className="btn" aria-pressed={playing === a} onClick={() => setPlaying(a)}>
+                <button className="btn" aria-pressed={playing === a} onClick={() => perform1(a)}>
+                  {ANIMATIONS[a].name}
+                </button>
+                <span className="muted">{ANIMATIONS[a].when}</span>
+              </div>
+            ))}
+          </section>
+
+          <section aria-labelledby="lab-activity-animations">
+            <h2 id="lab-activity-animations" className="lab-h">Animations: activity</h2>
+            <div className="lab-row">
+              <label htmlFor="lab-chats">Show it in a direct and a team chat</label>
+              <Switch id="lab-chats" checked={chats} onChange={setChats} />
+            </div>
+            {group("activity").map((a) => (
+              <div key={a} className="lab-animation">
+                <button className="btn" aria-pressed={playing === a} onClick={() => perform1(a)}>
                   {ANIMATIONS[a].name}
                 </button>
                 <span className="muted">{ANIMATIONS[a].when}</span>
@@ -188,10 +218,36 @@ export default function SprocketLab() {
           </section>
         </div>
 
-        <div className={"lab-stage" + (all ? " all" : "")}>
-          {shown.map((c) => (
-            <Sprocket key={c} look={{ character: c, color }} size={Number(size)} stance={stance} follow={follow} activity={playing ? ANIMATIONS[playing].activity : activity} label={CHARACTERS[c].name} onRig={track(c)} />
-          ))}
+        <div className="lab-stages">
+          <div className={"lab-stage" + (all ? " all" : "")}>
+            {shown.map((c) => (
+              <Sprocket key={c} look={{ character: c, color }} size={Number(size)} stance={stance} follow={follow} activity={activity} label={CHARACTERS[c].name} onRig={track(c)} />
+            ))}
+          </div>
+          {chats && (
+            <div className="lab-chats">
+              <figure className="lab-chat">
+                <figcaption className="muted">Direct chat: its row and the icon by a reply in flight are one drawing, so they move exactly alike.</figcaption>
+                <div className="lab-chat-row">
+                  <Sprocket id="lab-direct" look={{ character, color }} size={50} stance="rest" activity={activity} onRig={track("direct")} />
+                  <span>{CHARACTERS[character].name}</span>
+                </div>
+                <div className="lab-chat-flight">
+                  <svg className="lab-flight" viewBox={`0 0 50 ${(50 * VIEW.h) / VIEW.w}`} aria-hidden>
+                    <use href="#lab-direct" />
+                  </svg>
+                  <span className="muted">{CHARACTERS[character].name} is thinking…</span>
+                </div>
+              </figure>
+              <figure className="lab-chat">
+                <figcaption className="muted">Team chat: the icon goes through the members thinking on its own, apart from their rows.</figcaption>
+                <div className="lab-chat-flight">
+                  <TeamThinking looks={SPROCKET_CHARACTERS.slice(0, 3).map((c, i) => ({ id: c, look: { character: c, color: SPROCKET_COLORS[(SPROCKET_COLORS.indexOf(color) + i) % SPROCKET_COLORS.length] } }))} size={26} />
+                  <span className="muted">{SPROCKET_CHARACTERS.slice(0, 3).map((c) => CHARACTERS[c].name).join(", ")} are thinking…</span>
+                </div>
+              </figure>
+            </div>
+          )}
         </div>
       </div>
     </div>

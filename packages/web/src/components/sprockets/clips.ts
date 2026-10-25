@@ -8,6 +8,15 @@ const between = (rand: Rand, a: number, b: number) => a + rand() * (b - a);
 const side = (rand: Rand) => (rand() < 0.5 ? -1 : 1);
 const pick = <T,>(r: Rand, xs: readonly T[]): T => xs[Math.floor(r() * xs.length)];
 
+/** One eye's change from how it's drawn: moved (`dx`, `dy`, viewBox units) and sized (`sx`, `sy`) about its centre. */
+export interface EyeShape {
+  dx: number;
+  dy: number;
+  sx: number;
+  sy: number;
+}
+export const OPEN: EyeShape = { dx: 0, dy: 0, sx: 1, sy: 1 };
+
 // ---- moves ----
 
 /** How a key is reached from the one before: `out` slows into it (rising to the top of a hop), `in` speeds into it
@@ -20,8 +29,11 @@ export type Key = [t: number, v: number, ease?: Ease];
  * Body motion as keyframed tracks, played straight off the clock rather than through springs, so what has to happen
  * together does: it squashes the moment it lands, and stretches as it leaves the ground. On top of the pose: `hop`
  * (viewBox units up), `squash` (its width, 1 as drawn; its height is the inverse, so it keeps its volume), `tip`
- * (degrees, + chin up), `shift` (viewBox units, + right), `turn` and `roll` (degrees, + to the viewer's right) and
- * `look` (where the eyes look across, -1 to 1). Each track starts and ends at rest (1 for squash, 0 for the rest).
+ * (degrees, + chin up), `shift` (viewBox units, + right), `turn` and `roll` (degrees, + to the viewer's right), `near`
+ * (how close it comes, 1 as drawn), and where the eyes look (`look` across, `lookY` down, -1 to 1). Each track starts
+ * and ends at rest (1 for squash and near, 0 for the rest). `eyes` holds a face from each key's time on, blending into
+ * it over FACE_MS (end on `open`); `blinks` are when it blinks, its only blinks while it plays (none if left out), so
+ * a blink never lands on a face it didn't plan for, and two Sprockets playing it stay exactly alike.
  */
 export interface Moves {
   hop?: Key[];
@@ -30,7 +42,52 @@ export interface Moves {
   shift?: Key[];
   turn?: Key[];
   roll?: Key[];
+  near?: Key[];
   look?: Key[];
+  lookY?: Key[];
+  eyes?: [t: number, face: FaceName][];
+  blinks?: number[];
+}
+
+/** A face held for a while: each eye's shape, and whether it's the happy arcs or dilated circles. */
+export interface Face {
+  left: EyeShape;
+  right: EyeShape;
+  happy?: boolean;
+  round?: boolean;
+}
+const both = (s: Partial<EyeShape>): Face => ({ left: { ...OPEN, ...s }, right: { ...OPEN, ...s } });
+/** How long a face takes to blend into the next. */
+export const FACE_MS = 220;
+export const FACES = {
+  open: both({}),
+  /** Surprised: wide open. */
+  wide: both({ sx: 1.15, sy: 1.12 }),
+  /** Concentrating: narrowed, a touch raised. */
+  squint: both({ dy: -1, sx: 1.45, sy: 0.3 }),
+  /** Calm: half shut, settled lower. */
+  calm: both({ dy: 4, sx: 1.25, sy: 0.38 }),
+  /** Sleepy: nearly shut, drooping. */
+  sleepy: both({ dy: 5, sx: 1.06, sy: 0.2 }),
+  /** Curious, inspecting: one eye big, the other small. */
+  curious: { left: { ...OPEN, sx: 1.22, sy: 1.18 }, right: { ...OPEN, dy: 1, sx: 0.78, sy: 0.72 } },
+  /** Puzzled: one eye open, the other narrowed and raised. */
+  puzzled: { left: { ...OPEN, sx: 0.95, sy: 1.05 }, right: { ...OPEN, dy: -3, sx: 1.4, sy: 0.32 } },
+  /** Down: low and a little smaller. */
+  down: both({ dy: 5, sx: 0.92, sy: 0.7 }),
+  happy: { ...both({}), happy: true },
+  round: { ...both({}), round: true },
+} satisfies Record<string, Face>;
+export type FaceName = keyof typeof FACES;
+
+/** The face `t` ms into a list of face keys, blended from the one before. */
+export function faceAt(keys: [number, FaceName][], t: number): { face: Face; name: FaceName; from: Face; mix: number } {
+  let i = -1;
+  while (i + 1 < keys.length && keys[i + 1][0] <= t) i++;
+  const name = i < 0 ? "open" : keys[i][1];
+  const from = i < 1 ? FACES.open : FACES[keys[i - 1][1]];
+  const mix = i < 0 ? 1 : EASES.both(Math.min(1, (t - keys[i][0]) / FACE_MS));
+  return { face: FACES[name], name, from, mix };
 }
 
 const EASES: Record<Ease, (x: number) => number> = {
@@ -66,6 +123,188 @@ export const NOD: Moves = {
     [1405, 1.07, "out"], [1630, 0.95], [1850, 1.03], [2050, 0.99], [2250, 1], // lands, and the jelly wobble
   ],
   tip: [[0, 0], [150, -5, "out"], [430, 9], [710, -8, "out"], [930, 5], [1140, -5, "out"], [1260, 2], [1400, -3, "out"], [1750, 0]],
+};
+
+// ---- idle moves (animations.ts): now and then while it rests ----
+
+/** Breathing: it comes a little closer, glances one way and the other, and settles back, blinking twice. */
+export const BREATHE: Moves = {
+  near: [[0, 1], [900, 1], [1600, 1.07], [3000, 1.07], [3800, 1]],
+  turn: [[0, 0], [900, 0], [1600, -9], [2500, 6], [3450, 0]],
+  roll: [[0, 0], [900, 0], [1600, -3], [2500, 2], [3450, 0]],
+  look: [[0, 0], [900, 0], [1500, -0.5], [2400, 0.45], [3400, 0]],
+  blinks: [1480, 3460],
+};
+
+/** Looking around: up to one side, down to the other, up again, then all the way round to face you. */
+export const LOOK_AROUND: Moves = {
+  turn: [[0, 0], [500, 0], [1400, -32], [1800, -30], [2750, 14], [2930, 6], [4080, 32], [5750, 360]],
+  tip: [[0, 0], [500, 0], [1400, 14], [1800, 12], [2750, -9], [2930, -16], [4080, 18], [5750, 0]],
+  roll: [[0, 0], [500, 0], [1400, -10], [1800, -11], [2750, 10], [2930, 5], [4080, 14], [5750, 0]],
+  shift: [[0, 0], [500, 0], [1400, -11], [1800, -11], [2750, -5], [2930, -5], [4080, 0]],
+  near: [[0, 1], [2400, 1], [2800, 0.96], [3300, 1]],
+  look: [[0, 0], [500, 0], [1300, -0.8], [1800, -0.8], [2700, 0.5], [3000, 0.3], [4000, 0.7], [5000, 0.6], [5600, 0]],
+  lookY: [[0, 0], [500, 0], [1300, -0.6], [1800, -0.6], [2700, 0.6], [3000, 0.5], [4000, -0.4], [5600, 0]],
+  blinks: [1160, 4000],
+};
+
+/** Daydreaming: calm eyes, gazing up and away, drifting from one side to the other, with slow blinks. */
+export const DAYDREAM: Moves = {
+  tip: [[0, 0], [600, 18], [1100, 20], [2000, 6], [2700, 6], [3900, 10], [4800, 10], [5700, 0]],
+  turn: [[0, 0], [600, 16], [1100, 17], [2000, 3], [2700, 3], [3900, 32], [4800, 32], [5700, 0]],
+  roll: [[0, 0], [600, 12], [1100, 14], [2000, 12], [2700, 12], [3900, 20], [4800, 20], [5700, 0]],
+  look: [[0, 0], [600, 0.5], [1100, 0.5], [2000, 0.1], [2700, 0.1], [3900, 0.7], [4800, 0.7], [5600, 0]],
+  lookY: [[0, 0], [600, -0.8], [1100, -0.8], [2000, -0.3], [3900, -0.5], [5600, 0]],
+  eyes: [[300, "calm"], [5300, "open"]],
+  blinks: [600, 2070, 2370, 4250],
+};
+
+/** Dozing off: its eyes droop, its head nods down twice, then it jolts awake with a little hop. */
+export const DOZE: Moves = {
+  eyes: [[200, "calm"], [1400, "sleepy"], [4300, "wide"], [5400, "open"]],
+  tip: [[0, 0], [1400, -6], [2600, -14, "in"], [2900, -4, "out"], [3900, -16, "in"], [4300, 4, "out"], [5000, 0]],
+  roll: [[0, 0], [2600, -5], [3900, 6], [4300, 0]],
+  near: [[0, 1], [2500, 0.97], [4300, 1], [4420, 1.04, "out"], [5200, 1]],
+  squash: [[0, 1], [2600, 1.05], [2900, 1], [3900, 1.06], [4300, 0.9, "out"], [4600, 1.05], [4850, 0.98], [5100, 1]],
+  hop: [[0, 0], [4280, 0], [4450, 6, "out"], [4650, 0, "in"]],
+  blinks: [5650],
+};
+
+/** Humming to itself: calm eyes, chin up, rocking to a beat with a little dip on each one. */
+export const HUM: Moves = (() => {
+  const BEAT = 500;
+  const m: Required<Pick<Moves, "roll" | "turn" | "squash" | "tip" | "eyes" | "blinks">> = { roll: [[0, 0]], turn: [[0, 0]], squash: [[0, 1]], tip: [[0, 0], [500, 6], [3300, 6], [3800, 0]], eyes: [[150, "calm"], [3700, "open"]], blinks: [] };
+  for (let i = 0; i < 7; i++) {
+    const [t, side] = [250 + i * BEAT, i % 2 ? 1 : -1];
+    m.roll.push([t, side * 7]);
+    m.turn.push([t, side * 6]);
+    m.squash.push([t - 120, 1], [t, 1.04, "out"], [t + 150, 1]);
+  }
+  m.roll.push([3800, 0]);
+  m.turn.push([3800, 0]);
+  return m;
+})();
+
+/** A stretch, like a yawn: it squashes down, stretches up tall with its eyes squeezed, then shakes out. */
+export const STRETCH: Moves = {
+  squash: [[0, 1], [400, 1.1, "out"], [1300, 0.84], [2100, 0.84], [2350, 1.06, "out"], [2550, 0.97], [2750, 1.02], [2950, 1]],
+  tip: [[0, 0], [400, -6], [1300, 16], [2100, 16], [2400, -3], [2800, 0]],
+  roll: [[0, 0], [1300, -4], [1700, 4], [2100, 0], [2300, -3], [2500, 2], [2700, 0]],
+  eyes: [[350, "squint"], [2200, "open"]],
+  blinks: [2650],
+};
+
+// ---- activity moves (animations.ts): while it works on a message, or as one lands ----
+
+/** Streaming a reply: a nod down and up, then drifting to one side and the other as the words come. */
+export const STREAM: Moves = {
+  tip: [[0, 0], [350, -9], [580, 14], [830, -4], [1220, 0], [1620, 5], [2060, 2], [2590, 0]],
+  turn: [[0, 0], [1220, 0], [1620, 15], [2060, -11], [2590, 0]],
+  roll: [[0, 0], [830, 4], [1220, 0], [1620, -3], [2060, 18], [2590, 0]],
+  shift: [[0, 0], [1220, 0], [1620, 10], [2060, -11], [2590, 0]],
+  hop: [[0, 0], [350, 0], [590, 4, "out"], [830, 0, "in"]],
+  squash: [[0, 1], [350, 1.05], [590, 0.97], [830, 1]],
+  look: [[0, 0], [1220, 0], [1620, 0.6], [2060, -0.6], [2590, 0]],
+  lookY: [[0, 0], [350, 0.4], [580, -0.3], [830, 0]],
+};
+
+/** Focusing: tipped down over its work with its eyes narrowed, floating side to side, then a turn all the way round. */
+export const FOCUS: Moves = {
+  eyes: [[90, "squint"], [2150, "open"]],
+  tip: [[0, 0], [300, -18], [2000, -18], [2380, 0]],
+  roll: [[0, 0], [700, -12], [1300, 12], [2000, -4], [2380, 0]],
+  turn: [[0, 0], [700, 8], [1300, -2], [2380, 360]],
+  shift: [[0, 0], [700, 12], [1300, -12], [2380, 0]],
+  hop: [[0, 0], [700, 8], [1300, 8], [2380, 0]],
+  lookY: [[0, 0], [300, 0.6], [2000, 0.6], [2380, 0]],
+};
+
+/** An idea: it ponders up and to one side, then its eyes go wide with a little hop, and it looks about, pleased. */
+export const IDEA: Moves = {
+  turn: [[0, 0], [620, 0], [1420, -26], [2270, -4], [2800, 1], [3270, -17], [3840, 13], [3980, 0]],
+  tip: [[0, 0], [620, 0], [1420, 3], [2270, 26], [2800, 24], [3270, 18], [3840, 10], [3980, 0]],
+  roll: [[0, 0], [620, 0], [1420, -3], [2270, 22], [2800, 5], [3270, -7], [3840, 17], [3980, 0]],
+  shift: [[0, 0], [620, 0], [1420, -12], [2270, -12], [3160, 0]],
+  hop: [[0, 0], [2270, 0], [2450, 5, "out"], [2650, 0, "in"]],
+  squash: [[0, 1], [2200, 1], [2300, 1.08, "out"], [2450, 0.94], [2650, 1.04], [2850, 1]],
+  look: [[0, 0], [1400, -0.6], [2270, -0.3], [3270, -0.4], [3840, 0.4], [3980, 0]],
+  lookY: [[0, 0], [1400, 0], [2270, -0.8], [3270, -0.5], [3980, 0]],
+  eyes: [[2240, "wide"], [3700, "open"]],
+  blinks: [900, 3300],
+};
+
+/** Inspecting: one eye big, it tilts its head right over, backs off to look again from the other side, then spins round. */
+export const INSPECT: Moves = {
+  eyes: [[750, "curious"], [2560, "wide"], [3760, "open"]],
+  roll: [[0, 0], [180, 0], [1410, -32], [2750, 22], [3300, 22], [3900, 6], [4780, 0]],
+  turn: [[0, 0], [180, 0], [1410, -16], [2750, 16], [3300, 32], [3900, -270], [4780, -360]],
+  tip: [[0, 0], [1410, -2], [2750, 4], [4780, 0]],
+  shift: [[0, 0], [180, 0], [1410, -9], [2750, 9], [4780, 0]],
+  near: [[0, 1], [180, 1], [1410, 0.74], [2250, 0.88], [2990, 1.03], [4610, 1]],
+  look: [[0, 0], [1410, -0.6], [2750, 0.6], [3300, 0.5], [3900, 0]],
+  blinks: [1200, 3500],
+};
+
+/** Rummaging: tipped over and rocking hard from side to side, eyes wide, as if digging through something. */
+export const RUMMAGE: Moves = (() => {
+  const m: Required<Pick<Moves, "roll" | "turn" | "tip" | "shift" | "squash" | "eyes" | "lookY">> = { roll: [[0, 0]], turn: [[0, 0]], tip: [[0, 0]], shift: [[0, 0]], squash: [[0, 1]], eyes: [[0, "wide"], [4700, "open"]], lookY: [[0, 0], [300, 0.5], [4600, 0.5], [5000, 0]] };
+  [170, 1510, 1800, 3130, 3410, 4780].forEach((t, i) => {
+    const side = i % 2 ? 1 : -1;
+    m.roll.push([t, side * 33]);
+    m.turn.push([t, side * 7]);
+    m.tip.push([t, -16]);
+    m.shift.push([t, side * 6]);
+    m.squash.push([t - 60, 1], [t + 60, 1.05, "out"], [t + 220, 1]);
+  });
+  for (const k of [m.roll, m.turn, m.tip, m.shift]) k.push([5000, 0]);
+  return m;
+})();
+
+/** Noticing: its eyes pop wide and it jiggles like jelly, with a tiny hop. */
+export const NOTIFY: Moves = {
+  eyes: [[80, "wide"], [1100, "open"]],
+  squash: [[0, 1], [230, 1.13], [450, 0.92], [680, 1.05], [900, 0.99], [1080, 1]],
+  hop: [[0, 0], [450, 0], [560, 3, "out"], [680, 0, "in"]],
+};
+
+/** Puzzled: it turns aside, shakes its head with one eye narrowed, backing off a little, and settles. */
+export const PUZZLED: Moves = {
+  eyes: [[470, "puzzled"], [1610, "open"]],
+  turn: [[0, 0], [390, 26], [750, -14], [870, 14], [1050, -9], [1300, 14], [1760, 0]],
+  tip: [[0, 0], [390, -6], [750, -4], [870, -10], [1050, -8], [1300, -10], [1760, 0]],
+  roll: [[0, 0], [390, 6], [750, -8], [870, 7], [1050, -8], [1300, 7], [1760, 0]],
+  shift: [[0, 0], [390, 2], [750, -10], [870, 0], [1050, -9], [1300, 0], [1760, 0]],
+  near: [[0, 1], [390, 1], [1150, 0.85], [1900, 1]],
+};
+
+/** Down: sad eyes, its head sinking and backing away, then slowly back up. */
+export const DROOP: Moves = {
+  eyes: [[0, "down"], [2700, "open"]],
+  tip: [[0, 0], [1260, -18], [2400, -18], [2900, 0]],
+  roll: [[0, 0], [1260, -2], [2900, 0]],
+  near: [[0, 1], [1260, 0.92], [2400, 0.92], [2900, 1]],
+  squash: [[0, 1], [1260, 1.05], [2400, 1.05], [2900, 1]],
+  blinks: [1700],
+};
+
+/** Hooray: happy eyes, it floats up and sways from one side to the other with its chin up, then lands with a bounce. */
+export const HOORAY: Moves = {
+  eyes: [[0, "happy"], [1300, "open"]],
+  tip: [[0, 0], [380, 22], [940, 22], [1400, -12], [1590, 4], [1760, -7], [1960, 0]],
+  turn: [[0, 0], [380, -6], [940, 14], [1400, 0]],
+  roll: [[0, 0], [380, 14], [940, -13], [1400, -2], [1960, 0]],
+  shift: [[0, 0], [380, -9], [940, 9], [1380, 0]],
+  hop: [[0, 0], [380, 10, "out"], [940, 13], [1380, 0, "in"], [1580, 3, "out"], [1750, 0, "in"]],
+  squash: [[0, 1], [150, 1.06], [380, 0.94], [940, 0.95], [1380, 1], [1420, 1.08, "out"], [1600, 0.97], [1800, 1]],
+};
+
+/** A twirl: happy eyes, chin up, two slow turns all the way round. */
+export const TWIRL: Moves = {
+  eyes: [[0, "happy"], [2700, "open"]],
+  turn: [[0, 0], [2800, 720]],
+  tip: [[0, 0], [700, 12], [2200, 12], [2800, 0]],
+  roll: [[0, 0], [700, 10], [2200, 10], [2800, 0]],
+  hop: [[0, 0], [250, 5, "out"], [700, 0, "in"]],
 };
 
 // ---- gestures ----
@@ -182,7 +421,7 @@ export const SPIN_MS = 700;
 export const DANCE: Moves = (() => {
   const hops: [to: number, up: number, air: number][] = [[-11, 15, 440], [11, 14, 440], [-11, 12, 420], [0, 8, 360]];
   const LAND = 60; // on the ground between hops: a quick squash
-  const m: Required<Moves> = { hop: [[0, 0], [160, 0]], squash: [[0, 1], [150, 1.1, "out"], [160, 1.08]], tip: [[0, 0], [150, -4, "out"]], shift: [[0, 0]], turn: [[0, 0]], roll: [[0, 0]], look: [[0, 0]] };
+  const m: Required<Pick<Moves, "hop" | "squash" | "tip" | "shift" | "turn" | "roll" | "look">> = { hop: [[0, 0], [160, 0]], squash: [[0, 1], [150, 1.1, "out"], [160, 1.08]], tip: [[0, 0], [150, -4, "out"]], shift: [[0, 0]], turn: [[0, 0]], roll: [[0, 0]], look: [[0, 0]] };
   let [t, at] = [160, 0];
   for (const [to, up, air] of hops) {
     const dir = Math.sign(to - at);
@@ -237,14 +476,6 @@ export const LEAN_GLANCE = { turn: [-30, -20], slide: -6, aim: -0.6 } as const;
 
 // ---- the eyes ----
 
-/** One eye's change from how it's drawn: moved (`dx`, `dy`, viewBox units) and sized (`sx`, `sy`) about its centre. */
-export interface EyeShape {
-  dx: number;
-  dy: number;
-  sx: number;
-  sy: number;
-}
-export const OPEN: EyeShape = { dx: 0, dy: 0, sx: 1, sy: 1 };
 
 /** A cubic-bezier timing curve, as CSS defines it. */
 function bezier(x1: number, y1: number, x2: number, y2: number): (t: number) => number {

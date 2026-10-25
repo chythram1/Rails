@@ -42,3 +42,24 @@ throwaway page and a strip of screenshots.
 - Reduced motion is one input (`faceOnly`): the pose holds and only blinks and happy eyes move, as before.
 - A new animation is an entry in `animations.ts` built from parts in `clips.ts`, checked in the lab, whose
   Animations section lists only the finished ones.
+
+## Amendment (2026-10-25): idle and activity animations
+
+Animations come in two kinds (`kind` in `animations.ts`), after watching a Grok bot live (its clip table and
+frames; numbers are Grok's, Rails' animations use their own values):
+
+- **Idle**: played now and then while a Sprocket rests (Breathe, Look around, Daydream, Doze, Hum, Stretch).
+  Given a list (`setIdles`), a resting rig plays them on a Grok bot's timing: a beat to settle first
+  (`IDLE_FIRST`, 1.5–3 s), then one straight after another with half a second still between (`IDLE_GAP`),
+  weighted (Breathe most), the rarer ones never twice running; anything to do stops them at once.
+- **Activity**: while it works on a message (in flight: Stream, Focus, Idea, Inspect, Rummage, and Survey) or as
+  something lands (alerts: Cheer, Satisfied, Notify, Puzzled, Droop, Hooray, Twirl). In flight and alerts are one
+  set; what differs is the chat. In a direct chat the icon by a reply in flight and the Sprocket's row are one
+  drawing (`<use>` of the row's SVG, its `id`), so they move exactly alike. In a team chat the thinking icon is
+  its own Sprocket, going through the members thinking, apart from their rows.
+
+Moves gained `near`, `lookY`, held faces (`eyes`: named shapes in `FACES`, blending over `FACE_MS`) and their own
+`blinks`: while an animation with moves plays, those are its only blinks, so a blink never lands on a face it
+didn't plan for. The new animations are in the lab only (its Idle and Activity groups, a switch to idle now and
+then, and a panel showing the direct mirror and the team icon); where each plays in the app is still to decide.
+
