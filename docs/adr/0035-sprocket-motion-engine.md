@@ -80,3 +80,13 @@ to decide.
 - A team chat no longer cheers beside a member's new message; the face there stays still.
 - `Sprocket` takes `play` (an animation by name, once per key) and `idles`.
 
+## Amendment (2026-10-25, later still): resting rows
+
+A Grok bot's row pauses once nothing's going on: its state stays "finished" for 8 s after a turn settles, then
+idle, and 1.4 s later the drawing pauses in its resting pose; hovering wakes it. Rails' rows do the same
+(`resting` on `Sprocket`, `setResting` in `engine.ts`): from 9.4 s after a reply settles (`REST_AFTER`), and from
+the start, a row holds the pose it has beside its messages (`REST_POSE`, `toward`), with no blinks or glances, so
+the loop sleeps. Resting never cuts an animation short: a done or idle one plays out first. Following the pointer
+wakes it; a focused row faces you. The two-minute idle window this replaces is gone, and an open chat's row no
+longer faces you: it rests like the others.
+

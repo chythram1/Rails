@@ -214,19 +214,19 @@ function SprocketList(props: {
  * A Sprocket in the list, by its character and name. It opens its project chat when it has one (ADR 0021), its
  * direct chat otherwise; the line under its name is the newer of the two, and the dot shows replies waiting in either.
  */
-/** How long a row idles after its Sprocket last worked, before it holds still again (ms). */
-const IDLE_FOR = 120_000;
+/** How long after its reply settles a row rests, holding the pose it has beside its messages (ms): as a Grok bot's
+ * row, whose state stays "finished" for 8 s, then lingers 1.4 s before it pauses. */
+const REST_AFTER = 9_400;
 
 function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; teams: SprocketTeam[]; active: boolean }) {
-  // Its character holds still in the list. It comes alive while the pointer is on it (following the pointer), it has
-  // focus or its chat is open (facing you), and it's working on a reply in any of its chats, from about a second after
-  // it starts: in a team it surveys; otherwise, as the icon by its reply (the same drawing, ADR 0035), it becomes
-  // three dots while it thinks, inspects or rummages at each tool step, and streams as it types. Once its reply is
-  // done it plays a done animation by how it ended (doneFor), then idles for a while (IDLE_FOR) before it holds still
-  // again, as a Grok bot's row does.
+  // Its character rests in the list, holding the pose it has beside its messages, still (as a Grok bot's row does,
+  // ADR 0035). It comes alive while the pointer is on it (following the pointer) or it has focus (facing you), and
+  // while it's working on a reply in any of its chats, from about a second after it starts: in a team it surveys;
+  // otherwise, as the icon by its reply (the same drawing), it becomes three dots while it thinks, inspects or
+  // rummages at each tool step, and streams as it types. Once its reply is done it plays a done animation by how it
+  // ended (doneFor), then idles until REST_AFTER from then. Resting waits for what's playing to finish.
   const [hover, setHover] = useState(false);
   const [focus, setFocus] = useState(false);
-  const [awake, setAwake] = useState(active);
   const chats = [s.direct, ...(s.projectChat ? [s.projectChat] : [])];
   const mine = teams.filter((t) => t.members.includes(s.id));
   const talking = mine.some((t) => t.replying.includes(s.id)); // writing in a team: it surveys (animations.ts)
@@ -245,27 +245,10 @@ function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; t
   const done = newest ? doneFor(newest) : undefined;
   const ending = usePlaying(newest?.id, done ? ANIMATIONS[done].ms : 0);
   const flight = useFlight(s.id, busy && !talking);
-  // Still until it has done something; then it idles for a while after each time.
-  const [idleUntil, setIdleUntil] = useState(0);
-  const did = useRef(false);
-  useEffect(() => {
-    if (working) did.current = true;
-    else if (did.current) setIdleUntil(Date.now() + IDLE_FOR);
-  }, [working]);
-  const [, tick] = useState(0);
-  useEffect(() => {
-    if (idleUntil <= Date.now()) return;
-    const t = setTimeout(() => tick((n) => n + 1), idleUntil - Date.now());
-    return () => clearTimeout(t);
-  }, [idleUntil]);
-  const idling = !working && !hover && idleUntil > Date.now();
-  const facing = focus || active;
-  const live = hover || facing || busy || ending || idling;
-  useEffect(() => {
-    if (live) return setAwake(true);
-    const t = setTimeout(() => setAwake(false), 700);
-    return () => clearTimeout(t);
-  }, [live]);
+  // Settled: its reply landed, or its work ended. It idles from then until it rests.
+  const settled = useSettled(newest?.id, working);
+  const idling = !working && !ending && !hover && settled;
+  const live = hover || focus || busy || ending || idling;
   const latest = chats.reduce((a, b) => ((b.lastMessage?.createdAt ?? "") > (a.lastMessage?.createdAt ?? "") ? b : a));
   const shown: SprocketChatInfo = { ...latest, running: chats.some((c) => c.running), pending: chats.reduce((n, c) => n + c.pending, 0) };
   return (
@@ -283,17 +266,41 @@ function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; t
         id={rowId(s.id)}
         look={s.look}
         size={50}
-        still={!awake}
-        stance={facing ? "front" : "rest"}
+        stance={focus ? "front" : "rest"}
         follow={hover && !busy && !ending}
         activity={busy && talking ? "talk" : "idle"}
         dots={flight.dots}
         play={ending && newest && done ? { name: done, key: newest.id } : flight.play}
         idles={idling}
+        resting={!live}
       />
       <RowText name={s.name} chat={shown} />
     </a>
   );
+}
+
+/** True for REST_AFTER from each time `key` (its newest message) changes or `working` ends: its reply has just
+ * settled. */
+function useSettled(key: string | undefined, working: boolean): boolean {
+  const first = useRef(key);
+  const [at, setAt] = useState(0);
+  const was = useRef(working);
+  useEffect(() => {
+    if (key !== first.current) setAt(Date.now());
+    first.current = key;
+  }, [key]);
+  useEffect(() => {
+    if (was.current && !working) setAt(Date.now());
+    was.current = working;
+  }, [working]);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const left = at + REST_AFTER - Date.now();
+    if (left <= 0) return;
+    const t = setTimeout(() => tick((n) => n + 1), left);
+    return () => clearTimeout(t);
+  }, [at]);
+  return Date.now() < at + REST_AFTER;
 }
 
 /** A team chat (ADR 0022): its members' characters (the lead in front), its name, and the last line with who wrote it. */

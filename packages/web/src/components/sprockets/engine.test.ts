@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { IDLE_FIRST, IDLE_GAP, advance, createRig, express, perform, setIdles, setInput, type Activity, type Frame, type Input, type Rig } from "./engine.ts";
+import { IDLE_FIRST, IDLE_GAP, REST_POSE, advance, createRig, express, perform, setIdles, setInput, setResting, type Activity, type Frame, type Input, type Rig } from "./engine.ts";
 import { ANIMATIONS, IDLES } from "./animations.ts";
 import { BLINK_MS, FACES, FACE_MS, faceAt, lidAt } from "./clips.ts";
 import { POSES, poseOf, type Stance } from "./solid.ts";
@@ -246,4 +246,51 @@ describe("a Sprocket's motion engine", () => {
       expect(last.happy, a.name).toBeLessThan(0.05);
     }
   });
+
+  it("resting: it holds the pose it has beside its messages, still, not blinking, until it's woken", () => {
+    const r = rig(input("idle"));
+    setResting(r, true, r.clock);
+    run(r, 3000);
+    let [lid, moving] = [0, false];
+    let last: Frame | undefined;
+    for (let t = r.clock + 16, end = r.clock + 20_000; t <= end; t += 16) {
+      const out = advance(r, t, null);
+      lid = Math.max(lid, out.frame.lid);
+      moving ||= out.moving;
+      last = out.frame;
+    }
+    expect(lid).toBe(0); // no blinks
+    expect(moving).toBe(false); // nothing to draw: the loop sleeps
+    expect(last!.pose.yaw).toBeCloseTo(POSES[REST_POSE].yaw, 0);
+    expect(last!.pose.pitch).toBeCloseTo(POSES[REST_POSE].pitch, 0);
+    setResting(r, false, r.clock);
+    let blinked = false;
+    run(r, 8000, (f) => (blinked ||= f.lid > 0.5));
+    expect(blinked).toBe(true);
+  });
+
+  it("resting waits for what's playing: a done animation or an idle one plays out first", () => {
+    const r = rig(input("idle"));
+    perform(r, ANIMATIONS.cheer, r.clock);
+    run(r, 300);
+    setResting(r, true, r.clock);
+    let happy = 0;
+    run(r, 1500, (f) => (happy = Math.max(happy, f.happy)));
+    expect(happy).toBeGreaterThan(0.9); // still cheering
+    const settled = run(r, 4000);
+    expect(settled.happy).toBeLessThan(0.05);
+    expect(settled.pose.yaw).toBeCloseTo(POSES[REST_POSE].yaw, 0);
+  });
+
+  it("following the pointer wakes a resting Sprocket, and it settles back after", () => {
+    const r = rig(input("idle"));
+    setResting(r, true, r.clock);
+    run(r, 3000);
+    setInput(r, input("idle", "rest", { follow: true }), r.clock);
+    const looking = run(r, 1500, () => {}, [-1, 0]);
+    expect(looking.pose.yaw).toBeLessThan(-20);
+    setInput(r, input("idle"), r.clock);
+    expect(run(r, 3000).pose.yaw).toBeCloseTo(POSES[REST_POSE].yaw, 0);
+  });
 });
+

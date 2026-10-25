@@ -82,6 +82,9 @@ export interface Rig {
   nextBlink: number;
   /** A pose held on purpose, over its stance and gestures (the lab's sliders). */
   hold: Partial<Pick<Pose, "yaw" | "pitch" | "roll" | "near">> | null;
+  /** Resting: with nothing going on, once what's playing is over it holds the pose it has beside its messages
+   * (REST_POSE), not blinking or glancing, until it's woken (setResting), as a Grok bot's row does. */
+  resting: boolean;
 }
 
 const NEVER = Infinity;
@@ -134,6 +137,7 @@ export function createRig(input: Input, from: Pose, now: number, rand: Rand = Ma
     blink: null,
     nextBlink: now + between(rand, 2000, 5500),
     hold: null,
+    resting: false,
   };
   begin(r, now);
   return r;
@@ -170,6 +174,25 @@ export function perform(r: Rig, a: Animation, now: number) {
   if (!r.input.faceOnly && a.gesture) play(r, a.name, a.gesture, now);
 }
 
+/** Resting, with nothing left playing: holding REST_POSE, still (following the pointer wakes it). */
+const still = (r: Rig) => r.resting && !r.anim && !r.gesture && !r.input.follow;
+
+/** The pose a resting Sprocket holds: the one it has beside its messages. */
+export const REST_POSE: Stance = "toward";
+
+/** Rest (see Rig.resting), or wake. Resting never cuts what's playing short: an animation, a done one or an idle one,
+ * plays out first. */
+export function setResting(r: Rig, on: boolean, now: number) {
+  if (r.resting === on) return;
+  r.resting = on;
+  if (on) {
+    r.nextGlance = r.nextLean = r.nextIdle = NEVER;
+    return;
+  }
+  r.nextBlink = now + between(r.rand, 800, 2500);
+  if (!r.anim && !r.gesture) rest(r, now);
+}
+
 /** Let it play these idle animations now and then while resting (null: never). */
 export function setIdles(r: Rig, idles: Animation[] | null, now: number) {
   r.idles = idles;
@@ -189,7 +212,7 @@ function clear(r: Rig) {
 
 /** Rest: at its resting stance, and not following the pointer, it glances aside now and then and leans in gently. */
 function rest(r: Rig, now: number) {
-  if (r.input.follow) return;
+  if (r.input.follow || r.resting) return;
   // Idle animations play in any stance (an open chat's row faces you); glances and leaning in only at rest.
   if (r.idles?.length && r.input.activity === "idle") {
     const [a, b] = r.lastIdle ? IDLE_GAP : IDLE_FIRST;
@@ -250,7 +273,7 @@ function direct(r: Rig, now: number) {
   }
   // Blinks, even with only the face moving; sometimes two together. Not while an animation plays its own (above), nor
   // with happy eyes: the ^ ^ are already shut.
-  if (now >= r.nextBlink) {
+  if (now >= r.nextBlink && !still(r)) {
     if (r.anim?.eyes !== "happy" && !scripted) r.blink = now;
     r.nextBlink = now + (r.rand() < 0.2 ? 420 : between(r.rand, 2000, 5500));
   }
@@ -333,7 +356,7 @@ export function advance(r: Rig, now: number, pointer: [number, number] | null): 
   r.clock = now;
   direct(r, now);
   const { stance, activity, follow } = r.input;
-  const base = POSES[stance];
+  const base = POSES[still(r) ? REST_POSE : stance];
   const s = r.springs;
   const watching = follow && pointer ? pointer : null;
   const [px, py] = watching ?? [0, 0];
@@ -387,6 +410,6 @@ export function advance(r: Rig, now: number, pointer: [number, number] | null): 
     happy: Math.min(1, Math.max(0, s.happy.x)),
   };
   if (e || r.blink !== null) moving = true;
-  const due = [r.nextBlink, r.nextGlance, r.nextLean, r.nextIdle, r.gesture?.at ?? NEVER, r.lean?.at ?? NEVER, r.anim?.until ?? NEVER];
+  const due = [still(r) ? NEVER : r.nextBlink, r.nextGlance, r.nextLean, r.nextIdle, r.gesture?.at ?? NEVER, r.lean?.at ?? NEVER, r.anim?.until ?? NEVER];
   return { frame, moving, wake: Math.max(0, Math.min(...due) - now) };
 }
