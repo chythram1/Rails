@@ -47,13 +47,14 @@ drawings and their pop-in and wobble motion went with them.
 
 Amendment (2026-10-24, later): Sprockets are solids that turn. Characters bobbed and swayed all the time and only
 their eyes moved about; a flat drawing can't look somewhere else, or show it's busy except by moving faster. Now
-each is drawn as the front of a puffy slab with some depth (`solid.ts`): the body's outline in layers, back to front,
-the faces in its colour and the side between darker. A turn narrows the front and slides it (and the eyes, a little
-further) toward the turn, and the side shows; edge-on it's a sliver, past that its back. Facing you it's exactly the
-flat drawing, so every character keeps its look. One set of springs (`motion.ts`) moves its turn, lean, hop and
+each is drawn as the front of a soft, puffy slab with some depth (`solid.ts`): the body's outline in layers, back to
+front, all in its colour. A turn narrows the front and slides it (and the eyes, a little further) toward the turn,
+and the depth fills out the outline; edge-on it's a sliver, past that its back. It tips up and down the same way.
+There's no shading: a darker side read as stacked layers, and depth shows well enough in the outline and the eyes. Facing you it's exactly the
+flat drawing, so every character keeps its look. One set of springs (`motion.ts`) moves its turn, tip, lean, hop and
 squash, painted straight into the SVG. The poses: resting turned a little and still, glancing now and then; facing
-you on hover, in its open chat's row and in the creator; erratic while thinking; turned and leaning toward its
-message when done in a team. The constant bob and sway, the per-character tempo and the spin's streaks are gone.
-It's not a 3D model (there's no mesh or lighting): bodies are any 2D outline, so the side follows the outline, which
-reads as depth on rounded shapes and as a thick cut-out on spiky ones.
+you in its open chat's row; following the pointer in a hovered row and in the creator; while thinking, one small move
+after another (pondering, looking about, peeking, nodding, tilting, a bounce, a scrunch, now and then a spin);
+turned and leaning toward its message when done in a team. The constant bob and sway, the per-character tempo and the spin's streaks are gone.
+It's not a 3D model (there's no mesh or lighting): bodies are any 2D outline, so the depth follows the outline.
 

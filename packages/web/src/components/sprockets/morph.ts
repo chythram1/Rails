@@ -28,10 +28,11 @@ function ring(p: Extract<Primitive, { cx: number }>, n = 48): number[][] {
 
 const shapesOf = (look: SprocketLook) => CHARACTERS[look.character].body.map((p) => ("d" in p ? p.d : ring(p)));
 
-/** "#RRGGBB" between `a` and `b`. */
+/** `a` and `b` mixed at `t`, in OKLab (in RGB a red and a teal pass through grey); the ends are the colours as they are. */
 function mix(a: string, b: string, t: number): string {
-  const ch = (hex: string, i: number) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
-  return `#${[0, 1, 2].map((i) => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * t).toString(16).padStart(2, "0")).join("")}`;
+  if (t <= 0) return a.toLowerCase();
+  if (t >= 1) return b.toLowerCase();
+  return `color-mix(in oklab, ${a} ${+((1 - t) * 100).toFixed(1)}%, ${b})`;
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;

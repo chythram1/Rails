@@ -212,16 +212,17 @@ function SprocketList(props: {
  * direct chat otherwise; the line under its name is the newer of the two, and the dot shows replies waiting in either.
  */
 function SprocketRow({ sprocket: s, active }: { sprocket: SprocketData; active: boolean }) {
-  // Its character holds still in the list, and comes alive facing you while its chat is open or the pointer is on it;
-  // it turns back before it holds still again.
+  // Its character holds still in the list. It comes alive while the pointer is on it (following the pointer), or it
+  // has focus or its chat is open (facing you), and turns back before it holds still again.
   const [hover, setHover] = useState(false);
+  const [focus, setFocus] = useState(false);
   const [awake, setAwake] = useState(active);
-  const facing = hover || active;
+  const facing = focus || active;
   useEffect(() => {
-    if (facing) return setAwake(true);
+    if (hover || facing) return setAwake(true);
     const t = setTimeout(() => setAwake(false), 700);
     return () => clearTimeout(t);
-  }, [facing]);
+  }, [hover, facing]);
   const chats = [s.direct, ...(s.projectChat ? [s.projectChat] : [])];
   const newest = chats.reduce((a, b) => ((b.lastMessage?.createdAt ?? "") > (a.lastMessage?.createdAt ?? "") ? b : a));
   const shown: SprocketChatInfo = { ...newest, running: chats.some((c) => c.running), pending: chats.reduce((n, c) => n + c.pending, 0) };
@@ -233,10 +234,10 @@ function SprocketRow({ sprocket: s, active }: { sprocket: SprocketData; active: 
       aria-current={active ? "page" : undefined}
       onPointerEnter={() => setHover(true)}
       onPointerLeave={() => setHover(false)}
-      onFocus={() => setHover(true)}
-      onBlur={() => setHover(false)}
+      onFocus={() => setFocus(true)}
+      onBlur={() => setFocus(false)}
     >
-      <Sprocket look={s.look} size={36} still={!awake} stance={facing ? "front" : "rest"} />
+      <Sprocket look={s.look} size={36} still={!awake} stance={facing ? "front" : "rest"} follow={hover} />
       <RowText name={s.name} chat={shown} />
     </a>
   );

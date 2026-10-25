@@ -1,7 +1,8 @@
 // Sprocket motion (see ref characters.md §5, and solid.ts for how it stands). This module holds the shared timing
 // tokens, whether motion is on, and what JS animates: blinks, the eyes changing shape for a moment, and its pose (it
-// turns, leans, hops and squashes) with where its eyes look: calm at rest with a glance now and then, toward the
-// pointer in the creator, erratic while thinking, and a spin round as it starts writing.
+// turns, tips, leans, hops and squashes) with where its eyes look: calm at rest with a glance now and then, toward the
+// pointer in the creator and a hovered row, busy with one small move after another while thinking, and a spin round
+// as it starts writing.
 import { useEffect, useRef, useSyncExternalStore, type RefObject } from "react";
 import { POSES, type Pose, type Stance } from "./solid.ts";
 
@@ -98,9 +99,9 @@ function express(svg: SVGSVGElement | null, kind?: Expression) {
 }
 
 // ---- its pose, and where the eyes look ----
-// One requestAnimationFrame loop for every moving Sprocket. Each has damped springs: its turn, lean, hop and squash
-// (painted through solid.ts), and its eyes (written as --ex/--ey). They aim at its stance (rest, facing you, toward a
-// message) plus what it's doing on its own: a glance, the pointer, or the jumps of thinking. The loop stops once
+// One requestAnimationFrame loop for every moving Sprocket. Each has damped springs: its turn, tip, lean, hop and
+// squash (painted through solid.ts), and its eyes (written as --ex/--ey). They aim at its stance (rest, facing you,
+// toward a message) plus what it's doing on its own: a glance, the pointer, or a move while thinking. The loop stops once
 // every spring has settled and starts again when an aim changes.
 
 interface Spring {
@@ -111,6 +112,7 @@ interface Poser {
   el: SVGSVGElement;
   paint: (p: Pose) => void;
   yaw: Spring;
+  pitch: Spring;
   lean: Spring;
   hop: Spring;
   squash: Spring;
@@ -120,8 +122,10 @@ interface Poser {
   stance: Stance;
   follow: boolean;
   busy: boolean;
-  /** Turn added on its own (a glance, a jump while thinking), and whole turns from spins. */
+  /** Turn, tip and lean added on its own (a glance, a move while thinking), and whole turns from spins. */
   turn: number;
+  tip: number;
+  tilt: number;
   spins: number;
   /** Where its eyes look on their own, -1 to 1 on each axis. */
   aim: [number, number] | null;
@@ -175,16 +179,19 @@ function step(now: number) {
     const watching = l.follow && pointer;
     const [px, py] = watching ? toPointer(l) : [0, 0];
     const [ax, ay] = watching ? [px, py] : (l.aim ?? [0, 0]);
-    // Thinking turns snap and overshoot; otherwise it turns calmly.
-    const [k, d] = l.busy ? [210, 15] : watching ? [90, 16] : [70, 14];
-    moving = spring(l.yaw, base.yaw + l.turn + l.spins * 360 + px * 34, k, d, dt) || moving;
-    moving = spring(l.lean, base.lean, 120, 16, dt) || moving;
+    // Following the pointer it faces it, turning and tipping toward it; otherwise its stance plus its own moves.
+    const [k, d] = l.busy ? [95, 12] : watching ? [90, 15] : [70, 14];
+    const yaw = watching ? px * 42 : base.yaw + l.turn;
+    const pitch = watching ? -py * 26 : base.pitch + l.tip;
+    moving = spring(l.yaw, yaw + l.spins * 360, k, d, dt) || moving;
+    moving = spring(l.pitch, pitch, k, d, dt) || moving;
+    moving = spring(l.lean, base.lean + l.tilt, 110, 12, dt) || moving;
     moving = spring(l.hop, 0, 300, 18, dt) || moving;
     moving = spring(l.squash, 0, 400, 16, dt) || moving;
     moving = spring(l.eyesX, ax, watching ? 260 : 620, watching ? 26 : 40, dt) || moving;
     moving = spring(l.eyesY, ay, watching ? 260 : 620, watching ? 26 : 40, dt) || moving;
     const q = l.squash.x;
-    l.paint({ yaw: l.yaw.x, lean: l.lean.x, sx: 1 + q, sy: 1 - q, hop: Math.max(0, l.hop.x) });
+    l.paint({ yaw: l.yaw.x, pitch: l.pitch.x, lean: l.lean.x, sx: 1 + q, sy: 1 - q, hop: Math.max(0, l.hop.x) });
     write(l, l.eyesX.x * 9, l.eyesY.x * 6);
   }
   frame = moving ? requestAnimationFrame(step) : 0;
@@ -204,9 +211,9 @@ const pick = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
 
 interface PoseOptions {
   stance: Stance;
-  /** Turn toward the pointer, eyes following it (the creator's preview). */
+  /** Turn and tip toward the pointer, eyes following it (the creator's preview, a hovered row). */
   follow?: boolean;
-  /** Thinking: erratic. */
+  /** Thinking: one small move after another. */
   busy?: boolean;
   /** Spin round once when this turns true. */
   spin?: boolean;
@@ -214,10 +221,56 @@ interface PoseOptions {
   from: Pose;
 }
 
+/** A step of a move: how long to hold it (ms), and what it sets. */
+type MoveStep = [number, (l: Poser) => void];
+const set = (l: Poser, turn: number, tip: number, tilt: number, aim: [number, number] | null) => {
+  l.turn = turn;
+  l.tip = tip;
+  l.tilt = tilt;
+  l.aim = aim;
+};
+
+/**
+ * What a thinking Sprocket does, one after another: pondering upward, looking one way then the other, peeking round,
+ * nodding, tilting its head, a bounce, a scrunch, and now and then a spin. Each takes a second or two; `weight` is
+ * how often it comes up.
+ */
+const MOVES: Record<string, { weight: number; steps: () => MoveStep[] }> = {
+  ponder: { weight: 3, steps: () => {
+    const side = pick([-1, 1]);
+    return [[rand(1100, 1700), (l) => set(l, side * rand(8, 16), rand(14, 20), side * 3, [side * 0.4, -0.9])], [rand(500, 900), (l) => set(l, side * 4, rand(6, 10), 0, [0, -0.5])]];
+  } },
+  look: { weight: 3, steps: () => {
+    const side = pick([-1, 1]);
+    return [[rand(700, 1000), (l) => set(l, side * rand(30, 42), rand(-2, 6), 0, [side * 0.8, -0.1])], [rand(700, 1000), (l) => set(l, -side * rand(30, 42), rand(-2, 6), 0, [-side * 0.8, -0.1])]];
+  } },
+  peek: { weight: 2, steps: () => {
+    const side = pick([-1, 1]);
+    return [[rand(900, 1300), (l) => set(l, side * rand(55, 68), rand(-8, -3), -side * 4, [side, 0.2])], [400, (l) => set(l, side * 10, 0, 0, null)]];
+  } },
+  nod: { weight: 2, steps: () => [
+    [320, (l) => set(l, rand(-8, 8), -14, 0, [0, 0.5])],
+    [320, (l) => set(l, l.turn, 8, 0, [0, -0.3])],
+    [320, (l) => set(l, l.turn, -12, 0, [0, 0.4])],
+    [600, (l) => set(l, l.turn, 4, 0, null)],
+  ] },
+  tilt: { weight: 2, steps: () => {
+    const side = pick([-1, 1]);
+    return [[700, (l) => set(l, side * 10, 6, side * 11, [side * 0.5, -0.5])], [700, (l) => set(l, -side * 6, 6, -side * 7, [-side * 0.4, -0.5])], [400, (l) => set(l, 0, 0, 0, null)]];
+  } },
+  bounce: { weight: 2, steps: () => [
+    [260, (l) => ((l.squash.v -= 2.4), set(l, l.turn, 0, 0, [0, 0.2]))],
+    [700, (l) => ((l.hop.v += rand(170, 220)), (l.squash.v += 3), set(l, l.turn, 10, 0, [0, -0.6]))],
+    [500, (l) => set(l, l.turn, 0, 0, null)],
+  ] },
+  scrunch: { weight: 1.5, steps: () => [[900, (l) => (express(l.el, pick(["squeeze", "curious", "wide"])), set(l, rand(-12, 12), rand(-4, 6), pick([-1, 1]) * 4, null))], [500, (l) => set(l, l.turn, 0, 0, null)]] },
+  spin: { weight: 0.6, steps: () => [[1300, (l) => ((l.spins += pick([-1, 1])), (l.hop.v += 150), set(l, 0, 6, 0, [0, -0.4]))], [400, (l) => set(l, 0, 0, 0, null)]] },
+};
+
 /**
  * Move a Sprocket while `enabled`: `paint` draws a pose. At rest it's calm: still, glancing aside now and then, its
- * eyes sometimes changing shape. Facing you or turned toward a message it holds still. Thinking (`busy`) it's
- * erratic: quick turns either way, now and then a whole spin, a hop or a squash, its eyes darting up and around.
+ * eyes sometimes changing shape. Facing you or turned toward a message it holds still; following, it faces the
+ * pointer. Thinking (`busy`) it does one small move after another (`MOVES`), never the same twice running.
  */
 export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(p: Pose) => void>, enabled: boolean, { stance, follow = false, busy = false, spin = false, from }: PoseOptions) {
   const poser = useRef<Poser | null>(null);
@@ -229,6 +282,7 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
       el,
       paint: (p) => paint.current(p),
       yaw: at(from.yaw),
+      pitch: at(from.pitch),
       lean: at(from.lean),
       hop: at(from.hop),
       squash: at(0),
@@ -239,6 +293,8 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
       follow,
       busy,
       turn: 0,
+      tip: 0,
+      tilt: 0,
       spins: 0,
       aim: null,
     };
@@ -273,21 +329,26 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
     let timer: ReturnType<typeof setTimeout>;
     const later = (ms: number, then: () => void) => (timer = setTimeout(then, ms));
     if (busy) {
-      // Thinking: a new turn every fraction of a second, eyes up and around; sometimes a spin, a hop or a squash.
-      const jump = () => {
-        l.turn = rand(-70, 70);
-        l.aim = [rand(-0.9, 0.9), rand(-1, -0.2)];
-        const r = Math.random();
-        if (r < 0.14) l.spins += pick([-1, 1]);
-        else if (r < 0.3) l.hop.v += rand(160, 260);
-        else if (r < 0.45) l.squash.v += pick([-1, 1]) * rand(2.5, 4);
-        if (Math.random() < 0.12) express(l.el, pick(["squeeze", "curious", "wide"]));
-        kick();
-        later(rand(160, 560), jump);
+      // Thinking: one move after another, each a second or two, never the same one twice running.
+      let last = "";
+      const next = () => {
+        const options = Object.entries(MOVES).filter(([name]) => name !== last);
+        let r = Math.random() * options.reduce((n, [, m]) => n + m.weight, 0);
+        const [name, move] = options.find(([, m]) => (r -= m.weight) < 0) ?? options[0];
+        last = name;
+        const steps = move.steps();
+        const run = (i: number) => {
+          if (i >= steps.length) return next();
+          const [ms, act] = steps[i];
+          act(l);
+          kick();
+          later(ms, () => run(i + 1));
+        };
+        run(0);
       };
-      jump();
+      next();
     } else {
-      l.turn = 0;
+      l.turn = l.tip = l.tilt = 0;
       l.aim = null;
       l.spins = Math.round(l.spins); // whole turns look the same; keep the count, so it doesn't spin back
       kick();
@@ -297,11 +358,12 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
           if (document.visibilityState === "visible") {
             const side = pick([-1, 1]);
             l.turn = side * rand(10, 24);
+            l.tip = rand(-6, 8);
             l.aim = [side * rand(0.4, 0.8), rand(-0.4, 0.3)];
             if (Math.random() < 0.2) express(l.el);
             kick();
             return later(rand(700, 1600), () => {
-              l.turn = 0;
+              l.turn = l.tip = 0;
               l.aim = null;
               kick();
               later(rand(2500, 7000), glance);

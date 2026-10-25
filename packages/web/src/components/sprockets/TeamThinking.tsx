@@ -6,14 +6,14 @@ import { Sprocket } from "./Sprocket.tsx";
 
 /** How long each member's shape holds (a range, so it never settles into a beat), then how long it takes to become
  * the next one (ms). */
-const HOLD_MS = [450, 1100] as const;
-const MORPH_MS = 420;
+const HOLD_MS = [1500, 2400] as const;
+const MORPH_MS = 650;
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 /**
- * The team's thinking icon (ADR 0033): one Sprocket, thinking as a Sprocket does (erratic: turning, spinning,
- * hopping), that turns from one member into the next round `looks` (those thinking since the user's message), its
+ * The team's thinking icon (ADR 0033): one Sprocket, thinking as a Sprocket does (one small move after
+ * another), that turns from one member into the next round `looks` (those thinking since the user's message), its
  * outline and colour reforming as it moves. With reduced motion it holds the first member's shape.
  */
 export function TeamThinking({ looks, size }: { looks: { id: string; look: SprocketLook }[]; size: number }) {

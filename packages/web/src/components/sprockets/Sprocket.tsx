@@ -17,7 +17,7 @@ interface Props {
   still?: boolean;
   /** How it stands (solid.ts): at rest, turned a little; facing you; or turned and leaning toward its message. */
   stance?: Stance;
-  /** Turn toward the pointer, eyes following it (the creator's preview). */
+  /** Turn and tip toward the pointer, eyes following it (the creator's preview, a hovered row). */
   follow?: boolean;
   /** Working on a reply: erratic, turning and spinning. */
   busy?: boolean;
@@ -35,8 +35,8 @@ interface Props {
 const BOX: Box = { x: 40, y: 80, width: 120, height: 116 };
 
 /**
- * A Sprocket character, as a solid (solid.ts): the body's layers back to front (the faces in its colour, the side
- * between them darker), the side's band seen edge-on, and the eyes on the front face. s-pop squashes on a change of
+ * A Sprocket character, as a solid (solid.ts): the body's layers back to front, all in its colour (depth shows in
+ * the outline and where the eyes sit, never as shading), the slab's band seen edge-on, and the eyes on the front face. s-pop squashes on a change of
  * look; s-eyes looks (motion.ts writes --ex/--ey); s-lid blinks; each s-eye changes size and shape.
  */
 export function Sprocket({ look, size, still, stance = "rest", follow, busy = false, spin = false, turnIn, drawing, label }: Props) {
@@ -98,7 +98,6 @@ export function Sprocket({ look, size, still, stance = "rest", follow, busy = fa
   }, []);
 
   const l = layout(pose, axis, face, box.current, def.shadow.half);
-  const side = `color-mix(in oklab, ${color} 68%, #000)`;
   const body = drawing ? <path d={drawing.d} /> : def.body.map((p, i) => <Shape key={i} p={p} />);
   const style = { width: size, height: (size * VIEW.h) / VIEW.w } as CSSProperties;
 
@@ -116,7 +115,6 @@ export function Sprocket({ look, size, still, stance = "rest", follow, busy = fa
       <g ref={rig} transform={l.rig}>
         <g className="s-pop" ref={pop}>
           {l.layers.map((t, i) => {
-            const end = i === 0 || i === LAYERS - 1;
             const layer = (
               <g
                 key={i}
@@ -124,15 +122,15 @@ export function Sprocket({ look, size, still, stance = "rest", follow, busy = fa
                   layers.current[i] = el;
                 }}
                 transform={t}
-                style={{ fill: end ? color : side, stroke: round ? (end ? color : side) : undefined }}
+                style={{ fill: color, stroke: round ? color : undefined }}
                 strokeWidth={round || undefined}
                 strokeLinejoin="round"
               >
                 {body}
               </g>
             );
-            // The side seen edge-on goes under the front face.
-            return i === LAYERS - 1 ? [<rect key="band" ref={band} style={{ fill: side }} {...l.band} />, layer] : layer;
+            // The slab seen edge-on goes under the front face.
+            return i === LAYERS - 1 ? [<rect key="band" ref={band} style={{ fill: color }} {...l.band} />, layer] : layer;
           })}
           <g ref={eyes} transform={l.eyes.transform} opacity={l.eyes.opacity}>
             <g className="s-eyes">
