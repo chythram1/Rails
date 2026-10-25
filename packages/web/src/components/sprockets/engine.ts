@@ -10,7 +10,7 @@
 // cheering) plays its gesture with its eyes for as long as it lasts, then the Sprocket goes back to resting.
 import { POSES, type Pose, type Stance } from "./solid.ts";
 import { animationFor, type Animation } from "./animations.ts";
-import { BLINK_MS, EXPRESSIONS, GLANCE, LEAN_GLANCE, LEANS, OPEN, SPIN, THINKING, eyeAt, lidAt, type EyeShape, type Expression, type ExpressionName, type Gesture, type Rand, type Step } from "./clips.ts";
+import { BLINK_MS, EXPRESSIONS, GLANCE, LEAN_GLANCE, LEANS, OPEN, SPIN, THINKING, eyeAt, lidAt, sample, type EyeShape, type Expression, type ExpressionName, type Gesture, type Rand, type Step } from "./clips.ts";
 
 /** What a Sprocket is doing: resting, thinking (direct chats), writing (the spin), or one of the finished animations
  * (animations.ts): cheering, talking in a team (surveying), satisfied. */
@@ -62,7 +62,7 @@ export interface Rig {
   aim: [number, number] | null;
   gesture: { name: string; steps: Step[]; i: number; at: number } | null;
   /** The finished animation playing: its eyes, and when it ends (then it rests, whatever its activity). */
-  anim: { eyes: Animation["eyes"]; until: number } | null;
+  anim: { eyes: Animation["eyes"]; moves?: Animation["moves"]; start: number; until: number } | null;
   /** The last thinking move, so the next is a different one. */
   last: string;
   /** When the next resting glance starts. */
@@ -138,9 +138,11 @@ function begin(r: Rig, now: number) {
   const { activity, faceOnly } = r.input;
   clear(r);
   const a = animationFor(activity);
-  r.anim = a ? { eyes: a.eyes, until: now + a.ms } : null;
+  r.anim = a ? { eyes: a.eyes, moves: a.moves, start: now, until: now + a.ms } : null;
   if (faceOnly) return;
-  if (a) play(r, a.name, a.gesture, now);
+  if (a) {
+    if (a.gesture) play(r, a.name, a.gesture, now);
+  }
   else if (activity === "think") {
     r.last = "";
     nextMove(r, now);
@@ -203,9 +205,9 @@ function nextMove(r: Rig, now: number) {
 /** Run what's due by `now`: gesture steps, glances, lean-ins, blinks. */
 function direct(r: Rig, now: number) {
   const { activity, faceOnly } = r.input;
-  // Blinks, even with only the face moving; sometimes two together.
+  // Blinks, even with only the face moving; sometimes two together. Not with happy eyes: the ^ ^ are already shut.
   if (now >= r.nextBlink) {
-    r.blink = now;
+    if (r.anim?.eyes !== "happy") r.blink = now;
     r.nextBlink = now + (r.rand() < 0.2 ? 420 : between(r.rand, 2000, 5500));
   }
   if (r.blink !== null && now - r.blink >= BLINK_MS) r.blink = null;
@@ -308,8 +310,13 @@ export function advance(r: Rig, now: number, pointer: [number, number] | null): 
   go("round", eyes === "round" ? 1 : 0, 900, 24); // sudden: it pops in, overshooting a little
   const t = now;
   const e = r.expression;
+  // An animation's keyframed moves, on its own clock, on top.
+  const m = r.input.faceOnly ? undefined : r.anim?.moves;
+  const at = r.anim ? now - r.anim.start : 0;
+  const [mh, ms, mt] = m ? [m.hop ? sample(m.hop, at) : 0, m.squash ? sample(m.squash, at) : 1, m.tip ? sample(m.tip, at) : 0] : [0, 1, 0];
+  if (m) moving = true;
   const frame: Frame = {
-    pose: { yaw: s.yaw.x, pitch: s.pitch.x, roll: s.roll.x, near: s.near.x, slide: s.slide.x, lean: s.lean.x, sx: 1 + s.squash.x, sy: 1 - s.squash.x, hop: Math.max(0, s.hop.x) },
+    pose: { yaw: s.yaw.x, pitch: s.pitch.x + mt, roll: s.roll.x, near: s.near.x, slide: s.slide.x, lean: s.lean.x, sx: (1 + s.squash.x) * ms, sy: (1 - s.squash.x) / ms, hop: Math.max(0, s.hop.x) + mh },
     look: [s.lookX.x * 9, s.lookY.x * 6],
     left: dilate(e ? eyeAt(e.keys.left, t - e.start, e.keys.ms) : OPEN, s.round.x, -1),
     right: dilate(e ? eyeAt(e.keys.right, t - e.start, e.keys.ms) : OPEN, s.round.x, 1),

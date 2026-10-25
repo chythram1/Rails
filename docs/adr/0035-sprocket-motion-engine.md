@@ -20,9 +20,12 @@ throwaway page and a strip of screenshots.
   dance); `stance`, `follow` and `still` stay. The director in the engine picks what plays from it.
 - **Clips as data** (`clips.ts`): gestures are lists of timed steps (turn, tip, roll, where the eyes look, kicks to hop
   and squash, a spin, an expression), lean-ins are lists of nearness and time, expressions are keyframes of each eye's
-  shape, and the blink is a curve. A new move is a new entry, not more timer code.
+  shape, and the blink is a curve. A new move is a new entry, not more timer code. A move whose parts have to land
+  together (squashing the moment it touches down) is keyframed tracks instead (`Moves`: hop, squash, tip, each key
+  easing in, out or both), played straight off its animation's clock on top of the pose; kicks to free springs drift
+  apart and read as jerky. Satisfied's nod is the first.
 - **Finished animations, apart from their parts** (`animations.ts`): the polished set a Sprocket plays, each naming
-  when it plays, how long it lasts, its gesture and its eyes (Cheer, Survey for starting a reply in a team, and Satisfied). Every one shares the same blinks,
+  when it plays, how long it lasts, its gesture or moves and its eyes (Cheer, Survey for starting a reply in a team, and Satisfied). Every one shares the same blinks (none while the eyes are ^ ^, which are already shut),
   expressions and leaning in, so a Sprocket behaves predictably wherever it is; what's decided per animation is
   when it plays. Each plays once, for a set time, then the Sprocket goes back to resting, whatever its activity. The parts in `clips.ts` are what they're built from.
 - **Eyes drawn from numbers.** Each frame gives each eye a shape (moved and sized), how shut its lid is and how happy

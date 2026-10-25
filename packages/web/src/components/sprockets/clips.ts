@@ -8,6 +8,59 @@ const between = (rand: Rand, a: number, b: number) => a + rand() * (b - a);
 const side = (rand: Rand) => (rand() < 0.5 ? -1 : 1);
 const pick = <T,>(r: Rand, xs: readonly T[]): T => xs[Math.floor(r() * xs.length)];
 
+// ---- moves ----
+
+/** How a key is reached from the one before: `out` slows into it (rising to the top of a hop), `in` speeds into it
+ * (falling to land), `both` eases at each end. */
+type Ease = "in" | "out" | "both";
+/** At `t` ms the value is `v`, reached from the key before with `ease` (`both` if left out). */
+export type Key = [t: number, v: number, ease?: Ease];
+
+/**
+ * Body motion as keyframed tracks, played straight off the clock rather than through springs, so what has to happen
+ * together does: it squashes the moment it lands, and stretches as it leaves the ground. On top of the pose: `hop`
+ * (viewBox units up), `squash` (its width, 1 as drawn; its height is the inverse, so it keeps its volume) and `tip`
+ * (degrees, + chin up). Each track starts and ends at rest (0, 1, 0).
+ */
+export interface Moves {
+  hop?: Key[];
+  squash?: Key[];
+  tip?: Key[];
+}
+
+const EASES: Record<Ease, (x: number) => number> = {
+  in: (x) => x * x,
+  out: (x) => 1 - (1 - x) * (1 - x),
+  both: (x) => 0.5 - 0.5 * Math.cos(Math.PI * x),
+};
+
+/** A track's value at `t` ms (its first value before it starts, its last after). */
+export function sample(keys: Key[], t: number): number {
+  if (t <= keys[0][0]) return keys[0][1];
+  for (let i = 1; i < keys.length; i++) {
+    const [t1, v1, ease = "both"] = keys[i];
+    if (t < t1) {
+      const [t0, v0] = keys[i - 1];
+      return v0 + (v1 - v0) * EASES[ease]((t - t0) / (t1 - t0));
+    }
+  }
+  return keys[keys.length - 1][1];
+}
+
+/**
+ * A satisfied nod, an elastic bounce in place: it squashes down with its head dipped, springs up stretched with its
+ * chin raised, lands squashed wide with a nod, rebounds in a smaller hop, and wobbles to a stop.
+ */
+export const NOD: Moves = {
+  hop: [[0, 0], [140, 0], [320, 18, "out"], [480, 0, "in"], [560, 0], [670, 7, "out"], [780, 0, "in"]],
+  squash: [
+    [0, 1], [140, 1.14, "out"], [220, 0.84, "out"], [320, 0.97], [470, 0.92, "in"], // down, up and falling
+    [530, 1.22, "out"], [600, 0.9, "out"], [680, 1], [770, 0.96, "in"], // lands, and rebounds
+    [820, 1.1, "out"], [890, 0.96], [960, 1.03], [1040, 0.99], [1120, 1], // lands again, and wobbles
+  ],
+  tip: [[0, 0], [140, -6, "out"], [300, 9], [540, -10, "out"], [680, 4], [820, -4], [1000, 0]],
+};
+
 // ---- gestures ----
 
 /**
@@ -124,19 +177,6 @@ export const DANCE: Gesture = () => [
     { ms: 190, squash: 1.8, roll: s * 4 },
   ]),
   { ms: 300, shift: 0, turn: 0, roll: 0, aim: null },
-];
-
-/**
- * A satisfied nod: an elastic bounce in place. It squashes down and dips its head (anticipation), stretches tall as it
- * hops with its chin up, lands squashed wide with a nod down, rebounds a little and wobbles to a stop. Squash is wide
- * and short (+), stretch tall and thin (-).
- */
-export const NOD: Gesture = () => [
-  { ms: 140, squash: 3, tip: -6, aim: [0, 0.3] },
-  { ms: 260, hop: 270, squash: -6, tip: 10, aim: [0, -0.5] },
-  { ms: 200, squash: 7, tip: -12, aim: [0, 0.4] },
-  { ms: 220, hop: 110, squash: -3, tip: 6, aim: [0, -0.2] },
-  { ms: 300, squash: 1.6, tip: 0, aim: null },
 ];
 
 /**
