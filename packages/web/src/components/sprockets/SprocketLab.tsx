@@ -174,7 +174,7 @@ export default function SprocketLab() {
             <h2 id="lab-state" className="lab-h">State</h2>
             <div className="lab-row">
               <span id="lab-stance">Stance</span>
-              <Segmented name="lab-stance" aria-labelledby="lab-stance" small value={stance} onChange={(v) => setStance(v as Stance)} options={[{ value: "rest", label: "Rest" }, { value: "front", label: "Front" }, { value: "toward", label: "Toward" }]} />
+              <Segmented name="lab-stance" aria-labelledby="lab-stance" small value={stance} onChange={(v) => setStance(v as Stance)} options={[{ value: "rest", label: "Rest" }, { value: "front", label: "Front" }]} />
             </div>
             <div className="lab-row">
               <span id="lab-activity">Activity</span>

@@ -1,10 +1,12 @@
 // A Sprocket as a solid (ADR 0005, amended): its drawing is the front of a body with its own thickness and roundness
-// (characters.ts `depth`, `puff`): a pizza box is thin with straight sides, a bean deep and soft. Facing you it's the
-// flat drawing, its eyes upright. Turned or tipped it's seen in true perspective: a thin body narrows to a sliver,
-// while a deep, round one stays round, its depth filling out the outline, all in its one colour with no shading. The
-// eyes ride its front, travelling further on a deep body, and slant as they would on a dome (looking up and to the
-// right, the pair rises to the right and each eye's top leans left). Drawn as layers of the body from back to front,
-// each a slice of it, the front one with the eyes. Pure geometry: Sprocket.tsx draws it, motion.ts moves it.
+// (characters.ts `depth`, `puff`): a pizza box is thin with straight sides, a bean deep and soft. It's turned as a
+// solid in 3D, tipped then turned then rolled (as Grok's bots are), and seen straight on (no vanishing point): facing
+// you it's the flat drawing, its eyes upright; turned and tipped, a flat body shears into a parallelogram while a
+// deep, round one stays round, its depth filling out the outline, all in its one colour with no shading. Drawn as
+// slices of the body from back to front. The eyes are painted on its front, which curves as much as the body is
+// round (`puff`): every point of an eye is placed on that surface, turned with the body and projected, so the eye on
+// the far side narrows and bends as on a ball, and the slant they show comes from the turn alone. Pure geometry:
+// Sprocket.tsx draws it, motion.ts moves it.
 
 /** How a Sprocket stands: turned (`yaw`, degrees, + to the viewer's right), tipped (`pitch`, degrees, + looking
  * up), rolled about its middle (`roll`, degrees), how near the screen it's come (`near`, a scale, 1 where it stands),
@@ -22,16 +24,16 @@ export interface Pose {
   slide: number;
 }
 
-/** Where it rests: almost facing you, glancing up a little. Facing you, it's the flat drawing. Done with a message
- * in a team, it looks up toward it, rocking back a little. */
+/** Where it rests, beside its messages too: turned up and to the viewer's right, rolled a quarter turn's worth to the
+ * left, its face to the upper right (Grok's bots' resting pose, measured: tipped 16° up, turned 33°, rolled 25°).
+ * Facing you, it's the flat drawing. */
 export const POSES = {
-  rest: { yaw: 6, pitch: 6, lean: 0 },
-  front: { yaw: 0, pitch: 0, lean: 0 },
-  toward: { yaw: 40, pitch: 26, lean: -6 },
+  rest: { yaw: 33, pitch: 16, roll: -25, lean: 0 },
+  front: { yaw: 0, pitch: 0, roll: 0, lean: 0 },
 } as const;
 export type Stance = keyof typeof POSES;
 
-export const poseOf = (stance: Stance): Pose => ({ ...POSES[stance], roll: 0, near: 1, sx: 1, sy: 1, hop: 0, slide: 0 });
+export const poseOf = (stance: Stance): Pose => ({ ...POSES[stance], near: 1, sx: 1, sy: 1, hop: 0, slide: 0 });
 
 /** How many slices of the body are drawn, back to front: about one every 4 units of depth, so a deep body's edge
  * stays smooth (at least 5, and an odd number, so one is its middle). Turned well aside (`turned`), where the
@@ -41,8 +43,6 @@ export const layerCount = (body: Body, turned = false) =>
 /** How far aside (|sin yaw|) it is when it draws the denser slices: they overlap so much there that the change
  * doesn't show. */
 const TURNED = 0.3;
-/** How much the eyes' pair turns with a look up and aside, in degrees per unit of sin(yaw)·sin(pitch). */
-const PAIR = 30;
 const GROUND = 200;
 export interface Box {
   x: number;
@@ -53,14 +53,15 @@ export interface Box {
 
 export interface Layout {
   rig: string;
-  /** Each layer's transform, back to front as drawn. The first and last are the faces. */
+  /** Each slice's transform (an SVG matrix), back to front as drawn. The first and last are the faces. */
   layers: string[];
   /** How wide each layer's stroke in its colour is (viewBox units), so turned toward edge-on, where layers are
    * slivers, they join into one smooth side instead of a comb: a little over the gap between neighbours, up to twice
    * it edge-on, where their round ends must overlap well to make one curve. Facing you it's 0: the drawing as it is. */
   gap: number;
-  /** Where the eyes sit and how the pair turns; `slant` turns each eye about its own centre (degrees). */
-  eyes: { transform: string; opacity: number; slant: number };
+  /** The eyes: `project` takes a point on the face, drawn upright from the face's centre (viewBox units, y down), to
+   * where it's seen; `opacity` is each eye's (left, right), fading as its side of the face turns away. */
+  eyes: { project: (x: number, y: number) => [number, number]; opacity: [number, number] };
   shadow: { rx: number; opacity: number };
 }
 
@@ -73,46 +74,71 @@ export interface Body {
 const clamp = (n: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, n));
 const f = (n: number) => +n.toFixed(3);
 
+/** Distance from the face's centre to each eye (parts.tsx draws them there). */
+export const EYE_X = 14.5;
+
 /**
  * The drawing's transforms for pose `p`, turning about the vertical line x = `axis`. `face` is where the eyes sit
  * on the front, `box` the body's bounds, `half` its shadow's half-width, `body` its thickness and roundness.
  */
 export function layout(p: Pose, axis: number, face: { x: number; y: number }, box: Box, half: number, body: Body): Layout {
   const a = (p.yaw * Math.PI) / 180;
-  const c = Math.cos(a);
-  const s = Math.sin(a);
   const b = (p.pitch * Math.PI) / 180;
-  const cp = Math.cos(b);
-  const sp = Math.sin(b);
-  // Which way the front faces: toward the viewer (c > 0) the front is drawn last, else the back is.
-  const toward = c >= 0 ? 1 : -1;
+  // Never quite edge-on: a slice squashed to nothing wouldn't draw (its stroke makes the sliver).
+  const nudge = (v: number) => (Math.abs(v) < 0.002 ? (v < 0 ? -0.002 : 0.002) : v);
+  const [ca, sa, cp, sp] = [nudge(Math.cos(a)), Math.sin(a), nudge(Math.cos(b)), Math.sin(b)];
+  // Tipped up by the pitch, then turned by the yaw, in a frame with y up and z toward you; rows of the rotation.
+  const R = [
+    [ca, -sa * sp, sa * cp],
+    [0, cp, sp],
+    [-sa, -ca * sp, ca * cp],
+  ];
+  // Which way the front faces: toward the viewer the front is drawn last, else the back is.
+  const toward = R[2][2] >= 0 ? 1 : -1;
   const mid = box.y + box.height / 2;
   const depth = body.depth / 2;
   // A slice's size at u (-1 back, 0 middle, 1 front): an ellipse through 1 - puff at the faces, so the sides curve.
   const k = 1 - (1 - body.puff) ** 2;
-  const n = layerCount(body, Math.abs(s) > TURNED);
+  const n = layerCount(body, Math.abs(sa) > TURNED);
   const layers = Array.from({ length: n }, (_, i) => {
     const u = (i / (n - 1)) * 2 - 1; // -1 farthest .. 1 nearest
     const z = u * toward * depth; // + toward the front face
     const size = Math.sqrt(1 - k * u * u);
-    // Never quite 0 wide: edge-on, a layer is a line its stroke thickens (a layer scaled to nothing isn't drawn).
-    const wide = Math.sign(c || 1) * Math.max(Math.abs(c * size), 0.002);
-    return `translate(${f(axis + z * s)} ${f(mid - z * sp)}) scale(${f(wide)} ${f(cp * size)}) translate(${f(-axis)} ${f(-mid)})`;
+    // (x, y) on the drawing to the screen: x' = axis + R0·(x - axis, mid - y, z), y' = mid - R1·(…).
+    const [ma, mb, mc, md] = [R[0][0] * size, -R[1][0] * size, -R[0][1] * size, R[1][1] * size];
+    const e = axis + R[0][2] * z - ma * axis - mc * mid;
+    const f_ = mid - R[1][2] * z - mb * axis - md * mid;
+    const q = (v: number) => +v.toFixed(5); // the scales finer, or a slice's middle drifts off the axis
+    return `matrix(${q(ma)} ${q(mb)} ${q(mc)} ${q(md)} ${f(e)} ${f(f_)})`;
   });
-  // The face rides the front, and the eyes narrow with it (less on a round body, whose front is a dome).
-  const eyeX = axis + (face.x - axis) * c + depth * s;
-  const eyeY = mid + (face.y - mid) * cp - depth * sp;
-  const flat = 1 - body.puff;
+  // The front's curve: a dome as round as the body (a sphere through its edges for the roundest, flat for a box).
+  const r = (box.width / 2) / Math.max(0.001, Math.min(1, body.puff * 2.5));
+  const onFront = (X: number, Y: number): [number, number, number] => {
+    if (body.puff <= 0) return [X, Y, depth];
+    const [u, v] = [X / r, Y / r];
+    return [r * Math.sin(u) * Math.cos(v), r * Math.sin(v), depth + r * (Math.cos(u) * Math.cos(v) - 1)];
+  };
+  const turn = ([x, y, z]: [number, number, number]): [number, number, number] => [
+    R[0][0] * x + R[0][1] * y + R[0][2] * z,
+    R[1][0] * x + R[1][1] * y + R[1][2] * z,
+    R[2][0] * x + R[2][1] * y + R[2][2] * z,
+  ];
+  const [fx, fy] = [face.x - axis, mid - face.y];
+  const project = (x: number, y: number): [number, number] => {
+    const [X, Y] = turn(onFront(fx + x, fy - y));
+    return [axis + X, mid - Y];
+  };
+  // Each eye fades as its side of the face turns away: its surface's facing, from how the dome slopes there.
+  const facing = (side: number) => {
+    const X = fx + side * EYE_X;
+    const nrm: [number, number, number] = body.puff <= 0 ? [0, 0, 1] : [Math.sin(X / r) * Math.cos(fy / r), Math.sin(fy / r), Math.cos(X / r) * Math.cos(fy / r)];
+    return f(clamp((turn(nrm)[2] - 0.15) / 0.25));
+  };
   return {
     rig: `translate(${f(p.slide)} ${f(-p.hop)}) rotate(${f(p.lean)} ${axis} ${GROUND}) rotate(${f(p.roll)} ${axis} ${f(mid)}) translate(${axis} ${f(mid)}) scale(${f(p.near)}) translate(${-axis} ${f(-mid)}) translate(${axis} ${GROUND}) scale(${f(p.sx)} ${f(p.sy)}) translate(${-axis} ${-GROUND})`,
     layers,
-    gap: f((body.depth / (n - 1)) * Math.hypot(s, sp) * (1.15 + 0.85 * s * s)),
-    eyes: {
-      transform: `translate(${f(eyeX)} ${f(eyeY)}) rotate(${f(-PAIR * s * sp)}) scale(${f(Math.max(c, 0.001) ** flat)} ${f(Math.max(cp, 0.001) ** flat)})`,
-      opacity: f(clamp((c - 0.15) / 0.25)),
-      // The face's "up" on a dome turned by yaw then pitch, seen from the front.
-      slant: f((Math.atan2(-s * sp, cp) * 180) / Math.PI),
-    },
-    shadow: { rx: f(half * (0.9 + 0.1 * Math.abs(c)) * (1 - clamp(p.hop / 60, 0, 0.5))), opacity: f(1 - clamp(p.hop / 50, 0, 0.5)) },
+    gap: f((body.depth / (n - 1)) * Math.hypot(sa, sp) * (1.15 + 0.85 * sa * sa)),
+    eyes: { project, opacity: [facing(-1), facing(1)] },
+    shadow: { rx: f(half * (0.9 + 0.1 * Math.abs(ca)) * (1 - clamp(p.hop / 60, 0, 0.5))), opacity: f(1 - clamp(p.hop / 50, 0, 0.5)) },
   };
 }

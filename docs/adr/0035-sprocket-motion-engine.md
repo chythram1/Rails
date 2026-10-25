@@ -89,7 +89,7 @@ DM or clicking the row while the DM is open. Moving the pointer or clicking insi
 2.2 s after the selection it settles into its resting pose and stops, and it stays still after you leave.
 
 Rails' rows do the same (`resting` on `Sprocket`, `setResting` in `engine.ts`, `useSeen` in `SprocketsPage.tsx`).
-A row starts out resting, holding the pose it has beside its messages (`REST_POSE`, `toward`), with no blinks or
+A row starts out resting, holding the pose it has beside its messages (`REST_POSE`, its resting pose, `rest`; ADR 0005's amendment of 2026-10-25), with no blinks or
 glances, so the loop sleeps. Its newest message changing, or its work ending, makes the reply unseen: it idles
 until you select it, then no new idle animation starts, and 1.4 s later (`SEEN_AFTER`) it rests once what's playing
 is over, so it settles in about 3 to 5 s. Resting never cuts an animation short. Following the pointer wakes it;

@@ -313,7 +313,7 @@ export function SprocketChat({
                     <div className="sp-said">
                       {team && m.author === "sprocket" && (
                         <span className="sp-avatar" aria-hidden>
-                          {/* Done: turned and leaning toward its message, still: a team chat leaves nothing to celebrate (ADR 0035). */}
+                          {/* Done: in its resting pose, looking up toward its message, still: a team chat leaves nothing to celebrate (ADR 0035). */}
                           {last && by && <DoneFace look={by.look} />}
                         </span>
                       )}
@@ -478,9 +478,9 @@ function ChatTab({ href: to, current, label, chat }: { href: string; current: bo
   );
 }
 
-/** A team member's face at the foot of its last message: looking up toward it, still (ADR 0035). */
+/** A team member's face at the foot of its last message: its resting pose, which looks up toward it, still (ADR 0035). */
 function DoneFace({ look }: { look: SprocketData["look"] }) {
-  return <Sprocket look={look} size={26} stance="toward" still />;
+  return <Sprocket look={look} size={26} stance="rest" still />;
 }
 
 /**

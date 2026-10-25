@@ -5,8 +5,9 @@ import { dotsAt, toDots, type Drawing } from "./morph.ts";
 import { REST_POSE, perform, pop, setIdles, setResting, type Activity, type Frame, type Rig } from "./engine.ts";
 import { clock, kick, useRig, useSprocketMotion } from "./motion.ts";
 import { ANIMATIONS, IDLES, type AnimationName } from "./animations.ts";
-import { EYE, EYE_X, Eyes } from "./parts.tsx";
-import { layerCount, layout, poseOf, type Box, type Stance } from "./solid.ts";
+import { Eyes, eyeDraw, type EyeDraw } from "./parts.tsx";
+import { OPEN } from "./clips.ts";
+import { layerCount, layout, poseOf, type Box, type Layout, type Stance } from "./solid.ts";
 
 /** The drawn area of the shared 200×215 coordinate system (the shadow included). */
 export const VIEW = { x: 14, y: 24, w: 172, h: 190 };
@@ -67,7 +68,6 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
   const rigEl = useRef<SVGGElement>(null);
   const layers = useRef<(SVGGElement | null)[]>([]);
   const eyes = useRef<SVGGElement>(null);
-  const look_ = useRef<SVGGElement>(null);
   const shadow = useRef<SVGEllipseElement>(null);
   const box = useRef<Box>(BOX);
 
@@ -93,11 +93,9 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
       el.setAttribute("transform", l.layers[i]);
       el.setAttribute("stroke-width", stroke);
     });
-    eyes.current?.setAttribute("transform", l.eyes.transform);
-    eyes.current?.setAttribute("opacity", String(l.eyes.opacity * g.eyes));
-    look_.current?.setAttribute("transform", `translate(${f.look[0].toFixed(2)} ${f.look[1].toFixed(2)})`);
+    eyes.current?.setAttribute("opacity", String(g.eyes));
     shadow.current?.setAttribute("rx", String(l.shadow.rx));
-    paintEyes(eyes.current, f, l.eyes.slant);
+    paintEyes(eyes.current, f, l);
   });
 
   const moving = !still;
@@ -184,42 +182,26 @@ export function Sprocket({ look, size, still, stance = "rest", follow = false, a
           );
           return layer;
         })}
-        <g ref={eyes} transform={l.eyes.transform} opacity={l.eyes.opacity * (drawing?.eyes ?? 1)}>
-          <g ref={look_}>
-            <Eyes slant={l.eyes.slant} />
-          </g>
+        <g ref={eyes} opacity={drawing?.eyes ?? 1}>
+          <Eyes eyes={([-1, 1] as const).map((side) => eyeDraw(side, OPEN, [0, 0], 0, 0, l.eyes.project)) as [EyeDraw, EyeDraw]} opacity={l.eyes.opacity} />
         </g>
       </g>
     </svg>
   );
 }
 
-/**
- * Each eye's shape for frame `f`: moved, and drawn at its size with its corners fully round, so it stays a capsule (a
- * circle when it's as wide as it's tall, a rounded line as the lid shuts, widening a touch). Happy, the open eye
- * squashes away as the arc grows in. Its slant follows the pose.
- */
-function paintEyes(root: SVGGElement | null, f: Frame, slant: number) {
+/** Each eye for frame `f`, on the face of layout `l` (parts.tsx eyeDraw): its shapes, and how much it shows. */
+function paintEyes(root: SVGGElement | null, f: Frame, l: Layout) {
   if (!root) return;
-  const shut = 1 - 0.92 * f.lid;
-  const wide = 1 + 0.08 * f.lid;
-  const n = (v: number) => v.toFixed(2);
   root.querySelectorAll<SVGGElement>(".s-eye").forEach((eye, i) => {
-    const x = i === 0 ? -EYE_X : EYE_X;
-    const s = i === 0 ? f.left : f.right;
-    eye.setAttribute("transform", `translate(${n(s.dx)} ${n(s.dy)})`);
-    eye.querySelector(".s-slant")?.setAttribute("transform", `rotate(${slant} ${x} 0)`);
+    const d = eyeDraw(i === 0 ? -1 : 1, i === 0 ? f.left : f.right, f.look, f.lid, f.happy, l.eyes.project);
+    eye.setAttribute("opacity", String(l.eyes.opacity[i]));
     const open = eye.querySelector(".s-open");
-    if (open) {
-      const w = EYE.w * s.sx * wide;
-      const h = EYE.h * s.sy * shut * (1 - 0.75 * f.happy);
-      const y = -h / 2 - 4 * f.happy;
-      for (const [k, v] of [["x", x - w / 2], ["y", y], ["width", w], ["height", h], ["rx", Math.min(w, h) / 2]] as const) open.setAttribute(k, n(v));
-      open.setAttribute("opacity", Math.max(0, 1 - f.happy * 1.6).toFixed(3));
-    }
+    open?.setAttribute("d", d.open);
+    open?.setAttribute("opacity", d.openOpacity.toFixed(3));
     const arc = eye.querySelector(".s-happy");
-    arc?.setAttribute("opacity", Math.min(1, Math.max(0, f.happy * 1.6 - 0.6)).toFixed(3));
-    arc?.setAttribute("transform", `translate(${x} 0) scale(${(s.sx * wide).toFixed(3)} ${(s.sy * shut * (0.5 + 0.5 * f.happy)).toFixed(3)}) translate(${-x} 0)`);
+    arc?.setAttribute("d", d.happy);
+    arc?.setAttribute("opacity", d.happyOpacity.toFixed(3));
   });
 }
 

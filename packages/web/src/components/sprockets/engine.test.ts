@@ -57,8 +57,8 @@ describe("a Sprocket's motion engine", () => {
   });
 
   it("cheering: happy eyes and a dance bouncing side to side, then back to its open eyes", () => {
-    const r = rig(input("idle", "toward"));
-    setInput(r, input("cheer", "toward"), r.clock);
+    const r = rig(input("idle", "rest"));
+    setInput(r, input("cheer", "rest"), r.clock);
     let [lo, hi, up, airborneWide] = [0, 0, 0, 1];
     const f = run(r, 2000, (f) => {
       lo = Math.min(lo, f.pose.slide);
@@ -72,7 +72,7 @@ describe("a Sprocket's motion engine", () => {
     expect(up).toBeGreaterThan(12);
     expect(airborneWide).toBeLessThan(1.05); // it squashes on the ground, not in the air
     expect(run(r, 1000).pose.slide).toBeCloseTo(0, 0); // back in the middle
-    setInput(r, input("idle", "toward"), r.clock);
+    setInput(r, input("idle", "rest"), r.clock);
     expect(run(r, 1000).happy).toBeLessThan(0.05);
   });
 
@@ -149,8 +149,8 @@ describe("a Sprocket's motion engine", () => {
   });
 
   it("satisfied: happy eyes and an elastic nod, squashing and stretching in place, then it rests", () => {
-    const r = rig(input("idle", "toward"));
-    setInput(r, input("satisfied", "toward"), r.clock);
+    const r = rig(input("idle", "rest"));
+    setInput(r, input("satisfied", "rest"), r.clock);
     let [wide, tall, up, slide, airborneWide, lid] = [1, 1, 0, 0, 1, 0];
     const f = run(r, 2200, (f) => {
       wide = Math.max(wide, f.pose.sx);
@@ -210,7 +210,7 @@ describe("a Sprocket's motion engine", () => {
   });
 
   it("an animation's faces blend in and out, and it blinks only where it says", () => {
-    const r = rig(input("idle", "toward"));
+    const r = rig(input("idle", "rest"));
     perform(r, ANIMATIONS.doze, r.clock);
     const lids: number[] = [];
     let narrowest = 1;
@@ -232,7 +232,7 @@ describe("a Sprocket's motion engine", () => {
 
   it("every animation starts and ends at rest, so one can follow another without a jump", () => {
     for (const a of Object.values(ANIMATIONS)) {
-      const r = rig(input("idle", "toward"));
+      const r = rig(input("idle", "rest"));
       perform(r, a, r.clock);
       const first = run(r, 16);
       const last = run(r, a.ms + 600);
@@ -241,7 +241,7 @@ describe("a Sprocket's motion engine", () => {
       expect(Math.abs(last.pose.sx - 1), a.name).toBeLessThan(0.02);
       expect(Math.abs(last.pose.slide), a.name).toBeLessThan(0.5);
       expect(Math.abs(last.pose.near - 1), a.name).toBeLessThan(0.02);
-      const turned = (((last.pose.yaw - POSES.toward.yaw) % 360) + 360) % 360;
+      const turned = (((last.pose.yaw - POSES.rest.yaw) % 360) + 360) % 360;
       expect(Math.min(turned, 360 - turned), a.name).toBeLessThan(1); // facing the same way (whole turns look the same)
       expect(last.happy, a.name).toBeLessThan(0.05);
     }

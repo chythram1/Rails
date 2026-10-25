@@ -178,7 +178,7 @@ export function perform(r: Rig, a: Animation, now: number) {
 const still = (r: Rig) => r.resting && !r.anim && !r.gesture && !r.input.follow;
 
 /** The pose a resting Sprocket holds: the one it has beside its messages. */
-export const REST_POSE: Stance = "toward";
+export const REST_POSE: Stance = "rest";
 
 /** Rest (see Rig.resting), or wake. Resting never cuts what's playing short: an animation, a done one or an idle one,
  * plays out first. */
@@ -370,7 +370,7 @@ export function advance(r: Rig, now: number, pointer: [number, number] | null): 
   const h = r.hold ?? {};
   go("yaw", h.yaw ?? (watching ? px * 36 : base.yaw + (leaning ? r.glance + r.turn * 0.2 : r.turn)) + r.spins * 360, k, d);
   go("pitch", h.pitch ?? (watching ? -py * 24 : base.pitch + r.tip), k, d);
-  go("roll", h.roll ?? (watching ? px * 7 : r.roll), 140, 11);
+  go("roll", h.roll ?? (watching ? px * 7 : base.roll + r.roll), 140, 11);
   go("near", h.near ?? 1 + r.near, 45, 11); // slow: it eases toward the screen
   // Aside: slowly with a lean-in's glance, quicker when a gesture moves it (a dance's bounces).
   if (leaning) go("slide", LEAN_GLANCE.slide, 60, 13);
