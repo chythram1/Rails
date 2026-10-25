@@ -354,7 +354,7 @@ export function SprocketChat({
                       {team && m.author === "sprocket" && (
                         <span className="sp-avatar" aria-hidden>
                           {/* Done: turned and leaning toward its message (turning there if it just came in). */}
-                          {last && by && !tail.has(m.id) && <Sprocket look={by.look} size={26} stance="toward" still={!pop} turnIn={pop} />}
+                          {last && by && !tail.has(m.id) && <Sprocket look={by.look} size={26} stance="toward" still={!pop} cheer={pop} />}
                         </span>
                       )}
                       <div className="sp-bubbles">

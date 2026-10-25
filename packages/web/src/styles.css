@@ -780,6 +780,9 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sprocket .s-shadow { fill: #000; opacity: var(--sprocket-shadow); }
 /* Eyes look about (motion.ts writes --ex/--ey in viewBox units). */
 .sprocket .s-eyes { transform: translate(calc(var(--ex, 0) * 1px), calc(var(--ey, 0) * 1px)); }
+/* Happy eyes (^ ^) while it dances (motion.ts adds `joy`). */
+.sprocket .s-happy, .sprocket.joy .s-open { opacity: 0; }
+.sprocket.joy .s-happy { opacity: 1; }
 
 /* ---- Sprockets page: list column + chat or creator (components/sprockets) ---- */
 .sprockets { display: flex; height: 100%; min-height: 0; }

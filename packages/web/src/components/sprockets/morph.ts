@@ -28,11 +28,12 @@ function ring(p: Extract<Primitive, { cx: number }>, n = 48): number[][] {
 
 const shapesOf = (look: SprocketLook) => CHARACTERS[look.character].body.map((p) => ("d" in p ? p.d : ring(p)));
 
-/** `a` and `b` mixed at `t`, in OKLab (in RGB a red and a teal pass through grey); the ends are the colours as they are. */
+/** `a` and `b` mixed at `t`, round the hue wheel in OKLCH (in RGB or OKLab a red and a teal pass through grey); the ends
+ * are the colours as they are. */
 function mix(a: string, b: string, t: number): string {
   if (t <= 0) return a.toLowerCase();
   if (t >= 1) return b.toLowerCase();
-  return `color-mix(in oklab, ${a} ${+((1 - t) * 100).toFixed(1)}%, ${b})`;
+  return `color-mix(in oklch, ${a} ${+((1 - t) * 100).toFixed(1)}%, ${b})`;
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;

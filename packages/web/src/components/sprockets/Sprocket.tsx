@@ -23,8 +23,8 @@ interface Props {
   busy?: boolean;
   /** Spin round, as it starts writing: plays when this turns true. */
   spin?: boolean;
-  /** Start at rest and turn to `stance` (a message that just came in). */
-  turnIn?: boolean;
+  /** A message that just came in: start at rest, dance a moment with happy eyes, and turn to `stance`. */
+  cheer?: boolean;
   /** The drawing midway between two Sprockets (TeamThinking's morph), instead of `look`'s. */
   drawing?: Frame;
   /** Accessible name. Without one the drawing is decorative and hidden from screen readers. */
@@ -39,7 +39,7 @@ const BOX: Box = { x: 40, y: 80, width: 120, height: 116 };
  * the outline and where the eyes sit, never as shading), the slab's band seen edge-on, and the eyes on the front face. s-pop squashes on a change of
  * look; s-eyes looks (motion.ts writes --ex/--ey); s-lid blinks; each s-eye changes size and shape.
  */
-export function Sprocket({ look, size, still, stance = "rest", follow, busy = false, spin = false, turnIn, drawing, label }: Props) {
+export function Sprocket({ look, size, still, stance = "rest", follow, busy = false, spin = false, cheer, drawing, label }: Props) {
   const def = CHARACTERS[look.character];
   const color = drawing?.color ?? COLORS[look.color];
   const round = drawing ? drawing.round : (def.round ?? 0);
@@ -60,7 +60,7 @@ export function Sprocket({ look, size, still, stance = "rest", follow, busy = fa
   const mounted = useRef(false);
 
   // Moving, it's drawn from where it started and motion.ts paints every frame after; still, from its stance.
-  const [from] = useState<Pose>(() => poseOf(turnIn ? "rest" : stance));
+  const [from] = useState<Pose>(() => poseOf(cheer ? "rest" : stance));
   const pose = live ? from : poseOf(stance);
   const shown = useRef(pose);
   const paint = useRef((p: Pose) => {
@@ -79,7 +79,7 @@ export function Sprocket({ look, size, still, stance = "rest", follow, busy = fa
   geometry.current = { axis, face, half: def.shadow.half };
 
   useBlink(lid, !still);
-  usePose(svg, paint, live && size >= 20, { stance, follow, busy, spin, from });
+  usePose(svg, paint, live && size >= 20, { stance, follow, busy, spin, cheer, from });
 
   // The band is as tall as the body: measure it (again when the body changes), and redraw where it is.
   useLayoutEffect(() => {

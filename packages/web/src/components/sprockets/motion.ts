@@ -1,8 +1,8 @@
 // Sprocket motion (see ref characters.md §5, and solid.ts for how it stands). This module holds the shared timing
 // tokens, whether motion is on, and what JS animates: blinks, the eyes changing shape for a moment, and its pose (it
-// turns, tips, leans, hops and squashes) with where its eyes look: calm at rest with a glance now and then, toward the
-// pointer in the creator and a hovered row, busy with one small move after another while thinking, and a spin round
-// as it starts writing.
+// turns, tips, rolls, leans, hops and squashes) with where its eyes look: calm at rest with a glance now and then,
+// toward the pointer in the creator and a hovered row, busy with one small move after another while thinking, a spin
+// round as it starts writing, and a little dance with happy eyes as its message arrives in a team.
 import { useEffect, useRef, useSyncExternalStore, type RefObject } from "react";
 import { POSES, type Pose, type Stance } from "./solid.ts";
 
@@ -68,6 +68,8 @@ const held = (to: string, outEase = EASE_BACK): Frames => [still, { transform: t
 const EXPRESSIONS: Record<string, () => [Frames, Frames, number]> = {
   // Both squeeze in together and squash: a cute scrunch.
   squeeze: () => [held("translate(5px, 1px) scale(1.25, 0.5)"), held("translate(-5px, 1px) scale(1.25, 0.5)"), 900],
+  // Round dots.
+  dots: () => [held("scale(1, 0.42)"), held("scale(1, 0.42)"), 1000],
   // Wide open.
   wide: () => [held("scale(1.25, 1.22)"), held("scale(1.25, 1.22)"), 750],
   // A happy squint.
@@ -99,8 +101,8 @@ function express(svg: SVGSVGElement | null, kind?: Expression) {
 }
 
 // ---- its pose, and where the eyes look ----
-// One requestAnimationFrame loop for every moving Sprocket. Each has damped springs: its turn, tip, lean, hop and
-// squash (painted through solid.ts), and its eyes (written as --ex/--ey). They aim at its stance (rest, facing you,
+// One requestAnimationFrame loop for every moving Sprocket. Each has damped springs: its turn, tip, roll, lean, hop
+// and squash (painted through solid.ts), and its eyes (written as --ex/--ey). They aim at its stance (rest, facing you,
 // toward a message) plus what it's doing on its own: a glance, the pointer, or a move while thinking. The loop stops once
 // every spring has settled and starts again when an aim changes.
 
@@ -113,6 +115,7 @@ interface Poser {
   paint: (p: Pose) => void;
   yaw: Spring;
   pitch: Spring;
+  roll: Spring;
   lean: Spring;
   hop: Spring;
   squash: Spring;
@@ -122,7 +125,7 @@ interface Poser {
   stance: Stance;
   follow: boolean;
   busy: boolean;
-  /** Turn, tip and lean added on its own (a glance, a move while thinking), and whole turns from spins. */
+  /** Turn, tip and roll added on its own (a glance, a move while thinking), and whole turns from spins. */
   turn: number;
   tip: number;
   tilt: number;
@@ -181,17 +184,19 @@ function step(now: number) {
     const [ax, ay] = watching ? [px, py] : (l.aim ?? [0, 0]);
     // Following the pointer it faces it, turning and tipping toward it; otherwise its stance plus its own moves.
     const [k, d] = l.busy ? [95, 12] : watching ? [90, 15] : [70, 14];
-    const yaw = watching ? px * 42 : base.yaw + l.turn;
-    const pitch = watching ? -py * 26 : base.pitch + l.tip;
+    const yaw = watching ? px * 36 : base.yaw + l.turn;
+    const pitch = watching ? -py * 24 : base.pitch + l.tip;
+    const roll = watching ? px * 7 : l.tilt;
     moving = spring(l.yaw, yaw + l.spins * 360, k, d, dt) || moving;
     moving = spring(l.pitch, pitch, k, d, dt) || moving;
-    moving = spring(l.lean, base.lean + l.tilt, 110, 12, dt) || moving;
+    moving = spring(l.roll, roll, 140, 11, dt) || moving;
+    moving = spring(l.lean, base.lean, 110, 12, dt) || moving;
     moving = spring(l.hop, 0, 300, 18, dt) || moving;
     moving = spring(l.squash, 0, 400, 16, dt) || moving;
     moving = spring(l.eyesX, ax, watching ? 260 : 620, watching ? 26 : 40, dt) || moving;
     moving = spring(l.eyesY, ay, watching ? 260 : 620, watching ? 26 : 40, dt) || moving;
     const q = l.squash.x;
-    l.paint({ yaw: l.yaw.x, pitch: l.pitch.x, lean: l.lean.x, sx: 1 + q, sy: 1 - q, hop: Math.max(0, l.hop.x) });
+    l.paint({ yaw: l.yaw.x, pitch: l.pitch.x, roll: l.roll.x, lean: l.lean.x, sx: 1 + q, sy: 1 - q, hop: Math.max(0, l.hop.x) });
     write(l, l.eyesX.x * 9, l.eyesY.x * 6);
   }
   frame = moving ? requestAnimationFrame(step) : 0;
@@ -217,36 +222,39 @@ interface PoseOptions {
   busy?: boolean;
   /** Spin round once when this turns true. */
   spin?: boolean;
+  /** Dance a moment with happy eyes when this turns true (or starts true). */
+  cheer?: boolean;
   /** The pose it starts from (it turns from there to its stance). */
   from: Pose;
 }
 
 /** A step of a move: how long to hold it (ms), and what it sets. */
 type MoveStep = [number, (l: Poser) => void];
-const set = (l: Poser, turn: number, tip: number, tilt: number, aim: [number, number] | null) => {
+const set = (l: Poser, turn: number, tip: number, roll: number, aim: [number, number] | null) => {
   l.turn = turn;
   l.tip = tip;
-  l.tilt = tilt;
+  l.tilt = roll;
   l.aim = aim;
 };
 
 /**
  * What a thinking Sprocket does, one after another: pondering upward, looking one way then the other, peeking round,
- * nodding, tilting its head, a bounce, a scrunch, and now and then a spin. Each takes a second or two; `weight` is
+ * nodding, tilting its head (a roll), a bounce, a scrunch (its eyes squeezing, going round or one big), and now and
+ * then a spin. Each takes a second or two; `weight` is
  * how often it comes up.
  */
 const MOVES: Record<string, { weight: number; steps: () => MoveStep[] }> = {
   ponder: { weight: 3, steps: () => {
     const side = pick([-1, 1]);
-    return [[rand(1100, 1700), (l) => set(l, side * rand(8, 16), rand(14, 20), side * 3, [side * 0.4, -0.9])], [rand(500, 900), (l) => set(l, side * 4, rand(6, 10), 0, [0, -0.5])]];
+    return [[rand(1100, 1700), (l) => set(l, side * rand(8, 16), rand(16, 24), side * rand(6, 12), [side * 0.4, -0.9])], [rand(500, 900), (l) => set(l, side * 4, rand(6, 10), side * 3, [0, -0.5])]];
   } },
   look: { weight: 3, steps: () => {
     const side = pick([-1, 1]);
-    return [[rand(700, 1000), (l) => set(l, side * rand(30, 42), rand(-2, 6), 0, [side * 0.8, -0.1])], [rand(700, 1000), (l) => set(l, -side * rand(30, 42), rand(-2, 6), 0, [-side * 0.8, -0.1])]];
+    return [[rand(700, 1000), (l) => set(l, side * rand(30, 42), rand(-2, 6), side * 5, [side * 0.8, -0.1])], [rand(700, 1000), (l) => set(l, -side * rand(30, 42), rand(-2, 6), -side * 5, [-side * 0.8, -0.1])]];
   } },
   peek: { weight: 2, steps: () => {
     const side = pick([-1, 1]);
-    return [[rand(900, 1300), (l) => set(l, side * rand(55, 68), rand(-8, -3), -side * 4, [side, 0.2])], [400, (l) => set(l, side * 10, 0, 0, null)]];
+    return [[rand(900, 1300), (l) => set(l, side * rand(50, 60), rand(-10, -4), side * 10, [side, 0.2])], [400, (l) => set(l, side * 10, 0, 0, null)]];
   } },
   nod: { weight: 2, steps: () => [
     [320, (l) => set(l, rand(-8, 8), -14, 0, [0, 0.5])],
@@ -256,14 +264,14 @@ const MOVES: Record<string, { weight: number; steps: () => MoveStep[] }> = {
   ] },
   tilt: { weight: 2, steps: () => {
     const side = pick([-1, 1]);
-    return [[700, (l) => set(l, side * 10, 6, side * 11, [side * 0.5, -0.5])], [700, (l) => set(l, -side * 6, 6, -side * 7, [-side * 0.4, -0.5])], [400, (l) => set(l, 0, 0, 0, null)]];
+    return [[700, (l) => set(l, side * 10, 6, side * 22, [side * 0.5, -0.5])], [700, (l) => set(l, -side * 6, 6, -side * 16, [-side * 0.4, -0.5])], [400, (l) => set(l, 0, 0, 0, null)]];
   } },
   bounce: { weight: 2, steps: () => [
     [260, (l) => ((l.squash.v -= 2.4), set(l, l.turn, 0, 0, [0, 0.2]))],
     [700, (l) => ((l.hop.v += rand(170, 220)), (l.squash.v += 3), set(l, l.turn, 10, 0, [0, -0.6]))],
     [500, (l) => set(l, l.turn, 0, 0, null)],
   ] },
-  scrunch: { weight: 1.5, steps: () => [[900, (l) => (express(l.el, pick(["squeeze", "curious", "wide"])), set(l, rand(-12, 12), rand(-4, 6), pick([-1, 1]) * 4, null))], [500, (l) => set(l, l.turn, 0, 0, null)]] },
+  scrunch: { weight: 1.5, steps: () => [[900, (l) => (express(l.el, pick(["squeeze", "curious", "wide", "dots"])), set(l, rand(-12, 12), rand(-4, 6), pick([-1, 1]) * 4, null))], [500, (l) => set(l, l.turn, 0, 0, null)]] },
   spin: { weight: 0.6, steps: () => [[1300, (l) => ((l.spins += pick([-1, 1])), (l.hop.v += 150), set(l, 0, 6, 0, [0, -0.4]))], [400, (l) => set(l, 0, 0, 0, null)]] },
 };
 
@@ -272,7 +280,7 @@ const MOVES: Record<string, { weight: number; steps: () => MoveStep[] }> = {
  * eyes sometimes changing shape. Facing you or turned toward a message it holds still; following, it faces the
  * pointer. Thinking (`busy`) it does one small move after another (`MOVES`), never the same twice running.
  */
-export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(p: Pose) => void>, enabled: boolean, { stance, follow = false, busy = false, spin = false, from }: PoseOptions) {
+export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(p: Pose) => void>, enabled: boolean, { stance, follow = false, busy = false, spin = false, cheer = false, from }: PoseOptions) {
   const poser = useRef<Poser | null>(null);
   useEffect(() => {
     const el = svg.current;
@@ -283,6 +291,7 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
       paint: (p) => paint.current(p),
       yaw: at(from.yaw),
       pitch: at(from.pitch),
+      roll: at(from.roll),
       lean: at(from.lean),
       hop: at(from.hop),
       squash: at(0),
@@ -388,4 +397,27 @@ export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(
     l.hop.v += 240;
     kick();
   }, [spin, enabled]);
+
+  // A dance: happy eyes (^ ^), rocking side to side with little hops, then back to its stance.
+  const cheered = useRef(false);
+  useEffect(() => {
+    const l = poser.current;
+    const was = cheered.current;
+    cheered.current = cheer;
+    if (!l || !cheer || was) return;
+    l.el.classList.add("joy");
+    const beats = [14, -14, 12, -10, 6, 0];
+    const timers = beats.map((roll, i) =>
+      setTimeout(() => {
+        l.tilt = roll;
+        if (i % 2 === 0 && roll) l.hop.v += 110;
+        kick();
+      }, i * 230),
+    );
+    timers.push(setTimeout(() => l.el.classList.remove("joy"), 1700));
+    return () => {
+      timers.forEach(clearTimeout);
+      l.el.classList.remove("joy");
+    };
+  }, [cheer, enabled]);
 }
