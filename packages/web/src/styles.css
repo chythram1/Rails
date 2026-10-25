@@ -1247,31 +1247,38 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
   background: var(--surface); border: 1px solid var(--border-strong); box-shadow: var(--shadow-pop);
 }
 
-.sp-creator { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-/* One centred column: preview, colour / shape rows, name, button. */
-.sp-creator-body {
-  flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 28px 20px 32px;
-  display: flex; flex-direction: column; align-items: center; gap: 16px;
+/* New Sprocket (SprocketCreator.tsx): the small dialog's frame in three parts: a header with the title and a close
+   button on a rule, the preview, name, shapes and colours centred, then Cancel and Create on a rule. */
+.sp-create form { padding: 0; }
+.sp-create-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 24px; border-bottom: 1px solid var(--border); }
+.sp-create h2 { margin: 0; font-size: 16px; }
+.sp-create-body {
+  max-height: calc(100dvh - 160px); overflow-y: auto; overscroll-behavior: contain; padding: 20px 24px 24px;
+  display: flex; flex-direction: column; align-items: center; gap: 18px;
 }
-.sp-creator-body > .sprocket { margin-bottom: 4px; }
-.sp-row-picker { border: 0; padding: 0; margin: 0; min-width: 0; max-width: 520px; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.sp-create-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 24px; border-top: 1px solid var(--border); }
+.sp-create .error { margin: 0; align-self: stretch; }
+.sp-row-picker { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; grid-template-columns: repeat(var(--cols), auto); justify-content: center; gap: 6px; }
 .sp-pick { position: relative; display: grid; place-items: center; cursor: pointer; }
 .sp-pick input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
 .sp-pick:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
 /* Colours: round swatches; the chosen one gets a ring. */
+.sp-row-picker.swatch { gap: 6px 10px; }
 .swatch .sp-pick { width: 36px; height: 36px; border-radius: 50%; }
 .sp-swatch { width: 26px; height: 26px; border-radius: 50%; }
 .swatch .sp-pick:has(input:checked) { box-shadow: 0 0 0 2px var(--text); }
 /* Shapes: square thumbnails; the chosen one gets the blue segment fill and an edge. */
-.thumb .sp-pick { width: 50px; height: 50px; border: 1px solid transparent; }
+.sp-row-picker.thumb { gap: 8px; }
+.thumb .sp-pick { width: 62px; height: 62px; border: 1px solid transparent; }
 .thumb .sp-pick:has(input:checked) { border-color: var(--tint-ink); background: var(--tint); }
-.sp-name { width: 100%; max-width: 360px; margin-top: 12px; }
+/* The name: one field across the dialog, its text centred under the preview. */
+.sp-name { align-self: stretch; }
 /* Name ideas slide up through the empty field, one every 2.6s (IDEA_MS in SprocketCreator.tsx). */
 .sp-name-input { position: relative; display: block; overflow: hidden; }
-.sp-name-input input { width: 100%; }
+.sp-name-input input { width: 100%; text-align: center; }
 .sp-name-input:has(.sp-name-idea) input::placeholder { color: transparent; }
 .sp-name-idea {
-  position: absolute; inset: 0 auto 0 13px; display: flex; align-items: center; pointer-events: none;
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none;
   color: var(--muted); animation: sp-name-idea 2600ms ease-in-out both;
 }
 @keyframes sp-name-idea {
@@ -1279,10 +1286,6 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
   12%, 88% { opacity: 1; transform: none; }
   100% { opacity: 0; transform: translateY(-10px); }
 }
-@container (max-width: 560px) {
-  .sp-row-picker { display: grid; grid-template-columns: repeat(var(--cols), auto); }
-}
-.sp-actions { display: flex; gap: 8px; margin-top: 8px; }
 .sp-card-name { font: 600 17px/1.3 var(--grotesk); color: var(--text); }
 
 /* Gallery: the page with no Sprocket open. Square filled cards, the character top

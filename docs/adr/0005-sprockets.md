@@ -10,7 +10,9 @@ one's chat, or the creator. The creator follows `ref/sprockets/stage1/create-bot
 top, then a row each for colour, accessory and shape, then the name. The empty name field cycles through
 name ideas (an empty name takes the one showing). The list column's header is a search field, not a
 title, so the word "Sprockets" shows once (the nav item). With no Sprocket open, the page shows them all as cards; a chat
-opens with the Sprocket itself, and time labels mark gaps between messages.
+opens with the Sprocket itself, and time labels mark gaps between messages. (Amended 2026-10-25: the creator is a
+dialog over the page, not a page of its own: the preview, the name, then the shapes and the colours, so making one
+never closes the chat that's open; DESIGN.md's Dialogs.)
 
 Stage 1 is visual only. Sprockets can be created, restyled, renamed and deleted (restyling was dropped
 later: a Sprocket's look is chosen once, when it's made), and the user can send

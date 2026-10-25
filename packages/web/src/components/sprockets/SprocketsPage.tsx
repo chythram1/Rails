@@ -34,6 +34,10 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
   const [filter, setFilter] = useState("all");
   /** The New team dialog (from the list's New menu). */
   const [makingTeam, setMakingTeam] = useState(false);
+  /** The New Sprocket dialog, from the list's New menu (the gallery's New card links to #/sprockets/new). */
+  const [making, setMaking] = useState(false);
+  /** With no Sprockets yet the dialog opens by itself, once: closed, the empty gallery shows. */
+  const [welcomed, setWelcomed] = useState(false);
   // Ready before a settings panel opens: the server can take a moment to list the models.
   useEffect(() => void fetchModelSettings().catch(() => {}), []);
 
@@ -45,11 +49,14 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
   const current = route.id && !onTeam ? list.find((s) => s.id === route.id) : undefined;
   const team = onTeam ? chats.find((g) => g.id === route.id) : undefined;
   const lead = team && list.find((s) => s.id === team.members[0]);
-  const creating = route.view === "new" || (route.view === "list" && list.length === 0);
+  const creating = making || route.view === "new" || (route.view === "list" && list.length === 0 && !welcomed);
+  const closeCreator = () => {
+    setMaking(false);
+    setWelcomed(true);
+    if (route.view === "new") navigate(href.sprockets());
+  };
   let main;
-  if (creating) {
-    main = <SprocketCreator key="new" taken={list.map((s) => s.name)} onSaved={(s) => navigate(href.sprocket(s.id))} onCancel={list.length ? () => navigate(href.sprockets()) : undefined} />;
-  } else if ((route.view === "chat" || route.view === "settings") && current) {
+  if ((route.view === "chat" || route.view === "settings") && current) {
     // The chat stays put while its settings panel opens and closes beside it. The key is on the wrapper:
     // another Sprocket gets a fresh chat and panel (siblings sharing one key would pile up old chats).
     const panel = route.view === "settings";
@@ -76,17 +83,25 @@ export function SprocketsPage({ route }: { route: SprocketsRoute }) {
   }
 
   return (
-    <div className={"sprockets " + (route.view === "list" && !creating ? "at-list" : "at-detail")}>
+    <div className={"sprockets " + (route.view === "list" || route.view === "new" ? "at-list" : "at-detail")}>
       <SprocketList
         list={list}
         chats={chats}
         projects={projects}
         filter={shownFilter}
         onFilter={setFilter}
+        onNewSprocket={() => setMaking(true)}
         onNewTeam={() => setMakingTeam(true)}
         activeId={route.id}
       />
       <section className="sp-main">{main}</section>
+      {creating && (
+        <SprocketCreator
+          taken={list.map((s) => s.name)}
+          onSaved={(s) => (setMaking(false), setWelcomed(true), navigate(href.sprocket(s.id)))}
+          onClose={closeCreator}
+        />
+      )}
       {makingTeam && (
         <TeamDialog
           all={list}
@@ -113,10 +128,11 @@ function SprocketList(props: {
   projects: Project[];
   filter: string;
   onFilter(key: string): void;
+  onNewSprocket(): void;
   onNewTeam(): void;
   activeId?: string;
 }) {
-  const { list, chats, projects, filter, onFilter, onNewTeam, activeId } = props;
+  const { list, chats, projects, filter, onFilter, onNewSprocket, onNewTeam, activeId } = props;
   const [query, setQuery] = useState("");
   const all = useMemo(() => groupSprockets(list, projects), [list, projects]);
   const nameOf = (id: string) => list.find((s) => s.id === id)?.name;
@@ -148,7 +164,7 @@ function SprocketList(props: {
           className="sp-new-btn"
           align="right"
           items={[
-            { label: "New Sprocket", icon: <Plus size={16} />, onSelect: () => navigate(href.newSprocket()) },
+            { label: "New Sprocket", icon: <Plus size={16} />, onSelect: onNewSprocket },
             { label: "New team", icon: <UsersPlus size={16} />, disabled: list.length < 2, note: list.length < 2 ? "Needs two Sprockets" : undefined, onSelect: onNewTeam },
           ]}
         />

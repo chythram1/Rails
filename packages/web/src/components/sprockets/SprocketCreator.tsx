@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { IconChevronLeft as ChevronLeft } from "@tabler/icons-react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { IconX as X } from "@tabler/icons-react";
 import {
   SPROCKET_CHARACTERS,
   SPROCKET_COLORS,
@@ -7,7 +8,6 @@ import {
   type SprocketLook,
 } from "@rails/shared";
 import { api } from "../../api.ts";
-import { href } from "../../router.ts";
 import { CHARACTERS, COLORS } from "./characters.ts";
 import { COLOR_NAMES } from "./names.ts";
 import { Sprocket } from "./Sprocket.tsx";
@@ -38,13 +38,17 @@ interface Props {
   /** Names already in use, which the name ideas skip. */
   taken: string[];
   onSaved(s: SprocketData): void;
-  onCancel?(): void;
+  onClose(): void;
 }
 
 /**
- * Make a Sprocket (ref/sprockets/stage1/create-bot.jpg): the preview on top, then rows for colour and shape, then the name. Its look is chosen once, here: it can't be changed later.
+ * Make a Sprocket, in a dialog over the page: a header with the title and a close button, then the preview, the name,
+ * the shapes and the colours, centred, then Cancel and Create on a rule. Its look is chosen once, here: it can't be
+ * changed later.
  */
-export function SprocketCreator({ taken, onSaved, onCancel }: Props) {
+export function SprocketCreator({ taken, onSaved, onClose }: Props) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const input = useRef<HTMLInputElement>(null);
   const [look, setLook] = useState<SprocketLook>(NEW_LOOK);
   const [name, setName] = useState("");
   const [error, setError] = useState("");
@@ -55,78 +59,91 @@ export function SprocketCreator({ taken, onSaved, onCancel }: Props) {
   const shownName = name.trim() || idea;
   const set = <K extends keyof SprocketLook>(key: K) => (v: SprocketLook[K]) => setLook((l) => ({ ...l, [key]: v }));
 
+  useLayoutEffect(() => {
+    // Focus goes back to what opened it, or to the list's New button when that's gone (a menu item) or unknown.
+    const opener = document.activeElement as HTMLElement | null;
+    const d = dialog.current!;
+    d.showModal();
+    input.current!.focus();
+    return () => {
+      d.close();
+      const back = opener && opener !== document.body && opener.isConnected ? opener : document.querySelector<HTMLElement>(".sp-new-btn");
+      back?.focus();
+    };
+  }, []);
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError("");
     try {
-      const body = { name: shownName, look };
-      onSaved(await api.createSprocket(body));
+      onSaved(await api.createSprocket({ name: shownName, look }));
     } catch (err: any) {
       setError(err.message);
       setSaving(false);
     }
   };
 
-  return (
-    <form className="sp-creator" onSubmit={submit} aria-labelledby="sp-creator-title">
-      <header className="sp-head">
-        <a className="icon-btn sp-back" href={href.sprockets()} aria-label="Back">
-          <ChevronLeft size={18} />
-        </a>
-        <h2 id="sp-creator-title" className="truncate">New Sprocket</h2>
-      </header>
-      <div className="sp-creator-body">
-        <Sprocket look={look} size={150} follow stance="front" label={`Preview of ${shownName}`} />
-
-        <Row legend="Colour" name="sp-color" value={look.color} onChange={set("color")}
-          options={SPROCKET_COLORS.map((c) => ({ value: c, label: COLOR_NAMES[c], view: <span className="sp-swatch" style={{ background: COLORS[c] }} /> }))}
-          variant="swatch" narrowColumns={5} />
-        <Row legend="Shape" name="sp-shape" value={look.character} onChange={set("character")}
-          options={SPROCKET_CHARACTERS.map((c) => ({ value: c, label: CHARACTERS[c].name, view: <Sprocket look={{ ...look, character: c }} size={38} still /> }))} narrowColumns={4} />
-
-        <label className="field sp-name">
-          <span>Name</span>
-          <span className="sp-name-input">
-            {/* The placeholder holds the idea for screen readers; sighted users see it animate in the span. */}
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={idea} maxLength={MAX_NAME} autoComplete="off" spellCheck={false} />
-            {ideas && (
-              <span key={idea} className="sp-name-idea" aria-hidden>
-                {idea}
-              </span>
-            )}
-          </span>
-        </label>
-        {error && <p className="error" role="alert">{error}</p>}
-        <div className="sp-actions">
-          {onCancel && (
-            <button type="button" className="btn" onClick={onCancel}>
-              Cancel
-            </button>
-          )}
-          <button className="btn primary" disabled={saving}>Get started</button>
+  return createPortal(
+    <dialog
+      ref={dialog}
+      className="small-dialog sp-create"
+      aria-labelledby="sp-creator-title"
+      onCancel={(e) => (e.preventDefault(), onClose())}
+      onClick={(e) => e.target === dialog.current && onClose()}
+    >
+      <form onSubmit={submit}>
+        <header className="sp-create-head">
+          <h2 id="sp-creator-title">New Sprocket</h2>
+          <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </header>
+        <div className="sp-create-body">
+          <Sprocket look={look} size={112} follow stance="front" label={`Preview of ${shownName}`} />
+          <label className="sp-name">
+            <span className="sr-only">Name</span>
+            <span className="sp-name-input">
+              {/* The placeholder holds the idea for screen readers; sighted users see it animate in the span. */}
+              <input ref={input} className="input" value={name} onChange={(e) => (setName(e.target.value), setError(""))} placeholder={idea} maxLength={MAX_NAME} autoComplete="off" spellCheck={false} />
+              {ideas && (
+                <span key={idea} className="sp-name-idea" aria-hidden>
+                  {idea}
+                </span>
+              )}
+            </span>
+          </label>
+          <Row legend="Shape" name="sp-shape" value={look.character} onChange={set("character")} columns={4}
+            options={SPROCKET_CHARACTERS.map((c) => ({ value: c, label: CHARACTERS[c].name, view: <Sprocket look={{ ...look, character: c }} size={54} still /> }))} />
+          <Row legend="Colour" name="sp-color" value={look.color} onChange={set("color")} variant="swatch" columns={5}
+            options={SPROCKET_COLORS.map((c) => ({ value: c, label: COLOR_NAMES[c], view: <span className="sp-swatch" style={{ background: COLORS[c] }} /> }))} />
+          {error && <p className="error small" role="alert">{error}</p>}
         </div>
-      </div>
-    </form>
+        <footer className="sp-create-foot">
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn primary" disabled={saving}>Create</button>
+        </footer>
+      </form>
+    </dialog>,
+    document.body,
   );
 }
 
 /**
- * One picker row: a radio group whose options are drawn as swatches or thumbnails. Arrow keys move
- * between options; each option's name is its tooltip and its accessible name.
+ * One picker: a radio group whose options are drawn as swatches or thumbnails, in a grid of `columns`. Arrow keys
+ * move between options; each option's name is its tooltip and its accessible name.
  */
-function Row<T extends string>({ legend, name, value, options, onChange, variant = "thumb", narrowColumns }: {
+function Row<T extends string>({ legend, name, value, options, onChange, variant = "thumb", columns }: {
   legend: string;
   name: string;
   value: T;
   options: { value: T; label: string; view: ReactNode }[];
   onChange(v: T): void;
   variant?: "thumb" | "swatch";
-  /** Columns on narrow screens, where one line doesn't fit, so the row wraps evenly. */
-  narrowColumns: number;
+  columns: number;
 }) {
   return (
-    <fieldset className={"sp-row-picker " + variant} style={{ "--cols": narrowColumns } as React.CSSProperties}>
+    <fieldset className={"sp-row-picker " + variant} style={{ "--cols": columns } as React.CSSProperties}>
       <legend className="sr-only">{legend}</legend>
       {options.map((o) => (
         <label key={o.value} className="sp-pick" title={o.label}>
