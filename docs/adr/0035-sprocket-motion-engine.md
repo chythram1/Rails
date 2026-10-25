@@ -21,6 +21,10 @@ throwaway page and a strip of screenshots.
 - **Clips as data** (`clips.ts`): gestures are lists of timed steps (turn, tip, roll, where the eyes look, kicks to hop
   and squash, a spin, an expression), lean-ins are lists of nearness and time, expressions are keyframes of each eye's
   shape, and the blink is a curve. A new move is a new entry, not more timer code.
+- **Finished animations, apart from their parts** (`animations.ts`): the polished set a Sprocket plays, each naming
+  when it plays, how long it lasts, its gesture and its eyes (Cheer first). Every one shares the same blinks,
+  expressions and leaning in, so a Sprocket behaves predictably wherever it is; what's decided per animation is
+  when it plays. The parts in `clips.ts` are what they're built from.
 - **Eyes drawn from numbers.** Each frame gives each eye a shape (moved and sized), how shut its lid is and how happy
   it is; `Sprocket.tsx` paints them. The happy arc grows in as the open eye squashes away, so it can blend.
 - **One loop, one clock** (`motion.ts`): a single requestAnimationFrame loop runs every moving rig and sleeps until
@@ -33,4 +37,5 @@ throwaway page and a strip of screenshots.
 
 - The look and timings are those of ADR 0005's amendments; this changes how they're built, not what they are.
 - Reduced motion is one input (`faceOnly`): the pose holds and only blinks and happy eyes move, as before.
-- New expressions, emotions and dances are data in `clips.ts`, checked in the lab.
+- A new animation is an entry in `animations.ts` built from parts in `clips.ts`, checked in the lab, whose
+  Animations section lists only the finished ones.

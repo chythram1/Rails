@@ -2,6 +2,7 @@
 // every moving Sprocket's rig (engine.ts). The loop draws a frame while anything moves, then sleeps until the next
 // thing a rig has planned (a blink, a glance, a lean-in). Its clock can be slowed, paused and stepped (the lab).
 import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { ANIMATIONS } from "./animations.ts";
 import { advance, createRig, setInput, type Frame, type Input, type Rig } from "./engine.ts";
 import type { Pose } from "./solid.ts";
 
@@ -19,11 +20,8 @@ export function useSprocketMotion(): boolean {
   );
 }
 
-/** How long a Sprocket cheers when its message lands: happy eyes (^ ^) the whole time, dancing for the first 1.5s. */
-const CHEER_MS = 5000;
-
 /**
- * True while a Sprocket cheers: for CHEER_MS from each time `key` (its newest message) changes, or from the start if
+ * True while a Sprocket cheers (animations.ts): for as long as the cheer lasts from each time `key` (its newest message) changes, or from the start if
  * it starts set and `fromStart`. The timer isn't cleared on cleanup, so StrictMode's second effect run can't end it.
  */
 export function useCheering(key: string | undefined, fromStart = false): boolean {
@@ -35,7 +33,7 @@ export function useCheering(key: string | undefined, fromStart = false): boolean
     seen.current = key;
     const n = ++count.current;
     setOn(true);
-    setTimeout(() => n === count.current && setOn(false), CHEER_MS);
+    setTimeout(() => n === count.current && setOn(false), ANIMATIONS.cheer.ms);
   }, [key]);
   return on;
 }

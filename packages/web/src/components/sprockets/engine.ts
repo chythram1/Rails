@@ -6,9 +6,11 @@
 //   3. leaning in, on its own clock, which leads over a gesture's turn while it lasts;
 //   4. the face: an expression, a blink and happy eyes, on their own clocks.
 // The director picks what plays from the activity: resting glances now and then and leans in gently, thinking does
-// one move after another and leans in often, writing spins once, cheering dances with happy eyes.
+// one move after another and leans in often, writing spins once, and a finished animation (animations.ts, such as
+// cheering) plays its gesture with its eyes.
 import { POSES, type Pose, type Stance } from "./solid.ts";
-import { BLINK_MS, DANCE, EXPRESSIONS, GLANCE, LEAN_GLANCE, LEANS, OPEN, SPIN, THINKING, eyeAt, lidAt, type EyeShape, type Expression, type ExpressionName, type Gesture, type Rand, type Step } from "./clips.ts";
+import { ANIMATIONS } from "./animations.ts";
+import { BLINK_MS, EXPRESSIONS, GLANCE, LEAN_GLANCE, LEANS, OPEN, SPIN, THINKING, eyeAt, lidAt, type EyeShape, type Expression, type ExpressionName, type Gesture, type Rand, type Step } from "./clips.ts";
 
 /** What a Sprocket is doing. */
 export type Activity = "idle" | "think" | "write" | "cheer";
@@ -145,7 +147,7 @@ function begin(r: Rig, now: number) {
   } else if (activity === "write") {
     play(r, "spin", SPIN, now);
   } else if (activity === "cheer") {
-    play(r, "dance", DANCE, now);
+    play(r, "cheer", ANIMATIONS.cheer.gesture, now);
   }
 }
 
@@ -275,7 +277,7 @@ export function advance(r: Rig, now: number, pointer: [number, number] | null): 
   go("squash", 0, 400, 16);
   go("lookX", leaning ? LEAN_GLANCE.aim : ax, ek, ed);
   go("lookY", ay, ek, ed);
-  go("happy", activity === "cheer" ? 1 : 0, 300, 30);
+  go("happy", activity === "cheer" && ANIMATIONS.cheer.eyes === "happy" ? 1 : 0, 300, 30);
   const t = now;
   const e = r.expression;
   const frame: Frame = {

@@ -3,6 +3,7 @@ import { SPROCKET_CHARACTERS, SPROCKET_COLORS, type SprocketCharacter, type Spro
 import { Dropdown } from "../ui/Dropdown.tsx";
 import { Segmented } from "../ui/Segmented.tsx";
 import { Switch } from "../ui/Switch.tsx";
+import { ANIMATIONS } from "./animations.ts";
 import { CHARACTERS } from "./characters.ts";
 import { DANCE, EXPRESSIONS, GLANCE, SPIN, THINKING, type ExpressionName, type Gesture } from "./clips.ts";
 import { blink, express, leanIn, play, type Activity, type Rig } from "./engine.ts";
@@ -33,6 +34,13 @@ export default function SprocketLab() {
   const [holding, setHolding] = useState(false);
   const [held, setHeld] = useState<Held>({ yaw: 0, pitch: 0, roll: 0, near: 1 });
   const rigs = useRef(new Map<string, Rig>());
+  // A finished animation plays as it does in the app: its activity for as long as it lasts, then back.
+  const [playing, setPlaying] = useState<keyof typeof ANIMATIONS | null>(null);
+  useEffect(() => {
+    if (!playing) return;
+    const t = setTimeout(() => setPlaying(null), ANIMATIONS[playing].ms / Math.max(Number(speed), 0.05));
+    return () => clearTimeout(t);
+  }, [playing]);
 
   const each = (fn: (r: Rig, now: number) => void) => {
     const now = clock();
@@ -57,6 +65,18 @@ export default function SprocketLab() {
       <p className="muted">Dev builds only. Play any clip, hold a pose, and slow the motion clock down to look closely.</p>
       <div className="lab-body">
         <div className="lab-controls">
+          <section aria-labelledby="lab-animations">
+            <h2 id="lab-animations" className="lab-h">Animations</h2>
+            {(Object.keys(ANIMATIONS) as (keyof typeof ANIMATIONS)[]).map((a) => (
+              <div key={a} className="lab-animation">
+                <button className="btn" aria-pressed={playing === a} onClick={() => setPlaying(a)}>
+                  {ANIMATIONS[a].name}
+                </button>
+                <span className="muted">{ANIMATIONS[a].when}</span>
+              </div>
+            ))}
+          </section>
+
           <section aria-labelledby="lab-look">
             <h2 id="lab-look" className="lab-h">Look</h2>
             <div className="lab-row">
@@ -123,7 +143,7 @@ export default function SprocketLab() {
           </section>
 
           <section aria-labelledby="lab-gestures">
-            <h2 id="lab-gestures" className="lab-h">Gestures</h2>
+            <h2 id="lab-gestures" className="lab-h">Parts: gestures</h2>
             <div className="lab-buttons">
               {Object.keys(GESTURES).map((g) => (
                 <button key={g} className="btn" onClick={() => each((r, now) => play(r, g, GESTURES[g], now))}>
@@ -137,7 +157,7 @@ export default function SprocketLab() {
           </section>
 
           <section aria-labelledby="lab-face">
-            <h2 id="lab-face" className="lab-h">Face</h2>
+            <h2 id="lab-face" className="lab-h">Parts: face</h2>
             <div className="lab-buttons">
               {(Object.keys(EXPRESSIONS) as ExpressionName[]).map((e) => (
                 <button key={e} className="btn" onClick={() => each((r, now) => express(r, e, now))}>
@@ -170,7 +190,7 @@ export default function SprocketLab() {
 
         <div className={"lab-stage" + (all ? " all" : "")}>
           {shown.map((c) => (
-            <Sprocket key={c} look={{ character: c, color }} size={Number(size)} stance={stance} follow={follow} activity={activity} label={CHARACTERS[c].name} onRig={track(c)} />
+            <Sprocket key={c} look={{ character: c, color }} size={Number(size)} stance={stance} follow={follow} activity={playing ? ANIMATIONS[playing].activity : activity} label={CHARACTERS[c].name} onRig={track(c)} />
           ))}
         </div>
       </div>

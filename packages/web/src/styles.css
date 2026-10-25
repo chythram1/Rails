@@ -783,6 +783,8 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .lab-row input[type="range"] { flex: 1; accent-color: var(--blue); }
 .lab-value { width: 44px; text-align: right; font: 400 12px var(--mono); color: var(--text-2); }
 .lab-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.lab-animation { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+.lab-animation .btn { flex-shrink: 0; min-width: 88px; }
 .lab-stage { flex: 1; min-height: 420px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); background: var(--surface); position: sticky; top: 24px; }
 .lab-stage.all { flex-wrap: wrap; gap: 16px; align-content: center; padding: 24px; }
 @media (max-width: 860px) { .lab-body { flex-direction: column; } .lab-controls { width: 100%; } .lab-stage { position: static; width: 100%; } }
