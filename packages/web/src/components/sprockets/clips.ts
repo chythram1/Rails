@@ -127,6 +127,19 @@ export const DANCE: Gesture = () => [
 ];
 
 /**
+ * A satisfied nod: an elastic bounce in place. It squashes down and dips its head (anticipation), stretches tall as it
+ * hops with its chin up, lands squashed wide with a nod down, rebounds a little and wobbles to a stop. Squash is wide
+ * and short (+), stretch tall and thin (-).
+ */
+export const NOD: Gesture = () => [
+  { ms: 140, squash: 3, tip: -6, aim: [0, 0.3] },
+  { ms: 260, hop: 270, squash: -6, tip: 10, aim: [0, -0.5] },
+  { ms: 200, squash: 7, tip: -12, aim: [0, 0.4] },
+  { ms: 220, hop: 110, squash: -3, tip: 6, aim: [0, -0.2] },
+  { ms: 300, squash: 1.6, tip: 0, aim: null },
+];
+
+/**
  * Surveying what's below: a pause at one end, then its eyes scanning along an upside-down arc (∪), from one side down
  * through the middle to the other and back, its body tipped down a little and turning after them.
  */

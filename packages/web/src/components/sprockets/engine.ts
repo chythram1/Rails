@@ -12,8 +12,9 @@ import { POSES, type Pose, type Stance } from "./solid.ts";
 import { animationFor, type Animation } from "./animations.ts";
 import { BLINK_MS, EXPRESSIONS, GLANCE, LEAN_GLANCE, LEANS, OPEN, SPIN, THINKING, eyeAt, lidAt, type EyeShape, type Expression, type ExpressionName, type Gesture, type Rand, type Step } from "./clips.ts";
 
-/** What a Sprocket is doing: resting, thinking (direct chats), writing (the spin), cheering, or talking in a team. */
-export type Activity = "idle" | "think" | "write" | "cheer" | "talk";
+/** What a Sprocket is doing: resting, thinking (direct chats), writing (the spin), or one of the finished animations
+ * (animations.ts): cheering, talking in a team (surveying), satisfied. */
+export type Activity = "idle" | "think" | "write" | "cheer" | "talk" | "satisfied";
 
 /** What a rig is told by its Sprocket. */
 export interface Input {

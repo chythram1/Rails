@@ -144,4 +144,22 @@ describe("a Sprocket's motion engine", () => {
     expect(r.gesture?.name ?? "").not.toBe("Survey");
     expect(r.nextGlance).toBeLessThan(Infinity);
   });
+
+  it("satisfied: happy eyes and an elastic nod, squashing and stretching in place, then it rests", () => {
+    const r = rig(input("idle", "toward"));
+    setInput(r, input("satisfied", "toward"), r.clock);
+    let [wide, tall, up, slide] = [1, 1, 0, 0];
+    const f = run(r, 1100, (f) => {
+      wide = Math.max(wide, f.pose.sx);
+      tall = Math.min(tall, f.pose.sx);
+      up = Math.max(up, f.pose.hop);
+      slide = Math.max(slide, Math.abs(f.pose.slide));
+    });
+    expect(f.happy).toBeGreaterThan(0.95);
+    expect(wide).toBeGreaterThan(1.12); // squashed wide
+    expect(tall).toBeLessThan(0.88); // stretched tall
+    expect(up).toBeGreaterThan(6);
+    expect(slide).toBeLessThan(0.5); // in place: no side to side
+    expect(run(r, 1000).happy).toBeLessThan(0.05); // over on time
+  });
 });

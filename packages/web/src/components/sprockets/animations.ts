@@ -2,7 +2,7 @@
 // They're built from the parts in clips.ts, and every one shares the same blinks, expressions and leaning in, so a
 // Sprocket behaves the same way wherever it is. Each plays once, for a set time, then the Sprocket goes back to
 // resting. What's left to decide per animation is when it plays.
-import { DANCE, SURVEY, type Gesture } from "./clips.ts";
+import { DANCE, NOD, SURVEY, type Gesture } from "./clips.ts";
 
 /** One finished animation. */
 export interface Animation {
@@ -10,7 +10,7 @@ export interface Animation {
   /** When it plays, in words (the lab shows it). */
   when: string;
   /** What the Sprocket is doing while it plays (engine.ts's activity). */
-  activity: "cheer" | "talk";
+  activity: "cheer" | "talk" | "satisfied";
   /** How long it lasts, its eyes included: one piece, so they go with it. Then it rests. */
   ms: number;
   /** The gesture it plays as it starts. */
@@ -26,6 +26,14 @@ export const ANIMATIONS = {
     activity: "cheer",
     ms: 2200, // the dance (1.9s), and a moment for the eyes to ease back as it settles
     gesture: DANCE,
+    eyes: "happy",
+  },
+  satisfied: {
+    name: "Satisfied",
+    when: "Not placed in the app yet.",
+    activity: "satisfied",
+    ms: 1600, // the nod (1.1s), and a moment for the eyes to ease back as it settles
+    gesture: NOD,
     eyes: "happy",
   },
   survey: {
