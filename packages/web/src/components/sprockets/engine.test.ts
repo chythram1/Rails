@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { IDLE_FIRST, IDLE_GAP, REST_POSE, advance, createRig, express, perform, setIdles, setInput, setResting, type Activity, type Frame, type Input, type Rig } from "./engine.ts";
+import { FOLLOW, IDLE_FIRST, IDLE_GAP, REST_POSE, advance, createRig, express, perform, setIdles, setInput, setResting, type Activity, type Frame, type Input, type Rig } from "./engine.ts";
 import { ANIMATIONS, IDLES } from "./animations.ts";
 import { BLINK_MS, FACES, FACE_MS, faceAt, lidAt } from "./clips.ts";
 import { POSES, poseOf, type Stance } from "./solid.ts";
@@ -84,12 +84,16 @@ describe("a Sprocket's motion engine", () => {
     expect(lidAt(BLINK_MS)).toBe(0);
   });
 
-  it("following the pointer turns and tips toward it, eyes on it", () => {
-    const r = rig(input("idle", "front", { follow: true }));
-    const f = run(r, 2000, () => {}, [0.5, -0.4]);
-    expect(f.pose.yaw).toBeGreaterThan(15);
-    expect(f.pose.pitch).toBeGreaterThan(8);
+  it("following the pointer, it leaves its rest and turns and tips toward it, all the way at its edge, eyes on it", () => {
+    const r = rig(input("idle", "rest", { follow: true }));
+    const f = run(r, 2000, () => {}, [1, -1]); // up and to the right, at or past its body's edge
+    expect(f.pose.yaw).toBeCloseTo(FOLLOW.yaw, 0);
+    expect(f.pose.pitch).toBeCloseTo(FOLLOW.pitch, 0);
+    expect(f.pose.roll).toBeCloseTo(0, 0); // unrolled, as it faces you
+    expect(f.pose.slide).toBeCloseTo(FOLLOW.slide, 0);
     expect(f.look[0]).toBeGreaterThan(3);
+    const centre = run(r, 2000, () => {}, [0, 0]); // over its middle: facing you
+    expect(Math.abs(centre.pose.yaw) + Math.abs(centre.pose.pitch)).toBeLessThan(1);
   });
 
   it("with only the face moving, it holds its stance but still blinks", () => {

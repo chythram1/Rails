@@ -98,15 +98,17 @@ function tick() {
   else if (wake < Infinity && speed > 0) timer = setTimeout(kick, wake / speed);
 }
 
-/** The pointer from a Sprocket, -1 to 1 on each axis; farther pointers saturate. */
+/**
+ * The pointer from a Sprocket's body, -1 to 1 on each axis (clamped each way), as a Grok bot measures it: a small one
+ * (a row) turns all the way once the pointer is at its body's edge (half its body's width, about a third of its
+ * drawing's), so even a row's height gives it its whole range; a big one (the creator's) over twice its width, so the
+ * pointer anywhere on the page doesn't swing it round.
+ */
 function toPointer(el: Element): [number, number] {
   const r = el.getBoundingClientRect();
-  const dx = pointer!.x - (r.left + r.width / 2);
-  const dy = pointer!.y - (r.top + r.height * 0.65);
-  const d = Math.hypot(dx, dy);
-  if (d < 1) return [0, 0];
-  const k = d / (d + 160) / d;
-  return [dx * k, dy * k];
+  const reach = r.width < 100 ? r.width * 0.35 : r.width * 2;
+  const clamp = (v: number) => Math.max(-1, Math.min(1, v));
+  return [clamp((pointer!.x - (r.left + r.width / 2)) / reach), clamp((pointer!.y - (r.top + r.height * 0.6)) / reach)];
 }
 
 const following = () => [...lives].some((l) => l.rig.input.follow);

@@ -347,6 +347,11 @@ function spring(s: Spring, to: number, stiffness: number, damping: number, dt: n
   return Math.abs(s.v) > 0.01 || Math.abs(to - s.x) > 0.01;
 }
 
+/** Following the pointer, it faces you and turns toward it, as far as this with the pointer at or past its edge
+ * (motion.ts toPointer): turned (degrees), tipped (degrees) and slid aside (viewBox units), unrolled, as a Grok bot's
+ * row does (26°, 19°, 7% of its width). */
+export const FOLLOW = { yaw: 26, pitch: 19, slide: 4 };
+
 /**
  * Move the rig to `now` (ms), `pointer` being where the pointer is from it (-1 to 1 each way) if it's following
  * one. Returns what to draw, whether anything is still moving, and how long until it next needs a frame if not.
@@ -368,12 +373,13 @@ export function advance(r: Rig, now: number, pointer: [number, number] | null): 
   let moving = false;
   const go = (c: Channel, to: number, stiffness: number, damping: number) => (moving = spring(s[c], to, stiffness, damping, dt) || moving);
   const h = r.hold ?? {};
-  go("yaw", h.yaw ?? (watching ? px * 36 : base.yaw + (leaning ? r.glance + r.turn * 0.2 : r.turn)) + r.spins * 360, k, d);
-  go("pitch", h.pitch ?? (watching ? -py * 24 : base.pitch + r.tip), k, d);
-  go("roll", h.roll ?? (watching ? px * 7 : base.roll + r.roll), 140, 11);
+  go("yaw", h.yaw ?? (watching ? px * FOLLOW.yaw : base.yaw + (leaning ? r.glance + r.turn * 0.2 : r.turn)) + r.spins * 360, k, d);
+  go("pitch", h.pitch ?? (watching ? -py * FOLLOW.pitch : base.pitch + r.tip), k, d);
+  go("roll", h.roll ?? (watching ? 0 : base.roll + r.roll), 140, 11);
   go("near", h.near ?? 1 + r.near, 45, 11); // slow: it eases toward the screen
   // Aside: slowly with a lean-in's glance, quicker when a gesture moves it (a dance's bounces).
-  if (leaning) go("slide", LEAN_GLANCE.slide, 60, 13);
+  if (watching) go("slide", px * FOLLOW.slide, 90, 15);
+  else if (leaning) go("slide", LEAN_GLANCE.slide, 60, 13);
   else go("slide", r.shift, 150, 15);
   go("lean", base.lean, 110, 12);
   go("hop", 0, 300, 18);
