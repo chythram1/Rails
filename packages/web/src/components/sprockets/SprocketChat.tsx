@@ -227,7 +227,7 @@ export function SprocketChat({
           <a className="icon-btn sp-back" href={href.sprockets()} aria-label="All Sprockets">
             <ChevronLeft size={18} />
           </a>
-          {team ? <TeamFace looks={members} size={28} /> : <Sprocket look={sprocket.look} size={28} seed={id} busy={running} />}
+          {team ? <TeamFace looks={members} size={28} /> : <Sprocket look={sprocket.look} size={28} busy={running} />}
           {/* A team's name, then its members. */}
           <h2 id="sp-chat-title" className="truncate" title={team ? `${title} · ${members.map((m) => m.name).join(", ")}` : name}>
             {team ? (
@@ -273,7 +273,7 @@ export function SprocketChat({
               <ul className="sp-intro-members">
                 {members.map((m, i) => (
                   <li key={m.id}>
-                    <Sprocket look={m.look} size={72} seed={m.id} />
+                    <Sprocket look={m.look} size={72} />
                     <span className="small">{m.name}</span>
                   </li>
                 ))}
@@ -285,7 +285,7 @@ export function SprocketChat({
             </div>
           ) : (
             <div className="sp-intro alone">
-              <Sprocket look={sprocket.look} size={120} seed={id} />
+              <Sprocket look={sprocket.look} size={120} />
               {projectChat && project ? (
                 <>
                   <p className="sp-intro-title">{project.name}'s chat</p>
@@ -353,7 +353,8 @@ export function SprocketChat({
                     <div className="sp-said">
                       {team && m.author === "sprocket" && (
                         <span className="sp-avatar" aria-hidden>
-                          {last && by && !tail.has(m.id) && <Sprocket look={by.look} size={26} seed={by.id} still />}
+                          {/* Done: turned and leaning toward its message (turning there if it just came in). */}
+                          {last && by && !tail.has(m.id) && <Sprocket look={by.look} size={26} stance="toward" still={!pop} turnIn={pop} />}
                         </span>
                       )}
                       <div className="sp-bubbles">
@@ -418,7 +419,7 @@ export function SprocketChat({
                       </div>
                     ) : (
                       <span key={one.id} className="sp-watcher">
-                        <Sprocket look={one.look} size={26} seed={one.id} busy={spinning !== one.id} spin={spinning === one.id} />
+                        <Sprocket look={one.look} size={26} busy={spinning !== one.id} spin={spinning === one.id} />
                       </span>
                     )}
                   </li>
@@ -445,7 +446,7 @@ export function SprocketChat({
           fill={fill}
           mentions={
             team && [
-              ...members.map((m) => ({ name: m.name, note: "Only them", icon: <Sprocket look={m.look} size={18} seed={m.id} still /> })),
+              ...members.map((m) => ({ name: m.name, note: "Only them", icon: <Sprocket look={m.look} size={18} still /> })),
             ]
           }
         >
@@ -511,7 +512,7 @@ function withMentions(text: string, members: SprocketData[]): ReactNode {
     parts.push(text.slice(at, found.start));
     parts.push(
       <span key={found.start} className="sp-mention" style={{ "--who": COLORS[m.look.color] } as CSSProperties}>
-        <Sprocket look={m.look} size={14} seed={m.id} still />
+        <Sprocket look={m.look} size={14} still />
         {found.at && <span className="sr-only">@</span>}
         {m.name}
       </span>,

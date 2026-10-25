@@ -51,7 +51,7 @@ export function MemberSlots(props: { members: string[]; all: SprocketData[]; pro
               icon={
                 <>
                   <span className="sp-slot-face">
-                    <Sprocket look={s.look} size={28} seed={s.id} still />
+                    <Sprocket look={s.look} size={28} still />
                   </span>
                   <span className="sp-slot-text">
                     <span className="truncate">{s.name}</span>
@@ -86,7 +86,7 @@ export function MemberSlots(props: { members: string[]; all: SprocketData[]; pro
             }
             items={
               available.length
-                ? available.map((a) => ({ label: a.name, note: where(a), icon: <Sprocket look={a.look} size={18} seed={a.id} still />, onSelect: () => change([...members, a.id], i) }))
+                ? available.map((a) => ({ label: a.name, note: where(a), icon: <Sprocket look={a.look} size={18} still />, onSelect: () => change([...members, a.id], i) }))
                 : [{ label: "Every Sprocket is in", disabled: true, onSelect: () => {} }]
             }
           />

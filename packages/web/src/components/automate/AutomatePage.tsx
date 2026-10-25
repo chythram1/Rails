@@ -305,7 +305,7 @@ function Card({
       <div className="au-card-facts">
         <ul className="au-tags" aria-label="Runs with">
           <li className="au-tag">
-            {sprocket ? <Sprocket look={sprocket.look} size={16} seed={sprocket.id} still /> : null}
+            {sprocket ? <Sprocket look={sprocket.look} size={16} still /> : null}
             {sprocket?.name ?? "No Sprocket"}
           </li>
           <li className="au-tag">

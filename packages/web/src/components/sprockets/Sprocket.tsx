@@ -1,72 +1,92 @@
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { SprocketLook } from "@rails/shared";
 import { CHARACTERS, COLORS, type Primitive } from "./characters.ts";
-import { squash, twirl, useBlink, useLook, useSprocketMotion } from "./motion.ts";
+import type { Frame } from "./morph.ts";
+import { squash, useBlink, usePose, useSprocketMotion } from "./motion.ts";
 import { Eyes } from "./parts.tsx";
+import { LAYERS, layout, poseOf, type Box, type Pose, type Stance } from "./solid.ts";
 
-/** Seconds per half bob (up, or down) at tempo 1. Sway takes longer, so the two never line up. */
-const PERIOD = 1.7;
-
-/**
- * Idle motion by drawn size: small avatars need bigger, quicker moves to read at all, big ones calmer.
- * `bob` is in viewBox units, `sway` in degrees, `speed` scales the period.
- */
-function idleFor(size: number) {
-  if (size <= 64) return { bob: 9, sway: 6, speed: 0.8 };
-  if (size <= 110) return { bob: 7, sway: 4.5, speed: 0.9 };
-  return { bob: 6, sway: 3.5, speed: 1 };
-}
-/** The drawn area of the shared 200×215 coordinate system (ear cups and the shadow included). */
+/** The drawn area of the shared 200×215 coordinate system (the shadow included). */
 export const VIEW = { x: 14, y: 24, w: 172, h: 190 };
 
 interface Props {
   look: SprocketLook;
   /** Width in px; the height follows the viewBox. */
   size: number;
-  /** A static drawing: no idle motion, blinks or reactions (thumbnails, pickers). */
+  /** A drawing that holds still: no glances, blinks or reactions (thumbnails, pickers, lists). */
   still?: boolean;
-  /** Eyes follow the pointer (the creator's preview). */
+  /** How it stands (solid.ts): at rest, turned a little; facing you; or turned and leaning toward its message. */
+  stance?: Stance;
+  /** Turn toward the pointer, eyes following it (the creator's preview). */
   follow?: boolean;
-  /** Working on a reply: it looks up and around, thinking. */
+  /** Working on a reply: erratic, turning and spinning. */
   busy?: boolean;
-  /** Spin round (with a streak), as it starts writing: plays when this turns true. */
+  /** Spin round, as it starts writing: plays when this turns true. */
   spin?: boolean;
+  /** Start at rest and turn to `stance` (a message that just came in). */
+  turnIn?: boolean;
+  /** The drawing midway between two Sprockets (TeamThinking's morph), instead of `look`'s. */
+  drawing?: Frame;
   /** Accessible name. Without one the drawing is decorative and hidden from screen readers. */
   label?: string;
-  /** Stable key (e.g. the Sprocket's id) that sets where in its idle loop this one starts. */
-  seed?: string;
 }
 
-/** Where in the idle loop to start (0–1), derived from a stable key so copies never move in sync. */
-function phaseOf(seed: string) {
-  let h = 2166136261;
-  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
-  return ((h >>> 0) % 1000) / 1000;
-}
+/** A body's bounds before it's measured (most bodies sit about here). */
+const BOX: Box = { x: 40, y: 80, width: 120, height: 116 };
 
 /**
- * A Sprocket character (see ref characters.md §5.2 for the layers). Each nested group owns one kind of
- * motion: s-rig bobs, s-sway sways, s-pop squashes on change and spins (s-fx, the streak round it, behind and in
- * front), s-face/s-eyes look (at the pointer, around, up while thinking), s-lid blinks, each s-eye changes size and
- * shape.
+ * A Sprocket character, as a solid (solid.ts): the body's layers back to front (the faces in its colour, the side
+ * between them darker), the side's band seen edge-on, and the eyes on the front face. s-pop squashes on a change of
+ * look; s-eyes looks (motion.ts writes --ex/--ey); s-lid blinks; each s-eye changes size and shape.
  */
-export function Sprocket({ look, size, still, follow, busy = false, spin = false, label, seed = look.character }: Props) {
+export function Sprocket({ look, size, still, stance = "rest", follow, busy = false, spin = false, turnIn, drawing, label }: Props) {
   const def = CHARACTERS[look.character];
-  const color = COLORS[look.color];
+  const color = drawing?.color ?? COLORS[look.color];
+  const round = drawing ? drawing.round : (def.round ?? 0);
+  const face = drawing?.face ?? def.face;
+  const axis = def.shadow.x;
   const motion = useSprocketMotion();
   const live = !still && motion;
+
   const svg = useRef<SVGSVGElement>(null);
   const pop = useRef<SVGGElement>(null);
   const lid = useRef<SVGGElement>(null);
+  const rig = useRef<SVGGElement>(null);
+  const layers = useRef<(SVGGElement | null)[]>([]);
+  const band = useRef<SVGRectElement>(null);
+  const eyes = useRef<SVGGElement>(null);
+  const shadow = useRef<SVGEllipseElement>(null);
+  const box = useRef<Box>(BOX);
   const mounted = useRef(false);
 
-  useBlink(lid, !still);
-  // Too small to see the eyes move (a 16px mention): they don't look around.
-  useLook(svg, live && size >= 24, { follow, busy });
+  // Moving, it's drawn from where it started and motion.ts paints every frame after; still, from its stance.
+  const [from] = useState<Pose>(() => poseOf(turnIn ? "rest" : stance));
+  const pose = live ? from : poseOf(stance);
+  const shown = useRef(pose);
+  const paint = useRef((p: Pose) => {
+    shown.current = p;
+    const g = geometry.current;
+    const l = layout(p, g.axis, g.face, box.current, g.half);
+    rig.current?.setAttribute("transform", l.rig);
+    layers.current.forEach((el, i) => el?.setAttribute("transform", l.layers[i]));
+    const b = band.current;
+    if (b) for (const [k, v] of Object.entries(l.band)) b.setAttribute(k, String(v));
+    eyes.current?.setAttribute("transform", l.eyes.transform);
+    eyes.current?.setAttribute("opacity", String(l.eyes.opacity));
+    shadow.current?.setAttribute("rx", String(l.shadow.rx));
+  });
+  const geometry = useRef({ axis, face, half: def.shadow.half });
+  geometry.current = { axis, face, half: def.shadow.half };
 
-  useEffect(() => {
-    if (spin && live) twirl(svg.current);
-  }, [spin, live]);
+  useBlink(lid, !still);
+  usePose(svg, paint, live && size >= 20, { stance, follow, busy, spin, from });
+
+  // The band is as tall as the body: measure it (again when the body changes), and redraw where it is.
+  useLayoutEffect(() => {
+    const b = layers.current[LAYERS - 1]?.getBBox(); // its own coordinates, before its transform
+    if (b && b.width) box.current = { x: b.x, y: b.y, width: b.width, height: b.height };
+    if (live) paint.current(shown.current);
+  }, [look.character, drawing?.d, live]);
 
   // Squash when the look changes (not on first render).
   useEffect(() => {
@@ -77,70 +97,53 @@ export function Sprocket({ look, size, still, follow, busy = false, spin = false
     mounted.current = true;
   }, []);
 
-  const idle = idleFor(size);
-  const period = PERIOD * def.tempo * idle.speed;
-  const style = {
-    "--bob": `${idle.bob}px`,
-    "--sway": `${idle.sway}deg`,
-    "--streak-w": `${size <= 40 ? 14 : size <= 90 ? 9 : 7}px`,
-    width: size,
-    height: (size * VIEW.h) / VIEW.w,
-    "--period": `${period.toFixed(2)}s`,
-    "--phase": `${(-phaseOf(seed) * period).toFixed(2)}s`,
-  } as CSSProperties;
+  const l = layout(pose, axis, face, box.current, def.shadow.half);
+  const side = `color-mix(in oklab, ${color} 68%, #000)`;
+  const body = drawing ? <path d={drawing.d} /> : def.body.map((p, i) => <Shape key={i} p={p} />);
+  const style = { width: size, height: (size * VIEW.h) / VIEW.w } as CSSProperties;
 
   return (
     <svg
       ref={svg}
-      className={"sprocket" + (still ? " still" : live ? "" : " paused")}
+      className={"sprocket" + (still ? " still" : "")}
       viewBox={`${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`}
       style={style}
       role={label ? "img" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <ellipse className="s-shadow" cx={def.shadow.x} cy={203} rx={def.shadow.half} ry={6} />
-      <g className="s-rig">
-        <g className="s-sway">
-          {live && <Streak def={def} half="back" />}
-          <g className="s-pop" ref={pop}>
-            <g fill={color} stroke={def.round ? color : undefined} strokeWidth={def.round} strokeLinejoin="round">
-              {def.body.map((p, i) => (
-                <Shape key={i} p={p} />
-              ))}
-            </g>
-            <g transform={`translate(${def.face.x} ${def.face.y})`}>
-              <g className="s-face">
-                <g className="s-eyes">
-                  <g className="s-lid" ref={lid}>
-                    <Eyes tilt={def.face.tilt} />
-                  </g>
-                </g>
+      <ellipse ref={shadow} className="s-shadow" cx={axis} cy={203} rx={l.shadow.rx} ry={6} />
+      <g ref={rig} transform={l.rig}>
+        <g className="s-pop" ref={pop}>
+          {l.layers.map((t, i) => {
+            const end = i === 0 || i === LAYERS - 1;
+            const layer = (
+              <g
+                key={i}
+                ref={(el) => {
+                  layers.current[i] = el;
+                }}
+                transform={t}
+                style={{ fill: end ? color : side, stroke: round ? (end ? color : side) : undefined }}
+                strokeWidth={round || undefined}
+                strokeLinejoin="round"
+              >
+                {body}
+              </g>
+            );
+            // The side seen edge-on goes under the front face.
+            return i === LAYERS - 1 ? [<rect key="band" ref={band} style={{ fill: side }} {...l.band} />, layer] : layer;
+          })}
+          <g ref={eyes} transform={l.eyes.transform} opacity={l.eyes.opacity}>
+            <g className="s-eyes">
+              <g className="s-lid" ref={lid}>
+                <Eyes tilt={face.tilt} />
               </g>
             </g>
           </g>
-          {live && <Streak def={def} half="front" />}
         </g>
       </g>
     </svg>
-  );
-}
-
-/**
- * Half of the two rings the spin's streaks run along: one round the body's middle, a thinner one higher up. The
- * back halves are drawn behind the body, the front halves over it. Hidden until twirl() runs a dash along them
- * (pathLength 100).
- */
-function Streak({ def, half }: { def: (typeof CHARACTERS)[keyof typeof CHARACTERS]; half: "back" | "front" }) {
-  const arc = (cy: number, rx: number, ry: number) => {
-    const cx = def.shadow.x;
-    return half === "back" ? `M ${cx - rx} ${cy} A ${rx} ${ry} 0 0 1 ${cx + rx} ${cy}` : `M ${cx + rx} ${cy} A ${rx} ${ry} 0 0 1 ${cx - rx} ${cy}`;
-  };
-  return (
-    <g className={`s-fx s-fx-${half}`}>
-      <path className="s-streak-arc" d={arc(def.face.y + 8, def.shadow.half + 18, 14)} pathLength={100} />
-      <path className="s-streak-arc thin" d={arc(def.face.y - 22, def.shadow.half + 6, 11)} pathLength={100} />
-    </g>
   );
 }
 

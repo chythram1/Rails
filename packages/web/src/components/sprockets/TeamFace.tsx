@@ -30,12 +30,12 @@ export function TeamFace({ looks, size }: { looks: { look: SprocketLook; id: str
     <span className="sp-face" style={{ width, height }} aria-hidden>
       {others.map((m, i) => (
         <span key={m.id} style={place(layout.others[i])}>
-          <Sprocket look={m.look} size={w} seed={m.id} still />
+          <Sprocket look={m.look} size={w} still />
         </span>
       ))}
       {lead && (
         <span style={place(layout.lead)}>
-          <Sprocket look={lead.look} size={w} seed={lead.id} still />
+          <Sprocket look={lead.look} size={w} still />
         </span>
       )}
     </span>

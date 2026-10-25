@@ -87,7 +87,7 @@ function SprocketView({ projectName, sprocket }: { projectName: string; sprocket
     <>
       <div className="side-bar">
         <p className="side-sprocket">
-          <Sprocket look={sprocket.look} size={20} seed={sprocket.id} busy={sprocket.running} />
+          <Sprocket look={sprocket.look} size={20} busy={sprocket.running} />
           <span className="truncate">{sprocket.name}</span>
           {sprocket.pending.length > 0 && (
             <span className="tab-attention" role="img" aria-label={sprocket.pending.length > 1 ? `${sprocket.pending.length} replies waiting` : "1 reply waiting"} />

@@ -30,8 +30,6 @@ interface CharacterDef {
   face: { x: number; y: number; tilt: number };
   /** Ground shadow: centre and half-width. */
   shadow: { x: number; half: number };
-  /** Idle speed multiplier, so characters shown together don't bob in sync. */
-  tempo: number;
 }
 
 const f = (n: number) => +n.toFixed(2);
@@ -100,14 +98,12 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
     body: [{ d: roundedPoly([[46, 86], [154, 86], [154, 196], [46, 196]], 30) }],
     face: { x: 100, y: 138, tilt: 6 },
     shadow: { x: 100, half: 52 },
-    tempo: 1,
   },
   bean: {
     name: "Bean",
     body: [{ d: "M 64 84 C 92 68 122 78 128 104 C 132 122 150 126 164 140 C 182 160 172 196 132 196 L 96 196 C 56 196 36 168 38 134 C 40 108 48 92 64 84 Z" }],
     face: { x: 110, y: 150, tilt: 10 },
     shadow: { x: 104, half: 56 },
-    tempo: 0.92,
   },
   lune: {
     name: "Lune",
@@ -115,35 +111,30 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
     round: 12,
     face: { x: 80, y: 150, tilt: 8 },
     shadow: { x: 100, half: 54 },
-    tempo: 1.12,
   },
   bell: {
     name: "Bell",
     body: [{ d: "M 100 80 C 132 80 146 102 148 134 C 150 160 158 172 170 182 C 178 190 172 197 160 197 L 40 197 C 28 197 22 190 30 182 C 42 172 50 160 52 134 C 54 102 68 80 100 80 Z" }],
     face: { x: 100, y: 146, tilt: 6 },
     shadow: { x: 100, half: 62 },
-    tempo: 0.96,
   },
   starry: {
     name: "Starry",
     body: [{ d: roundedPoly(star(100, 140, 68, 38, 5), (i) => (i % 2 ? 12 : 26)) }],
     face: { x: 100, y: 146, tilt: 6 },
     shadow: { x: 100, half: 54 },
-    tempo: 1.06,
   },
   cog: {
     name: "Cog",
     body: [{ d: roundedPoly(gear(100, 138, 60, 47, 8), 6) }],
     face: { x: 100, y: 140, tilt: 6 },
     shadow: { x: 100, half: 50 },
-    tempo: 0.9,
   },
   roo: {
     name: "Roo",
     body: [{ d: roundedPoly([[100, 74], [162, 136], [100, 198], [38, 136]], 22) }],
     face: { x: 100, y: 138, tilt: 6 },
     shadow: { x: 100, half: 44 },
-    tempo: 1.04,
   },
   momo: {
     name: "Momo",
@@ -153,6 +144,5 @@ export const CHARACTERS: Record<SprocketCharacter, CharacterDef> = {
     ],
     face: { x: 100, y: 150, tilt: 6 },
     shadow: { x: 100, half: 62 },
-    tempo: 0.98,
   },
 };

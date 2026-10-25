@@ -1,8 +1,9 @@
-// Sprocket motion (see ref characters.md §5). Idle loops are CSS (styles.css, "Sprockets"); this module
-// holds the shared timing tokens, whether motion is on, and the few things JS animates: blinks,
-// one-shot reactions (a squash, a spin before it writes, the eyes changing shape), and where the eyes
-// look (the pointer, darting around in bursts, up while thinking).
+// Sprocket motion (see ref characters.md §5, and solid.ts for how it stands). This module holds the shared timing
+// tokens, whether motion is on, and what JS animates: blinks, the eyes changing shape for a moment, and its pose (it
+// turns, leans, hops and squashes) with where its eyes look: calm at rest with a glance now and then, toward the
+// pointer in the creator, erratic while thinking, and a spin round as it starts writing.
 import { useEffect, useRef, useSyncExternalStore, type RefObject } from "react";
+import { POSES, type Pose, type Stance } from "./solid.ts";
 
 /** Playful identity: arrivals overshoot ~10%; three durations. */
 const EASE_BACK = "cubic-bezier(0.34, 1.56, 0.64, 1)";
@@ -58,44 +59,6 @@ export function squash(el: Element | null) {
 /** How long the spin takes (SprocketChat holds the typing dots back until it's done). */
 export const SPIN_MS = 700;
 
-/**
- * About to write: crouch, hop and spin round (its drawing squeezed to its edge and through its mirror image, which
- * reads as turning on a flat drawing), with a white streak going round it twice, and land with a squash.
- */
-export function twirl(svg: SVGSVGElement | null) {
-  if (!svg) return;
-  const hop = (scale: boolean) =>
-    [
-      { transform: `translateY(0)${scale ? " scale(1, 1)" : ""}` },
-      { transform: `translateY(0)${scale ? " scale(1.1, 0.88)" : ""}`, offset: 0.14, easing: "ease-out" },
-      { transform: `translateY(-16px)${scale ? " scale(0.12, 1.05)" : ""}`, offset: 0.36 },
-      { transform: `translateY(-20px)${scale ? " scale(-1, 1)" : ""}`, offset: 0.54 },
-      { transform: `translateY(-8px)${scale ? " scale(0.12, 1.02)" : ""}`, offset: 0.74, easing: "ease-in" },
-      { transform: `translateY(0)${scale ? " scale(1.08, 0.92)" : ""}`, offset: 0.88, easing: "ease-out" },
-      { transform: `translateY(0)${scale ? " scale(1, 1)" : ""}` },
-    ];
-  svg.querySelector(".s-pop")?.animate(hop(true), { duration: SPIN_MS, easing: "linear" });
-  // The streak: a short dash running along the back half of a ring round its middle, then the front half, twice,
-  // fading on the second lap. Its groups hop with the body.
-  svg.querySelectorAll(".s-fx").forEach((fx) => fx.animate(hop(false), { duration: SPIN_MS, easing: "linear" }));
-  const lap = (arcs: NodeListOf<Element>, start: number, fade: number) =>
-    // The thin ring trails the main one by a few hundredths.
-    arcs.forEach((arc, i) => arc.animate(
-      [
-        { strokeDashoffset: 34, opacity: fade },
-        { strokeDashoffset: -100, opacity: fade },
-      ],
-      // No fill: between laps the CSS keeps it hidden (a later lap filling backwards would hide an earlier one).
-      { duration: SPIN_MS * 0.17, delay: SPIN_MS * (start + i * 0.06), easing: "linear" },
-    ));
-  const back = svg.querySelectorAll(".s-fx-back .s-streak-arc");
-  const front = svg.querySelectorAll(".s-fx-front .s-streak-arc");
-  lap(back, 0.2, 1);
-  lap(front, 0.36, 1);
-  lap(back, 0.52, 0.6);
-  lap(front, 0.68, 0.35);
-}
-
 // ---- expressions: the eyes change size and shape for a moment ----
 type Frames = Keyframe[];
 const still = { transform: "translate(0, 0) scale(1, 1)" };
@@ -134,34 +97,42 @@ function express(svg: SVGSVGElement | null, kind?: Expression) {
   eyes[1].animate(r, { duration, easing: "ease-out" });
 }
 
-// ---- where the eyes look ----
-// One requestAnimationFrame loop for every looking Sprocket. Each has two damped springs: fast eyes
-// and a slower face, so the eyes lead and the face follows. They aim at the pointer (the creator's
-// preview), else at `aim` (a glance, or up while thinking), else straight ahead. The loop stops once
-// every spring has settled and starts again when the pointer moves or an aim changes.
+// ---- its pose, and where the eyes look ----
+// One requestAnimationFrame loop for every moving Sprocket. Each has damped springs: its turn, lean, hop and squash
+// (painted through solid.ts), and its eyes (written as --ex/--ey). They aim at its stance (rest, facing you, toward a
+// message) plus what it's doing on its own: a glance, the pointer, or the jumps of thinking. The loop stops once
+// every spring has settled and starts again when an aim changes.
 
 interface Spring {
   x: number;
-  y: number;
-  vx: number;
-  vy: number;
+  v: number;
 }
-interface Looker {
+interface Poser {
   el: SVGSVGElement;
-  eyes: Spring;
-  face: Spring;
+  paint: (p: Pose) => void;
+  yaw: Spring;
+  lean: Spring;
+  hop: Spring;
+  squash: Spring;
+  eyesX: Spring;
+  eyesY: Spring;
   written: string;
+  stance: Stance;
   follow: boolean;
-  /** Where it's looking on its own, -1 to 1 on each axis. */
+  busy: boolean;
+  /** Turn added on its own (a glance, a jump while thinking), and whole turns from spins. */
+  turn: number;
+  spins: number;
+  /** Where its eyes look on their own, -1 to 1 on each axis. */
   aim: [number, number] | null;
 }
 
-const lookers = new Set<Looker>();
+const posers = new Set<Poser>();
 let pointer: { x: number; y: number } | null = null;
 let frame = 0;
 let lastTime = 0;
 
-const following = () => [...lookers].some((l) => l.follow);
+const following = () => [...posers].some((l) => l.follow);
 const onMove = (e: PointerEvent) => {
   pointer = { x: e.clientX, y: e.clientY };
   if (following()) kick();
@@ -177,9 +148,9 @@ function kick() {
   frame = requestAnimationFrame(step);
 }
 
-/** Where a Sprocket should look, from -1 to 1 on each axis; farther pointers saturate. */
-function target(l: Looker): [number, number] {
-  if (!l.follow || !pointer) return l.aim ?? [0, 0];
+/** The pointer from a Sprocket, -1 to 1 on each axis; farther pointers saturate. */
+function toPointer(l: Poser): [number, number] {
+  if (!pointer) return [0, 0];
   const r = l.el.getBoundingClientRect();
   const dx = pointer.x - (r.left + r.width / 2);
   const dy = pointer.y - (r.top + r.height * 0.65);
@@ -189,123 +160,170 @@ function target(l: Looker): [number, number] {
   return [dx * k, dy * k];
 }
 
-function spring(s: Spring, tx: number, ty: number, stiffness: number, damping: number, dt: number) {
-  s.vx += (stiffness * (tx - s.x) - damping * s.vx) * dt;
-  s.vy += (stiffness * (ty - s.y) - damping * s.vy) * dt;
-  s.x += s.vx * dt;
-  s.y += s.vy * dt;
-  return Math.abs(s.vx) + Math.abs(s.vy) > 0.002 || Math.abs(tx - s.x) + Math.abs(ty - s.y) > 0.002;
+function spring(s: Spring, to: number, stiffness: number, damping: number, dt: number) {
+  s.v += (stiffness * (to - s.x) - damping * s.v) * dt;
+  s.x += s.v * dt;
+  return Math.abs(s.v) > 0.01 || Math.abs(to - s.x) > 0.01;
 }
 
 function step(now: number) {
   const dt = Math.min(0.032, (now - lastTime) / 1000);
   lastTime = now;
   let moving = false;
-  for (const l of lookers) {
-    const [tx, ty] = target(l);
-    // Smooth after the pointer; snappy on its own, so its looks around read as darts.
-    const [k, d] = l.follow && pointer ? [260, 26] : [620, 40];
-    moving = spring(l.eyes, tx, ty, k, d, dt) || moving;
-    moving = spring(l.face, tx, ty, 90, 17, dt) || moving;
-    write(l, l.eyes.x * 10, l.eyes.y * 7, l.face.x * 5, l.face.y * 4);
+  for (const l of posers) {
+    const base = POSES[l.stance];
+    const watching = l.follow && pointer;
+    const [px, py] = watching ? toPointer(l) : [0, 0];
+    const [ax, ay] = watching ? [px, py] : (l.aim ?? [0, 0]);
+    // Thinking turns snap and overshoot; otherwise it turns calmly.
+    const [k, d] = l.busy ? [210, 15] : watching ? [90, 16] : [70, 14];
+    moving = spring(l.yaw, base.yaw + l.turn + l.spins * 360 + px * 34, k, d, dt) || moving;
+    moving = spring(l.lean, base.lean, 120, 16, dt) || moving;
+    moving = spring(l.hop, 0, 300, 18, dt) || moving;
+    moving = spring(l.squash, 0, 400, 16, dt) || moving;
+    moving = spring(l.eyesX, ax, watching ? 260 : 620, watching ? 26 : 40, dt) || moving;
+    moving = spring(l.eyesY, ay, watching ? 260 : 620, watching ? 26 : 40, dt) || moving;
+    const q = l.squash.x;
+    l.paint({ yaw: l.yaw.x, lean: l.lean.x, sx: 1 + q, sy: 1 - q, hop: Math.max(0, l.hop.x) });
+    write(l, l.eyesX.x * 9, l.eyesY.x * 6);
   }
   frame = moving ? requestAnimationFrame(step) : 0;
 }
 
-/** Offsets in viewBox units, written as CSS variables only when they change. */
-function write(l: Looker, ex: number, ey: number, fx: number, fy: number) {
-  const v = [ex, ey, fx, fy].map((n) => n.toFixed(2));
-  const key = v.join();
+/** The eyes' offset in viewBox units, written as CSS variables only when it changes. */
+function write(l: Poser, ex: number, ey: number) {
+  const key = `${ex.toFixed(2)},${ey.toFixed(2)}`;
   if (key === l.written) return;
   l.written = key;
-  const s = l.el.style;
-  s.setProperty("--ex", v[0]);
-  s.setProperty("--ey", v[1]);
-  s.setProperty("--fx", v[2]);
-  s.setProperty("--fy", v[3]);
+  l.el.style.setProperty("--ex", ex.toFixed(2));
+  l.el.style.setProperty("--ey", ey.toFixed(2));
 }
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
-/** Somewhere to look: anywhere round it, mostly well off centre. */
-const anywhere = (): [number, number] => {
-  const a = Math.random() * Math.PI * 2;
-  const r = rand(0.45, 1);
-  return [Math.cos(a) * r, Math.sin(a) * r * 0.85];
-};
+const pick = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
+
+interface PoseOptions {
+  stance: Stance;
+  /** Turn toward the pointer, eyes following it (the creator's preview). */
+  follow?: boolean;
+  /** Thinking: erratic. */
+  busy?: boolean;
+  /** Spin round once when this turns true. */
+  spin?: boolean;
+  /** The pose it starts from (it turns from there to its stance). */
+  from: Pose;
+}
 
 /**
- * Where a Sprocket's eyes (and, a little, its face) look while `enabled`: at the pointer with `follow`; up and
- * around, darting, while `busy` (thinking); otherwise in bursts, as if excited: two to six quick looks all over,
- * a fraction of a second each, then a rest of a second or few. Now and then the eyes change shape (`express`).
+ * Move a Sprocket while `enabled`: `paint` draws a pose. At rest it's calm: still, glancing aside now and then, its
+ * eyes sometimes changing shape. Facing you or turned toward a message it holds still. Thinking (`busy`) it's
+ * erratic: quick turns either way, now and then a whole spin, a hop or a squash, its eyes darting up and around.
  */
-export function useLook(svg: RefObject<SVGSVGElement | null>, enabled: boolean, { follow = false, busy = false } = {}) {
-  const looker = useRef<Looker | null>(null);
-  const thinking = useRef(busy);
-  thinking.current = busy;
+export function usePose(svg: RefObject<SVGSVGElement | null>, paint: RefObject<(p: Pose) => void>, enabled: boolean, { stance, follow = false, busy = false, spin = false, from }: PoseOptions) {
+  const poser = useRef<Poser | null>(null);
   useEffect(() => {
     const el = svg.current;
     if (!enabled || !el) return;
-    const l: Looker = { el, eyes: { x: 0, y: 0, vx: 0, vy: 0 }, face: { x: 0, y: 0, vx: 0, vy: 0 }, written: "", follow, aim: null };
-    looker.current = l;
-    if (lookers.size === 0) {
+    const at = (x: number): Spring => ({ x, v: 0 });
+    const l: Poser = {
+      el,
+      paint: (p) => paint.current(p),
+      yaw: at(from.yaw),
+      lean: at(from.lean),
+      hop: at(from.hop),
+      squash: at(0),
+      eyesX: at(0),
+      eyesY: at(0),
+      written: "",
+      stance,
+      follow,
+      busy,
+      turn: 0,
+      spins: 0,
+      aim: null,
+    };
+    poser.current = l;
+    if (posers.size === 0) {
       addEventListener("pointermove", onMove);
       document.documentElement.addEventListener("pointerleave", onLeave);
     }
-    lookers.add(l);
+    posers.add(l);
     kick();
-    let timer: ReturnType<typeof setTimeout>;
-    const aim = (to: [number, number] | null) => ((l.aim = to), kick());
-    const later = (ms: number, then: () => void) => (timer = setTimeout(then, ms));
-    const rest = () => later(rand(1200, 4500), burst);
-    const burst = () => {
-      // Not while thinking (that has its own look), nor while it watches the pointer, nor unseen.
-      if (thinking.current || (l.follow && pointer) || document.visibilityState !== "visible") return rest();
-      let looks = 2 + Math.floor(Math.random() * 5);
-      const next = () => {
-        if (thinking.current) return rest();
-        if (looks-- <= 0) {
-          aim(Math.random() < 0.6 ? null : anywhere());
-          if (Math.random() < 0.25) express(el);
-          return rest();
-        }
-        aim(anywhere());
-        if (Math.random() < 0.15) express(el);
-        later(rand(140, 480), next);
-      };
-      next();
-    };
-    later(rand(500, 3000), burst);
     return () => {
-      clearTimeout(timer);
-      looker.current = null;
-      lookers.delete(l);
-      write(l, 0, 0, 0, 0); // back to rest
-      if (lookers.size === 0) {
+      poser.current = null;
+      posers.delete(l);
+      if (posers.size === 0) {
         removeEventListener("pointermove", onMove);
         document.documentElement.removeEventListener("pointerleave", onLeave);
         cancelAnimationFrame(frame);
         frame = 0;
       }
     };
-  }, [svg, enabled, follow]);
+    // `from` is only where it starts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [svg, enabled]);
 
-  // Thinking: darting about up high, now and then scrunching its eyes.
   useEffect(() => {
-    const l = looker.current;
+    const l = poser.current;
     if (!l) return;
-    if (!busy) {
-      l.aim = null;
-      kick();
-      return;
-    }
+    l.stance = stance;
+    l.follow = follow;
+    l.busy = busy;
+    kick();
     let timer: ReturnType<typeof setTimeout>;
-    const ponder = () => {
-      l.aim = [rand(-0.85, 0.85), rand(-1, -0.4)];
+    const later = (ms: number, then: () => void) => (timer = setTimeout(then, ms));
+    if (busy) {
+      // Thinking: a new turn every fraction of a second, eyes up and around; sometimes a spin, a hop or a squash.
+      const jump = () => {
+        l.turn = rand(-70, 70);
+        l.aim = [rand(-0.9, 0.9), rand(-1, -0.2)];
+        const r = Math.random();
+        if (r < 0.14) l.spins += pick([-1, 1]);
+        else if (r < 0.3) l.hop.v += rand(160, 260);
+        else if (r < 0.45) l.squash.v += pick([-1, 1]) * rand(2.5, 4);
+        if (Math.random() < 0.12) express(l.el, pick(["squeeze", "curious", "wide"]));
+        kick();
+        later(rand(160, 560), jump);
+      };
+      jump();
+    } else {
+      l.turn = 0;
+      l.aim = null;
+      l.spins = Math.round(l.spins); // whole turns look the same; keep the count, so it doesn't spin back
       kick();
-      if (Math.random() < 0.15) express(l.el, Math.random() < 0.6 ? "squeeze" : "curious");
-      timer = setTimeout(ponder, rand(250, 900));
-    };
-    ponder();
+      if (stance === "rest" && !follow) {
+        // At rest: a glance aside every few seconds, held a moment; now and then the eyes change shape.
+        const glance = () => {
+          if (document.visibilityState === "visible") {
+            const side = pick([-1, 1]);
+            l.turn = side * rand(10, 24);
+            l.aim = [side * rand(0.4, 0.8), rand(-0.4, 0.3)];
+            if (Math.random() < 0.2) express(l.el);
+            kick();
+            return later(rand(700, 1600), () => {
+              l.turn = 0;
+              l.aim = null;
+              kick();
+              later(rand(2500, 7000), glance);
+            });
+          }
+          later(rand(2500, 7000), glance);
+        };
+        later(rand(1500, 6000), glance);
+      }
+    }
     return () => clearTimeout(timer);
-  }, [busy, enabled]);
+  }, [stance, follow, busy, enabled]);
+
+  // A spin: one whole turn, with a hop.
+  const spun = useRef(spin);
+  useEffect(() => {
+    const l = poser.current;
+    const was = spun.current;
+    spun.current = spin;
+    if (!l || !spin || was) return;
+    l.spins += 1;
+    l.hop.v += 240;
+    kick();
+  }, [spin, enabled]);
 }

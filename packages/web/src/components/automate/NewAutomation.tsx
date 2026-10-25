@@ -12,7 +12,7 @@ import { localTimezone } from "./useAutomations.ts";
 
 /** Its Sprocket, as the Dropdown lists them: the face and the name. */
 export const sprocketOptions = (sprockets: SprocketData[]) =>
-  sprockets.map((s) => ({ value: s.id, label: s.name, icon: <Sprocket look={s.look} size={18} seed={s.id} still /> }));
+  sprockets.map((s) => ({ value: s.id, label: s.name, icon: <Sprocket look={s.look} size={18} still /> }));
 
 /** Whether a Sprocket has a template's use: it's attached to a project, or has the connector among its tools. */
 function canUse(s: SprocketData, u: TemplateUse, servers: McpServer[]) {

@@ -77,7 +77,7 @@ export function SprocketCreator({ taken, onSaved, onCancel }: Props) {
         <h2 id="sp-creator-title" className="truncate">New Sprocket</h2>
       </header>
       <div className="sp-creator-body">
-        <Sprocket look={look} size={150} follow label={`Preview of ${shownName}`} />
+        <Sprocket look={look} size={150} follow stance="front" label={`Preview of ${shownName}`} />
 
         <Row legend="Colour" name="sp-color" value={look.color} onChange={set("color")}
           options={SPROCKET_COLORS.map((c) => ({ value: c, label: COLOR_NAMES[c], view: <span className="sp-swatch" style={{ background: COLORS[c] }} /> }))}

@@ -767,37 +767,19 @@ textarea.input { resize: vertical; line-height: 1.5; }
 }
 
 /* ---- Sprocket characters (components/sprockets) ----
-   Each nested SVG group owns one motion. Idle loops run on --period (set per character, so a group of
-   Sprockets never bobs in sync) from --phase (a negative delay: each starts at a different point).
-   Loops are sine-like (ease-in-out each way). */
+   A solid (solid.ts): motion.ts paints its pose (turn, lean, hop, squash) into SVG transforms, so nothing here
+   loops. These are the one-shot pieces: a squash on a change of look (s-pop), blinks (s-lid), the eyes looking
+   (s-eyes, from --ex/--ey) and changing shape (each s-eye). */
 .sprocket { display: block; overflow: visible; flex-shrink: 0; }
-.sprocket :is(.s-rig, .s-sway, .s-pop, .s-lid, .s-shadow) { transform-box: fill-box; }
-.sprocket :is(.s-sway, .s-pop) { transform-origin: 50% 100%; }
-.sprocket .s-lid, .sprocket .s-shadow { transform-origin: 50% 50%; }
+.sprocket :is(.s-pop, .s-lid) { transform-box: fill-box; }
+.sprocket .s-pop { transform-origin: 50% 100%; }
+.sprocket .s-lid { transform-origin: 50% 50%; }
 /* Each eye changes size and shape about its own centre (motion.ts express). */
 .sprocket .s-eye { transform-box: fill-box; transform-origin: 50% 50%; }
-/* The spin's streak: white, with a faint dark edge so it shows on a light page too (from the shadow's strength).
-   A dash runs along it only while twirl() animates it; otherwise nothing shows. Thicker on small avatars. */
-.sprocket .s-streak-arc {
-  fill: none; stroke: #fff; stroke-width: var(--streak-w, 7px); stroke-linecap: round;
-  stroke-dasharray: 34 200; stroke-dashoffset: 34; opacity: 0;
-  filter: drop-shadow(0 0 2px rgb(0 0 0 / calc(var(--sprocket-shadow) * 1.2)));
-}
-.sprocket .s-streak-arc.thin { stroke-width: calc(var(--streak-w, 7px) * 0.55); }
 /* The ground shadow: black in both themes, lighter on a light page (--sprocket-shadow). */
 .sprocket .s-shadow { fill: #000; opacity: var(--sprocket-shadow); }
-.sprocket .s-rig { animation: sp-bob var(--period, 1.7s) ease-in-out var(--phase, 0s) infinite alternate; }
-.sprocket .s-sway { animation: sp-sway calc(var(--period, 1.7s) * 1.4) ease-in-out var(--phase, 0s) infinite alternate; }
-.sprocket .s-shadow { animation: sp-shadow var(--period, 1.7s) ease-in-out var(--phase, 0s) infinite alternate; }
-/* Eyes lead, the face follows (motion.ts writes --ex/--ey/--fx/--fy in viewBox units). */
-.sprocket .s-face { transform: translate(calc(var(--fx, 0) * 1px), calc(var(--fy, 0) * 1px)); }
+/* Eyes look about (motion.ts writes --ex/--ey in viewBox units). */
 .sprocket .s-eyes { transform: translate(calc(var(--ex, 0) * 1px), calc(var(--ey, 0) * 1px)); }
-.sprocket.paused * { animation-play-state: paused; }
-.sprocket.still * { animation: none; }
-/* Amplitudes come from --bob / --sway, set per size (Sprocket.tsx): small avatars move more. */
-@keyframes sp-bob { from { transform: translateY(0); } to { transform: translateY(calc(-1 * var(--bob, 6px))); } }
-@keyframes sp-sway { from { transform: rotate(calc(-1 * var(--sway, 3.5deg))); } to { transform: rotate(var(--sway, 3.5deg)); } }
-@keyframes sp-shadow { from { transform: scaleX(1); opacity: var(--sprocket-shadow); } to { transform: scaleX(0.84); opacity: calc(0.64 * var(--sprocket-shadow)); } }
 
 /* ---- Sprockets page: list column + chat or creator (components/sprockets) ---- */
 .sprockets { display: flex; height: 100%; min-height: 0; }
