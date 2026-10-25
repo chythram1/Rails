@@ -3,7 +3,7 @@
 
 const INK = "#17171c";
 /** Distance from the face centre to each eye. */
-const EYE_X = 13;
+const EYE_X = 14.5;
 
 export function Eyes({ slant }: { slant: number }) {
   return (

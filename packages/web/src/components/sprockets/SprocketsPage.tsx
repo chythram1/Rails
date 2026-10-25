@@ -214,14 +214,22 @@ function SprocketList(props: {
  */
 function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; teams: SprocketTeam[]; active: boolean }) {
   // Its character holds still in the list. It comes alive while the pointer is on it (following the pointer), it has
-  // focus or its chat is open (facing you), it's working on a reply in any of its chats, teams included (thinking),
+  // focus or its chat is open (facing you), it's working on a reply in any of its chats, teams included (thinking, from
+  // about a second after it starts),
   // and while it cheers as its message lands (happy eyes and a dance); it turns back before it holds still again.
   const [hover, setHover] = useState(false);
   const [focus, setFocus] = useState(false);
   const [awake, setAwake] = useState(active);
   const chats = [s.direct, ...(s.projectChat ? [s.projectChat] : [])];
   const mine = teams.filter((t) => t.members.includes(s.id));
-  const busy = chats.some((c) => c.running) || mine.some((t) => t.replying.includes(s.id));
+  const working = chats.some((c) => c.running) || mine.some((t) => t.replying.includes(s.id));
+  // It takes a moment to notice a message: thinking shows about a second after it starts work (each a little apart).
+  const [busy, setBusy] = useState(working);
+  useEffect(() => {
+    if (!working) return setBusy(false);
+    const t = setTimeout(() => setBusy(true), 800 + Math.random() * 500);
+    return () => clearTimeout(t);
+  }, [working]);
   const newest = [...chats, ...mine]
     .map((c) => c.lastMessage)
     .filter((m) => m?.author === "sprocket" && m.sprocketId === s.id)
