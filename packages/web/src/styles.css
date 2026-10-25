@@ -848,13 +848,28 @@ textarea.input { resize: vertical; line-height: 1.5; }
    header is just the name, so a line there only made an empty crossing. */
 .sp-head { padding: 7px 12px 0 20px; gap: 10px; }
 .sp-chat .sp-head { border-bottom-color: transparent; }
+/* The chat's header: three columns, who it is in the middle on a card (its still face and name, on the menus' surface
+   with a hairline edge), the back button and chat tabs left of it, the menu and settings right. */
+.sp-chat > .sp-head { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; }
+.sp-head-side { display: flex; align-items: center; align-self: stretch; gap: 6px; min-width: 0; }
+.sp-head-side.end { justify-content: flex-end; }
+.sp-identity {
+  display: flex; align-items: center; gap: 8px; min-width: 0; max-width: min(360px, 50cqw); height: 38px; padding: 0 14px 0 8px;
+  border: 1px solid var(--border); border-radius: var(--bubble-r); background: var(--surface);
+}
+.sp-identity .sp-head-sub { font-size: 14px; }
+/* Narrow, the sides take what they need and the card the rest, centred in it, so nothing runs under it. */
+@container (max-width: 560px) {
+  .sp-chat > .sp-head { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .sp-identity { justify-self: center; max-width: 100%; }
+}
 .sp-head h2 { font-size: 15px; font-weight: 600; }
 /* A project chat's header: the project's name, then the Sprocket that answers there. */
 .sp-head-sub { margin-left: 4px; color: var(--muted); font-weight: 400; }
 /* An attached Sprocket's two chats (ADR 0021) as tabs after its name, underlined at the header's foot when shown. */
 .sp-chat-tabs { display: flex; flex-shrink: 0; align-self: stretch; margin: -7px 0 0 6px; }
 .sp-chat-tab { display: flex; align-items: center; gap: 6px; max-width: 160px; padding: 7px 10px 0; color: var(--muted); font-size: 13px; }
-@media (max-width: 860px) { .sp-head:has(.sp-chat-tabs) > .sprocket { display: none; } .sp-chat-tabs { margin-left: 0; } .sp-chat-tab { max-width: 96px; padding: 7px 8px 0; } }
+@media (max-width: 860px) { .sp-head:has(.sp-chat-tabs) .sp-identity > .sprocket { display: none; } .sp-chat-tabs { margin-left: 0; } .sp-chat-tab { max-width: 96px; padding: 7px 8px 0; } }
 .sp-chat-tab[aria-current="page"] { color: var(--text); box-shadow: inset 0 -2px 0 var(--tint-ink); }
 .sp-chat-tab:focus-visible { outline-offset: -2px; }
 .sp-chat-tab:hover:not([aria-current="page"]) { color: var(--text-2); }

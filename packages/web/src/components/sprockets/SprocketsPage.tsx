@@ -18,7 +18,7 @@ import { useSprockets } from "./useSprockets.ts";
 import { usePlaying } from "./motion.ts";
 import { ANIMATIONS, doneFor } from "./animations.ts";
 import { rowId, useFlight } from "./flight.ts";
-import { spawned, useSpawn } from "./spawn.ts";
+import { settledPlay, spawned, useSpawn } from "./spawn.ts";
 import { plain } from "./marks.ts";
 
 type SprocketsRoute = Extract<Route, { name: "sprockets" }>;
@@ -288,9 +288,9 @@ function SprocketRow({ sprocket: s, teams, active }: { sprocket: SprocketData; t
         stance={focus ? "front" : "rest"}
         follow={hover && !busy && !ending}
         activity={busy && talking ? "talk" : "idle"}
-        dots={flight.dots}
-        spawn={spawn}
-        play={ending && newest && done ? { name: done, key: newest.id } : flight.play}
+        dots={flight.dots && !spawn}
+        spawn={spawn?.start}
+        play={ending && newest && done ? { name: done, key: newest.id } : (settledPlay(spawn) ?? flight.play)}
         idles={idling && !selected}
         resting={!live}
       />

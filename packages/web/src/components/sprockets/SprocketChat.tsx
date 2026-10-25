@@ -16,7 +16,7 @@ import { EventRow } from "./EventRow.tsx";
 import { SuggestionCard } from "./SuggestionCard.tsx";
 import { MessageActions } from "./MessageActions.tsx";
 import { AskCard } from "./AskCard.tsx";
-import { useSpawn } from "./spawn.ts";
+import { settledPlay, useSpawn } from "./spawn.ts";
 import { COLORS, DEEP } from "./characters.ts";
 import { rowId, useFlight, useStep } from "./flight.ts";
 import { VIEW } from "./Sprocket.tsx";
@@ -192,31 +192,37 @@ export function SprocketChat({
     <section className="sp-chat" {...(embedded ? { "aria-label": chatName } : { "aria-labelledby": "sp-chat-title" })}>
       {!embedded && (
         <header className="sp-head">
-          <a className="icon-btn sp-back" href={href.sprockets()} aria-label="All Sprockets">
-            <ChevronLeft size={18} />
-          </a>
-          {team ? <TeamFace looks={members} size={28} /> : <Sprocket look={sprocket.look} size={28} activity={running ? "think" : "idle"} />}
-          {/* A team's name, then its members. */}
-          <h2 id="sp-chat-title" className="truncate" title={team ? `${title} · ${members.map((m) => m.name).join(", ")}` : name}>
-            {team ? (
-              <>
-                {title} <span className="sp-head-sub">{members.map((m) => m.name).join(", ")}</span>
-              </>
-            ) : (
-              name
+          {/* Three columns, so who it is sits in the middle whatever is either side: the back button and an attached
+              Sprocket's two chats (ADR 0021) on the left, its menu and settings on the right. */}
+          <div className="sp-head-side">
+            <a className="icon-btn sp-back" href={href.sprockets()} aria-label="All Sprockets">
+              <ChevronLeft size={18} />
+            </a>
+            {!team && project && sprocket.projectChat && (
+              <nav className="sp-chat-tabs" aria-label={`${name}'s chats`}>
+                <ChatTab href={href.sprocket(id, true)} current={projectChat} label={project.name} chat={sprocket.projectChat} />
+                <ChatTab href={href.sprocket(id)} current={!projectChat} label="Direct" chat={sprocket.direct} />
+              </nav>
             )}
-          </h2>
-          {/* An attached Sprocket's two chats (ADR 0021): its project's, then its own. */}
-          {!team && project && sprocket.projectChat && (
-            <nav className="sp-chat-tabs" aria-label={`${name}'s chats`}>
-              <ChatTab href={href.sprocket(id, true)} current={projectChat} label={project.name} chat={sprocket.projectChat} />
-              <ChatTab href={href.sprocket(id)} current={!projectChat} label="Direct" chat={sprocket.direct} />
-            </nav>
-          )}
-          <span className="grow" />
-          <ChatMenu chatId={chatId} name={title} project={projectChat ? project?.name : undefined} team={!!team} empty={!messages?.length} />
-          {/* While the settings panel is open, its toggle sits at the panel's top right instead. */}
-          {!panelOpen && (team ? <TeamPanelToggle team={team.info} open={false} /> : <PanelToggle sprocket={sprocket} project={projectChat} open={false} />)}
+          </div>
+          {/* Who it is, on a card: its face, still, and its name (a team's, then its members). */}
+          <div className="sp-identity">
+            {team ? <TeamFace looks={members} size={26} /> : <Sprocket look={sprocket.look} size={26} still />}
+            <h2 id="sp-chat-title" className="truncate" title={team ? `${title} · ${members.map((m) => m.name).join(", ")}` : name}>
+              {team ? (
+                <>
+                  {title} <span className="sp-head-sub">{members.map((m) => m.name).join(", ")}</span>
+                </>
+              ) : (
+                name
+              )}
+            </h2>
+          </div>
+          <div className="sp-head-side end">
+            <ChatMenu chatId={chatId} name={title} project={projectChat ? project?.name : undefined} team={!!team} empty={!messages?.length} />
+            {/* While the settings panel is open, its toggle sits at the panel's top right instead. */}
+            {!panelOpen && (team ? <TeamPanelToggle team={team.info} open={false} /> : <PanelToggle sprocket={sprocket} project={projectChat} open={false} />)}
+          </div>
         </header>
       )}
       <div className="sp-thread" ref={thread}>
@@ -476,7 +482,7 @@ function FlightIcon({ who, working }: { who: SprocketData; working: boolean }) {
             <use href={`#${id}`} />
           </svg>
         ) : (
-          <Sprocket look={who.look} size={26} dots={flight.dots} spawn={spawn} play={flight.play} />
+          <Sprocket look={who.look} size={26} dots={flight.dots && !spawn} spawn={spawn?.start} play={settledPlay(spawn) ?? flight.play} />
         )}
       </span>
       {working && step && <span className="sp-working">{step}</span>}
