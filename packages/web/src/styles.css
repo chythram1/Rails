@@ -683,6 +683,8 @@ textarea.input { resize: vertical; line-height: 1.5; }
 /* Under the tabs, a bar for what the tab is about: the project's Sprocket, or the branch. */
 .side-bar { display: flex; align-items: center; gap: 2px; min-height: 40px; padding: 0 6px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
 .side-git-bar { padding-left: 16px; }
+/* "Show": one session's changes. A long title is cut so the refresh button always fits. */
+.side-git-bar .dropdown.plain { min-width: 0; max-width: 60%; }
 .side-sprocket { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 28px; margin: 0; padding: 0 9px 0 6px; color: var(--text); font-size: 13px; font-weight: 500; }
 .side-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 /* The panel is narrow, so the composer lines up with the messages, 16px in from both edges. */
@@ -690,10 +692,24 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .side-chat .sp-compose { padding: 0 16px 16px; }
 .side-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 20px 16px; font-size: 14px; }
 .side-empty p { margin: 0; text-wrap: pretty; }
-.git-files { list-style: none; margin: 0; padding: 0; max-height: 40%; overflow-y: auto; border-bottom: 1px solid var(--border); }
-.git-file { width: 100%; display: flex; gap: 10px; align-items: center; padding: 6px 16px; font-size: 13px; text-align: left; }
+/* The Git tab's files: the name and its line counts, the folder in muted mono, then who changed it. The list fills
+   the tab, and gives the diff the rest once a file is chosen. */
+.git-files { list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.git-files.with-diff { flex: none; max-height: 40%; border-bottom: 1px solid var(--border); }
+.git-files > li + li { border-top: 1px solid var(--border); }
+.git-file { width: 100%; display: flex; gap: 10px; align-items: flex-start; padding: 8px 16px; font-size: 13px; text-align: left; }
 .git-file.active { background: var(--surface-2); }
-.git-code { font: 11px var(--mono); width: 18px; text-align: center; flex-shrink: 0; }
+.git-code { font: 11px/20px var(--mono); width: 18px; text-align: center; flex-shrink: 0; }
+.git-file-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.git-file-head { display: flex; align-items: baseline; gap: 8px; line-height: 20px; }
+.git-file-name { flex: 1; min-width: 0; color: var(--text); }
+.git-counts { display: flex; gap: 6px; flex-shrink: 0; font: 11.5px var(--mono); font-variant-numeric: tabular-nums; }
+.git-counts .c-add { color: var(--diff-add-ink); }
+.git-counts .c-del { color: var(--diff-del-ink); }
+.git-file-dir { font: 11.5px var(--mono); color: var(--muted); }
+.git-file-by { display: flex; align-items: center; gap: 6px; min-width: 0; margin-top: 2px; font-size: 12px; color: var(--text-2); }
+.git-file-by :is(img, svg) { width: 14px; height: 14px; flex-shrink: 0; }
+.git-file-when { margin-left: auto; flex-shrink: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
 .git-code.c-new { color: var(--green); }
 .git-code.c-mod { color: var(--amber); }
 .git-code.c-del { color: var(--red); }

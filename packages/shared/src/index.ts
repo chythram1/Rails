@@ -276,6 +276,19 @@ export interface GitFile {
   path: string;
   /** Two-letter porcelain XY code, e.g. " M", "A ", "??". */
   status: string;
+  /** The Git tab's list only: lines added and deleted since the last commit (none for untracked or binary files). */
+  added?: number;
+  deleted?: number;
+  /** The Git tab's list only: the open sessions that changed it, as they reported (ADR 0014's edits), newest first. */
+  editedBy?: GitFileEditor[];
+}
+
+/** An open session that changed a file, and when it last did. */
+export interface GitFileEditor {
+  panelId: string;
+  kind: PanelKind;
+  title: string;
+  at: string;
 }
 
 /** A file's state in git, for the file tree (porcelain codes, read): what changed since the last commit. */
