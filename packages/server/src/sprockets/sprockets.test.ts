@@ -55,7 +55,7 @@ describe("sprockets", () => {
     expect(() => listMessages(chat)).toThrow("Not found");
   });
 
-  it("marks a chat unread when a Sprocket writes after you last saw it, on every device", () => {
+  it("marks a chat unread when a Sprocket writes after you last saw it, on every device", async () => {
     const s = createSprocket({ name: "Teller", look });
     const chat = directChat(s.id);
     const unread = () => listSprockets().find((x) => x.id === s.id)!.direct.unread;
@@ -66,6 +66,12 @@ describe("sprockets", () => {
     expect(unread()).toBe(false);
     sprocketMessages.create(chat, "sprocket", "Hello!", later(7));
     expect(unread()).toBe(true);
+    vi.useFakeTimers({ now: Date.now() + 8, toFake: ["Date"] });
+    sendMessage(chat, "thanks"); // writing in it, you've seen it
+    vi.useRealTimers();
+    expect(unread()).toBe(false);
+    sprocketMessages.create(chat, "sprocket", "Anytime.", later(9));
+    expect(unread()).toBe(true);
     const seen = vi.fn();
     const off = onSprocketsChanged(seen);
     vi.useFakeTimers({ now: Date.now() + 10, toFake: ["Date"] });
@@ -74,6 +80,7 @@ describe("sprockets", () => {
     off();
     expect(unread()).toBe(false);
     expect(seen).toHaveBeenCalled(); // other devices' dots go too
+    await idle(); // the reply "thanks" asked for (with no model, a notice)
   });
 
   it("refuses empty and oversized messages", () => {

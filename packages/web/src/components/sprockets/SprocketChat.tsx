@@ -267,8 +267,9 @@ export function SprocketChat({
           >
             {messages.map((m, i) => {
               const prev = messages[i - 1];
-              const fresh = (x?: SprocketMessage) => !!newSince && !!x && x.author !== "user" && x.createdAt > newSince;
-              /** The first message that came while you were away: the New line goes above it. */
+              // What the list's dot counts: a Sprocket's messages since you last saw the chat (not Rails' notices).
+              const fresh = (x?: SprocketMessage) => !!newSince && x?.author === "sprocket" && x.createdAt > newSince;
+              /** The first message a Sprocket wrote while you were away: the New line goes above it. */
               const firstNew = fresh(m) && !messages.slice(0, i).some(fresh);
               const next = messages[i + 1];
               const label = !prev || newGroup(prev.createdAt, m.createdAt);

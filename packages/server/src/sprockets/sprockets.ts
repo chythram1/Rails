@@ -171,6 +171,7 @@ export function sendMessage(chatId: string, rawText: unknown): SprocketMessage {
   if (!text) throw new ServiceError("Message is empty", 400);
   if (text.length > MAX_MESSAGE) throw new ServiceError(`Messages can be at most ${MAX_MESSAGE} characters.`, 400);
   const message = sprocketMessages.create(chatId, "user", text, userMessageTime(chatId));
+  sprocketChats.markRead(chatId, message.createdAt); // writing in it, you've seen it
   changed();
   if (chat.kind === "team") wakeTeam(chatId, text, message.id);
   else {
