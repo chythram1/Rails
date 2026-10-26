@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { IconChevronLeft as ChevronLeft, IconLayoutSidebarRight as PanelRight } from "@tabler/icons-react";
+import { IconChevronLeft as ChevronLeft, IconSettings as Cog } from "@tabler/icons-react";
 import { TEAM_MEMBERS_MIN, type Sprocket as SprocketData, type SprocketTeam } from "@rails/shared";
 import { api } from "../../api.ts";
 import { href, navigate } from "../../router.ts";
@@ -17,7 +17,7 @@ export function TeamPanelToggle({ team, open }: { team: SprocketTeam; open: bool
       aria-expanded={open}
       title={open ? "Close settings" : "Settings"}
     >
-      <PanelRight size={18} />
+      <Cog size={18} />
     </a>
   );
 }

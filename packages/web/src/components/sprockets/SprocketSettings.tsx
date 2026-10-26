@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { IconArrowRight as ArrowRight, IconBook as Book, IconChevronLeft as ChevronLeft, IconLayoutSidebarRight as PanelRight, IconPlus as Plus, IconX as X } from "@tabler/icons-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { IconArrowRight as ArrowRight, IconBook as Book, IconChevronLeft as ChevronLeft, IconPlus as Plus, IconSettings as Cog, IconX as X } from "@tabler/icons-react";
 import {
   SPROCKET_DESCRIPTION_MAX,
   SPROCKET_RULE_MAX,
@@ -37,7 +37,7 @@ export function PanelToggle({ sprocket, project = false, open }: { sprocket: Spr
       aria-expanded={open}
       title={open ? "Close settings" : "Settings"}
     >
-      <PanelRight size={18} />
+      <Cog size={18} />
     </a>
   );
 }
@@ -180,18 +180,16 @@ export function SprocketSettings({ sprocket, all, onProjectChat = false }: { spr
                   // Held in place while the models load, so the panel doesn't shift when they arrive.
                   <Dropdown id="sp-model" value="" options={[]} placeholder="Loading models…" disabled onChange={() => {}} />
                 )}
-                {models && !models.models.length && (
+                {models && !models.models.length ? (
                   <p className="muted small">
                     No models yet.{" "}
                     <button type="button" className="link" onClick={() => openSettings("providers")}>
                       Connect a provider
                     </button>
                   </p>
+                ) : (
+                  sprocket.usage.runs > 0 && <p className="muted small">{usageText(sprocket.usage)}</p>
                 )}
-              </div>
-              <div className="settings-field">
-                <p className="sp-field-label">Usage</p>
-                <p className="muted small">{usageText(sprocket.usage)}</p>
               </div>
             </section>
             {/* Delete, at the end, set apart from what you change often. */}
@@ -203,34 +201,36 @@ export function SprocketSettings({ sprocket, all, onProjectChat = false }: { spr
           </>
         )}
         {tab === "project" && (
-          <section className="sp-section" aria-label="Project">
-            <div className="settings-field">
-              <label htmlFor="sp-project">Project</label>
-              <Dropdown
-                id="sp-project"
-                value={sprocket.projectId ?? ""}
-                disabled={sprocket.running}
-                options={[
-                  { value: "", label: "None" },
-                  ...projects.map((p) => {
-                    const holder = holderOf(p.id);
-                    return { value: p.id, label: holder ? `${p.name} (${holder.name})` : p.name, disabled: !!holder };
-                  }),
-                ]}
-                describedBy="sp-project-help"
-                onChange={(v) => void move(v)}
-              />
-              <p id="sp-project-help" className="muted small">
-                {sprocket.running
-                  ? "It's replying. You can move it when it's done."
-                  : project
-                    ? "It looks after this project's sessions: it tells you when one waits for you, passes things on and watches for clashes."
-                    : "Attach it to a project to have it look after that project's sessions. A project has one Sprocket."}
-              </p>
-            </div>
+          <>
+            <section className="sp-section" aria-label="Project">
+              <div className="settings-field">
+                <label htmlFor="sp-project">Project</label>
+                <Dropdown
+                  id="sp-project"
+                  value={sprocket.projectId ?? ""}
+                  disabled={sprocket.running}
+                  options={[
+                    { value: "", label: "None" },
+                    ...projects.map((p) => {
+                      const holder = holderOf(p.id);
+                      return { value: p.id, label: holder ? `${p.name} (${holder.name})` : p.name, disabled: !!holder };
+                    }),
+                  ]}
+                  describedBy="sp-project-help"
+                  onChange={(v) => void move(v)}
+                />
+                <p id="sp-project-help" className="muted small">
+                  {sprocket.running
+                    ? "It's replying. You can move it when it's done."
+                    : project
+                      ? "It looks after this project's sessions: who's waiting for you, handoffs and clashes."
+                      : "Attach it to look after a project's sessions. A project has one Sprocket."}
+                </p>
+              </div>
+            </section>
             {sprocket.coordinator && <HandoffsField sprocket={sprocket} />}
             {sprocket.projectId && <OwnersField sprocket={sprocket} />}
-          </section>
+          </>
         )}
         {tab === "rules" && <RulesField sprocket={sprocket} onSave={(rules) => save({ rules })} />}
         {tab === "tools" && <ToolsField sprocket={sprocket} onSave={(tools) => save({ tools })} />}
@@ -301,9 +301,11 @@ function RulesField({ sprocket, onSave }: { sprocket: SprocketData; onSave(rules
     addButton.current?.focus();
   }, [adding]);
   return (
-    <div className="settings-field sp-rules" role="group" aria-labelledby="sp-rules-label">
-      <div className="sp-field-head">
-        <p id="sp-rules-label" className="sp-field-label">Rules</p>
+    <Group
+      id="sp-rules-label"
+      title="Rules"
+      count={rules.length ? `${rules.length} of ${SPROCKET_RULES_MAX}` : undefined}
+      action={
         <button
           ref={addButton}
           type="button"
@@ -315,7 +317,8 @@ function RulesField({ sprocket, onSave }: { sprocket: SprocketData; onSave(rules
           <Plus size={14} aria-hidden />
           Add
         </button>
-      </div>
+      }
+    >
       <p className="muted small">
         How it answers sessions, one sentence each{rules.length || adding ? "." : ", e.g. “If it asks whether to continue with its plan, say yes.”"}
       </p>
@@ -341,7 +344,24 @@ function RulesField({ sprocket, onSave }: { sprocket: SprocketData; onSave(rules
         </ol>
       )}
       {full && <p className="muted small">That's {SPROCKET_RULES_MAX} rules, the most a Sprocket can have.</p>}
-    </div>
+    </Group>
+  );
+}
+
+/**
+ * A group on one of the panel's pages: its heading in small capitals on a rule, a muted count beside it and an
+ * action at the right, then what's in it. Groups sit 28px apart, so a page reads as a few named parts.
+ */
+function Group({ id, title, count, action, children }: { id: string; title: string; count?: string; action?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="sp-group" aria-labelledby={id}>
+      <div className="sp-group-head">
+        <h3 id={id}>{title}</h3>
+        {count && <span className="sp-group-count">{count}</span>}
+        {action}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -463,12 +483,11 @@ function OwnersField({ sprocket }: { sprocket: SprocketData }) {
     }
   };
   return (
-    <div className="settings-field" role="group" aria-labelledby="sp-owners-label">
-      <p id="sp-owners-label" className="sp-field-label">Owners</p>
+    <Group id="sp-owners-label" title="Owners" count={sprocket.owners.length ? String(sprocket.owners.length) : undefined}>
       <p className="muted small">
         {sprocket.owners.length
-          ? "Who owns which files. It sends requests to their owner and tells you when another session changes them."
-          : `None yet. Tell ${sprocket.name} in the chat, e.g. \u201cClaude owns src/engine and index.html.\u201d`}
+          ? "Requests go to a file's owner, and you hear when another session changes its files."
+          : `None yet. Tell ${sprocket.name} in the chat, e.g. \u201cClaude owns src/engine.\u201d`}
       </p>
       {sprocket.owners.length > 0 && (
         <ul className="sp-handoffs">
@@ -489,7 +508,7 @@ function OwnersField({ sprocket }: { sprocket: SprocketData }) {
         </ul>
       )}
       {error && <p className="error" role="alert">{error}</p>}
-    </div>
+    </Group>
   );
 }
 
@@ -508,12 +527,11 @@ function HandoffsField({ sprocket }: { sprocket: SprocketData }) {
     }
   };
   return (
-    <div className="settings-field" role="group" aria-labelledby="sp-handoffs-label">
-      <p id="sp-handoffs-label" className="sp-field-label">Handoffs</p>
+    <Group id="sp-handoffs-label" title="Handoffs" count={sprocket.handoffs.length ? String(sprocket.handoffs.length) : undefined}>
       <p className="muted small">
         {sprocket.handoffs.length
           ? "What it passes on when a session finishes."
-          : `None waiting. Ask ${sprocket.name} in the chat, e.g. “When the auth session is done, tell the UI session to use the new endpoint.”`}
+          : `None waiting. Ask ${sprocket.name} in the chat, e.g. “When auth is done, tell the UI session to use the new endpoint.”`}
       </p>
       {sprocket.handoffs.length > 0 && (
         <ul className="sp-handoffs">
@@ -539,7 +557,7 @@ function HandoffsField({ sprocket }: { sprocket: SprocketData }) {
         </ul>
       )}
       {error && <p className="error" role="alert">{error}</p>}
-    </div>
+    </Group>
   );
 }
 
@@ -591,54 +609,67 @@ function DescriptionField({ sprocket, onSave }: { sprocket: SprocketData; onSave
 }
 
 /**
- * What it can use (ADR 0025): a switch per MCP server and per skill in Customize. Each server's tools ask first
- * unless Customize allows them; it reaches them in its direct chat and teams.
+ * What it can use (ADR 0025), in two groups: Customize's connectors and MCP servers, then its skills, each with a
+ * switch, in Customize's order so a row never moves when it's switched. Each server's tools ask first unless
+ * Customize allows them; it reaches them in its direct chat and teams.
  */
 function ToolsField({ sprocket, onSave }: { sprocket: SprocketData; onSave(tools: { mcp?: string[]; skills?: string[] }): Promise<boolean> }) {
   const { mcpServers, skills } = useStore();
   const has = sprocket.tools;
   const toggle = (kind: "mcp" | "skills", itemId: string, on: boolean) =>
     void onSave({ [kind]: on ? [...has[kind], itemId] : has[kind].filter((x) => x !== itemId) });
-  const none = !mcpServers?.length && !skills?.length;
+  const servers = mcpServers ?? [];
+  const skillList = skills ?? [];
+  const onOf = (ids: string[], list: { id: string }[]) => `${list.filter((x) => ids.includes(x.id)).length} of ${list.length} on`;
   return (
-    <div className="settings-field" role="group" aria-labelledby="sp-tools-label">
-      <p id="sp-tools-label" className="sp-field-label">Tools</p>
-      <p className="muted small">
-        {none ? (
+    <>
+      <p className="muted small sp-tools-intro">
+        What it can use, from <a href={href.customize()}>Customize</a>. Tools that change things ask you first.
+      </p>
+      <Group id="sp-servers-label" title="Connectors" count={servers.length ? onOf(has.mcp, servers) : undefined}>
+        {servers.length ? (
           <>
-            None yet. Add MCP servers and skills in <a href={href.customize()}>Customize</a>.
+            <p className="muted small">It uses them in its own chat and teams, not the project chat.</p>
+            <ul className="sp-tools">
+              {servers.map((s) => (
+                <ToolRow
+                  key={s.id}
+                  id={`sp-tool-${s.id}`}
+                  name={connectorById(s.connector)?.name ?? s.name}
+                  server={s}
+                  detail={[s.connector ? "" : "Custom server", s.toolsAt ? `${s.tools.filter((t) => t.policy !== "off").length} tools` : ""].filter(Boolean).join(" · ")}
+                  warn={s.signIn?.state === "needed" ? "Sign in to it in Customize" : s.status.state === "error" ? "Can't connect" : undefined}
+                  on={has.mcp.includes(s.id)}
+                  onChange={(on) => toggle("mcp", s.id, on)}
+                />
+              ))}
+            </ul>
           </>
         ) : (
-          <>
-            From <a href={href.customize()}>Customize</a>. It uses servers in its own chat and teams; tools that change things ask you first.
-          </>
+          <p className="muted small">
+            None yet. <a href={href.customize()}>Browse connectors</a> to add Linear, GitHub, Notion and more.
+          </p>
         )}
-      </p>
-      {!none && (
-        <ul className="sp-tools">
-          {(mcpServers ?? []).map((s) => (
-            <ToolRow
-              key={s.id}
-              id={`sp-tool-${s.id}`}
-              name={connectorById(s.connector)?.name ?? s.name}
-              server={s}
-              kind={s.connector ? "Connector" : "MCP server"}
-              detail={s.signIn?.state === "needed" ? "Sign in to it in Customize" : s.status.state === "error" ? "Can't connect" : s.toolsAt ? `${s.tools.filter((t) => t.policy !== "off").length} tools` : ""}
-              warn={s.status.state === "error"}
-              on={has.mcp.includes(s.id)}
-              onChange={(on) => toggle("mcp", s.id, on)}
-            />
-          ))}
-          {(skills ?? []).map((k) => (
-            <ToolRow key={k.id} id={`sp-skill-${k.id}`} name={k.name} kind="Skill" detail="" on={has.skills.includes(k.id)} onChange={(on) => toggle("skills", k.id, on)} />
-          ))}
-        </ul>
-      )}
-    </div>
+      </Group>
+      <Group id="sp-skills-label" title="Skills" count={skillList.length ? onOf(has.skills, skillList) : undefined}>
+        {skillList.length ? (
+          <ul className="sp-tools">
+            {skillList.map((k) => (
+              <ToolRow key={k.id} id={`sp-skill-${k.id}`} name={k.name} detail={k.description} on={has.skills.includes(k.id)} onChange={(on) => toggle("skills", k.id, on)} />
+            ))}
+          </ul>
+        ) : (
+          <p className="muted small">
+            None yet. <a href={href.customize("skills")}>Write or copy a skill</a> in Customize.
+          </p>
+        )}
+      </Group>
+    </>
   );
 }
 
-function ToolRow(props: { id: string; name: string; kind: string; detail: string; warn?: boolean; server?: McpServer; on: boolean; onChange(on: boolean): void }) {
+/** One connector, server or skill: its mark, its name over one muted line (or what's wrong, in red), and its switch. */
+function ToolRow(props: { id: string; name: string; detail: string; warn?: string; server?: McpServer; on: boolean; onChange(on: boolean): void }) {
   return (
     <li className="sp-tool">
       {props.server ? (
@@ -650,10 +681,11 @@ function ToolRow(props: { id: string; name: string; kind: string; detail: string
       )}
       <label htmlFor={props.id} className="sp-tool-text">
         <span className="sp-tool-name truncate">{props.name}</span>
-        <span className="muted small">
-          {props.kind}
-          {props.detail && (props.warn ? <span className="sp-tool-warn"> · {props.detail}</span> : ` · ${props.detail}`)}
-        </span>
+        {(props.warn || props.detail) && (
+          <span className="muted small truncate" title={props.detail || undefined}>
+            {props.warn ? <span className="sp-tool-warn">{props.warn}</span> : props.detail}
+          </span>
+        )}
       </label>
       <Switch id={props.id} checked={props.on} onChange={props.onChange} />
     </li>

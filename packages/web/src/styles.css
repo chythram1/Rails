@@ -226,7 +226,7 @@ body.resizing .main { pointer-events: none; } /* terminals would otherwise grab 
   /* right padding matches .project-row so the add-project button lines up with the rows' + buttons */
   padding: 20px 4px 6px 12px;
 }
-.section-head > span, .sp-group-title, .menu-heading, .set-group > h3 {
+.section-head > span, .sp-group-title, .menu-heading, .set-group > h3, .sp-group-head > h3 {
   font: 600 11.5px/1.4 var(--font); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
 }
 .tree { flex: 1; overflow-y: auto; padding-bottom: 12px; }
@@ -354,7 +354,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .settings-field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
 .settings-field > label { font-size: 13px; color: var(--text-2); }
 .settings-field p { margin: 0; }
-.settings-field a { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
+.settings-field a, .sp-group a, .sp-tools-intro a { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
 .provider-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); }
 .provider-row { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .provider-row + .provider-row { border-top: 1px solid var(--border); }
@@ -1243,11 +1243,19 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
 .sp-panel .settings-field > :is(.input, .dropdown) { width: 100%; }
 .sp-field-foot { display: flex; align-items: center; gap: 8px; }
 .sp-field-label { font-size: 13px; color: var(--text-2); }
+/* A group on a page (Handoffs, Owners, Rules, Connectors, Skills): its heading in small capitals on a rule, a muted
+   count beside it and an action at the right; 8px inside, 28px between groups (the body's gap). */
+.sp-group { display: flex; flex-direction: column; gap: 8px; }
+.sp-group-head { display: flex; align-items: center; gap: 8px; min-height: 30px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.sp-group-head > h3, .sp-group p { margin: 0; }
+.sp-group-count { margin-right: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sp-group-head > h3:last-child, .sp-group-head > h3:has(+ .btn) { margin-right: auto; }
+.sp-group-head .btn svg { margin-left: -4px; }
+.sp-tools-intro { margin: 0 0 -12px; }
+.sp-group-head + .sp-tools { margin-top: -8px; border-top: 0; }
 /* A Coordinator's rules (SprocketSettings.tsx): one ruled list of numbered sentences. A row turns into a field
    (--field, the focus edge) only while it's edited; its remove button shows on hover or focus. "Add" sits in the
    heading. */
-.sp-field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.sp-field-head .btn svg { margin-left: -4px; }
 .sp-rules-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--border); }
 .sp-rule { display: flex; align-items: flex-start; gap: 8px; padding: 6px 3px 6px 8px; border-bottom: 1px solid var(--border); }
 .sp-rule:hover { background: var(--hover); }
@@ -1406,7 +1414,7 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
   .sp-slot:not(.idle):hover { background: var(--hover); }
   .sp-card-new:hover .sp-new-plus { fill: var(--tint-ink); }
   .thumb .sp-pick:hover { background: var(--hover); }
-  .settings-field a:hover, .sp-event-open:hover, button.link:hover { text-decoration-thickness: 2px; }
+  .settings-field a:hover, .sp-group a:hover, .sp-tools-intro a:hover, .sp-event-open:hover, button.link:hover { text-decoration-thickness: 2px; }
 }
 
 /* ---- Customize (ADR 0025): a page of cards per tab (connectors, skills, prompts), and one item open full width
