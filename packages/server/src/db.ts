@@ -110,6 +110,12 @@ db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS sprocket_chats_project ON sprocket_chats (sprocket_id) WHERE kind = 'project';
 `);
 addColumn("sprocket_messages", "chat_id", "TEXT");
+// When the user last saw each chat (its unread dot and New line). Chats from before count as read, so an upgrade
+// doesn't mark them all.
+if (!(db.prepare("PRAGMA table_info(sprocket_chats)").all() as { name: string }[]).some((c) => c.name === "read_at")) {
+  addColumn("sprocket_chats", "read_at", "TEXT");
+  db.prepare("UPDATE sprocket_chats SET read_at = ?").run(new Date().toISOString());
+}
 db.exec("CREATE INDEX IF NOT EXISTS sprocket_messages_by_chat ON sprocket_messages (chat_id, created_at)");
 // Team chats (ADR 0022): a name, the lead in sprocket_id, and the members (the lead too) in order. A message's
 // sprocket_id is the member that wrote it.
@@ -599,10 +605,11 @@ type ChatRow = {
   project_id: string | null;
   name: string | null;
   cleared_at: string | null;
+  read_at: string | null;
   created_at: string;
 };
 /** A chat. `sprocketId` is the Sprocket that answers it: in a team, its lead. */
-export type StoredChat = { id: string; kind: SprocketChatKind; sprocketId: string; projectId?: string; name?: string; clearedAt?: string; createdAt: string };
+export type StoredChat = { id: string; kind: SprocketChatKind; sprocketId: string; projectId?: string; name?: string; clearedAt?: string; readAt: string; createdAt: string };
 const toChat = (r: ChatRow): StoredChat => ({
   id: r.id,
   kind: r.kind,
@@ -610,6 +617,7 @@ const toChat = (r: ChatRow): StoredChat => ({
   ...(r.project_id ? { projectId: r.project_id } : {}),
   ...(r.name ? { name: r.name } : {}),
   ...(r.cleared_at ? { clearedAt: r.cleared_at } : {}),
+  readAt: r.read_at ?? r.created_at,
   createdAt: r.created_at,
 });
 
@@ -622,6 +630,10 @@ export const sprocketChats = {
   of(sprocketId: string, kind: SprocketChatKind): StoredChat | undefined {
     const r = db.prepare("SELECT * FROM sprocket_chats WHERE sprocket_id = ? AND kind = ?").get(sprocketId, kind) as ChatRow | undefined;
     return r && toChat(r);
+  },
+  /** The user has seen it up to `at`. */
+  markRead(id: string, at: string): void {
+    db.prepare("UPDATE sprocket_chats SET read_at = ? WHERE id = ?").run(at, id);
   },
   /** Delete its messages, and note when (a reply started before then is dropped). */
   clear(id: string): void {
@@ -706,6 +718,10 @@ export const sprocketMessages = {
       const list = byMessage.get(m.id);
       return list ? { ...m, suggestions: list } : m;
     });
+  },
+  /** Whether a Sprocket wrote in it after `at` (Rails' own notices don't count). */
+  wroteSince(chatId: string, at: string): boolean {
+    return !!db.prepare("SELECT 1 FROM sprocket_messages WHERE chat_id = ? AND author = 'sprocket' AND created_at > ? LIMIT 1").get(chatId, at);
   },
   last(chatId: string): SprocketMessage | undefined {
     const r = db.prepare("SELECT * FROM sprocket_messages WHERE chat_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(chatId) as MessageRow | undefined;

@@ -115,6 +115,7 @@ export const api = {
   chatMessages: (chatId: string) => req<SprocketMessage[]>(`/api/chats/${enc(chatId)}/messages`),
   sendChatMessage: (chatId: string, text: string) =>
     req<SprocketMessage>(`/api/chats/${enc(chatId)}/messages`, { method: "POST", body: JSON.stringify({ text }) }),
+  readChat: (chatId: string) => req(`/api/chats/${enc(chatId)}/read`, { method: "POST" }),
   clearChat: (chatId: string) => req(`/api/chats/${enc(chatId)}/messages`, { method: "DELETE" }),
   sprocketSettings: (id: string, body: SprocketSettings) =>
     req<Sprocket>(`/api/sprockets/${enc(id)}/settings`, { method: "PUT", body: JSON.stringify(body) }),

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { idle } from "./runs.ts";
-import { sprockets } from "../db.ts";
-import { createSprocket, deleteSprocket, directChat, listMessages, listSprockets, onSprocketsChanged, sendMessage, updateSprocket } from "./sprockets.ts";
+import { sprocketMessages, sprockets } from "../db.ts";
+import { createSprocket, deleteSprocket, directChat, listMessages, listSprockets, onSprocketsChanged, readChat, sendMessage, updateSprocket } from "./sprockets.ts";
 
 const look = { character: "roo", color: "blue" } as const;
 
@@ -53,6 +53,27 @@ describe("sprockets", () => {
     await idle();
     deleteSprocket(s.id);
     expect(() => listMessages(chat)).toThrow("Not found");
+  });
+
+  it("marks a chat unread when a Sprocket writes after you last saw it, on every device", () => {
+    const s = createSprocket({ name: "Teller", look });
+    const chat = directChat(s.id);
+    const unread = () => listSprockets().find((x) => x.id === s.id)!.direct.unread;
+    const later = (ms: number) => new Date(Date.now() + ms).toISOString();
+    expect(unread()).toBe(false);
+    sprocketMessages.create(chat, "notice", "Pick a model first.", later(5)); // Rails' own notice: not the Sprocket
+    sprocketMessages.create(chat, "user", "hi", later(6));
+    expect(unread()).toBe(false);
+    sprocketMessages.create(chat, "sprocket", "Hello!", later(7));
+    expect(unread()).toBe(true);
+    const seen = vi.fn();
+    const off = onSprocketsChanged(seen);
+    vi.useFakeTimers({ now: Date.now() + 10, toFake: ["Date"] });
+    readChat(chat);
+    vi.useRealTimers();
+    off();
+    expect(unread()).toBe(false);
+    expect(seen).toHaveBeenCalled(); // other devices' dots go too
   });
 
   it("refuses empty and oversized messages", () => {

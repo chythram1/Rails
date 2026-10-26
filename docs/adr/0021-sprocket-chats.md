@@ -45,3 +45,11 @@ Consequences:
   user moves to the direct chat.
 - Team chats need their own decisions (who answers a message, and how Sprockets keep from replying to each other
   without end), but no change to how chats are stored.
+
+## Amendment (2026-10-25): read and unread
+
+Each chat keeps when the user last saw it (`read_at`; chats from before count as read), on the server so every
+device agrees. A chat is unread while a Sprocket has written in it since (Rails' own notices don't count); its info
+says so (`readAt`, `unread`). An open chat with the page showing is read as messages come (`POST
+/api/chats/:id/read`, which tells every device). The list shows a blue dot on an unread chat's row, and a team chat
+opened with unread messages draws a New line above them, as a Grok group does.

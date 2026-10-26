@@ -31,7 +31,7 @@ import { providerInfo } from "./providers/index.ts";
 import { getProfile, updateProfile } from "./settings/profile.ts";
 import { cancelSignIn, modelSettings, removeCredential, setApiKey, setDefaultModel, startSignIn, submitSignInCode } from "./settings/models.ts";
 import { createTeam, deleteTeam, listTeams, updateTeam } from "./sprockets/teams.ts";
-import { clearChat, createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets/sprockets.ts";
+import { clearChat, readChat, createSprocket, deleteSprocket, listMessages, listSprockets, sendMessage, updateSettings, updateSprocket } from "./sprockets/sprockets.ts";
 import { cancelHandoff } from "./coordination/handoffs.ts";
 import { clearOwner } from "./coordination/owners.ts";
 import { dismissSuggestion, sendSuggestion } from "./coordination/suggestions.ts";
@@ -343,6 +343,11 @@ app.get("/api/chats/:id/messages", (c) => c.json(listMessages(c.req.param("id"))
 app.post("/api/chats/:id/messages", async (c) =>
   c.json(sendMessage(c.req.param("id"), (await c.req.json<{ text?: unknown }>()).text), 201),
 );
+
+app.post("/api/chats/:id/read", (c) => {
+  readChat(c.req.param("id"));
+  return c.json({ ok: true });
+});
 
 app.delete("/api/chats/:id/messages", (c) => {
   clearChat(c.req.param("id"));

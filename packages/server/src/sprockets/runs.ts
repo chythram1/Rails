@@ -7,7 +7,7 @@
 // once more.
 import { Agent } from "@earendil-works/pi-agent-core";
 import { isRetryableAssistantError, type AssistantMessage, type Message, type Model } from "@earendil-works/pi-ai";
-import { CARD_ACTIONS_MAX, TEAM_TURNS_MAX, actionSettled, cardText, findMentions, type SprocketCard, type SprocketCardAction, type SprocketMessage } from "@rails/shared";
+import { CARD_ACTIONS_MAX, TEAM_TURNS_MAX, actionSettled, cardText, findMentions, type SprocketCard, type SprocketCardAction, type ReplyPhase, type SprocketMessage } from "@rails/shared";
 import {
   automationRuns,
   handoffs,
@@ -61,8 +61,11 @@ const HISTORY = 40;
  */
 const REPLAYED = 3;
 const STEP_RESULT_CHARS = 6000;
-/** How often a reply in progress is sent to browsers. */
-const TYPING_MS = 120;
+/**
+ * How long a model request shows as starting on it (`working`) before, with nothing streamed yet, it shows as
+ * thinking: a model that thinks without streaming it is thinking all the same. A Grok bot's step lasts at least 0.8 s.
+ */
+const THINKING_AFTER_MS = 800;
 /**
  * How long a provider gets to start answering a request: the OpenAI and Anthropic SDKs (and Mistral's) stop
  * waiting once the reply starts, so a long reply isn't cut; Google's ignores it. Unset, a request that hung waited
@@ -89,17 +92,17 @@ const going = new Map<string, { sprocketId: string; chatId: string; start?: numb
 const recent = new Map<string, number[]>();
 
 const runChanges = listeners();
-const typingChanges = listeners<[sprocketId: string, chatId: string, text: string | null]>();
+const phaseChanges = listeners<[sprocketId: string, chatId: string, phase: ReplyPhase | null]>();
 const activityChanges = listeners<[sprocketId: string, chatId: string, step: string | null, summary: string | null]>();
 /** Something visible changed: a run was queued, started or ended, a message or the core memory was written. */
 export const onRunsChanged = runChanges.on;
-export const onTyping = typingChanges.on;
+/** What a reply in flight is doing between tool steps (ReplyPhase); null when the run ends. */
+export const onPhase = phaseChanges.on;
 /** The step a reply is on and what it has done so far (the run log); nulls when the run ends. */
 export const onActivity = activityChanges.on;
 const changed = runChanges.emit;
 /** Tell browsers a chat changed (a message was updated outside a run, as an approval decided). */
 export const runsChanged = changed;
-const typing = typingChanges.emit;
 
 /** Whether a Sprocket has a run going (in any chat). A Sprocket answers one chat at a time (ADR 0021). */
 export const isRunning = (sprocketId: string) => [...going.values()].some((g) => g.sprocketId === sprocketId);
@@ -273,7 +276,7 @@ async function start(r: StoredRun, chat: StoredChat) {
     notice(chatId, `Something went wrong: ${error}`, sprocketId);
   } finally {
     going.delete(r.id);
-    typing(sprocketId, chatId, null);
+    phaseChanges.emit(sprocketId, chatId, null);
     activityChanges.emit(sprocketId, chatId, null, null);
     // Cancelled meanwhile (the chat was cleared): it stays so.
     if (sprocketRuns.get(r.id)?.status === "running") sprocketRuns.setStatus(r.id, status, error);
@@ -494,13 +497,26 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
   }
 
   let steps = 0;
-  let lastTyping = 0;
+  // What it's doing between tool steps, as a Grok bot's mark shows: each model request starts on it (working), shows
+  // as thinking while it thinks (or once nothing has come for a moment), and as typing while it writes a message.
+  // Writing a script is working.
+  let phase: ReplyPhase | null = null;
+  let thinkingSoon: ReturnType<typeof setTimeout> | undefined;
+  const setPhase = (p: ReplyPhase) => {
+    clearTimeout(thinkingSoon);
+    if (p !== phase) phaseChanges.emit(id, chatId, (phase = p));
+  };
   agent.subscribe((e) => {
-    if (e.type === "turn_start" && ++steps > MAX_STEPS) agent.abort();
-    if (e.type === "message_update" && Date.now() - lastTyping > TYPING_MS) {
-      lastTyping = Date.now();
-      typing(id, chatId, textOf(e.message as AssistantMessage) || "…");
+    if (e.type === "turn_start") {
+      if (++steps > MAX_STEPS) agent.abort();
+      setPhase("working");
+      thinkingSoon = setTimeout(() => setPhase("thinking"), THINKING_AFTER_MS);
     }
+    if (e.type === "message_update" && e.message.role === "assistant") {
+      const block = (e.message as AssistantMessage).content.at(-1);
+      if (block) setPhase(block.type === "thinking" ? "thinking" : block.type === "text" && block.text.trim() ? "typing" : "working");
+    }
+    if (e.type === "agent_end") clearTimeout(thinkingSoon);
     if (live && e.type === "message_end" && e.message.role === "assistant") {
       const m = e.message as AssistantMessage;
       const text = m.stopReason === "error" || m.stopReason === "aborted" ? "" : clean(textOf(m));
@@ -525,6 +541,7 @@ async function run(chat: StoredChat, r: StoredRun): Promise<Outcome | undefined>
     }
     return live ? finish() : save();
   } finally {
+    clearTimeout(thinkingSoon);
     suggestions.drop(made); // a run that saved no reply: its suggestions would have nothing to show under
     // What the run used, quiet runs and failed ones included.
     const used = agent.state.messages.slice(before).filter((m): m is AssistantMessage => m.role === "assistant");

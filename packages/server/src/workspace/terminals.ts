@@ -13,7 +13,7 @@ import { onOwnersChanged } from "../coordination/owners.ts";
 import { onDecisionsChanged } from "../coordination/decisions.ts";
 import { onModelsChanged, onSignIn } from "../settings/models.ts";
 import { getProfile, onProfileChanged } from "../settings/profile.ts";
-import { onActivity, onTyping } from "../sprockets/runs.ts";
+import { onActivity, onPhase } from "../sprockets/runs.ts";
 import { onSprocketsChanged } from "../sprockets/sprockets.ts";
 import * as tmux from "./tmux.ts";
 
@@ -34,7 +34,7 @@ export class TerminalHub {
     onOwnersChanged(() => this.broadcast({ type: "sprockets.changed" })); // so do owners
     onCustomizeChanged(() => this.broadcast({ type: "customize.changed" }));
     onAutomationsChanged(() => this.broadcast({ type: "automations.changed" }));
-    onTyping((sprocketId, chatId, text) => this.broadcast({ type: "sprockets.typing", sprocketId, chatId, text }));
+    onPhase((sprocketId, chatId, phase) => this.broadcast({ type: "sprockets.phase", sprocketId, chatId, phase }));
     onActivity((sprocketId, chatId, step, summary) => this.broadcast({ type: "sprockets.activity", sprocketId, chatId, step, summary }));
     onModelsChanged(() => this.broadcast({ type: "models.changed" }));
     onDecisionsChanged(() => this.broadcast({ type: "decisions.changed" }));

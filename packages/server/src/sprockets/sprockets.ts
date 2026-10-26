@@ -21,7 +21,7 @@ import { handoffs, mcpServers, projects, sprocketChats, sprocketMessages, sprock
 import { customizeChanged } from "../customize/customize.ts";
 import { skillExists } from "../customize/skills.ts";
 import { ServiceError } from "../errors.ts";
-import { nameClash, onTeamsChanged, stopTeam, wakeTeam } from "./teams.ts";
+import { nameClash, onTeamsChanged, readOf, stopTeam, wakeTeam } from "./teams.ts";
 import { settleHandoffs } from "../coordination/handoffs.ts";
 import { projectOwners } from "../coordination/owners.ts";
 import { findModel } from "../settings/models.ts";
@@ -75,7 +75,7 @@ function parseInput(body: Partial<SprocketInput> | undefined): SprocketInput {
 
 function chatInfo(chat: StoredChat): SprocketChatInfo {
   const last = sprocketMessages.last(chat.id);
-  return { id: chat.id, kind: chat.kind, running: runningChat(chat.sprocketId) === chat.id, pending: suggestions.pendingIn(chat.id), ...(last ? { lastMessage: last } : {}) };
+  return { id: chat.id, kind: chat.kind, running: runningChat(chat.sprocketId) === chat.id, pending: suggestions.pendingIn(chat.id), ...(last ? { lastMessage: last } : {}), ...readOf(chat) };
 }
 
 function withLook({ coreMemory: _internal, ...row }: ReturnType<typeof sprockets.list>[number]): Sprocket {
@@ -150,6 +150,13 @@ export function projectChat(sprocketId: string): string {
   const chat = sprocketChats.of(sprocketId, "project");
   if (!chat) throw new ServiceError("It isn't attached to a project.", 404);
   return chat.id;
+}
+
+/** The user is looking at a chat (on some device): what's in it is read, everywhere. */
+export function readChat(chatId: string): void {
+  const chat = getChat(chatId);
+  sprocketChats.markRead(chatId, new Date().toISOString());
+  if (readOf(chat).unread) changed();
 }
 
 export function listMessages(chatId: string): SprocketMessage[] {

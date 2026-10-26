@@ -139,7 +139,7 @@ packages/
   one chat at a time per Sprocket, team members at once, and up to 6 runs at once. A run reads its chat's last 40 messages and the latest of
   the Sprocket's other chats (ADR 0034); outside the project chat a run posts each text as its own message,
   can `send_message`, `show_card` (a card: table, facts, list, checklist, code or diff, ADR 0024) and `ask_user`, with options to tap or none (its run then waits for the answer). Each run is a
-  pi-agent-core loop on the Sprocket's model, streamed to browsers as `sprockets.typing`, capped at 12 model
+  pi-agent-core loop on the Sprocket's model, with what it's doing (working, thinking or typing) sent to browsers as `sprockets.phase`, capped at 12 model
   calls (a request that hears nothing for 20 s is sent again, `resend.ts`), 30 runs per Sprocket per hour and 2 runs at once. Its one tool is codemode (ADR 0008,
   `harness/codemode.ts`): scripts run in pi's QuickJS sandbox and call the Sprocket's capabilities (`harness/`:
   memory; and for attached Sprockets the board, sessions, git and read-only files, `files.ts`). Each call's step goes

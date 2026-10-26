@@ -17,6 +17,9 @@ export const onTeamsChanged = teamChanges.on;
 const changed = teamChanges.emit;
 
 
+/** When the user last saw a chat, and whether a Sprocket wrote in it since. */
+export const readOf = (chat: StoredChat) => ({ readAt: chat.readAt, unread: sprocketMessages.wroteSince(chat.id, chat.readAt) });
+
 function toTeam(chat: StoredChat): SprocketTeam {
   const members = sprocketChats.members(chat.id);
   const last = sprocketMessages.last(chat.id);
@@ -34,6 +37,7 @@ function toTeam(chat: StoredChat): SprocketTeam {
     running: replying.length > 0,
     pending: suggestions.pendingIn(chat.id),
     ...(last ? { lastMessage: last } : {}),
+    ...readOf(chat),
   };
 }
 

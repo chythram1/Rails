@@ -1,10 +1,10 @@
-import { fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall } from "@earendil-works/pi-ai";
+import { fauxAssistantMessage, fauxProvider, fauxText, fauxThinking, fauxToolCall } from "@earendil-works/pi-ai";
 import { SPROCKET_DESCRIPTION_MAX } from "@rails/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projects, settings, sprocketRuns, sprockets } from "../db.ts";
 import { models, refOf } from "../settings/models.ts";
 import { CORE_MEMORY_MAX, editMemory } from "../harness/memory.ts";
-import { idle, isRunning, onActivity, onTyping, readableError, REQUEST_TIMEOUT_MS, resumeRuns, RETRY_MS, textOf } from "./runs.ts";
+import { idle, isRunning, onActivity, onPhase, readableError, REQUEST_TIMEOUT_MS, resumeRuns, RETRY_MS, textOf } from "./runs.ts";
 import { sprocketMessages } from "../db.ts";
 import { createSprocket, deleteSprocket, detachFromProject, directChat, listMessages, listSprockets, projectChat, sendMessage, updateSettings } from "./sprockets.ts";
 
@@ -42,14 +42,14 @@ describe("runs", () => {
     expect(tokens).toBeGreaterThan(0);
   });
 
-  it("streams the reply while it's written", async () => {
+  it("says what a reply is doing: working, thinking, then typing", async () => {
     const s = sprocket();
     const seen: (string | null)[] = [];
-    onTyping((id, _chat, text) => id === s.id && seen.push(text));
-    faux.setResponses([fauxAssistantMessage("A longer reply that streams in several pieces.")]);
+    onPhase((id, _chat, phase) => id === s.id && seen.push(phase));
+    faux.setResponses([fauxAssistantMessage([fauxThinking("Hm, a greeting."), fauxText("A longer reply that streams in several pieces.")])]);
     sendMessage(directChat(s.id), "hi");
     await idle();
-    expect(seen.at(-1)).toBeNull(); // typing ends with null
+    expect(seen).toEqual(["working", "thinking", "typing", null]);
   });
 
   it("a new Sprocket introduces itself and asks what to start with", async () => {

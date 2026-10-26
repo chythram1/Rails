@@ -383,6 +383,9 @@ export interface SprocketChatInfo {
   pending: number;
   /** The newest message, for the list preview. */
   lastMessage?: SprocketMessage;
+  /** When the user last saw it (on any device), and whether a Sprocket wrote in it since: its row's blue dot. */
+  readAt: string;
+  unread: boolean;
 }
 
 /**
@@ -898,6 +901,12 @@ export type ClientMsg =
   | { type: "term.input"; panelId: string; data: string }
   | { type: "term.resize"; panelId: string; cols: number; rows: number };
 
+/**
+ * What a Sprocket's reply in flight is doing between tool steps, as a Grok bot's status line says: starting on it
+ * (`working`), thinking, or typing a message. A tool step (`sprockets.activity`) shows over any of them.
+ */
+export type ReplyPhase = "working" | "thinking" | "typing";
+
 export type ServerMsg =
   | { type: "term.data"; panelId: string; attachId: number; data: string }
   /** A project's panels changed: opened, closed, ended on their own (possibly on another device), or one of its sessions was renamed. */
@@ -913,8 +922,8 @@ export type ServerMsg =
   | { type: "customize.changed" }
   /** Automations or their runs changed (ADR 0032). */
   | { type: "automations.changed" }
-  /** A Sprocket's reply so far, while it's being written; null when it's done. */
-  | { type: "sprockets.typing"; sprocketId: string; chatId: string; text: string | null }
+  /** What a Sprocket's reply in flight is doing between tool steps (ReplyPhase); null when it's done. */
+  | { type: "sprockets.phase"; sprocketId: string; chatId: string; phase: ReplyPhase | null }
   /** While a Sprocket replies: the step it's on ("Reading src/api.ts"), and what it has done so far; null when done. */
   | { type: "sprockets.activity"; sprocketId: string; chatId: string; step: string | null; summary: string | null }
   /** Providers, sign-ins or the default model changed. */

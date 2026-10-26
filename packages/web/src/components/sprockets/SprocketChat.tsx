@@ -5,6 +5,7 @@ import { api } from "../../api.ts";
 import { href } from "../../router.ts";
 import { socket } from "../../ws.ts";
 import { Composer } from "../ui/Composer.tsx";
+import { useVisible } from "../ui/useVisible.ts";
 import { SavedPromptsMenu } from "../customize/SavedPromptsMenu.tsx";
 import { useStore } from "../../store.tsx";
 import { ChatMenu } from "./ChatMenu.tsx";
@@ -18,7 +19,7 @@ import { MessageActions } from "./MessageActions.tsx";
 import { AskCard } from "./AskCard.tsx";
 import { settledPlay, useSpawn } from "./spawn.ts";
 import { COLORS, DEEP } from "./characters.ts";
-import { rowId, useFlight, useStep } from "./flight.ts";
+import { phaseOf, rowId, useFlight, useFlights, useStatus } from "./flight.ts";
 import { VIEW } from "./Sprocket.tsx";
 import { useThreadScroll } from "./threadScroll.ts";
 import { TeamThinking } from "./TeamThinking.tsx";
@@ -89,8 +90,6 @@ export function SprocketChat({
   const [messages, setMessages] = useState<SprocketMessage[] | null>(null);
   /** A saved prompt to put in the composer (Customize, ADR 0020). */
   const [fill, setFill] = useState<{ text: string }>();
-  /** The Sprocket whose reply has started (its typing says so): its face shows as dots. */
-  const [typingBy, setTypingBy] = useState<string | null>(null);
   /** Sent, with no run started yet: the face shows at once, as if it saw the message. */
   const [expecting, setExpecting] = useState(false);
   /** The messages of the first load: they're there already, so they don't pop in. */
@@ -98,8 +97,6 @@ export function SprocketChat({
   /** Who's on it, at the bottom left: the members replying, then those woken and about to; or the Sprocket. */
   const turns = team ? [...team.info.replying, ...team.info.waiting] : running || expecting ? [id] : [];
   const watching = [...new Set(turns)];
-  /** Writing now: the member whose reply has started. */
-  const writing = typingBy;
   /** Re-renders once a minute, so "5 minutes ago" under each message stays true. */
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -110,7 +107,10 @@ export function SprocketChat({
   const [loadError, setLoadError] = useState("");
   const thread = useRef<HTMLDivElement>(null);
   const spacer = useRef<HTMLDivElement>(null);
-  const scroll = useThreadScroll(thread, spacer, running || watching.length > 0, [messages, running, watching.join(), typingBy]);
+  useFlights(); // the status line below can grow
+  /** Typing now: those on it whose reply has started. */
+  const typingNow = watching.filter((w) => phaseOf(w).phase === "typing").join();
+  const scroll = useThreadScroll(thread, spacer, running || watching.length > 0, [messages, running, watching.join(), typingNow]);
 
   /** Loads overlap (the first one, every `sprockets.changed`, StrictMode's second run): only the latest applies. */
   const loads = useRef(0);
@@ -134,14 +134,26 @@ export function SprocketChat({
     void load();
     return socket.on((m) => {
       if (m.type === "sprockets.changed") void load();
-      // The reply itself isn't shown as it's written: only that it is.
-      if (m.type === "sprockets.typing" && m.chatId === chatId) setTypingBy(m.text ? m.sprocketId : null);
     });
   }, [load, chatId]);
 
   useEffect(() => {
     if (running) setExpecting(false);
   }, [running]);
+
+  // While it's on screen, what comes in is read, on every device (the list's blue dot goes). In a team, what came
+  // while you were away (before you opened it, or while the page was hidden) gets a New line above it, as in a Grok
+  // group, and keeps it while you're here; what comes in as you watch doesn't.
+  const visible = useVisible();
+  const away = useRef(true);
+  const [newSince, setNewSince] = useState<string>();
+  useEffect(() => {
+    if (!visible) return void (away.current = true);
+    if (!chat.unread) return void (away.current = false);
+    if (team && away.current) setNewSince(chat.readAt);
+    away.current = false;
+    api.readChat(chatId).catch(() => {});
+  }, [visible, chat.unread, chat.readAt, chatId, !!team]);
 
   const send = async (text: string) => {
     setError("");
@@ -174,12 +186,14 @@ export function SprocketChat({
   /** A question with options waits for your answer: the composer says you can type one. */
   const asking = !!messages?.some((m) => m.ask?.options.length && m.ask.answer === undefined);
   /**
-   * In a team, who's thinking now, by name: "Bo is thinking…", "Bo and Cy are thinking…". A member stays named a
-   * moment after it stops, so one that rereads quietly for a moment (a teammate's reply woke it) doesn't flicker in and out.
+   * In a team, what those on it are doing, as a Grok group's line says (useStatus): one member's step or phrase
+   * ("Making progress…"), several by name ("Bo and Cy are working…"). A member stays on it a moment after it stops,
+   * so one that rereads quietly for a moment (a teammate's reply woke it) doesn't flicker in and out.
    */
   const named = useLinger(onIt.map((w) => w.id), LINGER_MS);
   const namedNow = members.filter((m) => named.includes(m.id));
-  const thinking = team && namedNow.length ? `${names(namedNow.map((w) => w.name))} ${namedNow.length === 1 ? "is" : "are"} thinking…` : "";
+  const teamStatus = useStatus(team ? namedNow : [], true);
+  const thinking = team && namedNow.length ? teamStatus : "";
   /** In a team, the members the icon turns through: all those thinking since it started, until none is. */
   const [cycle, setCycle] = useState<string[]>([]);
   useLayoutEffect(() => {
@@ -253,6 +267,9 @@ export function SprocketChat({
           >
             {messages.map((m, i) => {
               const prev = messages[i - 1];
+              const fresh = (x?: SprocketMessage) => !!newSince && !!x && x.author !== "user" && x.createdAt > newSince;
+              /** The first message that came while you were away: the New line goes above it. */
+              const firstNew = fresh(m) && !messages.slice(0, i).some(fresh);
               const next = messages[i + 1];
               const label = !prev || newGroup(prev.createdAt, m.createdAt);
               const by = m.author === "sprocket" ? speaker(m.sprocketId) : undefined;
@@ -290,50 +307,57 @@ export function SprocketChat({
               const read = m.author === "notice" || m.card || m.approval ? undefined : blocks(m.text);
               const Bubble = read?.some((b) => b.kind === "fence") ? "div" : "p";
               return (
-                <li key={m.id} className={"sp-message " + m.author + (cont ? " cont" : "") + (pop ? " pop" : "")} style={by ? ({ "--who": COLORS[by.look.color] } as CSSProperties) : undefined}>
-                  {label && <time className="sp-stamp" dateTime={m.createdAt}>{stamp(m.createdAt)}</time>}
-                  {team && m.author === "sprocket" && first && <p className="sp-author" aria-hidden>{by?.name ?? "A deleted Sprocket"}</p>}
-                  {m.event ? (
-                    <EventRow message={m} projectId={sprocket.projectId} name={name} />
-                  ) : (
-                    <div className="sp-said">
-                      {team && m.author === "sprocket" && (
-                        <span className="sp-avatar" aria-hidden>
-                          {/* Done: in its resting pose, looking up toward its message, still: a team chat leaves nothing to celebrate (ADR 0035). */}
-                          {last && by && <DoneFace look={by.look} />}
-                        </span>
-                      )}
-                      <div className="sp-bubbles">
-                        {m.card && (
-                          <>
-                            <span className="sr-only">{by?.name ?? "A deleted Sprocket"} showed a card:</span>
-                            <Card card={m.card} messageId={m.id} />
-                          </>
-                        )}
-                        {m.approval && <ApprovalCard messageId={m.id} approval={m.approval} name={by?.name ?? "A deleted Sprocket"} />}
-                        {!m.card && !m.approval && (
-                          // The time and copy sit beside the bubble, on its inner side, so a run of messages stays close.
-                          <div className="sp-line">
-                            {/* Focusable by a tap (not by Tab), so a touch screen can show its details. */}
-                            {asks ? (
-                              <AskCard ask={m.ask!} name={by?.name ?? "A deleted Sprocket"} onPick={(o) => void send(o)} />
-                            ) : (
-                              <Bubble className="sp-bubble" tabIndex={m.author === "notice" ? undefined : -1}>
-                                {m.author === "sprocket" && <span className="sr-only">{by?.name ?? "A deleted Sprocket"}: </span>}
-                                {read ? <Marked blocks={read} text={text} /> : m.text}
-                              </Bubble>
-                            )}
-                            {m.author !== "notice" && <MessageActions text={m.text} at={m.createdAt} now={now} reply={m.author !== "user"} />}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                <Fragment key={m.id}>
+                  {firstNew && (
+                    <li className="sp-new" role="separator" aria-label="New messages">
+                      <span aria-hidden>New</span>
+                    </li>
                   )}
-                  {/* A Coordinator's suggested replies. */}
-                  {m.suggestions?.map((s) => <SuggestionCard key={s.id} suggestion={s} projectId={by?.projectId ?? sprocket.projectId} />)}
-                  {/* Cards and session events are wide: their details go under them. */}
-                  {(m.card || m.approval || m.event) && <MessageActions text={m.text} at={m.createdAt} now={now} reply={m.author !== "user"} />}
-                </li>
+                  <li className={"sp-message " + m.author + (cont ? " cont" : "") + (pop ? " pop" : "")} style={by ? ({ "--who": COLORS[by.look.color] } as CSSProperties) : undefined}>
+                    {label && <time className="sp-stamp" dateTime={m.createdAt}>{stamp(m.createdAt)}</time>}
+                    {team && m.author === "sprocket" && first && <p className="sp-author" aria-hidden>{by?.name ?? "A deleted Sprocket"}</p>}
+                    {m.event ? (
+                      <EventRow message={m} projectId={sprocket.projectId} name={name} />
+                    ) : (
+                      <div className="sp-said">
+                        {team && m.author === "sprocket" && (
+                          <span className="sp-avatar" aria-hidden>
+                            {/* Done: in its resting pose, looking up toward its message, still: a team chat leaves nothing to celebrate (ADR 0035). */}
+                            {last && by && <DoneFace look={by.look} />}
+                          </span>
+                        )}
+                        <div className="sp-bubbles">
+                          {m.card && (
+                            <>
+                              <span className="sr-only">{by?.name ?? "A deleted Sprocket"} showed a card:</span>
+                              <Card card={m.card} messageId={m.id} />
+                            </>
+                          )}
+                          {m.approval && <ApprovalCard messageId={m.id} approval={m.approval} name={by?.name ?? "A deleted Sprocket"} />}
+                          {!m.card && !m.approval && (
+                            // The time and copy sit beside the bubble, on its inner side, so a run of messages stays close.
+                            <div className="sp-line">
+                              {/* Focusable by a tap (not by Tab), so a touch screen can show its details. */}
+                              {asks ? (
+                                <AskCard ask={m.ask!} name={by?.name ?? "A deleted Sprocket"} onPick={(o) => void send(o)} />
+                              ) : (
+                                <Bubble className="sp-bubble" tabIndex={m.author === "notice" ? undefined : -1}>
+                                  {m.author === "sprocket" && <span className="sr-only">{by?.name ?? "A deleted Sprocket"}: </span>}
+                                  {read ? <Marked blocks={read} text={text} /> : m.text}
+                                </Bubble>
+                              )}
+                              {m.author !== "notice" && <MessageActions text={m.text} at={m.createdAt} now={now} reply={m.author !== "user"} />}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {/* A Coordinator's suggested replies. */}
+                    {m.suggestions?.map((s) => <SuggestionCard key={s.id} suggestion={s} projectId={by?.projectId ?? sprocket.projectId} />)}
+                    {/* Cards and session events are wide: their details go under them. */}
+                    {(m.card || m.approval || m.event) && <MessageActions text={m.text} at={m.createdAt} now={now} reply={m.author !== "user"} />}
+                  </li>
+                </Fragment>
               );
             })}
             {/* Who's on it (above): in a team, the icon that turns through the members thinking; otherwise the
@@ -355,7 +379,7 @@ export function SprocketChat({
         )}
         <div className="sp-spacer" ref={spacer} aria-hidden />
         <div className="sp-fade" aria-hidden />
-        <p className="sr-only" role="status">{thinking || (writing ? `${speaker(writing)?.name ?? name} is typing` : "")}</p>
+        <p className="sr-only" role="status">{thinking || (!team && typingNow ? `${name} is typing` : "")}</p>
       </div>
       <div className="sp-compose">
         {scroll.hidden && (
@@ -408,7 +432,7 @@ function Marked({ blocks: read, text }: { blocks: Block[]; text: (t: string) => 
   );
 }
 
-/** How long a team member stays named in the thinking line after it stops (ms). */
+/** How long a team member stays named in the status line after it stops (ms). */
 const LINGER_MS = 800;
 
 /** `ids`, with each one that leaves kept for `ms` more (it's back at once if it returns meanwhile). */
@@ -424,9 +448,6 @@ function useLinger(ids: string[], ms: number): string[] {
   }, [key]);
   return kept;
 }
-
-/** Names as a sentence: "Bo", "Bo and Cy", "Ada, Bo and Cy". */
-const names = (list: string[]) => (list.length < 2 ? list.join("") : `${list.slice(0, -1).join(", ")} and ${list.at(-1)}`);
 
 /** A message with team members' names as chips (ADR 0022, 0033): the member's face and its whole name. */
 function withMentions(text: string, members: SprocketData[]): ReactNode {
@@ -466,7 +487,7 @@ function DoneFace({ look }: { look: SprocketData["look"] }) {
 
 /**
  * The icon by a reply in flight in a direct or project chat (ADR 0035): the Sprocket's row in the list, the same
- * drawing (`<use>`), so they move exactly alike, with the tool step it's on beside it. Where the list isn't on screen
+ * drawing (`<use>`), so they move exactly alike, with what it's doing beside it (useStatus) from the moment it shows. Where the list isn't on screen
  * it's a Sprocket of its own, playing the same (useFlight).
  */
 function FlightIcon({ who, working }: { who: SprocketData; working: boolean }) {
@@ -474,7 +495,7 @@ function FlightIcon({ who, working }: { who: SprocketData; working: boolean }) {
   const [mirror, setMirror] = useState(false);
   useLayoutEffect(() => setMirror(!!document.getElementById(id)), [id]);
   const flight = useFlight(who.id, working);
-  const step = useStep(who.id);
+  const status = useStatus([who], false);
   const spawn = useSpawn(who.id);
   return (
     <>
@@ -487,7 +508,7 @@ function FlightIcon({ who, working }: { who: SprocketData; working: boolean }) {
           <Sprocket look={who.look} size={26} dots={flight.dots && !spawn} spawn={spawn?.start} play={settledPlay(spawn) ?? flight.play} />
         )}
       </span>
-      {working && step && <span className="sp-working">{step}</span>}
+      <span className="sp-working">{status}</span>
     </>
   );
 }

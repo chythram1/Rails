@@ -107,3 +107,18 @@ mirroring the row, so the spawn plays where its first message will be. Once it h
 Satisfied, as a reply's done animation can, before it thinks. Without a model its hello (a template) waits
 out the spawn on the server (`INTRO_PAUSE_MS`). Other devices see it arrive without the spawn, which is cosmetic.
 
+
+## Amendment (2026-10-25, later still): the status line and the order in flight
+
+A Grok bot's reply in flight goes through its states in one order, measured live in Grok Bot 0.75.8 and read from
+its code: it starts on it (`working`, about half a second), thinks (its mark becomes the dots), takes tool steps,
+then types (`streaming`), each shown at least 0.8 s. The dots come second, not last. Rails follows it: the server
+says what each model request is doing (`sprockets.phase`: `working` as it starts, `thinking` while the model thinks
+or once nothing has come for 0.8 s, `typing` while it writes a message), replacing `sprockets.typing`, which sent
+the text so far that no one showed. `useFlight` plays Focus while working, the dots while thinking, Inspect or
+Rummage at a tool step (`sprockets.activity`, over any phase) and Stream while typing.
+
+Beside the icon, a status line says it in a Grok bot's words (`useStatus`): a working or thinking phrase drawn at
+each change, the tool step, or "Typing…". A team's line says the same for one member, with "…", and names several
+("Becky and Chandler are working…"), replacing ADR 0033's "are thinking…" line. Before, a direct chat had no words
+until a tool step.
