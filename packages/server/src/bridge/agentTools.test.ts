@@ -317,7 +317,9 @@ describe("message (ADR 0018)", () => {
 });
 
 describe("wait_for (ADR 0018)", () => {
-  const soon = () => new Promise((r) => setTimeout(r, 5));
+  // Long enough for wait_for to look up the sessions' titles and start waiting, even while every test file runs at
+  // once: at 5ms the session sometimes closed or moved on before the wait began.
+  const soon = () => new Promise((r) => setTimeout(r, 50));
 
   it("answers at once when the session isn't working: idle with its last reply, waiting for its user, failed", async () => {
     const { engine, ui, game } = setup();
