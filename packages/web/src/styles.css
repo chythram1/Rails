@@ -1062,9 +1062,8 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .approval-result-label { margin: 0 0 6px; color: var(--muted); font-size: 12px; }
 .approval-result { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 var(--mono); max-height: 16em; overflow-y: auto; color: var(--text-2); }
 /* Who's on it, at the bottom left: faces pop up when they get the message; the one writing is dots in its colour. */
-.sp-watching { min-height: 36px; justify-content: flex-end; }
-/* In a team, the icon turning through the members thinking, and who: "Bo and Cy are thinking…". */
-.sp-watching.team { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; }
+/* The icon, and what it's doing to its right ("Mulling it over"; in a team "Bo and Cy are working…"). */
+.sp-message.sp-watching { min-height: 36px; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; }
 .sp-working { flex: none; white-space: nowrap; color: var(--muted); font-size: 13px; line-height: 18px; animation: sp-face-in 240ms ease-out both; }
 /* What it's doing shimmers, a light sweeping across the words, as a Grok bot's status does. */
 @media (prefers-reduced-motion: no-preference) {
