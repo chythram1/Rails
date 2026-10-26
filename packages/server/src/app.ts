@@ -14,7 +14,8 @@ import { accessToken } from "./config.ts";
 import { claudeInbox, piInbox } from "./bridge/deliver.ts";
 import { receive, tokenOk as bridgeTokenOk } from "./bridge/index.ts";
 import { projects } from "./db.ts";
-import { gitDiff, gitStatus } from "./workspace/git.ts";
+import { projectChanges } from "./workspace/changes.ts";
+import { gitDiff } from "./workspace/git.ts";
 import { listFolder, previewFile } from "./workspace/tree.ts";
 import { nameSession } from "./workspace/names.ts";
 import type { AutomationInput, ConnectorInput, McpAppInput, McpServerInput, OpenPanel, SavedPromptInput, SkillInput, SprocketTeamInput, SprocketInput, SprocketSettings } from "@rails/shared";
@@ -270,7 +271,7 @@ app.delete("/api/automations/:id", (c) => {
 app.post("/api/automations/:id/run", (c) => c.json(runAutomation(c.req.param("id")), 201));
 
 // ---- git (read-only) ----
-app.get("/api/projects/:id/git", async (c) => c.json(await gitStatus(getProject(c.req.param("id")).path)));
+app.get("/api/projects/:id/git", async (c) => c.json(await projectChanges(c.req.param("id"))));
 
 app.get("/api/projects/:id/git/diff", async (c) =>
   c.text(await gitDiff(getProject(c.req.param("id")).path, c.req.query("path") ?? "")),
