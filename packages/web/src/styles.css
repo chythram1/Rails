@@ -1380,7 +1380,7 @@ textarea.input.sp-fixed { resize: none; overflow-y: auto; }
   .icon-btn:hover, .tab-close:hover { background: var(--hover); color: var(--text); }
   .avatar-btn:hover .avatar-edit { opacity: 1; }
   .sp-jump:hover { background: var(--hover); }
-  .btn:hover:not(:disabled), button.chip:hover, .menu button:hover:not(:disabled), .dropdown.plain:hover:not(:disabled), .git-file:hover,
+  .btn:hover:not(:disabled), button.chip:hover, .menu button:hover:not(:disabled), .dropdown.plain:hover:not(:disabled), .git-file:hover { background: var(--hover); }
   .btn.primary:hover:not(:disabled), .send-btn:hover:not(:disabled) { background: var(--primary-hover); border-color: var(--primary-hover); }
   .segment:hover:not(:has(input:checked)) { background: var(--hover); }
   .switch[aria-checked="false"]:not(:disabled):hover { background: var(--muted); }
