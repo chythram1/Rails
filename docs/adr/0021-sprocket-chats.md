@@ -51,5 +51,5 @@ Consequences:
 Each chat keeps when the user last saw it (`read_at`; chats from before count as read), on the server so every
 device agrees. A chat is unread while a Sprocket has written in it since (Rails' own notices don't count); its info
 says so (`readAt`, `unread`). Writing in a chat reads it, and an open chat with the page showing is read as messages come (`POST
-/api/chats/:id/read`, which tells every device). The list shows a blue dot on an unread chat's row, and a team chat
-opened with unread messages draws a New line above them, as a Grok group does.
+/api/chats/:id/read`, which tells every device). The list shows a blue dot on an unread chat's row, and a chat opened with
+unread messages draws a New line above them, as Grok does: blue in a team, the Sprocket's colour otherwise.

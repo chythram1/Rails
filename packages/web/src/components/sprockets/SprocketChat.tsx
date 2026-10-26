@@ -141,19 +141,19 @@ export function SprocketChat({
     if (running) setExpecting(false);
   }, [running]);
 
-  // While it's on screen, what comes in is read, on every device (the list's blue dot goes). In a team, what came
-  // while you were away (before you opened it, or while the page was hidden) gets a New line above it, as in a Grok
-  // group, and keeps it while you're here; what comes in as you watch doesn't.
+  // While it's on screen, what comes in is read, on every device (the list's blue dot goes). What came while you
+  // were away (before you opened it, or while the page was hidden) gets a New line above it, as in Grok, and keeps
+  // it while you're here; what comes in as you watch doesn't.
   const visible = useVisible();
   const away = useRef(true);
   const [newSince, setNewSince] = useState<string>();
   useEffect(() => {
     if (!visible) return void (away.current = true);
     if (!chat.unread) return void (away.current = false);
-    if (team && away.current) setNewSince(chat.readAt);
+    if (away.current) setNewSince(chat.readAt);
     away.current = false;
     api.readChat(chatId).catch(() => {});
-  }, [visible, chat.unread, chat.readAt, chatId, !!team]);
+  }, [visible, chat.unread, chat.readAt, chatId]);
 
   const send = async (text: string) => {
     setError("");
@@ -261,7 +261,7 @@ export function SprocketChat({
           // A log: screen readers announce new messages. In its direct chat your bubbles take the Sprocket's colour.
           <ol
             className={"sp-messages" + (team ? " in-team" : "") + (chat.kind === "direct" ? " tinted" : "")}
-            style={chat.kind === "direct" ? ({ "--mine": DEEP[sprocket.look.color] } as CSSProperties) : undefined}
+            style={team ? undefined : ({ "--who": COLORS[sprocket.look.color], "--who-deep": DEEP[sprocket.look.color], ...(chat.kind === "direct" ? { "--mine": DEEP[sprocket.look.color] } : {}) } as CSSProperties)}
             aria-label={chatName}
             role="log"
           >
@@ -309,13 +309,19 @@ export function SprocketChat({
               const Bubble = read?.some((b) => b.kind === "fence") ? "div" : "p";
               return (
                 <Fragment key={m.id}>
+                  {/* Its day stamp, if it starts a new group, goes above the line, as in Grok. */}
+                  {firstNew && label && (
+                    <li className="sp-message">
+                      <time className="sp-stamp" dateTime={m.createdAt}>{stamp(m.createdAt)}</time>
+                    </li>
+                  )}
                   {firstNew && (
                     <li className="sp-new" role="separator" aria-label="New messages">
                       <span aria-hidden>New</span>
                     </li>
                   )}
                   <li className={"sp-message " + m.author + (cont ? " cont" : "") + (pop ? " pop" : "")} style={by ? ({ "--who": COLORS[by.look.color] } as CSSProperties) : undefined}>
-                    {label && <time className="sp-stamp" dateTime={m.createdAt}>{stamp(m.createdAt)}</time>}
+                    {label && !firstNew && <time className="sp-stamp" dateTime={m.createdAt}>{stamp(m.createdAt)}</time>}
                     {team && m.author === "sprocket" && first && <p className="sp-author" aria-hidden>{by?.name ?? "A deleted Sprocket"}</p>}
                     {m.event ? (
                       <EventRow message={m} projectId={sprocket.projectId} name={name} />

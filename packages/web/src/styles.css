@@ -932,7 +932,10 @@ textarea.input { resize: vertical; line-height: 1.5; }
 /* A team's New line: what came while you were away starts under it. A blue rule across the column with "New" in its
    middle, in the day stamps' type. */
 .sp-new { display: flex; align-items: center; gap: 12px; margin-bottom: -8px; color: var(--blue); font: 11px/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
-.sp-new::before, .sp-new::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--blue) 35%, transparent); }
+.sp-new::before, .sp-new::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, currentColor 35%, transparent); }
+/* With one Sprocket (a direct or project chat) it's in its colour, as a Grok bot's is: deepened on light, to read. */
+.sp-messages:not(.in-team) > .sp-new { color: var(--who); }
+:root[data-theme="light"] .sp-messages:not(.in-team) > .sp-new { color: var(--who-deep); }
 .sp-message:first-child .sp-stamp { margin-top: 0; }
 .sp-bubble {
   margin: 0; max-width: min(560px, 85%); padding: 9px 14px; background: var(--surface-2); border-radius: var(--bubble-r);
